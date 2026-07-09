@@ -296,7 +296,7 @@
         <div class="field"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
       </form>
       <div class="preview" id="f-preview"></div>
-      <div style="margin-top:14px"><button class="btn" onclick="addFrais(event)">+ Enregistrer le frais</button></div>
+      <div style="margin-top:14px"><button class="btn" id="f-savebtn" onclick="addFrais(event)">+ Enregistrer le frais</button> <button class="btn ghost" type="button" id="f-cancelbtn" onclick="cancelEditFrais()" style="display:none">Annuler</button></div>
     </section>
     <section class="panel">
       <h2>Historique des frais</h2>
@@ -316,7 +316,8 @@
         <div class="field"><label>Nom</label><input type="text" id="s-nom" placeholder="ex. DB Telecom" required></div>
         <span id="s-parts" style="display:contents"></span>
         <div class="field"><label>Devise</label><select id="s-devise"><option value="EUR">Euro (€)</option><option value="ILS">Shekel (₪)</option></select></div>
-        <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
+        <div class="field"><button class="btn" type="submit" id="s-savebtn">+ Ajouter</button></div>
+        <div class="field"><button class="btn ghost" type="button" id="s-cancelbtn" onclick="cancelEditSource()" style="display:none">Annuler</button></div>
       </form>
     </section>
     <section class="panel">
@@ -544,7 +545,7 @@ async function loadSources(){
   document.getElementById('sources-body').innerHTML = SOURCES.length? SOURCES.map(s=>`<tr>
     <td>${s.nom}</td>${as.map(a=>`<td class="num">${num(s['part_'+a.k])} %</td>`).join('')}
     <td><span class="pill">${s.devise==='ILS'?'Shekel ₪':'Euro €'}</span></td>
-    <td class="num"><button class="btn danger small" onclick="delRow('${T('sources')}','${s.id}')">Suppr.</button></td>
+    <td class="num"><button class="btn ghost small" onclick="editSource('${s.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('sources')}','${s.id}')">Suppr.</button></td>
   </tr>`).join('') : `<tr><td colspan="${as.length+3}" class="empty">Aucune source</td></tr>`;
 }
 async function loadRegiesConfig(){
@@ -615,7 +616,7 @@ async function loadFrais(){
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
-      <td class="num"><button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
+      <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="10" class="empty">Aucun frais</td></tr>`;
   window._frais=data||[]; refreshDashboard(); renderRegies(); checkMissingRecurrents();
 }
@@ -730,21 +731,66 @@ async function addDossier(e){
 }
 
 // ===== Sources =====
+let editingSourceId=null;
+function editSource(id){
+  const s=SOURCES.find(x=>x.id===id); if(!s) return;
+  document.getElementById('s-nom').value=s.nom;
+  A().forEach(a=>{ const el=document.getElementById('s-part-'+a.k); if(el) el.value=s['part_'+a.k]; });
+  document.getElementById('s-devise').value=s.devise;
+  editingSourceId=id;
+  document.getElementById('s-savebtn').textContent='💾 Enregistrer les modifications';
+  document.getElementById('s-cancelbtn').style.display='';
+  document.getElementById('s-nom').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditSource(){
+  editingSourceId=null;
+  document.getElementById('s-nom').value='';
+  A().forEach(a=>{ const el=document.getElementById('s-part-'+a.k); if(el) el.value='0'; });
+  document.getElementById('s-savebtn').textContent='+ Ajouter';
+  document.getElementById('s-cancelbtn').style.display='none';
+}
 async function addSource(e){
   e.preventDefault();
   const row={ nom:document.getElementById('s-nom').value, devise:document.getElementById('s-devise').value };
   if(!row.nom){toast('Indique un nom');return;}
   A().forEach(a=>{ row['part_'+a.k]=Number(document.getElementById('s-part-'+a.k).value)||0; });
-  const {error}=await db.from(T('sources')).insert(row);
-  if(error){toast('Erreur : '+error.message);return;}
-  document.getElementById('s-nom').value='';
-  toast('Source ajoutée ✅'); loadSources();
+  const wasEdit=!!editingSourceId;
+  const res = wasEdit ? await db.from(T('sources')).update(row).eq('id',editingSourceId) : await db.from(T('sources')).insert(row);
+  if(res.error){toast('Erreur : '+res.error.message);return;}
+  cancelEditSource();
+  toast(wasEdit?'Source modifiée ✅':'Source ajoutée ✅'); loadSources();
 }
 
 // ===== Frais =====
 function fraisPreview(){
   const m=Number(document.getElementById('f-montant').value)||0, pct=Number(document.getElementById('f-pct').value)||0;
   document.getElementById('f-preview').innerHTML=`Refacturé régie : <b>${eur(m*pct/100)}</b> / À charge société : <b class="val-bad">${eur(m-m*pct/100)}</b>`;
+}
+let editingFraisId=null;
+function editFrais(id){
+  const f=(window._frais||[]).find(x=>x.id===id); if(!f) return;
+  document.getElementById('f-date').value=f.date||today();
+  const csel=document.getElementById('f-categorie');
+  if(f.categorie && ![...csel.options].some(o=>o.value===f.categorie)) csel.insertAdjacentHTML('afterbegin',`<option>${f.categorie}</option>`);
+  csel.value=f.categorie||'Autre';
+  document.getElementById('f-libelle').value=f.libelle||'';
+  document.getElementById('f-fournisseur').value=f.fournisseur||'';
+  document.getElementById('f-source').value=f.source_id||'';
+  document.getElementById('f-montant').value=f.montant;
+  document.getElementById('f-regie').value=f.regie_concernee||'';
+  document.getElementById('f-pct').value=f.pct_decompte||0;
+  editingFraisId=id;
+  document.getElementById('f-savebtn').textContent='💾 Enregistrer les modifications';
+  document.getElementById('f-cancelbtn').style.display='';
+  fraisPreview();
+  document.getElementById('f-montant').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditFrais(){
+  editingFraisId=null;
+  ['f-libelle','f-fournisseur','f-montant','f-regie'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('f-pct').value='0'; document.getElementById('f-preview').innerHTML='';
+  document.getElementById('f-savebtn').textContent='+ Enregistrer le frais';
+  document.getElementById('f-cancelbtn').style.display='none';
 }
 async function addFrais(e){
   e.preventDefault();
@@ -753,17 +799,19 @@ async function addFrais(e){
     libelle:document.getElementById('f-libelle').value||null, fournisseur:document.getElementById('f-fournisseur').value||null, montant,
     source_id:document.getElementById('f-source').value||null, regie_concernee:document.getElementById('f-regie').value||null,
     pct_decompte:Number(document.getElementById('f-pct').value)||0 };
-  const ym=(row.date||'').slice(0,7);
-  const dup=(window._frais||[]).find(f=>(f.categorie||'')===row.categorie && (f.date||'').slice(0,7)===ym);
-  if(dup){
-    const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais « '+row.categorie+' » existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+eur(dup.montant)+' le '+fdate(dup.date)+(dup.libelle?' ('+dup.libelle+')':'')+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
-    if(!ok) return;
+  if(!editingFraisId){
+    const ym=(row.date||'').slice(0,7);
+    const dup=(window._frais||[]).find(f=>(f.categorie||'')===row.categorie && (f.date||'').slice(0,7)===ym);
+    if(dup){
+      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais « '+row.categorie+' » existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+eur(dup.montant)+' le '+fdate(dup.date)+(dup.libelle?' ('+dup.libelle+')':'')+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
+      if(!ok) return;
+    }
   }
-  const {error}=await db.from(T('frais')).insert(row);
-  if(error){toast('Erreur : '+error.message);return;}
-  ['f-libelle','f-fournisseur','f-montant','f-regie'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('f-pct').value='0'; document.getElementById('f-preview').innerHTML='';
-  toast('Frais enregistré ✅'); loadFrais();
+  const wasEdit=!!editingFraisId;
+  const res = wasEdit ? await db.from(T('frais')).update(row).eq('id',editingFraisId) : await db.from(T('frais')).insert(row);
+  if(res.error){toast('Erreur : '+res.error.message);return;}
+  cancelEditFrais();
+  toast(wasEdit?'Frais modifié ✅':'Frais enregistré ✅'); loadFrais();
 }
 
 // ===== Frais récurrents =====
