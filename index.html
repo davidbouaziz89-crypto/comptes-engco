@@ -3,19 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Comptes ENGCO — Associés</title>
+<title>Comptes — Multi-projets</title>
 <style>
   :root{
     --bg:#0f172a; --panel:#111c33; --panel2:#16233f; --line:#25324f;
     --txt:#e8eefc; --muted:#93a1c0; --accent:#3b82f6; --accent2:#22c55e;
-    --jd:#3b82f6; --dan:#f59e0b; --danger:#ef4444; --radius:14px;
+    --danger:#ef4444; --radius:14px;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);}
-  header{padding:18px 22px;background:linear-gradient(120deg,#0b1224,#16233f);
+  header{padding:16px 22px;background:linear-gradient(120deg,#0b1224,#16233f);
     border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
-  header h1{font-size:20px;margin:0;letter-spacing:.3px}
-  header .sub{color:var(--muted);font-size:13px}
+  header h1{font-size:19px;margin:0}
   .btn{background:var(--accent);color:#fff;border:0;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600}
   .btn:hover{filter:brightness(1.08)}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
@@ -26,14 +25,12 @@
   nav button.active{background:var(--panel2);color:var(--txt)}
   main{padding:22px;max-width:1150px;margin:0 auto}
   .grid{display:grid;gap:16px}
-  .cards{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
   .card .label{color:var(--muted);font-size:13px;margin-bottom:6px}
-  .card .value{font-size:26px;font-weight:700}
-  .card.jd{border-left:4px solid var(--jd)}
-  .card.dan{border-left:4px solid var(--dan)}
+  .card .value{font-size:24px;font-weight:700}
   .card.good{border-left:4px solid var(--accent2)}
-  .val-jd{color:#93c5fd}.val-dan{color:#fcd34d}.val-good{color:#86efac}.val-bad{color:#fca5a5}
+  .val-good{color:#86efac}.val-bad{color:#fca5a5}
   section.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:18px}
   section.panel h2{margin:0 0 4px;font-size:17px}
   section.panel .hint{color:var(--muted);font-size:13px;margin-bottom:16px}
@@ -51,7 +48,6 @@
   .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;background:var(--panel2);border:1px solid var(--line)}
   .preview{background:var(--panel2);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--muted);margin-top:6px}
   .preview b{color:var(--txt);font-size:16px}
-  .split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .banner{background:#3b2f0b;border:1px solid #b4830f;color:#fde68a;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;display:none}
   .empty{color:var(--muted);padding:22px;text-align:center;font-style:italic}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16233f;border:1px solid var(--line);
@@ -64,14 +60,19 @@
   .auth-err{color:#fca5a5;font-size:13px;margin-top:12px;min-height:18px}
   .userbox{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);flex-wrap:wrap}
   .rolebadge{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;color:var(--txt)}
+  .projbtn{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:22px;cursor:pointer;color:var(--txt);
+    font-size:16px;font-weight:600;flex:1;min-width:150px;text-align:center}
+  .projbtn:hover{border-color:var(--accent)} .projbtn .ic{font-size:38px;display:block;margin-bottom:8px}
+  .chk{display:flex;align-items:center;gap:8px;font-size:14px}
+  .chk input{width:auto}
 </style>
 </head>
 <body>
 
-<!-- ============ CONNEXION ============ -->
+<!-- CONNEXION -->
 <div id="auth" class="auth-overlay">
   <form class="auth-card" onsubmit="doLogin(event)">
-    <h2>💼 Comptes ENGCO</h2>
+    <h2>💼 Comptes</h2>
     <div class="p">Connecte-toi pour accéder à l'application.</div>
     <div class="field"><label>Email</label><input type="email" id="login-email" required autocomplete="username"></div>
     <div class="field"><label>Mot de passe</label><input type="password" id="login-pass" required autocomplete="current-password"></div>
@@ -80,14 +81,24 @@
   </form>
 </div>
 
+<!-- CHOIX DU PROJET -->
+<div id="projpick" class="auth-overlay hidden">
+  <div class="auth-card" style="max-width:480px">
+    <h2>Choisis un projet</h2>
+    <div class="p">Sur quel projet veux-tu travailler ?</div>
+    <div id="projpick-list" style="display:flex;gap:14px;flex-wrap:wrap"></div>
+    <div class="auth-err" id="projpick-msg"></div>
+  </div>
+</div>
+
 <header>
   <div>
-    <h1>💼 Comptes ENGCO</h1>
-    <div class="sub">Suivi des apports entre associés (JD &amp; Dan) et rentabilité des dossiers</div>
+    <h1 id="proj-label">💼 Comptes</h1>
   </div>
   <div class="userbox">
     <span id="user-email"></span>
-    <button class="btn ghost small" onclick="loadAll()">🔄 Rafraîchir</button>
+    <button class="btn ghost small" id="btn-changeproj" onclick="showProjectPicker()" style="display:none">🔀 Changer de projet</button>
+    <button class="btn ghost small" onclick="reloadData()">🔄 Rafraîchir</button>
     <button class="btn ghost small" onclick="changePassword()">🔑 Mot de passe</button>
     <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
   </div>
@@ -107,188 +118,156 @@
 <main>
   <div id="loaderr" class="banner"></div>
 
-  <!-- ============ DASHBOARD ============ -->
+  <!-- DASHBOARD -->
   <div id="tab-dashboard">
-    <div class="grid cards">
-      <div class="card jd"><div class="label">Investi par JD</div><div class="value val-jd" id="db-inv-jd">—</div></div>
-      <div class="card dan"><div class="label">Investi par Dan</div><div class="value val-dan" id="db-inv-dan">—</div></div>
-      <div class="card"><div class="label">Total investi dans ENGCO</div><div class="value" id="db-inv-tot">—</div></div>
-      <div class="card good"><div class="label">Marge nette totale (après manager &amp; régie)</div><div class="value val-good" id="db-marge">—</div></div>
-    </div>
-
+    <div class="grid cards" id="db-invest-cards"></div>
     <div class="grid cards" style="margin-top:16px">
+      <div class="card good"><div class="label">Marge nette totale (dossiers)</div><div class="value val-good" id="db-marge">—</div></div>
       <div class="card"><div class="label">Commissions de régie versées</div><div class="value" id="db-regie">—</div></div>
-      <div class="card"><div class="label">Part manager David prélevée</div><div class="value" id="db-david">—</div></div>
+      <div class="card"><div class="label">Part manager prélevée</div><div class="value" id="db-david">—</div></div>
       <div class="card"><div class="label">Frais / dépenses (part société)</div><div class="value val-bad" id="db-frais">—</div></div>
-      <div class="card good"><div class="label">Résultat net société (marge nette − frais)</div><div class="value val-good" id="db-resultat">—</div></div>
+      <div class="card good"><div class="label">Résultat net société</div><div class="value val-good" id="db-resultat">—</div></div>
     </div>
-
     <section class="panel">
       <h2>Où en est-on ?</h2>
-      <div class="hint">Chacun récupère d'abord son investissement ; ensuite le bénéfice se partage 50 / 50.</div>
-      <div class="table-wrap">
-      <table>
+      <div class="hint">Chacun récupère d'abord son investissement ; ensuite le bénéfice se partage à parts égales.</div>
+      <div class="table-wrap"><table>
         <thead><tr><th>Associé</th><th class="num">Investi</th><th class="num">Déjà récupéré</th><th class="num">Reste à récupérer</th></tr></thead>
-        <tbody>
-          <tr><td>🔵 JD (David)</td><td class="num" id="db-jd-inv">—</td><td class="num" id="db-jd-rec">—</td><td class="num val-bad" id="db-jd-reste">—</td></tr>
-          <tr><td>🟠 Dan</td><td class="num" id="db-dan-inv">—</td><td class="num" id="db-dan-rec">—</td><td class="num val-bad" id="db-dan-reste">—</td></tr>
-        </tbody>
-      </table>
-      </div>
+        <tbody id="db-reste-body"></tbody>
+      </table></div>
     </section>
-
     <div class="grid cards" style="margin-top:18px">
       <div class="card good"><div class="label">Bénéfice à partager (après remboursement des investissements)</div><div class="value val-good" id="db-benef">—</div></div>
-      <div class="card"><div class="label">→ Part JD (50%)</div><div class="value val-jd" id="db-benef-jd">—</div></div>
-      <div class="card"><div class="label">→ Part Dan (50%)</div><div class="value val-dan" id="db-benef-dan">—</div></div>
-      <div class="card"><div class="label">📅 Estimation : investissements couverts par la marge</div><div class="value" id="db-date" style="font-size:19px">—</div></div>
+      <div class="card"><div class="label">📅 Estimation : investissements couverts</div><div class="value" id="db-date" style="font-size:18px">—</div></div>
     </div>
+    <div class="grid cards" id="db-benef-cards" style="margin-top:16px"></div>
 
     <section class="panel">
       <h2>💸 Récupérations d'argent</h2>
-      <div class="hint">Quand JD ou Dan retire de l'argent de la boîte (récupère une partie de son investissement).</div>
+      <div class="hint">Quand un associé retire de l'argent de la boîte (récupère une partie de son investissement).</div>
       <form class="row" onsubmit="addRemboursement(event)">
         <div class="field"><label>Date</label><input type="date" id="r-date" required></div>
-        <div class="field"><label>Qui récupère ?</label>
-          <select id="r-benef" required><option value="JD">JD (David)</option><option value="Dan">Dan</option></select>
-        </div>
+        <div class="field"><label>Qui récupère ?</label><select id="r-benef" required></select></div>
         <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="r-montant" placeholder="0.00" required></div>
-        <div class="field"><label>Note (facultatif)</label><input type="text" id="r-note" placeholder="ex. virement"></div>
+        <div class="field"><label>Note</label><input type="text" id="r-note" placeholder="ex. virement"></div>
         <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
       </form>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Bénéficiaire</th><th class="num">Montant</th><th>Note</th><th></th></tr></thead>
-          <tbody id="remb-body"></tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Bénéficiaire</th><th class="num">Montant</th><th>Note</th><th></th></tr></thead>
+        <tbody id="remb-body"></tbody>
+      </table></div>
     </section>
   </div>
 
-  <!-- ============ APPORTS ============ -->
-  <div id="tab-apports" class="hidden">
-    <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <b style="margin-right:auto">📥 Import Excel des apports</b>
-      <button class="btn ghost small" onclick="downloadTemplate('apports')">⬇️ Télécharger le modèle</button>
-      <button class="btn small" onclick="document.getElementById('imp-apports').click()">⬆️ Importer un fichier</button>
-      <input type="file" id="imp-apports" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('apports',this.files[0]);this.value='';">
-    </section>
-    <section class="panel">
-      <h2>Ajouter un apport / un frais</h2>
-      <div class="hint">L'argent entré dans ENGCO, ou une dépense payée par une société (comptée comme un investissement).</div>
-      <form class="row" onsubmit="addApport(event)">
-        <div class="field"><label>Date</label><input type="date" id="a-date" required></div>
-        <div class="field"><label>Source (qui paie)</label><select id="a-source" required onchange="onSourceChange()"></select></div>
-        <div class="field"><label>Libellé</label><input type="text" id="a-libelle" placeholder="ex. loyer, virement…"></div>
-        <div class="field"><label>Montant de la dépense</label><input type="number" step="0.01" id="a-montant" placeholder="0.00" required oninput="apportPreview()"></div>
-        <div class="field"><label>% de la dépense à compter</label><input type="number" step="0.01" id="a-pct" value="100" oninput="apportPreview()"></div>
-        <div class="field" id="a-taux-field"><label>Taux (1 shekel = ? €)</label><input type="number" step="0.0001" id="a-taux" placeholder="ex. 0.25" oninput="apportPreview()"></div>
-        <div class="field"><label>Part JD (%)</label><input type="number" step="0.01" id="a-jd" value="0" oninput="apportPreview()"></div>
-        <div class="field"><label>Part Dan (%)</label><input type="number" step="0.01" id="a-dan" value="0" oninput="apportPreview()"></div>
-      </form>
-      <div class="preview" id="a-preview">Montant compté : <b>—</b></div>
-      <div style="margin-top:14px"><button class="btn" onclick="addApport(event)">+ Enregistrer l'apport</button></div>
-    </section>
-
-    <section class="panel">
-      <h2>Historique des apports</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Source</th><th>Libellé</th><th class="num">Dépense</th><th class="num">%</th><th class="num">Compté (€)</th><th class="num">Part JD</th><th class="num">Part Dan</th><th></th></tr></thead>
-          <tbody id="apports-body"></tbody>
-        </table>
-      </div>
-    </section>
-  </div>
-
-  <!-- ============ DOSSIERS ============ -->
+  <!-- DOSSIERS -->
   <div id="tab-dossiers" class="hidden">
     <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <b style="margin-right:auto">📥 Import Excel des dossiers</b>
-      <button class="btn ghost small" onclick="downloadTemplate('dossiers')">⬇️ Télécharger le modèle</button>
-      <button class="btn small" onclick="document.getElementById('imp-dossiers').click()">⬆️ Importer un fichier</button>
+      <button class="btn ghost small" onclick="downloadTemplate('dossiers')">⬇️ Modèle</button>
+      <button class="btn small" onclick="document.getElementById('imp-dossiers').click()">⬆️ Importer</button>
       <input type="file" id="imp-dossiers" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('dossiers',this.files[0]);this.value='';">
     </section>
     <section class="panel">
       <h2>Ajouter un dossier</h2>
-      <div class="hint">Marge brute = Prime − tous les coûts. Puis on enlève le % manager (David) et la commission de régie → <b>Marge nette</b> (partagée 50/50).</div>
+      <div class="hint" id="dossier-hint"></div>
+      <div id="dossier-fields"></div>
+      <div class="hint" style="margin:16px 0 8px">Manager &amp; régie (prélevés sur la marge) :</div>
       <form class="row" onsubmit="addDossier(event)">
-        <div class="field"><label>Date</label><input type="date" id="d-date" required></div>
-        <div class="field"><label>Nom du client</label><input type="text" id="d-client" placeholder="Nom"></div>
-        <div class="field"><label>N° de dépôt</label><input type="text" id="d-depot" placeholder="N°"></div>
-        <div class="field"><label>Montant de la prime (HT)</label><input type="number" step="0.01" id="d-prime" value="0" oninput="dossierPreview()"></div>
-      </form>
-      <div class="hint" style="margin:16px 0 8px">Les coûts (mets 0 si non concerné) :</div>
-      <form class="row" onsubmit="addDossier(event)">
-        <div class="field"><label>Coût installation</label><input type="number" step="0.01" id="d-install" value="0" oninput="dossierPreview()"></div>
-        <div class="field"><label>Coût matériel</label><input type="number" step="0.01" id="d-materiel" value="0" oninput="dossierPreview()"></div>
-        <div class="field"><label>Coût nacelle</label><input type="number" step="0.01" id="d-nacelle" value="0" oninput="dossierPreview()"></div>
-        <div class="field"><label>Coût Hamid</label><input type="number" step="0.01" id="d-hamid" value="0" oninput="dossierPreview()"></div>
-        <div class="field"><label>Coût livraison</label><input type="number" step="0.01" id="d-livraison" value="0" oninput="dossierPreview()"></div>
-        <div class="field"><label>Frais supp.</label><input type="number" step="0.01" id="d-fraissupp" value="0" oninput="dossierPreview()"></div>
-        <div class="field"><label>Coût audit</label><input type="number" step="0.01" id="d-audit" value="0" oninput="dossierPreview()"></div>
-      </form>
-      <div class="hint" style="margin:16px 0 8px">Manager &amp; régie (commissions prélevées sur la marge) :</div>
-      <form class="row" onsubmit="addDossier(event)">
-        <div class="field"><label>% manager (David)</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
-        <div class="field"><label>Commercial régie (si régie)</label><input type="text" id="d-commercial" placeholder="ex. JO, ADN…" oninput="dossierPreview()"></div>
+        <div class="field"><label>% manager</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
+        <div class="field"><label>Régie</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
         <div class="field"><label>% commission régie</label><input type="number" step="0.01" id="d-regiepct" value="0" oninput="dossierPreview()"></div>
       </form>
       <div class="preview" id="d-preview"></div>
       <div style="margin-top:14px"><button class="btn" onclick="addDossier(event)">+ Enregistrer le dossier</button></div>
     </section>
-
     <section class="panel">
       <h2>Liste des dossiers</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Client</th><th>N° dépôt</th><th class="num">Prime</th><th class="num">Marge brute</th><th class="num">Manager</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th></th></tr></thead>
-          <tbody id="dossiers-body"></tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr id="dossiers-head"></tr></thead>
+        <tbody id="dossiers-body"></tbody>
+      </table></div>
     </section>
   </div>
 
-  <!-- ============ REGIES ============ -->
+  <!-- REGIES -->
   <div id="tab-regies" class="hidden">
     <section class="panel">
-      <h2>🤝 Ce que chaque régie / commercial a gagné</h2>
-      <div class="hint">Commissions gagnées sur les dossiers, moins ce qui leur est refacturé sur les frais (décompte). Vue de suivi.</div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Régie / Commercial</th><th class="num">Nb dossiers</th><th class="num">Commissions gagnées</th><th class="num">Refacturé (frais)</th><th class="num">Net à leur revenir</th></tr></thead>
-          <tbody id="regies-body"></tbody>
-        </table>
-      </div>
+      <h2>⚙️ Régies configurées (nom + % par défaut)</h2>
+      <div class="hint">Ajoute tes régies ici. Quand tu crées un dossier, tu choisis la régie et son % se remplit tout seul (modifiable).</div>
+      <form class="row" onsubmit="addRegieConfig(event)">
+        <div class="field"><label>Nom de la régie</label><input type="text" id="rg-nom" placeholder="ex. JO" required></div>
+        <div class="field"><label>% par défaut</label><input type="number" step="0.01" id="rg-pct" value="0"></div>
+        <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
+      </form>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Régie</th><th class="num">% par défaut</th><th></th></tr></thead>
+        <tbody id="regiecfg-body"></tbody>
+      </table></div>
+    </section>
+    <section class="panel">
+      <h2>🤝 Ce que chaque régie a gagné</h2>
+      <div class="hint">Commissions gagnées sur les dossiers, moins ce qui leur est refacturé sur les frais.</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Régie</th><th class="num">Nb dossiers</th><th class="num">Commissions gagnées</th><th class="num">Refacturé</th><th class="num">Net à revenir</th></tr></thead>
+        <tbody id="regies-body"></tbody>
+      </table></div>
     </section>
     <section class="panel">
       <h2>Détail des dossiers par régie</h2>
       <div class="field" style="max-width:260px;margin-bottom:14px">
-        <label>Choisir une régie</label>
-        <select id="regie-filter" onchange="renderRegieDetail()"></select>
+        <label>Choisir une régie</label><select id="regie-filter" onchange="renderRegieDetail()"></select>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Client</th><th>N° dépôt</th><th class="num">Marge brute</th><th class="num">% régie</th><th class="num">Commission</th></tr></thead>
-          <tbody id="regie-detail-body"></tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Client</th><th class="num">Marge brute</th><th class="num">% régie</th><th class="num">Commission</th></tr></thead>
+        <tbody id="regie-detail-body"></tbody>
+      </table></div>
     </section>
   </div>
 
-  <!-- ============ FRAIS / DEPENSES ============ -->
+  <!-- APPORTS -->
+  <div id="tab-apports" class="hidden">
+    <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <b style="margin-right:auto">📥 Import Excel des apports</b>
+      <button class="btn ghost small" onclick="downloadTemplate('apports')">⬇️ Modèle</button>
+      <button class="btn small" onclick="document.getElementById('imp-apports').click()">⬆️ Importer</button>
+      <input type="file" id="imp-apports" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('apports',this.files[0]);this.value='';">
+    </section>
+    <section class="panel">
+      <h2>Ajouter un apport</h2>
+      <div class="hint">L'argent entré, ou une dépense payée par une société (comptée comme un investissement).</div>
+      <form class="row" onsubmit="addApport(event)">
+        <div class="field"><label>Date</label><input type="date" id="a-date" required></div>
+        <div class="field"><label>Source (qui paie)</label><select id="a-source" required onchange="onSourceChange()"></select></div>
+        <div class="field"><label>Libellé</label><input type="text" id="a-libelle" placeholder="ex. loyer, virement…"></div>
+        <div class="field"><label>Montant de la dépense</label><input type="number" step="0.01" id="a-montant" placeholder="0.00" required oninput="apportPreview()"></div>
+        <div class="field"><label>% à compter</label><input type="number" step="0.01" id="a-pct" value="100" oninput="apportPreview()"></div>
+        <div class="field" id="a-taux-field"><label>Taux (1 shekel = ? €)</label><input type="number" step="0.0001" id="a-taux" placeholder="ex. 0.25" oninput="apportPreview()"></div>
+      </form>
+      <form class="row" id="a-parts" style="margin-top:12px"></form>
+      <div class="preview" id="a-preview"></div>
+      <div style="margin-top:14px"><button class="btn" onclick="addApport(event)">+ Enregistrer l'apport</button></div>
+    </section>
+    <section class="panel">
+      <h2>Historique des apports</h2>
+      <div class="table-wrap"><table>
+        <thead><tr id="apports-head"></tr></thead>
+        <tbody id="apports-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- FRAIS -->
   <div id="tab-frais" class="hidden">
     <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <b style="margin-right:auto">📥 Import Excel des frais</b>
-      <button class="btn ghost small" onclick="downloadTemplate('frais')">⬇️ Télécharger le modèle</button>
-      <button class="btn small" onclick="document.getElementById('imp-frais').click()">⬆️ Importer un fichier</button>
+      <button class="btn ghost small" onclick="downloadTemplate('frais')">⬇️ Modèle</button>
+      <button class="btn small" onclick="document.getElementById('imp-frais').click()">⬆️ Importer</button>
       <input type="file" id="imp-frais" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('frais',this.files[0]);this.value='';">
     </section>
     <div id="recur-alert" class="banner"></div>
-
     <section class="panel">
       <h2>⚙️ Frais récurrents (à saisir chaque mois)</h2>
-      <div class="hint">Paramètre ici les frais mensuels (ex. Loyer). L'appli te prévient en haut de cette page s'il manque un mois. Le montant et le % restent modifiables à chaque saisie.</div>
+      <div class="hint">Frais mensuels (ex. Loyer). L'appli te prévient s'il manque un mois.</div>
       <form class="row" onsubmit="addRecurrent(event)">
         <div class="field"><label>Libellé (catégorie)</label><input type="text" id="rc-libelle" placeholder="ex. Loyer" required></div>
         <div class="field"><label>Montant habituel (€)</label><input type="number" step="0.01" id="rc-montant" placeholder="ex. 1000"></div>
@@ -298,101 +277,88 @@
         <div class="field"><label>À partir du mois</label><input type="month" id="rc-mois"></div>
         <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
       </form>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Libellé</th><th class="num">Montant habituel</th><th>Payé par</th><th>Régie</th><th class="num">%</th><th>Depuis</th><th></th></tr></thead>
-          <tbody id="recur-body"></tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Libellé</th><th class="num">Montant</th><th>Payé par</th><th>Régie</th><th class="num">%</th><th>Depuis</th><th></th></tr></thead>
+        <tbody id="recur-body"></tbody>
+      </table></div>
     </section>
-
     <section class="panel">
       <h2>Ajouter un frais / une dépense</h2>
-      <div class="hint">Dépenses hors dossier (ex. audit client quand le dossier n'aboutit pas, achat fournisseur…). Si ça concerne une régie, indique le % qu'on lui refacture.</div>
+      <div class="hint">Dépenses hors dossier. Si ça concerne une régie, indique le % refacturé.</div>
       <form class="row" onsubmit="addFrais(event)">
         <div class="field"><label>Date</label><input type="date" id="f-date" required></div>
-        <div class="field"><label>Catégorie</label>
-          <select id="f-categorie" onchange="onFraisCategorie()"></select>
-        </div>
+        <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
         <div class="field"><label>Libellé</label><input type="text" id="f-libelle" placeholder="ex. audit client Dupont"></div>
-        <div class="field"><label>Fournisseur</label><input type="text" id="f-fournisseur" placeholder="ex. nom du fournisseur"></div>
+        <div class="field"><label>Fournisseur</label><input type="text" id="f-fournisseur" placeholder="nom du fournisseur"></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source"></select></div>
         <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00" required oninput="fraisPreview()"></div>
-        <div class="field"><label>Régie concernée (facultatif)</label><input type="text" id="f-regie" placeholder="ex. JO, ADN…"></div>
-        <div class="field"><label>% refacturé à la régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
+        <div class="field"><label>Régie concernée</label><input type="text" id="f-regie" placeholder="ex. JO, ADN…"></div>
+        <div class="field"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
       </form>
       <div class="preview" id="f-preview"></div>
       <div style="margin-top:14px"><button class="btn" onclick="addFrais(event)">+ Enregistrer le frais</button></div>
     </section>
-
     <section class="panel">
       <h2>Historique des frais</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé régie</th><th class="num">Part société</th><th></th></tr></thead>
-          <tbody id="frais-body"></tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
+        <tbody id="frais-body"></tbody>
+      </table></div>
     </section>
   </div>
 
-  <!-- ============ SOURCES ============ -->
+  <!-- SOURCES -->
   <div id="tab-sources" class="hidden">
     <section class="panel">
       <h2>Ajouter une source (société qui finance)</h2>
-      <div class="hint">La règle de répartition sera pré-remplie automatiquement quand tu choisis cette source dans un apport.</div>
+      <div class="hint">La répartition sera pré-remplie automatiquement quand tu choisis cette source dans un apport.</div>
       <form class="row" onsubmit="addSource(event)">
         <div class="field"><label>Nom</label><input type="text" id="s-nom" placeholder="ex. DB Telecom" required></div>
-        <div class="field"><label>Part JD (%)</label><input type="number" step="0.01" id="s-jd" value="100"></div>
-        <div class="field"><label>Part Dan (%)</label><input type="number" step="0.01" id="s-dan" value="0"></div>
+        <span id="s-parts" style="display:contents"></span>
         <div class="field"><label>Devise</label><select id="s-devise"><option value="EUR">Euro (€)</option><option value="ILS">Shekel (₪)</option></select></div>
         <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
       </form>
     </section>
-
     <section class="panel">
       <h2>Mes sources</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Nom</th><th class="num">Part JD</th><th class="num">Part Dan</th><th>Devise</th><th></th></tr></thead>
-          <tbody id="sources-body"></tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr id="sources-head"></tr></thead>
+        <tbody id="sources-body"></tbody>
+      </table></div>
     </section>
   </div>
 
-  <!-- ============ UTILISATEURS (admin) ============ -->
+  <!-- UTILISATEURS -->
   <div id="tab-users" class="hidden">
     <section class="panel">
       <h2>Créer un utilisateur</h2>
-      <div class="hint">La personne se connectera avec l'email et le mot de passe que tu définis ici. Rôles : <b>admin</b> (tout), <b>secrétaire</b> (tout sauf la gestion des utilisateurs), <b>régie</b> (voit seulement ses dossiers, en lecture).</div>
+      <div class="hint">La personne se connectera avec cet email et ce mot de passe. Coche le(s) projet(s) auxquels elle a accès.</div>
       <form class="row" onsubmit="createUser(event)">
         <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
         <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères" required></div>
         <div class="field"><label>Rôle</label>
           <select id="u-role" onchange="document.getElementById('u-regie-field').style.display=(this.value==='regie')?'flex':'none'">
-            <option value="secretaire">Secrétaire</option>
-            <option value="regie">Régie</option>
-            <option value="admin">Admin</option>
+            <option value="secretaire">Secrétaire</option><option value="regie">Régie</option><option value="admin">Admin</option>
           </select>
         </div>
+        <div class="field"><label>Projets</label>
+          <div style="display:flex;gap:14px;padding-top:8px" id="u-projects"></div>
+        </div>
         <div class="field" id="u-regie-field" style="display:none"><label>Nom de la régie</label><input type="text" id="u-regie" placeholder="ex. JO, ADN"></div>
-        <div class="field"><button class="btn" type="submit">+ Créer l'utilisateur</button></div>
+        <div class="field"><button class="btn" type="submit">+ Créer</button></div>
       </form>
       <div class="preview" id="u-msg"></div>
     </section>
     <section class="panel">
-      <h2>Utilisateurs existants</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Email</th><th>Rôle</th><th>Régie</th></tr></thead>
-          <tbody id="users-body"></tbody>
-        </table>
-      </div>
+      <h2>Utilisateurs &amp; accès</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Email</th><th>Projet</th><th>Rôle</th><th>Régie</th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table></div>
     </section>
   </div>
 
-  <!-- ============ MON ESPACE (régie, lecture seule) ============ -->
+  <!-- MON ESPACE -->
   <div id="tab-monespace" class="hidden">
     <div class="grid cards">
       <div class="card good"><div class="label">Vos commissions gagnées</div><div class="value val-good" id="me-comm">—</div></div>
@@ -401,12 +367,10 @@
     </div>
     <section class="panel">
       <h2>Vos dossiers</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Client</th><th>N° dépôt</th><th class="num">Marge brute</th><th class="num">% régie</th><th class="num">Commission</th></tr></thead>
-          <tbody id="me-dossiers"></tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Client</th><th class="num">Marge brute</th><th class="num">% régie</th><th class="num">Commission</th></tr></thead>
+        <tbody id="me-dossiers"></tbody>
+      </table></div>
     </section>
   </div>
 </main>
@@ -416,40 +380,37 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-// ====== Connexion à ta base Supabase ======
 const SUPABASE_URL = "https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ====== Helpers ======
+const PROJECTS = {
+  led:{ key:'led', nom:'LED intérieure', icon:'🔌', prefix:'engco_', dossierType:'led',
+    associes:[{k:'jd',label:'JD (David)',remb:'JD'},{k:'dan',label:'Dan',remb:'Dan'}] },
+  velo:{ key:'velo', nom:'Vélo', icon:'🚴', prefix:'velo_', dossierType:'velo',
+    associes:[{k:'david',label:'David',remb:'David'},{k:'dan',label:'Dan',remb:'Dan'},{k:'kevin',label:'Kevin',remb:'Kevin'},{k:'simon',label:'Simon',remb:'Simon'}] },
+};
+let PROJ=null, CURRENT_ROLE=null, CURRENT_REGIE=null, SESSION=null, MY_MEMBERSHIPS=[];
+let SOURCES=[], REGIES_CFG=[];
+function T(name){ return PROJ.prefix+name; }
+function A(){ return PROJ.associes; }
+
 const eur = n => new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(Number(n)||0);
 const num = n => new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(Number(n)||0);
 const fdate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('fr-FR') : '';
-let SOURCES = [];
-let CURRENT_ROLE = null, CURRENT_REGIE = null;
-
+function today(){return new Date().toISOString().slice(0,10);}
+function toast(msg){ const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(window._tt);window._tt=setTimeout(()=>el.style.display='none',2600); }
+function showError(e){ const b=document.getElementById('loaderr');b.style.display='block';b.textContent="⚠️ Souci de connexion : "+(e.message||e); }
 function showTab(t){
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dashboard','dossiers','regies','apports','frais','sources','users','monespace'].forEach(x=>{
-    document.getElementById('tab-'+x).classList.toggle('hidden',x!==t);
-  });
+  ['dashboard','dossiers','regies','apports','frais','sources','users','monespace'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
 }
-function toast(msg){
-  const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';
-  clearTimeout(window._tt);window._tt=setTimeout(()=>el.style.display='none',2600);
-}
-function showError(e){
-  const b=document.getElementById('loaderr');
-  b.style.display='block';
-  b.textContent="⚠️ Problème de connexion à la base : "+(e.message||e)+" — vérifie ta connexion internet.";
-}
-function today(){return new Date().toISOString().slice(0,10);}
 
-// ====== Connexion / rôles ======
+// ===== Connexion / projets / rôles =====
 async function initAuth(){
   const {data:{session}}=await db.auth.getSession();
   if(!session){ document.getElementById('auth').style.display='flex'; return; }
-  await afterLogin(session);
+  await afterAuth(session);
 }
 async function doLogin(e){
   e.preventDefault();
@@ -459,406 +420,251 @@ async function doLogin(e){
   const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error){ document.getElementById('login-err').textContent='Email ou mot de passe incorrect.'; return; }
   document.getElementById('login-err').textContent='';
-  await afterLogin(data.session);
+  await afterAuth(data.session);
 }
 async function doLogout(){ await db.auth.signOut(); location.reload(); }
-async function afterLogin(session){
+async function afterAuth(session){
+  SESSION=session;
+  const {data:mems}=await db.from('app_memberships').select('*').eq('user_id',session.user.id);
+  MY_MEMBERSHIPS=mems||[];
   document.getElementById('auth').style.display='none';
-  const {data:prof}=await db.from('engco_profiles').select('*').eq('id',session.user.id).maybeSingle();
-  CURRENT_ROLE=prof?.role||'regie'; CURRENT_REGIE=prof?.regie_name||null;
+  document.getElementById('user-email').innerHTML=(session.user.email||'');
+  if(!MY_MEMBERSHIPS.length){ document.getElementById('projpick').style.display='flex'; document.getElementById('projpick-list').innerHTML=''; document.getElementById('projpick-msg').textContent="Aucun accès n'a été configuré pour ce compte. Contacte l'administrateur."; return; }
+  showProjectPicker();
+}
+function showProjectPicker(){
+  const list=document.getElementById('projpick-list');
+  document.getElementById('projpick-msg').textContent='';
+  const keys=MY_MEMBERSHIPS.map(m=>m.project_key).filter(k=>PROJECTS[k]);
+  if(keys.length===1){ enterProject(keys[0]); return; }
+  list.innerHTML=keys.map(k=>`<button class="projbtn" onclick="enterProject('${k}')"><span class="ic">${PROJECTS[k].icon}</span>${PROJECTS[k].nom}</button>`).join('');
+  document.getElementById('projpick').style.display='flex';
+}
+function enterProject(key){
+  PROJ=PROJECTS[key];
+  const mem=MY_MEMBERSHIPS.find(m=>m.project_key===key);
+  CURRENT_ROLE=mem.role; CURRENT_REGIE=mem.regie_name||null;
+  document.getElementById('projpick').style.display='none';
   const roleLabel={admin:'Admin',secretaire:'Secrétaire',regie:'Régie '+(CURRENT_REGIE||'')}[CURRENT_ROLE]||CURRENT_ROLE;
-  document.getElementById('user-email').innerHTML=(prof?.email||session.user.email)+' <span class="rolebadge">'+roleLabel+'</span>';
+  document.getElementById('proj-label').innerHTML=PROJ.icon+' '+PROJ.nom;
+  document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">'+roleLabel+'</span>';
+  document.getElementById('btn-changeproj').style.display = MY_MEMBERSHIPS.length>1?'':'none';
+  buildAssocUI();
   applyRole(CURRENT_ROLE);
   if(CURRENT_ROLE==='regie'){ loadMonEspace(); } else { loadAll(); }
 }
 function applyRole(role){
-  const btns={};
-  document.querySelectorAll('#mainnav button').forEach(b=>btns[b.dataset.tab]=b);
-  const show=(tab,v)=>{ if(btns[tab]) btns[tab].style.display=v?'':'none'; };
+  const btns={}; document.querySelectorAll('#mainnav button').forEach(b=>btns[b.dataset.tab]=b);
+  const show=(t,v)=>{ if(btns[t]) btns[t].style.display=v?'':'none'; };
   ['dashboard','dossiers','regies','apports','frais','sources','users','monespace'].forEach(t=>show(t,false));
-  if(role==='regie'){
-    show('monespace',true); showTab('monespace');
-  } else {
-    ['dashboard','dossiers','regies','apports','frais','sources'].forEach(t=>show(t,true));
-    if(role==='admin') show('users',true);
-    showTab('dashboard');
-  }
+  if(role==='regie'){ show('monespace',true); showTab('monespace'); }
+  else { ['dashboard','dossiers','regies','apports','frais','sources'].forEach(t=>show(t,true)); if(role==='admin') show('users',true); showTab('dashboard'); }
 }
 function changePassword(){
-  const p=prompt('Nouveau mot de passe (6 caractères minimum) :');
-  if(!p) return;
-  if(p.length<6){ alert('Trop court (minimum 6 caractères).'); return; }
+  const p=prompt('Nouveau mot de passe (6 caractères minimum) :'); if(!p) return;
+  if(p.length<6){ alert('Trop court.'); return; }
   db.auth.updateUser({password:p}).then(({error})=>{ alert(error?('Erreur : '+error.message):'Mot de passe changé ✅'); });
 }
+function reloadData(){ if(CURRENT_ROLE==='regie') loadMonEspace(); else loadAll(); }
 
-// ====== Utilisateurs (admin) ======
-async function createUser(e){
-  e.preventDefault();
-  const email=document.getElementById('u-email').value.trim();
-  const password=document.getElementById('u-pass').value;
-  const role=document.getElementById('u-role').value;
-  const regie_name=document.getElementById('u-regie').value.trim()||null;
-  const msg=document.getElementById('u-msg');
-  msg.innerHTML='Création en cours…';
-  const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,role,regie_name}});
-  let errText=null;
-  if(error){ errText=error.message; try{ const c=await error.context.json(); if(c&&c.error) errText=c.error; }catch(_){} }
-  else if(data&&data.error){ errText=data.error; }
-  if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
-  msg.innerHTML='<span class="val-good">Utilisateur créé ✅ — il peut se connecter avec cet email et ce mot de passe.</span>';
-  ['u-email','u-pass','u-regie'].forEach(i=>document.getElementById(i).value='');
-  loadUsers();
+// ===== Construction de l'UI selon les associés du projet =====
+function buildAssocUI(){
+  const as=A();
+  document.getElementById('db-invest-cards').innerHTML =
+    as.map(a=>`<div class="card"><div class="label">Investi par ${a.label}</div><div class="value" id="db-inv-${a.k}">—</div></div>`).join('')
+    + `<div class="card"><div class="label">Total investi</div><div class="value" id="db-inv-tot">—</div></div>`;
+  document.getElementById('db-reste-body').innerHTML = as.map(a=>`<tr><td>${a.label}</td><td class="num" id="db-inv2-${a.k}">—</td><td class="num" id="db-rec-${a.k}">—</td><td class="num val-bad" id="db-reste-${a.k}">—</td></tr>`).join('');
+  const share=(100/as.length).toFixed(as.length===3?1:0);
+  document.getElementById('db-benef-cards').innerHTML = as.map(a=>`<div class="card"><div class="label">→ Part ${a.label} (${share}%)</div><div class="value" id="db-benef-${a.k}">—</div></div>`).join('');
+  document.getElementById('r-benef').innerHTML = as.map(a=>`<option value="${a.remb}">${a.label}</option>`).join('');
+  document.getElementById('s-parts').innerHTML = as.map(a=>`<div class="field"><label>Part ${a.label} (%)</label><input type="number" step="0.01" id="s-part-${a.k}" value="0"></div>`).join('');
+  document.getElementById('sources-head').innerHTML = `<th>Nom</th>`+as.map(a=>`<th class="num">${a.label}</th>`).join('')+`<th>Devise</th><th></th>`;
+  document.getElementById('a-parts').innerHTML = as.map(a=>`<div class="field"><label>Part ${a.label} (%)</label><input type="number" step="0.01" id="a-part-${a.k}" value="0" oninput="apportPreview()"></div>`).join('');
+  document.getElementById('apports-head').innerHTML = `<th>Date</th><th>Source</th><th>Libellé</th><th class="num">Dépense</th><th class="num">%</th><th class="num">Compté</th>`+as.map(a=>`<th class="num">${a.label}</th>`).join('')+`<th></th>`;
+  document.getElementById('dossier-hint').innerHTML = PROJ.dossierType==='velo'
+    ? "Rémunération = nb de vélos × tarif de la région (France 80 € / Corse 390 €). Puis manager % et régie % → marge nette (partagée en "+as.length+")."
+    : "Marge brute = Prime − tous les coûts. Puis manager % et régie % → marge nette (partagée en "+as.length+").";
+  document.getElementById('dossier-fields').innerHTML = PROJ.dossierType==='velo' ? veloDossierForm() : ledDossierForm();
+  document.getElementById('dossiers-head').innerHTML = PROJ.dossierType==='velo' ? veloDossierHead() : ledDossierHead();
+  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('');
+  buildImportSpecs();
+  document.getElementById('rc-mois').value=today().slice(0,7);
+  const dd=document.getElementById('d-date'); if(dd) dd.value=today();
+  const ad=document.getElementById('a-date'); if(ad) ad.value=today();
+  dossierPreview();
 }
-async function loadUsers(){
-  const {data,error}=await db.from('engco_profiles').select('*').order('created_at');
-  if(error){ return; }
-  document.getElementById('users-body').innerHTML=(data&&data.length)? data.map(u=>`<tr>
-    <td>${u.email||''}</td><td><span class="pill">${u.role}</span></td><td>${u.regie_name||'—'}</td>
-  </tr>`).join('') : `<tr><td colspan="3" class="empty">Aucun utilisateur</td></tr>`;
-}
+function ledDossierForm(){ return `
+  <form class="row" onsubmit="addDossier(event)">
+    <div class="field"><label>Date</label><input type="date" id="d-date" required></div>
+    <div class="field"><label>Nom du client</label><input type="text" id="d-client"></div>
+    <div class="field"><label>N° de dépôt</label><input type="text" id="d-depot"></div>
+    <div class="field"><label>Prime (HT)</label><input type="number" step="0.01" id="d-prime" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>Coût installation</label><input type="number" step="0.01" id="d-install" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>Coût matériel</label><input type="number" step="0.01" id="d-materiel" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>Coût nacelle</label><input type="number" step="0.01" id="d-nacelle" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>Coût Hamid</label><input type="number" step="0.01" id="d-hamid" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>Coût livraison</label><input type="number" step="0.01" id="d-livraison" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>Frais supp.</label><input type="number" step="0.01" id="d-fraissupp" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>Coût audit</label><input type="number" step="0.01" id="d-audit" value="0" oninput="dossierPreview()"></div>
+  </form>`; }
+function veloDossierForm(){ return `
+  <form class="row" onsubmit="addDossier(event)">
+    <div class="field"><label>Date</label><input type="date" id="d-date" required></div>
+    <div class="field"><label>Nom du client</label><input type="text" id="d-client"></div>
+    <div class="field"><label>N° de dépôt</label><input type="text" id="d-depot"></div>
+    <div class="field"><label>Région</label><select id="d-region" onchange="onVeloRegion()"><option>France</option><option>Corse</option></select></div>
+    <div class="field"><label>Nombre de vélos</label><input type="number" step="1" id="d-nbvelos" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>Tarif / vélo (€)</label><input type="number" step="0.01" id="d-tarif" value="80" oninput="dossierPreview()"></div>
+    <div class="field"><label>Autres coûts (€)</label><input type="number" step="0.01" id="d-autrescouts" value="0" oninput="dossierPreview()"></div>
+  </form>`; }
+function ledDossierHead(){ return `<th>Date</th><th>Client</th><th>N° dépôt</th><th class="num">Prime</th><th class="num">Marge brute</th><th class="num">Manager</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th></th>`; }
+function veloDossierHead(){ return `<th>Date</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th></th>`; }
+function onVeloRegion(){ document.getElementById('d-tarif').value = document.getElementById('d-region').value==='Corse'?390:80; dossierPreview(); }
 
-// ====== Mon espace (régie) ======
-async function loadMonEspace(){
-  const [{data:dos},{data:fr}]=await Promise.all([
-    db.from('engco_dossiers').select('*').order('date',{ascending:false}),
-    db.from('engco_frais').select('*'),
-  ]);
-  const comm=(dos||[]).reduce((s,d)=>s+Number(d.commission_regie||0),0);
-  const refac=(fr||[]).reduce((s,f)=>s+Number(f.montant_regie||0),0);
-  document.getElementById('me-comm').textContent=eur(comm);
-  document.getElementById('me-refac').textContent=eur(refac);
-  document.getElementById('me-net').textContent=eur(comm-refac);
-  document.getElementById('me-dossiers').innerHTML=(dos&&dos.length)? dos.map(d=>`<tr>
-    <td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td>
-    <td class="num">${eur(d.marge_brute)}</td><td class="num">${num(d.regie_pct)} %</td>
-    <td class="num val-good">${eur(d.commission_regie)}</td>
-  </tr>`).join('') : `<tr><td colspan="6" class="empty">Aucun dossier pour l'instant</td></tr>`;
-}
-
-// ====== Chargement ======
+// ===== Chargement =====
 async function loadAll(){
   document.getElementById('loaderr').style.display='none';
   await loadSources();
+  await loadRegiesConfig();
   await Promise.all([loadApports(), loadDossiers(), loadRemboursements(), loadFrais()]);
-  renderRegies();
-  loadRecurrents();
+  renderRegies(); loadRecurrents();
   if(CURRENT_ROLE==='admin') loadUsers();
 }
-
 async function loadSources(){
-  const {data,error}=await db.from('engco_sources').select('*').order('nom');
+  const {data,error}=await db.from(T('sources')).select('*').order('nom');
   if(error){showError(error);return;}
   SOURCES=data||[];
-  // menu déroulant des apports
-  const sel=document.getElementById('a-source');
-  sel.innerHTML=SOURCES.map(s=>`<option value="${s.id}">${s.nom} (${s.devise})</option>`).join('');
-  const fsel=document.getElementById('f-source');
-  if(fsel) fsel.innerHTML='<option value="">— société qui a payé —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join('');
-  const rcsel=document.getElementById('rc-source');
-  if(rcsel) rcsel.innerHTML='<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join('');
+  const opts=SOURCES.map(s=>`<option value="${s.id}">${s.nom} (${s.devise})</option>`).join('');
+  document.getElementById('a-source').innerHTML=opts;
+  const optsBlank='<option value="">— société —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join('');
+  document.getElementById('f-source').innerHTML=optsBlank;
+  document.getElementById('rc-source').innerHTML='<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join('');
   onSourceChange();
-  // tableau des sources
-  const tb=document.getElementById('sources-body');
-  tb.innerHTML = SOURCES.length? SOURCES.map(s=>`<tr>
-    <td>${s.nom}</td><td class="num">${num(s.part_jd)} %</td><td class="num">${num(s.part_dan)} %</td>
+  const as=A();
+  document.getElementById('sources-body').innerHTML = SOURCES.length? SOURCES.map(s=>`<tr>
+    <td>${s.nom}</td>${as.map(a=>`<td class="num">${num(s['part_'+a.k])} %</td>`).join('')}
     <td><span class="pill">${s.devise==='ILS'?'Shekel ₪':'Euro €'}</span></td>
-    <td class="num"><button class="btn danger small" onclick="delRow('engco_sources','${s.id}')">Suppr.</button></td>
-  </tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune source</td></tr>`;
+    <td class="num"><button class="btn danger small" onclick="delRow('${T('sources')}','${s.id}')">Suppr.</button></td>
+  </tr>`).join('') : `<tr><td colspan="${as.length+3}" class="empty">Aucune source</td></tr>`;
 }
-
+async function loadRegiesConfig(){
+  const {data,error}=await db.from('app_regies').select('*').eq('project_key',PROJ.key).order('nom');
+  if(error){ REGIES_CFG=[]; } else REGIES_CFG=data||[];
+  const sel=document.getElementById('d-commercial'); const prev=sel.value;
+  sel.innerHTML='<option value="">— aucune —</option>'+REGIES_CFG.map(r=>`<option value="${r.nom}">${r.nom} (${num(r.pct_defaut)}%)</option>`).join('');
+  if(prev) sel.value=prev;
+  document.getElementById('regiecfg-body').innerHTML = REGIES_CFG.length? REGIES_CFG.map(r=>`<tr>
+    <td><b>${r.nom}</b></td><td class="num">${num(r.pct_defaut)} %</td>
+    <td class="num"><button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td>
+  </tr>`).join('') : `<tr><td colspan="3" class="empty">Aucune régie configurée</td></tr>`;
+}
+function onDossierRegie(){
+  const r=REGIES_CFG.find(x=>x.nom===document.getElementById('d-commercial').value);
+  if(r) document.getElementById('d-regiepct').value=r.pct_defaut;
+  dossierPreview();
+}
+async function addRegieConfig(e){
+  e.preventDefault();
+  const nom=document.getElementById('rg-nom').value.trim(); if(!nom){toast('Indique un nom');return;}
+  const {error}=await db.from('app_regies').insert({project_key:PROJ.key, nom, pct_defaut:Number(document.getElementById('rg-pct').value)||0});
+  if(error){toast('Erreur : '+error.message);return;}
+  document.getElementById('rg-nom').value=''; document.getElementById('rg-pct').value='0';
+  toast('Régie ajoutée ✅'); loadRegiesConfig();
+}
 async function loadApports(){
-  const {data,error}=await db.from('engco_apports').select('*').order('date',{ascending:false});
+  const {data,error}=await db.from(T('apports')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
-  const tb=document.getElementById('apports-body');
-  tb.innerHTML = (data&&data.length)? data.map(a=>{
-    const src=SOURCES.find(s=>s.id===a.source_id);
-    return `<tr>
-      <td>${fdate(a.date)}</td><td>${src?src.nom:'—'}</td><td>${a.libelle||''}</td>
-      <td class="num">${num(a.montant_depense)} ${a.devise==='ILS'?'₪':'€'}</td>
-      <td class="num">${num(a.pourcentage_compte)} %</td>
-      <td class="num">${eur(a.montant_eur)}</td>
-      <td class="num val-jd">${eur(a.montant_jd)}</td>
-      <td class="num val-dan">${eur(a.montant_dan)}</td>
-      <td class="num"><button class="btn danger small" onclick="delRow('engco_apports','${a.id}')">Suppr.</button></td>
-    </tr>`;}).join('') : `<tr><td colspan="9" class="empty">Aucun apport pour l'instant</td></tr>`;
-  window._apports=data||[];
-  refreshDashboard();
+  const as=A();
+  document.getElementById('apports-body').innerHTML=(data&&data.length)? data.map(ap=>{
+    const src=SOURCES.find(s=>s.id===ap.source_id);
+    return `<tr><td>${fdate(ap.date)}</td><td>${src?src.nom:'—'}</td><td>${ap.libelle||''}</td>
+      <td class="num">${num(ap.montant_depense)} ${ap.devise==='ILS'?'₪':'€'}</td>
+      <td class="num">${num(ap.pourcentage_compte)} %</td><td class="num">${eur(ap.montant_eur)}</td>
+      ${as.map(a=>`<td class="num">${eur(ap['montant_'+a.k])}</td>`).join('')}
+      <td class="num"><button class="btn danger small" onclick="delRow('${T('apports')}','${ap.id}')">Suppr.</button></td></tr>`;
+  }).join('') : `<tr><td colspan="${as.length+7}" class="empty">Aucun apport</td></tr>`;
+  window._apports=data||[]; refreshDashboard();
 }
-
 async function loadDossiers(){
-  const {data,error}=await db.from('engco_dossiers').select('*').order('date',{ascending:false});
+  const {data,error}=await db.from(T('dossiers')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
-  const tb=document.getElementById('dossiers-body');
-  tb.innerHTML=(data&&data.length)? data.map(d=>`<tr>
-    <td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td>
-    <td class="num">${eur(d.montant_prime)}</td>
-    <td class="num">${eur(d.marge_brute)}</td>
-    <td class="num">${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span></td>
-    <td>${d.commercial_regie||'—'}${d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:''}</td>
-    <td class="num">${eur(d.commission_regie)}</td>
-    <td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td>
-    <td class="num"><button class="btn danger small" onclick="delRow('engco_dossiers','${d.id}')">Suppr.</button></td>
-  </tr>`).join('') : `<tr><td colspan="10" class="empty">Aucun dossier pour l'instant</td></tr>`;
-  window._dossiers=data||[];
-  refreshDashboard();
-  renderRegies();
+  const velo=PROJ.dossierType==='velo';
+  document.getElementById('dossiers-body').innerHTML=(data&&data.length)? data.map(d=>{
+    const reg=`${d.commercial_regie||'—'}${d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:''}`;
+    const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
+    const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td class="num"><button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
+    if(velo) return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
+    return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
+  }).join('') : `<tr><td colspan="${velo?11:10}" class="empty">Aucun dossier</td></tr>`;
+  window._dossiers=data||[]; refreshDashboard(); renderRegies();
 }
-
 async function loadRemboursements(){
-  const {data,error}=await db.from('engco_remboursements').select('*').order('date',{ascending:false});
+  const {data,error}=await db.from(T('remboursements')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
-  const tb=document.getElementById('remb-body');
-  tb.innerHTML=(data&&data.length)? data.map(r=>`<tr>
-    <td>${fdate(r.date)}</td><td>${r.beneficiaire==='JD'?'🔵 JD':'🟠 Dan'}</td>
-    <td class="num">${eur(r.montant)}</td><td>${r.note||''}</td>
-    <td class="num"><button class="btn danger small" onclick="delRow('engco_remboursements','${r.id}')">Suppr.</button></td>
-  </tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune récupération</td></tr>`;
-  window._remb=data||[];
-  refreshDashboard();
+  document.getElementById('remb-body').innerHTML=(data&&data.length)? data.map(r=>`<tr>
+    <td>${fdate(r.date)}</td><td>${r.beneficiaire}</td><td class="num">${eur(r.montant)}</td><td>${r.note||''}</td>
+    <td class="num"><button class="btn danger small" onclick="delRow('${T('remboursements')}','${r.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune récupération</td></tr>`;
+  window._remb=data||[]; refreshDashboard();
 }
-
-// ====== Frais / dépenses ======
 async function loadFrais(){
-  const {data,error}=await db.from('engco_frais').select('*').order('date',{ascending:false});
+  const {data,error}=await db.from(T('frais')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
-  const tb=document.getElementById('frais-body');
-  tb.innerHTML=(data&&data.length)? data.map(f=>{
+  document.getElementById('frais-body').innerHTML=(data&&data.length)? data.map(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
-    return `<tr>
-    <td>${fdate(f.date)}</td><td><span class="pill">${f.categorie||''}</span></td>
-    <td>${f.libelle||''}</td><td>${f.fournisseur||''}</td>
-    <td>${src?src.nom:'—'}</td>
-    <td class="num">${eur(f.montant)}</td>
-    <td>${f.regie_concernee||'—'}</td>
-    <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
-    <td class="num val-bad">${eur(f.montant_societe)}</td>
-    <td class="num"><button class="btn danger small" onclick="delRow('engco_frais','${f.id}')">Suppr.</button></td>
-  </tr>`;}).join('') : `<tr><td colspan="10" class="empty">Aucun frais pour l'instant</td></tr>`;
-  window._frais=data||[];
-  refreshDashboard();
-  renderRegies();
-  checkMissingRecurrents();
-}
-function fraisPreview(){
-  const montant=Number(document.getElementById('f-montant').value)||0;
-  const pct=Number(document.getElementById('f-pct').value)||0;
-  const regie=montant*pct/100, societe=montant-regie;
-  document.getElementById('f-preview').innerHTML=
-    `Refacturé à la régie : <b>${eur(regie)}</b> &nbsp; / &nbsp; À la charge de la société : <b class="val-bad">${eur(societe)}</b>`;
-}
-async function addFrais(e){
-  e.preventDefault();
-  const montant=Number(document.getElementById('f-montant').value);
-  if(!montant){toast('Indique un montant');return;}
-  const row={
-    date:document.getElementById('f-date').value||today(),
-    categorie:document.getElementById('f-categorie').value,
-    libelle:document.getElementById('f-libelle').value||null,
-    fournisseur:document.getElementById('f-fournisseur').value||null,
-    montant,
-    source_id:document.getElementById('f-source').value||null,
-    regie_concernee:document.getElementById('f-regie').value||null,
-    pct_decompte:Number(document.getElementById('f-pct').value)||0,
-  };
-  const {error}=await db.from('engco_frais').insert(row);
-  if(error){toast('Erreur : '+error.message);return;}
-  ['f-libelle','f-fournisseur','f-montant','f-regie'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('f-pct').value='0';
-  document.getElementById('f-preview').innerHTML='';
-  toast('Frais enregistré ✅');loadFrais();
+    return `<tr><td>${fdate(f.date)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}</td><td>${f.fournisseur||''}</td>
+      <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
+      <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
+      <td class="num val-bad">${eur(f.montant_societe)}</td>
+      <td class="num"><button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
+  }).join('') : `<tr><td colspan="10" class="empty">Aucun frais</td></tr>`;
+  window._frais=data||[]; refreshDashboard(); renderRegies(); checkMissingRecurrents();
 }
 
-// ====== Frais récurrents (mensuels) ======
-function moisLabel(d){ if(!d) return ''; return new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'}); }
-async function loadRecurrents(){
-  const {data,error}=await db.from('engco_recurrents').select('*').order('libelle');
-  if(error){ return; }
-  window._recurrents=data||[];
-  const tb=document.getElementById('recur-body');
-  tb.innerHTML=(data&&data.length)? data.map(r=>{
-    const src=SOURCES.find(s=>s.id===r.source_id);
-    return `<tr>
-      <td><b>${r.libelle}</b></td>
-      <td class="num">${r.montant_defaut!=null?eur(r.montant_defaut):'—'}</td>
-      <td>${src?src.nom:'—'}</td>
-      <td>${r.regie_defaut||'—'}</td>
-      <td class="num">${num(r.pct_defaut)} %</td>
-      <td>${moisLabel(r.mois_debut)}</td>
-      <td class="num"><button class="btn danger small" onclick="delRow('engco_recurrents','${r.id}')">Suppr.</button></td>
-    </tr>`;}).join('') : `<tr><td colspan="7" class="empty">Aucun frais récurrent</td></tr>`;
-  fillCategorieOptions();
-  checkMissingRecurrents();
-}
-function fillCategorieOptions(){
-  const sel=document.getElementById('f-categorie');
-  const prev=sel.value;
-  const base=['Audit client','Fournisseur','Autre'];
-  const recs=(window._recurrents||[]).map(r=>r.libelle);
-  const all=[...new Set([...recs,...base])];
-  sel.innerHTML=all.map(c=>`<option>${c}</option>`).join('');
-  if(prev && all.includes(prev)) sel.value=prev;
-}
-async function addRecurrent(e){
-  e.preventDefault();
-  const libelle=document.getElementById('rc-libelle').value.trim();
-  if(!libelle){toast('Indique un libellé');return;}
-  const moisVal=document.getElementById('rc-mois').value;
-  const row={
-    libelle,
-    montant_defaut: document.getElementById('rc-montant').value!==''?Number(document.getElementById('rc-montant').value):null,
-    source_id: document.getElementById('rc-source').value||null,
-    regie_defaut: document.getElementById('rc-regie').value.trim()||null,
-    pct_defaut: Number(document.getElementById('rc-pct').value)||0,
-    mois_debut: moisVal? moisVal+'-01' : today().slice(0,7)+'-01',
-  };
-  const {error}=await db.from('engco_recurrents').insert(row);
-  if(error){toast('Erreur : '+error.message);return;}
-  ['rc-libelle','rc-montant','rc-regie'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('rc-pct').value='0';
-  toast('Frais récurrent ajouté ✅');loadRecurrents();
-}
-function onFraisCategorie(){
-  const cat=document.getElementById('f-categorie').value;
-  const r=(window._recurrents||[]).find(x=>x.libelle===cat);
-  if(!r) return;
-  if(r.montant_defaut!=null) document.getElementById('f-montant').value=r.montant_defaut;
-  if(r.source_id) document.getElementById('f-source').value=r.source_id;
-  document.getElementById('f-regie').value=r.regie_defaut||'';
-  document.getElementById('f-pct').value=r.pct_defaut||0;
-  fraisPreview();
-}
-function checkMissingRecurrents(){
-  const el=document.getElementById('recur-alert');
-  if(!el) return;
-  const recs=(window._recurrents||[]).filter(r=>r.actif!==false);
-  const frais=window._frais||[];
-  const now=new Date(); const curY=now.getFullYear(), curM=now.getMonth();
-  const missing=[];
-  recs.forEach(r=>{
-    if(!r.mois_debut) return;
-    const start=new Date(r.mois_debut+'T00:00:00');
-    let y=start.getFullYear(), m=start.getMonth();
-    const moisManquants=[];
-    let guard=0;
-    while((y<curY || (y===curY && m<=curM)) && guard<600){
-      guard++;
-      const has=frais.some(f=>{ if((f.categorie||'')!==r.libelle) return false; const fd=new Date((f.date||'')+'T00:00:00'); return fd.getFullYear()===y && fd.getMonth()===m; });
-      if(!has){ moisManquants.push(new Date(y,m,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})); }
-      m++; if(m>11){m=0;y++;}
-    }
-    if(moisManquants.length) missing.push(`<b>${r.libelle}</b> : ${moisManquants.join(', ')}`);
-  });
-  if(missing.length){ el.style.display='block'; el.innerHTML='⚠️ Frais mensuels manquants — '+missing.join(' &nbsp;•&nbsp; '); }
-  else { el.style.display='none'; el.innerHTML=''; }
-}
-
-// ====== Régies (vue de suivi) ======
-function renderRegies(){
-  const dossiers=window._dossiers||[], frais=window._frais||[];
-  const map={};
-  const norm=s=>(s||'').trim();
-  dossiers.forEach(d=>{
-    const r=norm(d.commercial_regie);
-    if(!r) return;
-    map[r]=map[r]||{nom:r,nb:0,commissions:0,refacture:0};
-    map[r].nb++; map[r].commissions+=Number(d.commission_regie||0);
-  });
-  frais.forEach(f=>{
-    const r=norm(f.regie_concernee);
-    if(!r) return;
-    map[r]=map[r]||{nom:r,nb:0,commissions:0,refacture:0};
-    map[r].refacture+=Number(f.montant_regie||0);
-  });
-  const list=Object.values(map).sort((a,b)=>b.commissions-a.commissions);
-  const tb=document.getElementById('regies-body');
-  tb.innerHTML=list.length? list.map(r=>`<tr>
-    <td><b>${r.nom}</b></td><td class="num">${r.nb}</td>
-    <td class="num val-good">${eur(r.commissions)}</td>
-    <td class="num">${eur(r.refacture)}</td>
-    <td class="num"><b>${eur(r.commissions-r.refacture)}</b></td>
-  </tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune régie pour l'instant</td></tr>`;
-  // menu de filtre
-  const sel=document.getElementById('regie-filter');
-  const prev=sel.value;
-  sel.innerHTML='<option value="">— choisir —</option>'+list.map(r=>`<option value="${r.nom}">${r.nom}</option>`).join('');
-  if(prev)sel.value=prev;
-  renderRegieDetail();
-}
-function renderRegieDetail(){
-  const r=(document.getElementById('regie-filter').value||'').trim();
-  const dossiers=(window._dossiers||[]).filter(d=>(d.commercial_regie||'').trim()===r && r!=='');
-  const tb=document.getElementById('regie-detail-body');
-  tb.innerHTML=dossiers.length? dossiers.map(d=>`<tr>
-    <td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td>
-    <td class="num">${eur(d.marge_brute)}</td><td class="num">${num(d.regie_pct)} %</td>
-    <td class="num val-good">${eur(d.commission_regie)}</td>
-  </tr>`).join('') : `<tr><td colspan="6" class="empty">${r?'Aucun dossier pour cette régie':'Choisis une régie ci-dessus'}</td></tr>`;
-}
-
-// ====== Tableau de bord ======
+// ===== Tableau de bord =====
 function refreshDashboard(){
+  if(!PROJ) return;
+  const as=A();
   const apports=window._apports||[], dossiers=window._dossiers||[], remb=window._remb||[], frais=window._frais||[];
-  let invJD=apports.reduce((s,a)=>s+Number(a.montant_jd||0),0);
-  let invDan=apports.reduce((s,a)=>s+Number(a.montant_dan||0),0);
-  // Un frais payé par une société compte comme un apport de l'associé (règle du loyer)
-  frais.forEach(f=>{ const s=SOURCES.find(x=>x.id===f.source_id); if(!s) return;
-    invJD+=Number(f.montant||0)*Number(s.part_jd||0)/100;
-    invDan+=Number(f.montant||0)*Number(s.part_dan||0)/100; });
-  const invTot=invJD+invDan;
+  const inv={}, rec={};
+  as.forEach(a=>{ inv[a.k]=apports.reduce((s,ap)=>s+Number(ap['montant_'+a.k]||0),0); });
+  frais.forEach(f=>{ const src=SOURCES.find(x=>x.id===f.source_id); if(!src) return; as.forEach(a=>{ inv[a.k]+=Number(f.montant||0)*Number(src['part_'+a.k]||0)/100; }); });
+  as.forEach(a=>{ rec[a.k]=remb.filter(r=>r.beneficiaire===a.remb).reduce((s,r)=>s+Number(r.montant||0),0); });
+  const invTot=as.reduce((s,a)=>s+inv[a.k],0);
   const margeNette=dossiers.reduce((s,d)=>s+Number(d.marge_nette||0),0);
   const regieTot=dossiers.reduce((s,d)=>s+Number(d.commission_regie||0),0);
   const davidTot=dossiers.reduce((s,d)=>s+Number(d.cout_david||0),0);
   const fraisSociete=frais.reduce((s,f)=>s+Number(f.montant_societe||0),0);
-  const marge=margeNette-fraisSociete; // résultat net société, base du partage 50/50
-  const recJD=remb.filter(r=>r.beneficiaire==='JD').reduce((s,r)=>s+Number(r.montant||0),0);
-  const recDan=remb.filter(r=>r.beneficiaire==='Dan').reduce((s,r)=>s+Number(r.montant||0),0);
-
-  document.getElementById('db-inv-jd').textContent=eur(invJD);
-  document.getElementById('db-inv-dan').textContent=eur(invDan);
+  const marge=margeNette-fraisSociete;
+  as.forEach(a=>{
+    document.getElementById('db-inv-'+a.k).textContent=eur(inv[a.k]);
+    document.getElementById('db-inv2-'+a.k).textContent=eur(inv[a.k]);
+    document.getElementById('db-rec-'+a.k).textContent=eur(rec[a.k]);
+    document.getElementById('db-reste-'+a.k).textContent=eur(inv[a.k]-rec[a.k]);
+  });
   document.getElementById('db-inv-tot').textContent=eur(invTot);
   document.getElementById('db-marge').textContent=eur(margeNette);
   document.getElementById('db-regie').textContent=eur(regieTot);
   document.getElementById('db-david').textContent=eur(davidTot);
   document.getElementById('db-frais').textContent=eur(fraisSociete);
   document.getElementById('db-resultat').textContent=eur(marge);
-
-  document.getElementById('db-jd-inv').textContent=eur(invJD);
-  document.getElementById('db-dan-inv').textContent=eur(invDan);
-  document.getElementById('db-jd-rec').textContent=eur(recJD);
-  document.getElementById('db-dan-rec').textContent=eur(recDan);
-  document.getElementById('db-jd-reste').textContent=eur(invJD-recJD);
-  document.getElementById('db-dan-reste').textContent=eur(invDan-recDan);
-
-  const benef=Math.max(0, marge-invTot);
+  const benef=Math.max(0,marge-invTot);
   document.getElementById('db-benef').textContent=eur(benef);
-  document.getElementById('db-benef-jd').textContent=eur(benef/2);
-  document.getElementById('db-benef-dan').textContent=eur(benef/2);
-
-  // Estimation date de couverture des investissements par la marge
-  const el=document.getElementById('db-date');
-  const nonCouvert=invTot-marge;
+  as.forEach(a=>document.getElementById('db-benef-'+a.k).textContent=eur(benef/as.length));
+  const el=document.getElementById('db-date'); const nonCouvert=invTot-marge;
   if(invTot<=0){ el.textContent='—'; }
   else if(nonCouvert<=0){ el.innerHTML='<span class="val-good">Déjà couverts ✅</span>'; }
   else if(dossiers.length>=1){
     const dts=dossiers.map(d=>new Date(d.date+'T00:00:00')).sort((a,b)=>a-b);
-    const first=dts[0]; const now=new Date();
-    const mois=Math.max(1,(now-first)/(1000*60*60*24*30.44));
-    const margeParMois=marge/mois;
-    if(margeParMois<=0){ el.innerHTML='<span class="val-bad">Marge insuffisante</span>'; }
-    else{
-      const moisRestants=nonCouvert/margeParMois;
-      const cible=new Date(now.getTime()+moisRestants*30.44*24*60*60*1000);
-      el.innerHTML='<span class="val-good">~ '+cible.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</span>';
-    }
-  } else { el.textContent='—'; }
+    const mois=Math.max(1,(new Date()-dts[0])/(1000*60*60*24*30.44)); const parMois=marge/mois;
+    if(parMois<=0) el.innerHTML='<span class="val-bad">Marge insuffisante</span>';
+    else { const cible=new Date(Date.now()+(nonCouvert/parMois)*30.44*24*60*60*1000); el.innerHTML='<span class="val-good">~ '+cible.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</span>'; }
+  } else el.textContent='—';
 }
 
-// ====== Formulaire apport ======
+// ===== Apports =====
 function onSourceChange(){
-  const s=SOURCES.find(x=>x.id===document.getElementById('a-source').value);
-  if(!s)return;
-  document.getElementById('a-jd').value=s.part_jd;
-  document.getElementById('a-dan').value=s.part_dan;
+  const s=SOURCES.find(x=>x.id===document.getElementById('a-source').value); if(!s) return;
+  A().forEach(a=>{ const el=document.getElementById('a-part-'+a.k); if(el) el.value=s['part_'+a.k]; });
   const isILS=s.devise==='ILS';
   document.getElementById('a-taux-field').style.display=isILS?'flex':'none';
   if(!isILS)document.getElementById('a-taux').value='';
@@ -869,11 +675,9 @@ function apportPreview(){
   const dep=Number(document.getElementById('a-montant').value)||0;
   const pct=Number(document.getElementById('a-pct').value)||0;
   const taux=(s&&s.devise==='ILS')?(Number(document.getElementById('a-taux').value)||0):1;
-  const jd=Number(document.getElementById('a-jd').value)||0;
-  const dan=Number(document.getElementById('a-dan').value)||0;
   const compte=dep*pct/100*taux;
-  document.getElementById('a-preview').innerHTML=
-    `Montant compté : <b>${eur(compte)}</b> &nbsp;→&nbsp; <span class="val-jd">JD ${eur(compte*jd/100)}</span> &nbsp;/&nbsp; <span class="val-dan">Dan ${eur(compte*dan/100)}</span>`;
+  const parts=A().map(a=>{ const p=Number((document.getElementById('a-part-'+a.k)||{}).value)||0; return `${a.label} ${eur(compte*p/100)}`; }).join(' / ');
+  document.getElementById('a-preview').innerHTML=`Montant compté : <b>${eur(compte)}</b> &nbsp;→&nbsp; ${parts}`;
 }
 async function addApport(e){
   e.preventDefault();
@@ -884,202 +688,271 @@ async function addApport(e){
   const isILS=s&&s.devise==='ILS';
   const taux=isILS?Number(document.getElementById('a-taux').value):null;
   if(isILS&&!taux){toast('Indique le taux du shekel');return;}
-  const row={
-    date:document.getElementById('a-date').value||today(),
-    source_id, libelle:document.getElementById('a-libelle').value||null,
-    montant_depense:montant,
-    pourcentage_compte:Number(document.getElementById('a-pct').value)||100,
-    devise:s?s.devise:'EUR', taux_change:isILS?taux:null,
-    part_jd_pct:Number(document.getElementById('a-jd').value)||0,
-    part_dan_pct:Number(document.getElementById('a-dan').value)||0,
-  };
-  const {error}=await db.from('engco_apports').insert(row);
+  const row={ date:document.getElementById('a-date').value||today(), source_id, libelle:document.getElementById('a-libelle').value||null,
+    montant_depense:montant, pourcentage_compte:Number(document.getElementById('a-pct').value)||100, devise:s?s.devise:'EUR', taux_change:isILS?taux:null };
+  A().forEach(a=>{ row['part_'+a.k+'_pct']=Number(document.getElementById('a-part-'+a.k).value)||0; });
+  const {error}=await db.from(T('apports')).insert(row);
   if(error){toast('Erreur : '+error.message);return;}
   document.getElementById('a-montant').value='';document.getElementById('a-libelle').value='';
   toast('Apport enregistré ✅');loadApports();
 }
 
-// ====== Formulaire dossier ======
+// ===== Dossiers =====
 function dossierPreview(){
-  const g=id=>Number(document.getElementById(id).value)||0;
-  const brute=g('d-prime')-g('d-install')-g('d-materiel')-g('d-nacelle')-g('d-hamid')-g('d-livraison')-g('d-fraissupp')-g('d-audit');
-  const davidPct=g('d-davidpct'), regiePct=g('d-regiepct');
-  const david=brute*davidPct/100, regie=brute*regiePct/100;
-  const nette=brute-david-regie;
-  document.getElementById('d-preview').innerHTML=
-    `Marge brute : <b>${eur(brute)}</b> &nbsp; moins manager ${num(davidPct)}% : <b>${eur(david)}</b> &nbsp; moins régie ${num(regiePct)}% : <b>${eur(regie)}</b>`+
-    `<br>Marge nette : <b class="${nette>=0?'val-good':'val-bad'}" style="font-size:18px">${eur(nette)}</b> `+
-    `<span style="color:var(--muted)">(JD ${eur(nette/2)} / Dan ${eur(nette/2)})</span>`;
+  if(!PROJ) return;
+  const g=id=>{const el=document.getElementById(id); return el?Number(el.value)||0:0;};
+  let brute, extra='';
+  if(PROJ.dossierType==='velo'){ const montant=g('d-nbvelos')*g('d-tarif'); brute=montant-g('d-autrescouts'); extra=`Montant (nb × tarif) : <b>${eur(montant)}</b><br>`; }
+  else { brute=g('d-prime')-g('d-install')-g('d-materiel')-g('d-nacelle')-g('d-hamid')-g('d-livraison')-g('d-fraissupp')-g('d-audit'); }
+  const dv=g('d-davidpct'), rg=g('d-regiepct');
+  const david=brute*dv/100, regie=brute*rg/100, nette=brute-david-regie;
+  const per=nette/A().length;
+  document.getElementById('d-preview').innerHTML=`${extra}Marge brute : <b>${eur(brute)}</b> &nbsp; − manager ${num(dv)}% : <b>${eur(david)}</b> &nbsp; − régie ${num(rg)}% : <b>${eur(regie)}</b>`+
+    `<br>Marge nette : <b class="${nette>=0?'val-good':'val-bad'}" style="font-size:18px">${eur(nette)}</b> <span style="color:var(--muted)">(${A().map(a=>a.label+' '+eur(per)).join(' / ')})</span>`;
 }
 async function addDossier(e){
   e.preventDefault();
-  const g=id=>Number(document.getElementById(id).value)||0;
-  const row={
-    date:document.getElementById('d-date').value||today(),
-    nom_client:document.getElementById('d-client').value||null,
-    numero_depot:document.getElementById('d-depot').value||null,
-    montant_prime:g('d-prime'),
-    cout_installation:g('d-install'),cout_materiel:g('d-materiel'),cout_nacelle:g('d-nacelle'),
-    cout_hamid:g('d-hamid'),cout_livraison:g('d-livraison'),frais_supp:g('d-fraissupp'),cout_audit:g('d-audit'),
-    david_pct:g('d-davidpct'),regie_pct:g('d-regiepct'),
-    commercial_regie:document.getElementById('d-commercial').value||null,
-  };
-  const {error}=await db.from('engco_dossiers').insert(row);
+  const g=id=>{const el=document.getElementById(id); return el?Number(el.value)||0:0;};
+  const v=id=>{const el=document.getElementById(id); return el?el.value||null:null;};
+  let row={ date:v('d-date')||today(), nom_client:v('d-client'), numero_depot:v('d-depot'),
+    david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
+  if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); }
+  else { row.montant_prime=g('d-prime'); row.cout_installation=g('d-install'); row.cout_materiel=g('d-materiel'); row.cout_nacelle=g('d-nacelle'); row.cout_hamid=g('d-hamid'); row.cout_livraison=g('d-livraison'); row.frais_supp=g('d-fraissupp'); row.cout_audit=g('d-audit'); }
+  const {error}=await db.from(T('dossiers')).insert(row);
   if(error){toast('Erreur : '+error.message);return;}
-  ['d-client','d-depot','d-commercial'].forEach(i=>document.getElementById(i).value='');
-  ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit','d-regiepct'].forEach(i=>document.getElementById(i).value='0');
-  document.getElementById('d-davidpct').value='5';
-  dossierPreview();toast('Dossier enregistré ✅');loadDossiers();
+  ['d-client','d-depot'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
+  document.getElementById('d-commercial').value=''; document.getElementById('d-regiepct').value='0'; document.getElementById('d-davidpct').value='5';
+  if(PROJ.dossierType==='velo'){ document.getElementById('d-nbvelos').value='0'; document.getElementById('d-autrescouts').value='0'; }
+  else ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit'].forEach(i=>document.getElementById(i).value='0');
+  dossierPreview(); toast('Dossier enregistré ✅'); loadDossiers();
 }
 
-// ====== Formulaire source ======
+// ===== Sources =====
 async function addSource(e){
   e.preventDefault();
-  const row={
-    nom:document.getElementById('s-nom').value,
-    part_jd:Number(document.getElementById('s-jd').value)||0,
-    part_dan:Number(document.getElementById('s-dan').value)||0,
-    devise:document.getElementById('s-devise').value,
-  };
+  const row={ nom:document.getElementById('s-nom').value, devise:document.getElementById('s-devise').value };
   if(!row.nom){toast('Indique un nom');return;}
-  const {error}=await db.from('engco_sources').insert(row);
+  A().forEach(a=>{ row['part_'+a.k]=Number(document.getElementById('s-part-'+a.k).value)||0; });
+  const {error}=await db.from(T('sources')).insert(row);
   if(error){toast('Erreur : '+error.message);return;}
   document.getElementById('s-nom').value='';
-  toast('Source ajoutée ✅');loadSources();
+  toast('Source ajoutée ✅'); loadSources();
 }
 
-// ====== Suppression ======
+// ===== Frais =====
+function fraisPreview(){
+  const m=Number(document.getElementById('f-montant').value)||0, pct=Number(document.getElementById('f-pct').value)||0;
+  document.getElementById('f-preview').innerHTML=`Refacturé régie : <b>${eur(m*pct/100)}</b> / À charge société : <b class="val-bad">${eur(m-m*pct/100)}</b>`;
+}
+async function addFrais(e){
+  e.preventDefault();
+  const montant=Number(document.getElementById('f-montant').value); if(!montant){toast('Indique un montant');return;}
+  const row={ date:document.getElementById('f-date').value||today(), categorie:document.getElementById('f-categorie').value,
+    libelle:document.getElementById('f-libelle').value||null, fournisseur:document.getElementById('f-fournisseur').value||null, montant,
+    source_id:document.getElementById('f-source').value||null, regie_concernee:document.getElementById('f-regie').value||null,
+    pct_decompte:Number(document.getElementById('f-pct').value)||0 };
+  const ym=(row.date||'').slice(0,7);
+  const dup=(window._frais||[]).find(f=>(f.categorie||'')===row.categorie && (f.date||'').slice(0,7)===ym);
+  if(dup){
+    const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais « '+row.categorie+' » existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+eur(dup.montant)+' le '+fdate(dup.date)+(dup.libelle?' ('+dup.libelle+')':'')+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
+    if(!ok) return;
+  }
+  const {error}=await db.from(T('frais')).insert(row);
+  if(error){toast('Erreur : '+error.message);return;}
+  ['f-libelle','f-fournisseur','f-montant','f-regie'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('f-pct').value='0'; document.getElementById('f-preview').innerHTML='';
+  toast('Frais enregistré ✅'); loadFrais();
+}
+
+// ===== Frais récurrents =====
+function moisLabel(d){ return d? new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'}):''; }
+async function loadRecurrents(){
+  const {data,error}=await db.from(T('recurrents')).select('*').order('libelle');
+  if(error){ return; }
+  window._recurrents=data||[];
+  document.getElementById('recur-body').innerHTML=(data&&data.length)? data.map(r=>{
+    const src=SOURCES.find(s=>s.id===r.source_id);
+    return `<tr><td><b>${r.libelle}</b></td><td class="num">${r.montant_defaut!=null?eur(r.montant_defaut):'—'}</td><td>${src?src.nom:'—'}</td>
+      <td>${r.regie_defaut||'—'}</td><td class="num">${num(r.pct_defaut)} %</td><td>${moisLabel(r.mois_debut)}</td>
+      <td class="num"><button class="btn danger small" onclick="delRow('${T('recurrents')}','${r.id}')">Suppr.</button></td></tr>`;
+  }).join('') : `<tr><td colspan="7" class="empty">Aucun frais récurrent</td></tr>`;
+  fillCategorieOptions(); checkMissingRecurrents();
+}
+function fillCategorieOptions(){
+  const sel=document.getElementById('f-categorie'); const prev=sel.value;
+  const all=[...new Set([...(window._recurrents||[]).map(r=>r.libelle),'Audit client','Fournisseur','Autre'])];
+  sel.innerHTML=all.map(c=>`<option>${c}</option>`).join(''); if(prev&&all.includes(prev)) sel.value=prev;
+}
+async function addRecurrent(e){
+  e.preventDefault();
+  const libelle=document.getElementById('rc-libelle').value.trim(); if(!libelle){toast('Indique un libellé');return;}
+  const moisVal=document.getElementById('rc-mois').value;
+  const row={ libelle, montant_defaut:document.getElementById('rc-montant').value!==''?Number(document.getElementById('rc-montant').value):null,
+    source_id:document.getElementById('rc-source').value||null, regie_defaut:document.getElementById('rc-regie').value.trim()||null,
+    pct_defaut:Number(document.getElementById('rc-pct').value)||0, mois_debut:(moisVal||today().slice(0,7))+'-01' };
+  const {error}=await db.from(T('recurrents')).insert(row);
+  if(error){toast('Erreur : '+error.message);return;}
+  ['rc-libelle','rc-montant','rc-regie'].forEach(i=>document.getElementById(i).value=''); document.getElementById('rc-pct').value='0';
+  toast('Frais récurrent ajouté ✅'); loadRecurrents();
+}
+function onFraisCategorie(){
+  const r=(window._recurrents||[]).find(x=>x.libelle===document.getElementById('f-categorie').value); if(!r) return;
+  if(r.montant_defaut!=null) document.getElementById('f-montant').value=r.montant_defaut;
+  if(r.source_id) document.getElementById('f-source').value=r.source_id;
+  document.getElementById('f-regie').value=r.regie_defaut||''; document.getElementById('f-pct').value=r.pct_defaut||0;
+  fraisPreview();
+}
+function checkMissingRecurrents(){
+  const el=document.getElementById('recur-alert'); if(!el) return;
+  const recs=(window._recurrents||[]).filter(r=>r.actif!==false), frais=window._frais||[];
+  const now=new Date(), curY=now.getFullYear(), curM=now.getMonth(); const missing=[];
+  recs.forEach(r=>{ if(!r.mois_debut) return; const st=new Date(r.mois_debut+'T00:00:00'); let y=st.getFullYear(),m=st.getMonth(); const mm=[]; let g=0;
+    while((y<curY||(y===curY&&m<=curM))&&g<600){ g++; const has=frais.some(f=>{ if((f.categorie||'')!==r.libelle) return false; const fd=new Date((f.date||'')+'T00:00:00'); return fd.getFullYear()===y&&fd.getMonth()===m; }); if(!has) mm.push(new Date(y,m,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})); m++; if(m>11){m=0;y++;} }
+    if(mm.length) missing.push(`<b>${r.libelle}</b> : ${mm.join(', ')}`);
+  });
+  if(missing.length){ el.style.display='block'; el.innerHTML='⚠️ Frais mensuels manquants — '+missing.join(' &nbsp;•&nbsp; '); } else { el.style.display='none'; }
+}
+
+// ===== Régies (suivi) =====
+function renderRegies(){
+  const dossiers=window._dossiers||[], frais=window._frais||[], map={}, nm=s=>(s||'').trim();
+  dossiers.forEach(d=>{ const r=nm(d.commercial_regie); if(!r) return; map[r]=map[r]||{nom:r,nb:0,commissions:0,refacture:0}; map[r].nb++; map[r].commissions+=Number(d.commission_regie||0); });
+  frais.forEach(f=>{ const r=nm(f.regie_concernee); if(!r) return; map[r]=map[r]||{nom:r,nb:0,commissions:0,refacture:0}; map[r].refacture+=Number(f.montant_regie||0); });
+  const list=Object.values(map).sort((a,b)=>b.commissions-a.commissions);
+  document.getElementById('regies-body').innerHTML=list.length? list.map(r=>`<tr><td><b>${r.nom}</b></td><td class="num">${r.nb}</td><td class="num val-good">${eur(r.commissions)}</td><td class="num">${eur(r.refacture)}</td><td class="num"><b>${eur(r.commissions-r.refacture)}</b></td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune régie</td></tr>`;
+  const sel=document.getElementById('regie-filter'), prev=sel.value;
+  sel.innerHTML='<option value="">— choisir —</option>'+list.map(r=>`<option value="${r.nom}">${r.nom}</option>`).join(''); if(prev) sel.value=prev;
+  renderRegieDetail();
+}
+function renderRegieDetail(){
+  const r=(document.getElementById('regie-filter').value||'').trim();
+  const dossiers=(window._dossiers||[]).filter(d=>(d.commercial_regie||'').trim()===r&&r!=='');
+  document.getElementById('regie-detail-body').innerHTML=dossiers.length? dossiers.map(d=>`<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td class="num">${eur(d.marge_brute)}</td><td class="num">${num(d.regie_pct)} %</td><td class="num val-good">${eur(d.commission_regie)}</td></tr>`).join('') : `<tr><td colspan="5" class="empty">${r?'Aucun dossier':'Choisis une régie'}</td></tr>`;
+}
+
+// ===== Remboursements =====
+async function addRemboursement(e){
+  e.preventDefault();
+  const row={ date:document.getElementById('r-date').value||today(), beneficiaire:document.getElementById('r-benef').value,
+    montant:Number(document.getElementById('r-montant').value)||0, note:document.getElementById('r-note').value||null };
+  if(!row.montant){toast('Indique un montant');return;}
+  const {error}=await db.from(T('remboursements')).insert(row);
+  if(error){toast('Erreur : '+error.message);return;}
+  document.getElementById('r-montant').value=''; document.getElementById('r-note').value='';
+  toast('Enregistré ✅'); loadRemboursements();
+}
+
+// ===== Utilisateurs =====
+async function createUser(e){
+  e.preventDefault();
+  const email=document.getElementById('u-email').value.trim(), password=document.getElementById('u-pass').value;
+  const role=document.getElementById('u-role').value, regie_name=document.getElementById('u-regie').value.trim()||null;
+  const projs=[...document.querySelectorAll('.u-proj:checked')].map(c=>c.value);
+  const msg=document.getElementById('u-msg');
+  if(!projs.length){ msg.innerHTML='<span class="val-bad">Coche au moins un projet.</span>'; return; }
+  msg.innerHTML='Création en cours…';
+  const memberships=projs.map(p=>({project_key:p, role, regie_name}));
+  const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,memberships}});
+  let errText=null;
+  if(error){ errText=error.message; try{ const c=await error.context.json(); if(c&&c.error) errText=c.error; }catch(_){} }
+  else if(data&&data.error){ errText=data.error; }
+  if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
+  msg.innerHTML='<span class="val-good">Utilisateur créé ✅</span>';
+  document.getElementById('u-email').value=''; document.getElementById('u-pass').value=''; document.getElementById('u-regie').value='';
+  document.querySelectorAll('.u-proj:checked').forEach(c=>c.checked=false);
+  loadUsers();
+}
+async function loadUsers(){
+  const {data,error}=await db.from('app_memberships').select('*').order('email');
+  if(error){ return; }
+  document.getElementById('users-body').innerHTML=(data&&data.length)? data.map(u=>`<tr><td>${u.email||''}</td><td><span class="pill">${PROJECTS[u.project_key]?PROJECTS[u.project_key].nom:u.project_key}</span></td><td>${u.role}</td><td>${u.regie_name||'—'}</td></tr>`).join('') : `<tr><td colspan="4" class="empty">Aucun utilisateur</td></tr>`;
+}
+
+// ===== Mon espace (régie) =====
+async function loadMonEspace(){
+  const [{data:dos},{data:fr}]=await Promise.all([ db.from(T('dossiers')).select('*').order('date',{ascending:false}), db.from(T('frais')).select('*') ]);
+  const comm=(dos||[]).reduce((s,d)=>s+Number(d.commission_regie||0),0);
+  const refac=(fr||[]).reduce((s,f)=>s+Number(f.montant_regie||0),0);
+  document.getElementById('me-comm').textContent=eur(comm); document.getElementById('me-refac').textContent=eur(refac); document.getElementById('me-net').textContent=eur(comm-refac);
+  document.getElementById('me-dossiers').innerHTML=(dos&&dos.length)? dos.map(d=>`<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td class="num">${eur(d.marge_brute)}</td><td class="num">${num(d.regie_pct)} %</td><td class="num val-good">${eur(d.commission_regie)}</td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucun dossier</td></tr>`;
+}
+
+// ===== Suppression =====
 async function delRow(table,id){
   if(!confirm('Supprimer cette ligne ?'))return;
   const {error}=await db.from(table).delete().eq('id',id);
   if(error){toast('Erreur : '+error.message);return;}
-  toast('Supprimé');
-  if(CURRENT_ROLE==='regie') loadMonEspace(); else loadAll();
+  toast('Supprimé'); reloadData();
 }
 
-// ====== Import / Export Excel ======
-const _norm = s => (s==null?'':s.toString()).toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g,'');
-function _pick(m,...names){ for(const n of names){ const v=m[_norm(n)]; if(v!=null && v!=='') return v; } return null; }
+// ===== Import / Export Excel =====
+let IMPORT_SPECS={};
+const _norm=s=>(s==null?'':s.toString()).toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g,'');
+function _pick(m,...names){ for(const n of names){ const v=m[_norm(n)]; if(v!=null&&v!=='') return v; } return null; }
 function _pnum(v){ if(v==null||v==='') return 0; if(typeof v==='number') return v; return Number(String(v).replace(/[^0-9,.\-]/g,'').replace(/\s/g,'').replace(',','.'))||0; }
 function _p2(n){ return String(n).padStart(2,'0'); }
-function _pdate(v){
-  if(!v) return today();
-  if(v instanceof Date && !isNaN(v)) return `${v.getFullYear()}-${_p2(v.getMonth()+1)}-${_p2(v.getDate())}`;
-  const s=String(v).trim();
-  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return `${m[1]}-${_p2(m[2])}-${_p2(m[3])}`;
-  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(m){ let y=m[3]; if(y.length===2)y='20'+y; return `${y}-${_p2(m[2])}-${_p2(m[1])}`; }
-  return today();
-}
-function _findSource(name){ if(!name) return null; const n=_norm(name); return SOURCES.find(s=>_norm(s.nom)===n) || SOURCES.find(s=>_norm(s.nom).startsWith(n)) || null; }
-function _isExample(m){ return Object.values(m).some(v=> typeof v==='string' && _norm(v).includes('exemple')); }
-function _hasData(m){ return Object.values(m).some(v=> v!=null && v!==''); }
-
-const IMPORT_SPECS = {
-  dossiers:{
-    table:'engco_dossiers', reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','N° dépôt','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','% manager David','Commercial régie','% commission régie'],
-    example:['05/07/2026','EXEMPLE client (supprimez cette ligne)','14205','2255','0','1296','87','0','0','360','0','5','JO','40'],
-    build(m,errors,i){
-      if(_isExample(m)||!_hasData(m)) return null;
-      return {
-        date:_pdate(_pick(m,'Date')),
-        nom_client:_pick(m,'Client','Nom du client'),
-        numero_depot:(_pick(m,'N° dépôt','Numéro de dépôt','N° de dépôt')!=null?String(_pick(m,'N° dépôt','Numéro de dépôt','N° de dépôt')):null),
-        montant_prime:_pnum(_pick(m,'Prime HT','Prime','Montant de la prime')),
-        cout_installation:_pnum(_pick(m,'Coût installation')),
-        cout_materiel:_pnum(_pick(m,'Coût matériel')),
-        cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
-        cout_hamid:_pnum(_pick(m,'Coût Hamid')),
-        cout_livraison:_pnum(_pick(m,'Coût livraison')),
-        frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp','Frais supplémentaires')),
-        cout_audit:_pnum(_pick(m,'Coût audit')),
-        david_pct:(_pick(m,'% manager David','% David')!=null?_pnum(_pick(m,'% manager David','% David')):5),
-        commercial_regie:_pick(m,'Commercial régie','Commercial'),
-        regie_pct:_pnum(_pick(m,'% commission régie','% régie')),
-      };
-    }
-  },
-  apports:{
-    table:'engco_apports', reload:loadApports, sheet:'Apports',
-    headers:['Date','Source','Libellé','Montant dépense','% à compter','Taux (si shekel)','Part JD (%)','Part Dan (%)'],
-    example:['05/07/2026','DB Telecom','EXEMPLE loyer (supprimez cette ligne)','1000','50','','100','0'],
-    build(m,errors,i){
-      if(_isExample(m)||!_hasData(m)) return null;
-      const s=_findSource(_pick(m,'Source','Source (qui paie)'));
-      if(!s){ errors.push(`Ligne ${i+2} : source "${_pick(m,'Source')||''}" introuvable (crée-la dans l'onglet Sources, ou corrige le nom)`); return null; }
-      const isILS=s.devise==='ILS';
-      const jd=_pick(m,'Part JD (%)','Part JD'), dan=_pick(m,'Part Dan (%)','Part Dan');
-      const pc=_pick(m,'% à compter','Pourcentage');
-      return {
-        date:_pdate(_pick(m,'Date')),
-        source_id:s.id,
-        libelle:_pick(m,'Libellé','Libelle'),
-        montant_depense:_pnum(_pick(m,'Montant dépense','Montant de la dépense','Montant')),
-        pourcentage_compte:(pc!=null?_pnum(pc):100),
-        devise:s.devise,
-        taux_change:isILS?(_pnum(_pick(m,'Taux (si shekel)','Taux'))||null):null,
-        part_jd_pct:(jd!=null?_pnum(jd):Number(s.part_jd)),
-        part_dan_pct:(dan!=null?_pnum(dan):Number(s.part_dan)),
-      };
-    }
-  },
-  frais:{
-    table:'engco_frais', reload:loadFrais, sheet:'Frais',
+function _pdate(v){ if(!v) return today(); if(v instanceof Date&&!isNaN(v)) return `${v.getFullYear()}-${_p2(v.getMonth()+1)}-${_p2(v.getDate())}`;
+  const s=String(v).trim(); let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return `${m[1]}-${_p2(m[2])}-${_p2(m[3])}`;
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(m){ let y=m[3]; if(y.length===2)y='20'+y; return `${y}-${_p2(m[2])}-${_p2(m[1])}`; } return today(); }
+function _findSource(name){ if(!name) return null; const n=_norm(name); return SOURCES.find(s=>_norm(s.nom)===n)||SOURCES.find(s=>_norm(s.nom).startsWith(n))||null; }
+function _isEx(m){ return Object.values(m).some(v=>typeof v==='string'&&_norm(v).includes('exemple')); }
+function _has(m){ return Object.values(m).some(v=>v!=null&&v!==''); }
+function buildImportSpecs(){
+  const as=A();
+  const dossiers = PROJ.dossierType==='velo' ? {
+    table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
+    headers:['Date','Client','N° dépôt','Région','Nb vélos','Tarif unitaire','Autres coûts','% manager','Commercial régie','% commission régie'],
+    example:['05/07/2026','EXEMPLE (supprimez)','V001','France','10','80','0','5','JO','40'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), numero_depot:_pick(m,'N° dépôt','Numéro de dépôt'),
+      region:_pick(m,'Région')||'France', nb_velos:_pnum(_pick(m,'Nb vélos','Nombre de vélos')), tarif_unitaire:_pnum(_pick(m,'Tarif unitaire','Tarif'))||(_pick(m,'Région')==='Corse'?390:80),
+      autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:_pick(m,'Commercial régie','Régie'), regie_pct:_pnum(_pick(m,'% commission régie','% régie')) }; }
+  } : {
+    table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
+    headers:['Date','Client','N° dépôt','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','% manager','Commercial régie','% commission régie'],
+    example:['05/07/2026','EXEMPLE (supprimez)','14205','2255','0','1296','87','0','0','360','0','5','JO','40'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), numero_depot:_pick(m,'N° dépôt','Numéro de dépôt'),
+      montant_prime:_pnum(_pick(m,'Prime HT','Prime')), cout_installation:_pnum(_pick(m,'Coût installation')), cout_materiel:_pnum(_pick(m,'Coût matériel')), cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
+      cout_hamid:_pnum(_pick(m,'Coût Hamid')), cout_livraison:_pnum(_pick(m,'Coût livraison')), frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp')), cout_audit:_pnum(_pick(m,'Coût audit')),
+      david_pct:(_pick(m,'% manager','% manager David')!=null?_pnum(_pick(m,'% manager','% manager David')):5), commercial_regie:_pick(m,'Commercial régie','Régie'), regie_pct:_pnum(_pick(m,'% commission régie','% régie')) }; }
+  };
+  const apports = {
+    table:T('apports'), reload:loadApports, sheet:'Apports',
+    headers:['Date','Source','Libellé','Montant dépense','% à compter','Taux (si shekel)',...as.map(a=>`Part ${a.label} (%)`)],
+    example:['05/07/2026', SOURCES[0]?SOURCES[0].nom:'Source','EXEMPLE (supprimez)','1000','100','',...as.map((a,i)=>i===0?'100':'0')],
+    build(m){ if(_isEx(m)||!_has(m)) return null; const s=_findSource(_pick(m,'Source')); if(!s){ return null; } const isILS=s.devise==='ILS'; const pc=_pick(m,'% à compter');
+      const row={ date:_pdate(_pick(m,'Date')), source_id:s.id, libelle:_pick(m,'Libellé','Libelle'), montant_depense:_pnum(_pick(m,'Montant dépense','Montant')), pourcentage_compte:(pc!=null?_pnum(pc):100), devise:s.devise, taux_change:isILS?(_pnum(_pick(m,'Taux (si shekel)','Taux'))||null):null };
+      as.forEach(a=>{ const v=_pick(m,`Part ${a.label} (%)`); row['part_'+a.k+'_pct']=(v!=null?_pnum(v):Number(s['part_'+a.k])); }); return row; }
+  };
+  const frais = {
+    table:T('frais'), reload:loadFrais, sheet:'Frais',
     headers:['Date','Catégorie','Libellé','Fournisseur','Payé par (société)','Montant','Régie concernée','% refacturé régie'],
-    example:['05/07/2026','Audit client','EXEMPLE audit (supprimez cette ligne)','Cabinet X','DB Telecom','200','JO','50'],
-    build(m,errors,i){
-      if(_isExample(m)||!_hasData(m)) return null;
-      const srcName=_pick(m,'Payé par (société)','Payé par','Société');
-      const s=_findSource(srcName);
-      if(srcName && !s) errors.push(`Ligne ${i+2} : société "${srcName}" introuvable (payeur ignoré)`);
-      return {
-        date:_pdate(_pick(m,'Date')),
-        categorie:_pick(m,'Catégorie')||'Autre',
-        libelle:_pick(m,'Libellé','Libelle'),
-        fournisseur:_pick(m,'Fournisseur'),
-        source_id:s?s.id:null,
-        montant:_pnum(_pick(m,'Montant','Montant (€)')),
-        regie_concernee:_pick(m,'Régie concernée','Régie'),
-        pct_decompte:_pnum(_pick(m,'% refacturé régie','% refacturé à la régie','% refacturé')),
-      };
-    }
-  },
-};
-
-function downloadTemplate(type){
-  const spec=IMPORT_SPECS[type];
-  const ws=XLSX.utils.aoa_to_sheet([spec.headers, spec.example]);
-  ws['!cols']=spec.headers.map(h=>({wch:Math.max(12,h.length+2)}));
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, spec.sheet);
-  XLSX.writeFile(wb, `modele_${type}_ENGCO.xlsx`);
-  toast('Modèle téléchargé ✅ (remplis-le, garde les titres de colonnes)');
+    example:['05/07/2026','Fournisseur','EXEMPLE (supprimez)','Cabinet X', SOURCES[0]?SOURCES[0].nom:'','200','JO','50'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; const s=_findSource(_pick(m,'Payé par (société)','Payé par')); return { date:_pdate(_pick(m,'Date')), categorie:_pick(m,'Catégorie')||'Autre', libelle:_pick(m,'Libellé','Libelle'), fournisseur:_pick(m,'Fournisseur'), source_id:s?s.id:null, montant:_pnum(_pick(m,'Montant')), regie_concernee:_pick(m,'Régie concernée','Régie'), pct_decompte:_pnum(_pick(m,'% refacturé régie','% refacturé')) }; }
+  };
+  IMPORT_SPECS={dossiers,apports,frais};
 }
-
+function downloadTemplate(type){
+  const spec=IMPORT_SPECS[type]; const ws=XLSX.utils.aoa_to_sheet([spec.headers,spec.example]);
+  ws['!cols']=spec.headers.map(h=>({wch:Math.max(12,h.length+2)}));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,spec.sheet);
+  XLSX.writeFile(wb,`modele_${PROJ.key}_${type}.xlsx`); toast('Modèle téléchargé ✅');
+}
 async function importFile(type,file){
-  if(!file) return;
-  const spec=IMPORT_SPECS[type];
+  if(!file) return; const spec=IMPORT_SPECS[type];
   try{
-    const buf=await file.arrayBuffer();
-    const wb=XLSX.read(buf,{cellDates:true});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const raw=XLSX.utils.sheet_to_json(ws,{raw:true,cellDates:true,defval:null});
+    const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true});
+    const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:true,cellDates:true,defval:null});
     const rows=raw.map(r=>{ const m={}; for(const k in r) m[_norm(k)]=r[k]; return m; });
-    const toInsert=[], errors=[];
-    rows.forEach((m,i)=>{ const o=spec.build(m,errors,i); if(o) toInsert.push(o); });
-    if(!toInsert.length){ toast('Aucune ligne à importer'); if(errors.length) alert('Problèmes détectés :\n\n'+errors.join('\n')); return; }
+    const toInsert=[]; rows.forEach(m=>{ const o=spec.build(m); if(o) toInsert.push(o); });
+    if(!toInsert.length){ toast('Aucune ligne à importer'); return; }
     const {error}=await db.from(spec.table).insert(toInsert);
     if(error){ toast('Erreur : '+error.message); alert('Erreur import : '+error.message); return; }
-    toast(`${toInsert.length} ligne(s) importée(s) ✅`);
-    if(errors.length) alert(`Importé : ${toInsert.length} ligne(s).\n\nLignes ignorées / à vérifier :\n`+errors.join('\n'));
-    spec.reload();
-  }catch(e){ toast('Fichier illisible'); alert('Impossible de lire le fichier : '+(e.message||e)); }
+    toast(`${toInsert.length} ligne(s) importée(s) ✅`); spec.reload();
+  }catch(e){ toast('Fichier illisible'); alert('Impossible de lire : '+(e.message||e)); }
 }
 
-// ====== Démarrage ======
-['a-date','d-date','r-date','f-date'].forEach(i=>document.getElementById(i).value=today());
-document.getElementById('rc-mois').value=today().slice(0,7);
-dossierPreview();
+// ===== Démarrage =====
+['r-date','f-date'].forEach(i=>document.getElementById(i).value=today());
 initAuth();
 </script>
 </body>
