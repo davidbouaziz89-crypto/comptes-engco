@@ -304,7 +304,7 @@
     <section class="panel">
       <h2>Historique des frais</h2>
       <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Mois</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
         <tbody id="frais-body"></tbody>
       </table></div>
     </section>
@@ -474,6 +474,7 @@ function reloadData(){ if(CURRENT_ROLE==='regie') loadMonEspace(); else loadAll(
 // ===== Construction de l'UI selon les associés du projet =====
 function buildAssocUI(){
   const as=A();
+  // investi cards
   document.getElementById('db-invest-cards').innerHTML =
     as.map(a=>`<div class="card"><div class="label">Investi par ${a.label}</div><div class="value" id="db-inv-${a.k}">—</div></div>`).join('')
     + `<div class="card"><div class="label">Total investi</div><div class="value" id="db-inv-tot">—</div></div>`;
@@ -481,15 +482,19 @@ function buildAssocUI(){
   const share=(100/as.length).toFixed(as.length===3?1:0);
   document.getElementById('db-benef-cards').innerHTML = as.map(a=>`<div class="card"><div class="label">→ Part ${a.label} (${share}%)</div><div class="value" id="db-benef-${a.k}">—</div></div>`).join('');
   document.getElementById('r-benef').innerHTML = as.map(a=>`<option value="${a.remb}">${a.label}</option>`).join('');
+  // sources form + head
   document.getElementById('s-parts').innerHTML = as.map(a=>`<div class="field"><label>Part ${a.label} (%)</label><input type="number" step="0.01" id="s-part-${a.k}" value="0"></div>`).join('');
   document.getElementById('sources-head').innerHTML = `<th>Nom</th>`+as.map(a=>`<th class="num">${a.label}</th>`).join('')+`<th>Devise</th><th></th>`;
+  // apports parts + head
   document.getElementById('a-parts').innerHTML = as.map(a=>`<div class="field"><label>Part ${a.label} (%)</label><input type="number" step="0.01" id="a-part-${a.k}" value="0" oninput="apportPreview()"></div>`).join('');
-  document.getElementById('apports-head').innerHTML = `<th>Date</th><th>Source</th><th>Libellé</th><th class="num">Dépense</th><th class="num">%</th><th class="num">Compté</th>`+as.map(a=>`<th class="num">${a.label}</th>`).join('')+`<th></th>`;
+  document.getElementById('apports-head').innerHTML = `<th>Date</th><th>Mois</th><th>Source</th><th>Libellé</th><th class="num">Dépense</th><th class="num">%</th><th class="num">Compté</th>`+as.map(a=>`<th class="num">${a.label}</th>`).join('')+`<th></th>`;
+  // dossier form + head
   document.getElementById('dossier-hint').innerHTML = PROJ.dossierType==='velo'
     ? "Rémunération = nb de vélos × tarif de la région (France 80 € / Corse 390 €). Puis manager % et régie % → marge nette (partagée en "+as.length+")."
     : "Marge brute = Prime − tous les coûts. Puis manager % et régie % → marge nette (partagée en "+as.length+").";
   document.getElementById('dossier-fields').innerHTML = PROJ.dossierType==='velo' ? veloDossierForm() : ledDossierForm();
   document.getElementById('dossiers-head').innerHTML = PROJ.dossierType==='velo' ? veloDossierHead() : ledDossierHead();
+  // users projects checkboxes
   document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('');
   buildImportSpecs();
   document.getElementById('rc-mois').value=today().slice(0,7);
@@ -597,12 +602,12 @@ async function loadApports(){
   const as=A();
   document.getElementById('apports-body').innerHTML=(data&&data.length)? data.map(ap=>{
     const src=SOURCES.find(s=>s.id===ap.source_id);
-    return `<tr><td>${fdate(ap.date)}</td><td>${src?src.nom:'—'}</td><td>${ap.libelle||''}</td>
+    return `<tr><td>${fdate(ap.date)}</td><td>${moisLabel(ap.date)}</td><td>${src?src.nom:'—'}</td><td>${ap.libelle||''}</td>
       <td class="num">${num(ap.montant_depense)} ${ap.devise==='ILS'?'₪':'€'}</td>
       <td class="num">${num(ap.pourcentage_compte)} %</td><td class="num">${eur(ap.montant_eur)}</td>
       ${as.map(a=>`<td class="num">${eur(ap['montant_'+a.k])}</td>`).join('')}
       <td class="num"><button class="btn ghost small" onclick="editApport('${ap.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('apports')}','${ap.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="${as.length+7}" class="empty">Aucun apport</td></tr>`;
+  }).join('') : `<tr><td colspan="${as.length+8}" class="empty">Aucun apport</td></tr>`;
   window._apports=data||[]; refreshDashboard();
 }
 async function loadDossiers(){
@@ -631,12 +636,12 @@ async function loadFrais(){
   if(error){showError(error);return;}
   document.getElementById('frais-body').innerHTML=(data&&data.length)? data.map(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
-    return `<tr><td>${fdate(f.date)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}</td><td>${f.fournisseur||''}</td>
+    return `<tr><td>${fdate(f.date)}</td><td>${moisLabel(f.date)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}</td><td>${f.fournisseur||''}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
       <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="10" class="empty">Aucun frais</td></tr>`;
+  }).join('') : `<tr><td colspan="11" class="empty">Aucun frais</td></tr>`;
   window._frais=data||[]; refreshDashboard(); renderRegies(); checkMissingRecurrents();
 }
 
@@ -876,9 +881,9 @@ async function addFrais(e){
     pct_decompte:Number(document.getElementById('f-pct').value)||0 };
   if(!editingFraisId){
     const ym=(row.date||'').slice(0,7);
-    const dup=(window._frais||[]).find(f=>(f.categorie||'')===row.categorie && (f.date||'').slice(0,7)===ym);
+    const dup=(window._frais||[]).find(f=>(f.date||'').slice(0,7)===ym && Number(f.montant)===Number(row.montant));
     if(dup){
-      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais « '+row.categorie+' » existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+eur(dup.montant)+' le '+fdate(dup.date)+(dup.libelle?' ('+dup.libelle+')':'')+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
+      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais du MÊME montant ('+eur(row.montant)+') existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+(dup.libelle||dup.categorie||'')+(dup.fournisseur?' — '+dup.fournisseur:'')+' le '+fdate(dup.date)+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
       if(!ok) return;
     }
   }
