@@ -150,7 +150,8 @@
         <div class="field"><label>Qui récupère ?</label><select id="r-benef" required></select></div>
         <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="r-montant" placeholder="0.00" required></div>
         <div class="field"><label>Note</label><input type="text" id="r-note" placeholder="ex. virement"></div>
-        <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
+        <div class="field"><button class="btn" type="submit" id="r-savebtn">+ Ajouter</button></div>
+        <div class="field"><button class="btn ghost" type="button" id="r-cancelbtn" onclick="cancelEditRemboursement()" style="display:none">Annuler</button></div>
       </form>
       <div class="table-wrap"><table>
         <thead><tr><th>Date</th><th>Bénéficiaire</th><th class="num">Montant</th><th>Note</th><th></th></tr></thead>
@@ -178,7 +179,7 @@
         <div class="field"><label>% commission régie</label><input type="number" step="0.01" id="d-regiepct" value="0" oninput="dossierPreview()"></div>
       </form>
       <div class="preview" id="d-preview"></div>
-      <div style="margin-top:14px"><button class="btn" onclick="addDossier(event)">+ Enregistrer le dossier</button></div>
+      <div style="margin-top:14px"><button class="btn" id="d-savebtn" onclick="addDossier(event)">+ Enregistrer le dossier</button> <button class="btn ghost" type="button" id="d-cancelbtn" onclick="cancelEditDossier()" style="display:none">Annuler</button></div>
     </section>
     <section class="panel">
       <h2>Liste des dossiers</h2>
@@ -197,7 +198,8 @@
       <form class="row" onsubmit="addRegieConfig(event)">
         <div class="field"><label>Nom de la régie</label><input type="text" id="rg-nom" placeholder="ex. JO" required></div>
         <div class="field"><label>% par défaut</label><input type="number" step="0.01" id="rg-pct" value="0"></div>
-        <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
+        <div class="field"><button class="btn" type="submit" id="rg-savebtn">+ Ajouter</button></div>
+        <div class="field"><button class="btn ghost" type="button" id="rg-cancelbtn" onclick="cancelEditRegieCfg()" style="display:none">Annuler</button></div>
       </form>
       <div class="table-wrap"><table>
         <thead><tr><th>Régie</th><th class="num">% par défaut</th><th></th></tr></thead>
@@ -245,7 +247,7 @@
       </form>
       <form class="row" id="a-parts" style="margin-top:12px"></form>
       <div class="preview" id="a-preview"></div>
-      <div style="margin-top:14px"><button class="btn" onclick="addApport(event)">+ Enregistrer l'apport</button></div>
+      <div style="margin-top:14px"><button class="btn" id="a-savebtn" onclick="addApport(event)">+ Enregistrer l'apport</button> <button class="btn ghost" type="button" id="a-cancelbtn" onclick="cancelEditApport()" style="display:none">Annuler</button></div>
     </section>
     <section class="panel">
       <h2>Historique des apports</h2>
@@ -275,7 +277,8 @@
         <div class="field"><label>Régie concernée</label><input type="text" id="rc-regie" placeholder="facultatif"></div>
         <div class="field"><label>% refacturé régie</label><input type="number" step="0.01" id="rc-pct" value="0"></div>
         <div class="field"><label>À partir du mois</label><input type="month" id="rc-mois"></div>
-        <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
+        <div class="field"><button class="btn" type="submit" id="rc-savebtn">+ Ajouter</button></div>
+        <div class="field"><button class="btn ghost" type="button" id="rc-cancelbtn" onclick="cancelEditRecurrent()" style="display:none">Annuler</button></div>
       </form>
       <div class="table-wrap"><table>
         <thead><tr><th>Libellé</th><th class="num">Montant</th><th>Payé par</th><th>Régie</th><th class="num">%</th><th>Depuis</th><th></th></tr></thead>
@@ -556,7 +559,7 @@ async function loadRegiesConfig(){
   if(prev) sel.value=prev;
   document.getElementById('regiecfg-body').innerHTML = REGIES_CFG.length? REGIES_CFG.map(r=>`<tr>
     <td><b>${r.nom}</b></td><td class="num">${num(r.pct_defaut)} %</td>
-    <td class="num"><button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td>
+    <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td>
   </tr>`).join('') : `<tr><td colspan="3" class="empty">Aucune régie configurée</td></tr>`;
 }
 function onDossierRegie(){
@@ -564,13 +567,29 @@ function onDossierRegie(){
   if(r) document.getElementById('d-regiepct').value=r.pct_defaut;
   dossierPreview();
 }
+let editingRegieCfgId=null;
+function editRegieCfg(id){
+  const r=REGIES_CFG.find(x=>x.id===id); if(!r) return;
+  document.getElementById('rg-nom').value=r.nom; document.getElementById('rg-pct').value=r.pct_defaut;
+  editingRegieCfgId=id;
+  document.getElementById('rg-savebtn').textContent='💾 Modifier';
+  document.getElementById('rg-cancelbtn').style.display='';
+}
+function cancelEditRegieCfg(){
+  editingRegieCfgId=null;
+  document.getElementById('rg-nom').value=''; document.getElementById('rg-pct').value='0';
+  document.getElementById('rg-savebtn').textContent='+ Ajouter';
+  document.getElementById('rg-cancelbtn').style.display='none';
+}
 async function addRegieConfig(e){
   e.preventDefault();
   const nom=document.getElementById('rg-nom').value.trim(); if(!nom){toast('Indique un nom');return;}
-  const {error}=await db.from('app_regies').insert({project_key:PROJ.key, nom, pct_defaut:Number(document.getElementById('rg-pct').value)||0});
-  if(error){toast('Erreur : '+error.message);return;}
-  document.getElementById('rg-nom').value=''; document.getElementById('rg-pct').value='0';
-  toast('Régie ajoutée ✅'); loadRegiesConfig();
+  const data={project_key:PROJ.key, nom, pct_defaut:Number(document.getElementById('rg-pct').value)||0};
+  const wasEdit=!!editingRegieCfgId;
+  const res = wasEdit ? await db.from('app_regies').update(data).eq('id',editingRegieCfgId) : await db.from('app_regies').insert(data);
+  if(res.error){toast('Erreur : '+res.error.message);return;}
+  cancelEditRegieCfg();
+  toast(wasEdit?'Régie modifiée ✅':'Régie ajoutée ✅'); loadRegiesConfig();
 }
 async function loadApports(){
   const {data,error}=await db.from(T('apports')).select('*').order('date',{ascending:false});
@@ -582,7 +601,7 @@ async function loadApports(){
       <td class="num">${num(ap.montant_depense)} ${ap.devise==='ILS'?'₪':'€'}</td>
       <td class="num">${num(ap.pourcentage_compte)} %</td><td class="num">${eur(ap.montant_eur)}</td>
       ${as.map(a=>`<td class="num">${eur(ap['montant_'+a.k])}</td>`).join('')}
-      <td class="num"><button class="btn danger small" onclick="delRow('${T('apports')}','${ap.id}')">Suppr.</button></td></tr>`;
+      <td class="num"><button class="btn ghost small" onclick="editApport('${ap.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('apports')}','${ap.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="${as.length+7}" class="empty">Aucun apport</td></tr>`;
   window._apports=data||[]; refreshDashboard();
 }
@@ -593,7 +612,7 @@ async function loadDossiers(){
   document.getElementById('dossiers-body').innerHTML=(data&&data.length)? data.map(d=>{
     const reg=`${d.commercial_regie||'—'}${d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:''}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
-    const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td class="num"><button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
+    const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td class="num"><button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
     return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
   }).join('') : `<tr><td colspan="${velo?11:10}" class="empty">Aucun dossier</td></tr>`;
@@ -604,7 +623,7 @@ async function loadRemboursements(){
   if(error){showError(error);return;}
   document.getElementById('remb-body').innerHTML=(data&&data.length)? data.map(r=>`<tr>
     <td>${fdate(r.date)}</td><td>${r.beneficiaire}</td><td class="num">${eur(r.montant)}</td><td>${r.note||''}</td>
-    <td class="num"><button class="btn danger small" onclick="delRow('${T('remboursements')}','${r.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune récupération</td></tr>`;
+    <td class="num"><button class="btn ghost small" onclick="editRemboursement('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('remboursements')}','${r.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune récupération</td></tr>`;
   window._remb=data||[]; refreshDashboard();
 }
 async function loadFrais(){
@@ -682,6 +701,31 @@ function apportPreview(){
   const note=isILS?' <span style="color:var(--muted)">(taux +15 %)</span>':'';
   document.getElementById('a-preview').innerHTML=`Montant compté : <b>${eur(compte)}</b>${note} &nbsp;→&nbsp; ${parts}`;
 }
+let editingApportId=null;
+function editApport(id){
+  const ap=(window._apports||[]).find(x=>x.id===id); if(!ap) return;
+  document.getElementById('a-date').value=ap.date||today();
+  document.getElementById('a-source').value=ap.source_id||'';
+  const s=SOURCES.find(x=>x.id===ap.source_id);
+  const isILS=s&&s.devise==='ILS';
+  document.getElementById('a-taux-field').style.display=isILS?'flex':'none';
+  document.getElementById('a-taux').value=ap.taux_change||'';
+  document.getElementById('a-libelle').value=ap.libelle||'';
+  document.getElementById('a-montant').value=ap.montant_depense;
+  document.getElementById('a-pct').value=ap.pourcentage_compte;
+  A().forEach(a=>{ const el=document.getElementById('a-part-'+a.k); if(el) el.value=ap['part_'+a.k+'_pct']||0; });
+  editingApportId=id;
+  document.getElementById('a-savebtn').textContent='💾 Enregistrer les modifications';
+  document.getElementById('a-cancelbtn').style.display='';
+  apportPreview();
+  document.getElementById('a-preview').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditApport(){
+  editingApportId=null;
+  document.getElementById('a-montant').value=''; document.getElementById('a-libelle').value='';
+  document.getElementById('a-savebtn').textContent="+ Enregistrer l'apport";
+  document.getElementById('a-cancelbtn').style.display='none';
+}
 async function addApport(e){
   e.preventDefault();
   const source_id=document.getElementById('a-source').value;
@@ -694,10 +738,11 @@ async function addApport(e){
   const row={ date:document.getElementById('a-date').value||today(), source_id, libelle:document.getElementById('a-libelle').value||null,
     montant_depense:montant, pourcentage_compte:Number(document.getElementById('a-pct').value)||100, devise:s?s.devise:'EUR', taux_change:isILS?taux:null };
   A().forEach(a=>{ row['part_'+a.k+'_pct']=Number(document.getElementById('a-part-'+a.k).value)||0; });
-  const {error}=await db.from(T('apports')).insert(row);
-  if(error){toast('Erreur : '+error.message);return;}
-  document.getElementById('a-montant').value='';document.getElementById('a-libelle').value='';
-  toast('Apport enregistré ✅');loadApports();
+  const wasEdit=!!editingApportId;
+  const res = wasEdit ? await db.from(T('apports')).update(row).eq('id',editingApportId) : await db.from(T('apports')).insert(row);
+  if(res.error){toast('Erreur : '+res.error.message);return;}
+  cancelEditApport();
+  toast(wasEdit?'Apport modifié ✅':'Apport enregistré ✅');loadApports();
 }
 
 // ===== Dossiers =====
@@ -713,6 +758,33 @@ function dossierPreview(){
   document.getElementById('d-preview').innerHTML=`${extra}Marge brute : <b>${eur(brute)}</b> &nbsp; − manager ${num(dv)}% : <b>${eur(david)}</b> &nbsp; − régie ${num(rg)}% : <b>${eur(regie)}</b>`+
     `<br>Marge nette : <b class="${nette>=0?'val-good':'val-bad'}" style="font-size:18px">${eur(nette)}</b> <span style="color:var(--muted)">(${A().map(a=>a.label+' '+eur(per)).join(' / ')})</span>`;
 }
+let editingDossierId=null;
+function editDossier(id){
+  const d=(window._dossiers||[]).find(x=>x.id===id); if(!d) return;
+  const S=(i,val)=>{const el=document.getElementById(i); if(el) el.value=(val==null?'':val);};
+  S('d-date',d.date||today()); S('d-client',d.nom_client); S('d-depot',d.numero_depot);
+  S('d-davidpct',d.david_pct); S('d-regiepct',d.regie_pct);
+  const csel=document.getElementById('d-commercial');
+  if(d.commercial_regie && ![...csel.options].some(o=>o.value===d.commercial_regie)) csel.insertAdjacentHTML('beforeend',`<option value="${d.commercial_regie}">${d.commercial_regie}</option>`);
+  csel.value=d.commercial_regie||'';
+  if(PROJ.dossierType==='velo'){ S('d-region',d.region||'France'); S('d-nbvelos',d.nb_velos); S('d-tarif',d.tarif_unitaire); S('d-autrescouts',d.autres_couts); }
+  else { S('d-prime',d.montant_prime); S('d-install',d.cout_installation); S('d-materiel',d.cout_materiel); S('d-nacelle',d.cout_nacelle); S('d-hamid',d.cout_hamid); S('d-livraison',d.cout_livraison); S('d-fraissupp',d.frais_supp); S('d-audit',d.cout_audit); }
+  editingDossierId=id;
+  document.getElementById('d-savebtn').textContent='💾 Enregistrer les modifications';
+  document.getElementById('d-cancelbtn').style.display='';
+  dossierPreview();
+  document.getElementById('d-preview').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditDossier(){
+  editingDossierId=null;
+  ['d-client','d-depot'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
+  document.getElementById('d-commercial').value=''; document.getElementById('d-regiepct').value='0'; document.getElementById('d-davidpct').value='5';
+  if(PROJ.dossierType==='velo'){ const n=document.getElementById('d-nbvelos'); if(n)n.value='0'; const c=document.getElementById('d-autrescouts'); if(c)c.value='0'; }
+  else ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';});
+  document.getElementById('d-savebtn').textContent='+ Enregistrer le dossier';
+  document.getElementById('d-cancelbtn').style.display='none';
+  dossierPreview();
+}
 async function addDossier(e){
   e.preventDefault();
   const g=id=>{const el=document.getElementById(id); return el?Number(el.value)||0:0;};
@@ -721,13 +793,11 @@ async function addDossier(e){
     david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
   if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); }
   else { row.montant_prime=g('d-prime'); row.cout_installation=g('d-install'); row.cout_materiel=g('d-materiel'); row.cout_nacelle=g('d-nacelle'); row.cout_hamid=g('d-hamid'); row.cout_livraison=g('d-livraison'); row.frais_supp=g('d-fraissupp'); row.cout_audit=g('d-audit'); }
-  const {error}=await db.from(T('dossiers')).insert(row);
-  if(error){toast('Erreur : '+error.message);return;}
-  ['d-client','d-depot'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
-  document.getElementById('d-commercial').value=''; document.getElementById('d-regiepct').value='0'; document.getElementById('d-davidpct').value='5';
-  if(PROJ.dossierType==='velo'){ document.getElementById('d-nbvelos').value='0'; document.getElementById('d-autrescouts').value='0'; }
-  else ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit'].forEach(i=>document.getElementById(i).value='0');
-  dossierPreview(); toast('Dossier enregistré ✅'); loadDossiers();
+  const wasEdit=!!editingDossierId;
+  const res = wasEdit ? await db.from(T('dossiers')).update(row).eq('id',editingDossierId) : await db.from(T('dossiers')).insert(row);
+  if(res.error){toast('Erreur : '+res.error.message);return;}
+  cancelEditDossier();
+  toast(wasEdit?'Dossier modifié ✅':'Dossier enregistré ✅'); loadDossiers();
 }
 
 // ===== Sources =====
@@ -824,7 +894,7 @@ async function loadRecurrents(){
     const src=SOURCES.find(s=>s.id===r.source_id);
     return `<tr><td><b>${r.libelle}</b></td><td class="num">${r.montant_defaut!=null?eur(r.montant_defaut):'—'}</td><td>${src?src.nom:'—'}</td>
       <td>${r.regie_defaut||'—'}</td><td class="num">${num(r.pct_defaut)} %</td><td>${moisLabel(r.mois_debut)}</td>
-      <td class="num"><button class="btn danger small" onclick="delRow('${T('recurrents')}','${r.id}')">Suppr.</button></td></tr>`;
+      <td class="num"><button class="btn ghost small" onclick="editRecurrent('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('recurrents')}','${r.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="7" class="empty">Aucun frais récurrent</td></tr>`;
   fillCategorieOptions(); checkMissingRecurrents();
 }
@@ -833,6 +903,26 @@ function fillCategorieOptions(){
   const all=[...new Set([...(window._recurrents||[]).map(r=>r.libelle),'Audit client','Fournisseur','Autre'])];
   sel.innerHTML=all.map(c=>`<option>${c}</option>`).join(''); if(prev&&all.includes(prev)) sel.value=prev;
 }
+let editingRecurId=null;
+function editRecurrent(id){
+  const r=(window._recurrents||[]).find(x=>x.id===id); if(!r) return;
+  document.getElementById('rc-libelle').value=r.libelle;
+  document.getElementById('rc-montant').value=r.montant_defaut!=null?r.montant_defaut:'';
+  document.getElementById('rc-source').value=r.source_id||'';
+  document.getElementById('rc-regie').value=r.regie_defaut||'';
+  document.getElementById('rc-pct').value=r.pct_defaut||0;
+  document.getElementById('rc-mois').value=(r.mois_debut||'').slice(0,7);
+  editingRecurId=id;
+  document.getElementById('rc-savebtn').textContent='💾 Modifier';
+  document.getElementById('rc-cancelbtn').style.display='';
+}
+function cancelEditRecurrent(){
+  editingRecurId=null;
+  ['rc-libelle','rc-montant','rc-regie'].forEach(i=>document.getElementById(i).value=''); document.getElementById('rc-pct').value='0';
+  document.getElementById('rc-mois').value=today().slice(0,7);
+  document.getElementById('rc-savebtn').textContent='+ Ajouter';
+  document.getElementById('rc-cancelbtn').style.display='none';
+}
 async function addRecurrent(e){
   e.preventDefault();
   const libelle=document.getElementById('rc-libelle').value.trim(); if(!libelle){toast('Indique un libellé');return;}
@@ -840,10 +930,11 @@ async function addRecurrent(e){
   const row={ libelle, montant_defaut:document.getElementById('rc-montant').value!==''?Number(document.getElementById('rc-montant').value):null,
     source_id:document.getElementById('rc-source').value||null, regie_defaut:document.getElementById('rc-regie').value.trim()||null,
     pct_defaut:Number(document.getElementById('rc-pct').value)||0, mois_debut:(moisVal||today().slice(0,7))+'-01' };
-  const {error}=await db.from(T('recurrents')).insert(row);
-  if(error){toast('Erreur : '+error.message);return;}
-  ['rc-libelle','rc-montant','rc-regie'].forEach(i=>document.getElementById(i).value=''); document.getElementById('rc-pct').value='0';
-  toast('Frais récurrent ajouté ✅'); loadRecurrents();
+  const wasEdit=!!editingRecurId;
+  const res = wasEdit ? await db.from(T('recurrents')).update(row).eq('id',editingRecurId) : await db.from(T('recurrents')).insert(row);
+  if(res.error){toast('Erreur : '+res.error.message);return;}
+  cancelEditRecurrent();
+  toast(wasEdit?'Frais récurrent modifié ✅':'Frais récurrent ajouté ✅'); loadRecurrents();
 }
 function onFraisCategorie(){
   const r=(window._recurrents||[]).find(x=>x.libelle===document.getElementById('f-categorie').value); if(!r) return;
@@ -881,15 +972,33 @@ function renderRegieDetail(){
 }
 
 // ===== Remboursements =====
+let editingRembId=null;
+function editRemboursement(id){
+  const r=(window._remb||[]).find(x=>x.id===id); if(!r) return;
+  document.getElementById('r-date').value=r.date||today();
+  document.getElementById('r-benef').value=r.beneficiaire;
+  document.getElementById('r-montant').value=r.montant;
+  document.getElementById('r-note').value=r.note||'';
+  editingRembId=id;
+  document.getElementById('r-savebtn').textContent='💾 Modifier';
+  document.getElementById('r-cancelbtn').style.display='';
+}
+function cancelEditRemboursement(){
+  editingRembId=null;
+  document.getElementById('r-montant').value=''; document.getElementById('r-note').value='';
+  document.getElementById('r-savebtn').textContent='+ Ajouter';
+  document.getElementById('r-cancelbtn').style.display='none';
+}
 async function addRemboursement(e){
   e.preventDefault();
   const row={ date:document.getElementById('r-date').value||today(), beneficiaire:document.getElementById('r-benef').value,
     montant:Number(document.getElementById('r-montant').value)||0, note:document.getElementById('r-note').value||null };
   if(!row.montant){toast('Indique un montant');return;}
-  const {error}=await db.from(T('remboursements')).insert(row);
-  if(error){toast('Erreur : '+error.message);return;}
-  document.getElementById('r-montant').value=''; document.getElementById('r-note').value='';
-  toast('Enregistré ✅'); loadRemboursements();
+  const wasEdit=!!editingRembId;
+  const res = wasEdit ? await db.from(T('remboursements')).update(row).eq('id',editingRembId) : await db.from(T('remboursements')).insert(row);
+  if(res.error){toast('Erreur : '+res.error.message);return;}
+  cancelEditRemboursement();
+  toast(wasEdit?'Récupération modifiée ✅':'Enregistré ✅'); loadRemboursements();
 }
 
 // ===== Utilisateurs =====
