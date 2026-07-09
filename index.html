@@ -20,7 +20,10 @@
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
   .btn.small{padding:6px 10px;font-size:12px}
   .btn.danger{background:transparent;border:1px solid var(--danger);color:#fca5a5}
-  nav{display:flex;gap:6px;padding:12px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel)}
+  nav{display:flex;gap:6px;padding:12px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:40;box-shadow:0 6px 16px rgba(0,0,0,.28)}
+  .search-box{position:relative;max-width:380px;margin-bottom:6px}
+  .search-box input{padding-left:34px}
+  .search-box .ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
   nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600}
   nav button.active{background:var(--panel2);color:var(--txt)}
   main{padding:22px;max-width:1150px;margin:0 auto}
@@ -183,6 +186,7 @@
     </section>
     <section class="panel">
       <h2>Liste des dossiers</h2>
+      <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, n° dépôt, régie, région…" oninput="renderDossiers()"></div>
       <div class="table-wrap"><table>
         <thead><tr id="dossiers-head"></tr></thead>
         <tbody id="dossiers-body"></tbody>
@@ -251,6 +255,7 @@
     </section>
     <section class="panel">
       <h2>Historique des apports</h2>
+      <div class="search-box"><span class="ic">🔎</span><input type="text" id="apports-search" placeholder="Rechercher une source, libellé, mois, montant…" oninput="renderApports()"></div>
       <div class="table-wrap"><table>
         <thead><tr id="apports-head"></tr></thead>
         <tbody id="apports-body"></tbody>
@@ -303,6 +308,7 @@
     </section>
     <section class="panel">
       <h2>Historique des frais</h2>
+      <div class="search-box"><span class="ic">🔎</span><input type="text" id="frais-search" placeholder="Rechercher : payé par (ex. DB Telecom), fournisseur, catégorie, mois…" oninput="renderFrais()"></div>
       <div class="table-wrap"><table>
         <thead><tr><th>Date</th><th>Mois</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
         <tbody id="frais-body"></tbody>
@@ -403,6 +409,8 @@ const eur = n => new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}
 const num = n => new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(Number(n)||0);
 const fdate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('fr-FR') : '';
 function today(){return new Date().toISOString().slice(0,10);}
+function searchNorm(s){ return (s==null?'':s.toString()).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function matchSearch(term,text){ const t=searchNorm(term).trim(); if(!t) return true; const hay=searchNorm(text); return t.split(/\s+/).every(w=>hay.includes(w)); }
 function toast(msg){ const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(window._tt);window._tt=setTimeout(()=>el.style.display='none',2600); }
 function showError(e){ const b=document.getElementById('loaderr');b.style.display='block';b.textContent="⚠️ Souci de connexion : "+(e.message||e); }
 function showTab(t){
@@ -599,29 +607,38 @@ async function addRegieConfig(e){
 async function loadApports(){
   const {data,error}=await db.from(T('apports')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
-  const as=A();
-  document.getElementById('apports-body').innerHTML=(data&&data.length)? data.map(ap=>{
+  window._apports=data||[]; renderApports(); refreshDashboard();
+}
+function renderApports(){
+  const as=A(); const term=(document.getElementById('apports-search')||{}).value||'';
+  const rows=(window._apports||[]).filter(ap=>{
+    const src=SOURCES.find(s=>s.id===ap.source_id);
+    return matchSearch(term,[fdate(ap.date),moisLabel(ap.date),src?src.nom:'',ap.libelle,ap.montant_depense,ap.montant_eur].join(' '));
+  });
+  document.getElementById('apports-body').innerHTML=rows.length? rows.map(ap=>{
     const src=SOURCES.find(s=>s.id===ap.source_id);
     return `<tr><td>${fdate(ap.date)}</td><td>${moisLabel(ap.date)}</td><td>${src?src.nom:'—'}</td><td>${ap.libelle||''}</td>
       <td class="num">${num(ap.montant_depense)} ${ap.devise==='ILS'?'₪':'€'}</td>
       <td class="num">${num(ap.pourcentage_compte)} %</td><td class="num">${eur(ap.montant_eur)}</td>
       ${as.map(a=>`<td class="num">${eur(ap['montant_'+a.k])}</td>`).join('')}
       <td class="num"><button class="btn ghost small" onclick="editApport('${ap.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('apports')}','${ap.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="${as.length+8}" class="empty">Aucun apport</td></tr>`;
-  window._apports=data||[]; refreshDashboard();
+  }).join('') : `<tr><td colspan="${as.length+8}" class="empty">${term?'Aucun apport ne correspond à la recherche':'Aucun apport'}</td></tr>`;
 }
 async function loadDossiers(){
   const {data,error}=await db.from(T('dossiers')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
-  const velo=PROJ.dossierType==='velo';
-  document.getElementById('dossiers-body').innerHTML=(data&&data.length)? data.map(d=>{
+  window._dossiers=data||[]; renderDossiers(); refreshDashboard(); renderRegies();
+}
+function renderDossiers(){
+  const velo=PROJ.dossierType==='velo'; const term=(document.getElementById('dossiers-search')||{}).value||'';
+  const rows=(window._dossiers||[]).filter(d=>matchSearch(term,[fdate(d.date),moisLabel(d.date),d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette].join(' ')));
+  document.getElementById('dossiers-body').innerHTML=rows.length? rows.map(d=>{
     const reg=`${d.commercial_regie||'—'}${d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:''}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
     const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td class="num"><button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
     return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
-  }).join('') : `<tr><td colspan="${velo?11:10}" class="empty">Aucun dossier</td></tr>`;
-  window._dossiers=data||[]; refreshDashboard(); renderRegies();
+  }).join('') : `<tr><td colspan="${velo?11:10}" class="empty">${term?'Aucun dossier ne correspond à la recherche':'Aucun dossier'}</td></tr>`;
 }
 async function loadRemboursements(){
   const {data,error}=await db.from(T('remboursements')).select('*').order('date',{ascending:false});
@@ -634,15 +651,22 @@ async function loadRemboursements(){
 async function loadFrais(){
   const {data,error}=await db.from(T('frais')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
-  document.getElementById('frais-body').innerHTML=(data&&data.length)? data.map(f=>{
+  window._frais=data||[]; renderFrais(); refreshDashboard(); renderRegies(); checkMissingRecurrents();
+}
+function renderFrais(){
+  const term=(document.getElementById('frais-search')||{}).value||'';
+  const rows=(window._frais||[]).filter(f=>{
+    const src=SOURCES.find(s=>s.id===f.source_id);
+    return matchSearch(term,[fdate(f.date),moisLabel(f.date),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant].join(' '));
+  });
+  document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
     return `<tr><td>${fdate(f.date)}</td><td>${moisLabel(f.date)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}</td><td>${f.fournisseur||''}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
       <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="11" class="empty">Aucun frais</td></tr>`;
-  window._frais=data||[]; refreshDashboard(); renderRegies(); checkMissingRecurrents();
+  }).join('') : `<tr><td colspan="11" class="empty">${term?'Aucun frais ne correspond à la recherche':'Aucun frais'}</td></tr>`;
 }
 
 // ===== Tableau de bord =====
