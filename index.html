@@ -404,7 +404,7 @@ function A(){ return PROJ.associes; }
 
 // Lien vers le CRM par projet. Mettre l'URL d'une fiche client avec {id} là où va l'identifiant
 // (ex. 'https://mon-crm.com/fiche/{id}'). Si pas de {id}, l'ID est ajouté à la fin. Vide = ID non cliquable.
-const CRM_URL_TEMPLATE = { led:'', velo:'' };
+const CRM_URL_TEMPLATE = { led:'https://nrj.koneckt.fr/crm/contact.php?id_contact={id}', velo:'https://nrj.koneckt.fr/crm/contact.php?id_contact={id}' };
 function crmLink(id){ if(id==null||id===''||!PROJ) return null; const t=(CRM_URL_TEMPLATE[PROJ.key]||'').trim(); if(!t) return null; return t.includes('{id}')?t.replace(/\{id\}/g,encodeURIComponent(id)):(t+encodeURIComponent(id)); }
 function dossierIdCell(d){ const id=d.crm_id||''; if(!id) return '<td>—</td>'; const url=crmLink(id); return url?`<td><a href="${url}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${id} ↗</a></td>`:`<td>${id}</td>`; }
 
