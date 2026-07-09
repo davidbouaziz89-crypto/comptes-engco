@@ -241,7 +241,7 @@
         <div class="field"><label>Libellé</label><input type="text" id="a-libelle" placeholder="ex. loyer, virement…"></div>
         <div class="field"><label>Montant de la dépense</label><input type="number" step="0.01" id="a-montant" placeholder="0.00" required oninput="apportPreview()"></div>
         <div class="field"><label>% à compter</label><input type="number" step="0.01" id="a-pct" value="100" oninput="apportPreview()"></div>
-        <div class="field" id="a-taux-field"><label>Taux (1 shekel = ? €)</label><input type="number" step="0.0001" id="a-taux" placeholder="ex. 0.25" oninput="apportPreview()"></div>
+        <div class="field" id="a-taux-field"><label>Taux 1 shekel = ? € (+15 % auto)</label><input type="number" step="0.0001" id="a-taux" placeholder="ex. 0.25" oninput="apportPreview()"></div>
       </form>
       <form class="row" id="a-parts" style="margin-top:12px"></form>
       <div class="preview" id="a-preview"></div>
@@ -674,10 +674,12 @@ function apportPreview(){
   const s=SOURCES.find(x=>x.id===document.getElementById('a-source').value);
   const dep=Number(document.getElementById('a-montant').value)||0;
   const pct=Number(document.getElementById('a-pct').value)||0;
-  const taux=(s&&s.devise==='ILS')?(Number(document.getElementById('a-taux').value)||0):1;
-  const compte=dep*pct/100*taux;
+  const isILS=s&&s.devise==='ILS';
+  const taux=isILS?(Number(document.getElementById('a-taux').value)||0):1;
+  const compte=dep*pct/100*taux*(isILS?1.15:1);
   const parts=A().map(a=>{ const p=Number((document.getElementById('a-part-'+a.k)||{}).value)||0; return `${a.label} ${eur(compte*p/100)}`; }).join(' / ');
-  document.getElementById('a-preview').innerHTML=`Montant compté : <b>${eur(compte)}</b> &nbsp;→&nbsp; ${parts}`;
+  const note=isILS?' <span style="color:var(--muted)">(taux +15 %)</span>':'';
+  document.getElementById('a-preview').innerHTML=`Montant compté : <b>${eur(compte)}</b>${note} &nbsp;→&nbsp; ${parts}`;
 }
 async function addApport(e){
   e.preventDefault();
