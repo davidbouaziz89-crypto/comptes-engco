@@ -195,6 +195,10 @@
     <section class="panel">
       <h2>Liste des dossiers</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, n° dépôt, régie, région…" oninput="renderDossiers()"></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="field" style="max-width:230px"><label>Filtrer par régie / campagne</label><select id="dossiers-fregie" onchange="renderDossiers()"></select></div>
+        <div class="field" id="dossiers-fregion-wrap" style="max-width:200px"><label>Filtrer par région</label><select id="dossiers-fregion" onchange="renderDossiers()"><option value="">Toutes les régions</option><option>France</option><option>Corse</option><option>DOM-TOM</option></select></div>
+      </div>
       <div class="table-wrap"><table>
         <thead><tr id="dossiers-head"></tr></thead>
         <tbody id="dossiers-body"></tbody>
@@ -519,6 +523,7 @@ function buildAssocUI(){
   document.getElementById('dossier-managerrow').innerHTML = managerRegieRow();
   // régie config adaptée au projet
   const velo=PROJ.dossierType==='velo';
+  document.getElementById('dossiers-fregion-wrap').style.display = velo?'':'none';
   document.getElementById('rg-title').innerHTML = velo ? '⚙️ Régies / Campagnes (commission par vélo)' : '⚙️ Régies configurées (nom + % par défaut)';
   document.getElementById('rg-hint').innerHTML = velo
     ? "Ajoute tes régies ET tes campagnes internes. Indique la commission en € par vélo pour chaque région. Coche « Interne » si la commission reste dans la boîte (elle ne réduit pas la marge nette)."
@@ -728,14 +733,30 @@ async function loadDossiers(){
 }
 function renderDossiers(){
   const velo=PROJ.dossierType==='velo'; const term=(document.getElementById('dossiers-search')||{}).value||'';
-  const rows=(window._dossiers||[]).filter(d=>matchSearch(term,[fdate(d.date),moisLabel(d.date),d.crm_id,d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette].join(' ')));
+  const all=window._dossiers||[];
+  // remplir le filtre régie (en conservant la sélection)
+  const freg=document.getElementById('dossiers-fregie');
+  if(freg){
+    const cur=freg.value;
+    const regies=[...new Set(all.map(d=>(d.commercial_regie||'').trim()).filter(Boolean))].sort();
+    freg.innerHTML='<option value="">Toutes les régies</option>'+regies.map(r=>`<option value="${r}">${r}</option>`).join('')+'<option value="__none__">— sans régie —</option>';
+    if([...freg.options].some(o=>o.value===cur)) freg.value=cur;
+  }
+  const fRegie=(document.getElementById('dossiers-fregie')||{}).value||'';
+  const fRegion=(document.getElementById('dossiers-fregion')||{}).value||'';
+  const rows=all.filter(d=>{
+    const reg=(d.commercial_regie||'').trim();
+    if(fRegie==='__none__'){ if(reg) return false; } else if(fRegie){ if(reg!==fRegie) return false; }
+    if(fRegion && (d.region||'')!==fRegion) return false;
+    return matchSearch(term,[fdate(d.date),moisLabel(d.date),d.crm_id,d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette].join(' '));
+  });
   document.getElementById('dossiers-body').innerHTML=rows.length? rows.map(d=>{
     const reg=`${d.commercial_regie||'—'}${velo?(d.regie_interne?` <span style="color:var(--muted);font-size:11px">(interne)</span>`:''):(d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:'')}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
     const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td class="num"><button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
     return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
-  }).join('') : `<tr><td colspan="${velo?12:11}" class="empty">${term?'Aucun dossier ne correspond à la recherche':'Aucun dossier'}</td></tr>`;
+  }).join('') : `<tr><td colspan="${velo?12:11}" class="empty">${(term||fRegie||fRegion)?'Aucun dossier ne correspond à la recherche / aux filtres':'Aucun dossier'}</td></tr>`;
 }
 async function loadRemboursements(){
   const {data,error}=await db.from(T('remboursements')).select('*').order('date',{ascending:false});
@@ -1270,11 +1291,25 @@ async function importFile(type,file){
     const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true});
     const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:true,cellDates:true,defval:null});
     const rows=raw.map(r=>{ const m={}; for(const k in r) m[_norm(k)]=r[k]; return m; });
-    const toInsert=[]; rows.forEach(m=>{ const o=spec.build(m); if(o) toInsert.push(o); });
-    if(!toInsert.length){ toast('Aucune ligne à importer'); return; }
+    const built=[]; rows.forEach(m=>{ const o=spec.build(m); if(o) built.push(o); });
+    if(!built.length){ toast('Aucune ligne à importer'); return; }
+    // Anti-doublons : contre les données existantes ET à l'intérieur du fichier
+    const existing = type==='dossiers' ? (window._dossiers||[]) : type==='frais' ? (window._frais||[]) : [];
+    const isDup=(o,list)=>{
+      if(type==='dossiers'){ const nid=(o.crm_id||'').toString().trim(), ndep=(o.numero_depot||'').toString().trim();
+        return list.some(d=> (nid && (d.crm_id||'').toString().trim()===nid) || (ndep && (d.numero_depot||'').toString().trim()===ndep) ); }
+      if(type==='frais'){ const ym=(o.date||'').slice(0,7);
+        return list.some(f=> (f.date||'').slice(0,7)===ym && Number(f.montant)===Number(o.montant) ); }
+      return false;
+    };
+    const toInsert=[]; let dupCount=0;
+    built.forEach(o=>{ if(isDup(o, existing.concat(toInsert))){ dupCount++; } else toInsert.push(o); });
+    if(!toInsert.length){ alert(dupCount? ('Aucune ligne importée : les '+dupCount+' ligne(s) du fichier existent déjà (doublons).') : 'Aucune ligne à importer'); return; }
     const {error}=await db.from(spec.table).insert(toInsert);
     if(error){ toast('Erreur : '+error.message); alert('Erreur import : '+error.message); return; }
-    toast(`${toInsert.length} ligne(s) importée(s) ✅`); spec.reload();
+    toast(`${toInsert.length} importée(s) ✅`+(dupCount?` — ${dupCount} doublon(s) ignoré(s)`:''));
+    if(dupCount) alert('Import terminé :\n• '+toInsert.length+' ligne(s) importée(s)\n• '+dupCount+' doublon(s) ignoré(s) (déjà présents, non réimportés)');
+    spec.reload();
   }catch(e){ toast('Fichier illisible'); alert('Impossible de lire : '+(e.message||e)); }
 }
 
