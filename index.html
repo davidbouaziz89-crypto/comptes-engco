@@ -176,11 +176,7 @@
       <div class="hint" id="dossier-hint"></div>
       <div id="dossier-fields"></div>
       <div class="hint" style="margin:16px 0 8px">Manager &amp; régie (prélevés sur la marge) :</div>
-      <form class="row" onsubmit="addDossier(event)">
-        <div class="field"><label>% manager</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
-        <div class="field"><label>Régie</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
-        <div class="field"><label>% commission régie</label><input type="number" step="0.01" id="d-regiepct" value="0" oninput="dossierPreview()"></div>
-      </form>
+      <div id="dossier-managerrow"></div>
       <div class="preview" id="d-preview"></div>
       <div style="margin-top:14px"><button class="btn" id="d-savebtn" onclick="addDossier(event)">+ Enregistrer le dossier</button> <button class="btn ghost" type="button" id="d-cancelbtn" onclick="cancelEditDossier()" style="display:none">Annuler</button></div>
     </section>
@@ -197,16 +193,16 @@
   <!-- REGIES -->
   <div id="tab-regies" class="hidden">
     <section class="panel">
-      <h2>⚙️ Régies configurées (nom + % par défaut)</h2>
-      <div class="hint">Ajoute tes régies ici. Quand tu crées un dossier, tu choisis la régie et son % se remplit tout seul (modifiable).</div>
+      <h2 id="rg-title">⚙️ Régies configurées</h2>
+      <div class="hint" id="rg-hint"></div>
       <form class="row" onsubmit="addRegieConfig(event)">
         <div class="field"><label>Nom de la régie</label><input type="text" id="rg-nom" placeholder="ex. JO" required></div>
-        <div class="field"><label>% par défaut</label><input type="number" step="0.01" id="rg-pct" value="0"></div>
+        <span id="rg-extra-fields" style="display:contents"></span>
         <div class="field"><button class="btn" type="submit" id="rg-savebtn">+ Ajouter</button></div>
         <div class="field"><button class="btn ghost" type="button" id="rg-cancelbtn" onclick="cancelEditRegieCfg()" style="display:none">Annuler</button></div>
       </form>
       <div class="table-wrap"><table>
-        <thead><tr><th>Régie</th><th class="num">% par défaut</th><th></th></tr></thead>
+        <thead><tr id="regiecfg-head"></tr></thead>
         <tbody id="regiecfg-body"></tbody>
       </table></div>
     </section>
@@ -502,6 +498,22 @@ function buildAssocUI(){
     : "Marge brute = Prime − tous les coûts. Puis manager % et régie % → marge nette (partagée en "+as.length+").";
   document.getElementById('dossier-fields').innerHTML = PROJ.dossierType==='velo' ? veloDossierForm() : ledDossierForm();
   document.getElementById('dossiers-head').innerHTML = PROJ.dossierType==='velo' ? veloDossierHead() : ledDossierHead();
+  document.getElementById('dossier-managerrow').innerHTML = managerRegieRow();
+  // régie config adaptée au projet
+  const velo=PROJ.dossierType==='velo';
+  document.getElementById('rg-title').innerHTML = velo ? '⚙️ Régies / Campagnes (commission par vélo)' : '⚙️ Régies configurées (nom + % par défaut)';
+  document.getElementById('rg-hint').innerHTML = velo
+    ? "Ajoute tes régies ET tes campagnes internes. Indique la commission en € par vélo pour chaque région. Coche « Interne » si la commission reste dans la boîte (elle ne réduit pas la marge nette)."
+    : "Ajoute tes régies ici. Quand tu crées un dossier, tu choisis la régie et son % se remplit tout seul (modifiable).";
+  document.getElementById('rg-extra-fields').innerHTML = velo
+    ? `<div class="field"><label>€/vélo France</label><input type="number" step="0.01" id="rg-mf" value="0"></div>
+       <div class="field"><label>€/vélo Corse</label><input type="number" step="0.01" id="rg-mc" value="0"></div>
+       <div class="field"><label>€/vélo DOM-TOM</label><input type="number" step="0.01" id="rg-md" value="0"></div>
+       <div class="field"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="rg-interne"> Interne (gardée)</label></div>`
+    : `<div class="field"><label>% par défaut</label><input type="number" step="0.01" id="rg-pct" value="0"></div>`;
+  document.getElementById('regiecfg-head').innerHTML = velo
+    ? `<th>Régie / Campagne</th><th class="num">€/vélo France</th><th class="num">€/vélo Corse</th><th class="num">€/vélo DOM-TOM</th><th>Interne</th><th></th>`
+    : `<th>Régie</th><th class="num">% par défaut</th><th></th>`;
   // users projects checkboxes
   document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('');
   buildImportSpecs();
@@ -528,14 +540,28 @@ function veloDossierForm(){ return `
   <form class="row" onsubmit="addDossier(event)">
     <div class="field"><label>Date</label><input type="date" id="d-date" required></div>
     <div class="field"><label>Nom du client</label><input type="text" id="d-client"></div>
-    <div class="field"><label>Région</label><select id="d-region" onchange="onVeloRegion()"><option>France</option><option>Corse</option></select></div>
+    <div class="field"><label>Région</label><select id="d-region" onchange="onVeloRegion()"><option>France</option><option>Corse</option><option>DOM-TOM</option></select></div>
     <div class="field"><label>Nombre de vélos</label><input type="number" step="1" id="d-nbvelos" value="0" oninput="dossierPreview()"></div>
     <div class="field"><label>Tarif / vélo (€)</label><input type="number" step="0.01" id="d-tarif" value="80" oninput="dossierPreview()"></div>
     <div class="field"><label>Autres coûts (€)</label><input type="number" step="0.01" id="d-autrescouts" value="0" oninput="dossierPreview()"></div>
   </form>`; }
 function ledDossierHead(){ return `<th>Date</th><th>Client</th><th>N° dépôt</th><th class="num">Prime</th><th class="num">Marge brute</th><th class="num">Manager</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th></th>`; }
-function veloDossierHead(){ return `<th>Date</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th></th>`; }
-function onVeloRegion(){ document.getElementById('d-tarif').value = document.getElementById('d-region').value==='Corse'?390:80; dossierPreview(); }
+function veloDossierHead(){ return `<th>Date</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th></th>`; }
+const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
+function onVeloRegion(){ document.getElementById('d-tarif').value = VELO_TARIF_DEFAUT[document.getElementById('d-region').value]||80; onDossierRegie(); }
+function managerRegieRow(){
+  if(PROJ.dossierType==='velo') return `<form class="row" onsubmit="addDossier(event)">
+    <div class="field"><label>% manager</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
+    <div class="field"><label>Régie / Campagne</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
+    <div class="field"><label>Commission / vélo (€)</label><input type="number" step="0.01" id="d-regie-montant" value="0" oninput="dossierPreview()"></div>
+    <div class="field"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="d-regie-interne" onchange="dossierPreview()"> Campagne interne (gardée)</label></div>
+  </form>`;
+  return `<form class="row" onsubmit="addDossier(event)">
+    <div class="field"><label>% manager</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
+    <div class="field"><label>Régie</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
+    <div class="field"><label>% commission régie</label><input type="number" step="0.01" id="d-regiepct" value="0" oninput="dossierPreview()"></div>
+  </form>`;
+}
 
 // ===== Chargement =====
 async function loadAll(){
@@ -566,37 +592,66 @@ async function loadSources(){
 async function loadRegiesConfig(){
   const {data,error}=await db.from('app_regies').select('*').eq('project_key',PROJ.key).order('nom');
   if(error){ REGIES_CFG=[]; } else REGIES_CFG=data||[];
+  const velo=PROJ.dossierType==='velo';
   const sel=document.getElementById('d-commercial'); const prev=sel.value;
-  sel.innerHTML='<option value="">— aucune —</option>'+REGIES_CFG.map(r=>`<option value="${r.nom}">${r.nom} (${num(r.pct_defaut)}%)</option>`).join('');
+  sel.innerHTML='<option value="">— aucune —</option>'+REGIES_CFG.map(r=>`<option value="${r.nom}">${r.nom}${velo?(r.interne?' — interne':''):` (${num(r.pct_defaut)}%)`}</option>`).join('');
   if(prev) sel.value=prev;
-  document.getElementById('regiecfg-body').innerHTML = REGIES_CFG.length? REGIES_CFG.map(r=>`<tr>
-    <td><b>${r.nom}</b></td><td class="num">${num(r.pct_defaut)} %</td>
-    <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td>
-  </tr>`).join('') : `<tr><td colspan="3" class="empty">Aucune régie configurée</td></tr>`;
+  const body=document.getElementById('regiecfg-body');
+  if(!REGIES_CFG.length){ body.innerHTML=`<tr><td colspan="${velo?6:3}" class="empty">Aucune régie configurée</td></tr>`; return; }
+  body.innerHTML=REGIES_CFG.map(r=> velo
+    ? `<tr><td><b>${r.nom}</b></td><td class="num">${eur(r.montant_france)}</td><td class="num">${eur(r.montant_corse)}</td><td class="num">${eur(r.montant_domtom)}</td><td>${r.interne?'✅ Oui':'—'}</td>
+        <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td></tr>`
+    : `<tr><td><b>${r.nom}</b></td><td class="num">${num(r.pct_defaut)} %</td>
+        <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td></tr>`
+  ).join('');
 }
 function onDossierRegie(){
   const r=REGIES_CFG.find(x=>x.nom===document.getElementById('d-commercial').value);
-  if(r) document.getElementById('d-regiepct').value=r.pct_defaut;
+  if(PROJ.dossierType==='velo'){
+    const region=(document.getElementById('d-region')||{}).value||'France';
+    const mu = r ? (region==='France'?r.montant_france:region==='Corse'?r.montant_corse:r.montant_domtom) : 0;
+    const mel=document.getElementById('d-regie-montant'); if(mel) mel.value=Number(mu)||0;
+    const ie=document.getElementById('d-regie-interne'); if(ie) ie.checked=!!(r&&r.interne);
+  } else {
+    if(r) document.getElementById('d-regiepct').value=r.pct_defaut;
+  }
   dossierPreview();
 }
 let editingRegieCfgId=null;
 function editRegieCfg(id){
   const r=REGIES_CFG.find(x=>x.id===id); if(!r) return;
-  document.getElementById('rg-nom').value=r.nom; document.getElementById('rg-pct').value=r.pct_defaut;
+  document.getElementById('rg-nom').value=r.nom;
+  if(PROJ.dossierType==='velo'){
+    const s=(i,v)=>{const el=document.getElementById(i); if(el) el.value=v;};
+    s('rg-mf',r.montant_france||0); s('rg-mc',r.montant_corse||0); s('rg-md',r.montant_domtom||0);
+    const ci=document.getElementById('rg-interne'); if(ci) ci.checked=!!r.interne;
+  } else {
+    document.getElementById('rg-pct').value=r.pct_defaut;
+  }
   editingRegieCfgId=id;
   document.getElementById('rg-savebtn').textContent='💾 Modifier';
   document.getElementById('rg-cancelbtn').style.display='';
 }
 function cancelEditRegieCfg(){
   editingRegieCfgId=null;
-  document.getElementById('rg-nom').value=''; document.getElementById('rg-pct').value='0';
+  document.getElementById('rg-nom').value='';
+  ['rg-pct','rg-mf','rg-mc','rg-md'].forEach(i=>{const el=document.getElementById(i); if(el) el.value='0';});
+  const ci=document.getElementById('rg-interne'); if(ci) ci.checked=false;
   document.getElementById('rg-savebtn').textContent='+ Ajouter';
   document.getElementById('rg-cancelbtn').style.display='none';
 }
 async function addRegieConfig(e){
   e.preventDefault();
   const nom=document.getElementById('rg-nom').value.trim(); if(!nom){toast('Indique un nom');return;}
-  const data={project_key:PROJ.key, nom, pct_defaut:Number(document.getElementById('rg-pct').value)||0};
+  const data={project_key:PROJ.key, nom};
+  if(PROJ.dossierType==='velo'){
+    data.montant_france=Number((document.getElementById('rg-mf')||{}).value)||0;
+    data.montant_corse=Number((document.getElementById('rg-mc')||{}).value)||0;
+    data.montant_domtom=Number((document.getElementById('rg-md')||{}).value)||0;
+    data.interne=!!(document.getElementById('rg-interne')||{}).checked;
+  } else {
+    data.pct_defaut=Number(document.getElementById('rg-pct').value)||0;
+  }
   const wasEdit=!!editingRegieCfgId;
   const res = wasEdit ? await db.from('app_regies').update(data).eq('id',editingRegieCfgId) : await db.from('app_regies').insert(data);
   if(res.error){toast('Erreur : '+res.error.message);return;}
@@ -632,7 +687,7 @@ function renderDossiers(){
   const velo=PROJ.dossierType==='velo'; const term=(document.getElementById('dossiers-search')||{}).value||'';
   const rows=(window._dossiers||[]).filter(d=>matchSearch(term,[fdate(d.date),moisLabel(d.date),d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette].join(' ')));
   document.getElementById('dossiers-body').innerHTML=rows.length? rows.map(d=>{
-    const reg=`${d.commercial_regie||'—'}${d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:''}`;
+    const reg=`${d.commercial_regie||'—'}${velo?(d.regie_interne?` <span style="color:var(--muted);font-size:11px">(interne)</span>`:''):(d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:'')}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
     const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td class="num"><button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
@@ -679,7 +734,7 @@ function refreshDashboard(){
   as.forEach(a=>{ rec[a.k]=remb.filter(r=>r.beneficiaire===a.remb).reduce((s,r)=>s+Number(r.montant||0),0); });
   const invTot=as.reduce((s,a)=>s+inv[a.k],0);
   const margeNette=dossiers.reduce((s,d)=>s+Number(d.marge_nette||0),0);
-  const regieTot=dossiers.reduce((s,d)=>s+Number(d.commission_regie||0),0);
+  const regieTot=dossiers.reduce((s,d)=>s+(d.regie_interne?0:Number(d.commission_regie||0)),0);
   const davidTot=dossiers.reduce((s,d)=>s+Number(d.cout_david||0),0);
   const fraisSociete=frais.reduce((s,f)=>s+Number(f.montant_societe||0),0);
   const marge=margeNette-fraisSociete;
@@ -785,10 +840,18 @@ function dossierPreview(){
   let brute, extra='';
   if(PROJ.dossierType==='velo'){ const montant=g('d-nbvelos')*g('d-tarif'); brute=montant-g('d-autrescouts'); extra=`Montant (nb × tarif) : <b>${eur(montant)}</b><br>`; }
   else { brute=g('d-prime')-g('d-install')-g('d-materiel')-g('d-nacelle')-g('d-hamid')-g('d-livraison')-g('d-fraissupp')-g('d-audit'); }
-  const dv=g('d-davidpct'), rg=g('d-regiepct');
-  const david=brute*dv/100, regie=brute*rg/100, nette=brute-david-regie;
+  const dv=g('d-davidpct'); const david=brute*dv/100;
+  let regie, regieLabel, interne=false;
+  if(PROJ.dossierType==='velo'){
+    const mu=g('d-regie-montant'); regie=g('d-nbvelos')*mu;
+    interne=!!(document.getElementById('d-regie-interne')||{}).checked;
+    regieLabel=`régie ${eur(mu)}/vélo${interne?' <span style="color:var(--muted)">(interne, gardée)</span>':''}`;
+  } else {
+    const rg=g('d-regiepct'); regie=brute*rg/100; regieLabel=`régie ${num(rg)}%`;
+  }
+  const nette=brute-david-(interne?0:regie);
   const per=nette/A().length;
-  document.getElementById('d-preview').innerHTML=`${extra}Marge brute : <b>${eur(brute)}</b> &nbsp; − manager ${num(dv)}% : <b>${eur(david)}</b> &nbsp; − régie ${num(rg)}% : <b>${eur(regie)}</b>`+
+  document.getElementById('d-preview').innerHTML=`${extra}Marge brute : <b>${eur(brute)}</b> &nbsp; − manager ${num(dv)}% : <b>${eur(david)}</b> &nbsp; − ${regieLabel} : <b>${eur(regie)}</b>${interne?' <span style="color:var(--muted)">(non déduite)</span>':''}`+
     `<br>Marge nette : <b class="${nette>=0?'val-good':'val-bad'}" style="font-size:18px">${eur(nette)}</b> <span style="color:var(--muted)">(${A().map(a=>a.label+' '+eur(per)).join(' / ')})</span>`;
 }
 let editingDossierId=null;
@@ -800,7 +863,7 @@ function editDossier(id){
   const csel=document.getElementById('d-commercial');
   if(d.commercial_regie && ![...csel.options].some(o=>o.value===d.commercial_regie)) csel.insertAdjacentHTML('beforeend',`<option value="${d.commercial_regie}">${d.commercial_regie}</option>`);
   csel.value=d.commercial_regie||'';
-  if(PROJ.dossierType==='velo'){ S('d-region',d.region||'France'); S('d-nbvelos',d.nb_velos); S('d-tarif',d.tarif_unitaire); S('d-autrescouts',d.autres_couts); }
+  if(PROJ.dossierType==='velo'){ S('d-region',d.region||'France'); S('d-nbvelos',d.nb_velos); S('d-tarif',d.tarif_unitaire); S('d-autrescouts',d.autres_couts); S('d-regie-montant',d.regie_montant_unitaire); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=!!d.regie_interne; }
   else { S('d-prime',d.montant_prime); S('d-install',d.cout_installation); S('d-materiel',d.cout_materiel); S('d-nacelle',d.cout_nacelle); S('d-hamid',d.cout_hamid); S('d-livraison',d.cout_livraison); S('d-fraissupp',d.frais_supp); S('d-audit',d.cout_audit); }
   editingDossierId=id;
   document.getElementById('d-savebtn').textContent='💾 Enregistrer les modifications';
@@ -811,8 +874,9 @@ function editDossier(id){
 function cancelEditDossier(){
   editingDossierId=null;
   ['d-client','d-depot'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
-  document.getElementById('d-commercial').value=''; document.getElementById('d-regiepct').value='0'; document.getElementById('d-davidpct').value='5';
-  if(PROJ.dossierType==='velo'){ const n=document.getElementById('d-nbvelos'); if(n)n.value='0'; const c=document.getElementById('d-autrescouts'); if(c)c.value='0'; }
+  document.getElementById('d-commercial').value=''; document.getElementById('d-davidpct').value='5';
+  const rp=document.getElementById('d-regiepct'); if(rp) rp.value='0';
+  if(PROJ.dossierType==='velo'){ ['d-nbvelos','d-autrescouts','d-regie-montant'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';}); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=false; }
   else ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';});
   document.getElementById('d-savebtn').textContent='+ Enregistrer le dossier';
   document.getElementById('d-cancelbtn').style.display='none';
@@ -824,7 +888,7 @@ async function addDossier(e){
   const v=id=>{const el=document.getElementById(id); return el?el.value||null:null;};
   let row={ date:v('d-date')||today(), nom_client:v('d-client'), numero_depot:v('d-depot'),
     david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
-  if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); }
+  if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); row.regie_montant_unitaire=g('d-regie-montant'); row.regie_interne=!!(document.getElementById('d-regie-interne')||{}).checked; row.regie_pct=0; }
   else { row.montant_prime=g('d-prime'); row.cout_installation=g('d-install'); row.cout_materiel=g('d-materiel'); row.cout_nacelle=g('d-nacelle'); row.cout_hamid=g('d-hamid'); row.cout_livraison=g('d-livraison'); row.frais_supp=g('d-fraissupp'); row.cout_audit=g('d-audit'); }
   const wasEdit=!!editingDossierId;
   const res = wasEdit ? await db.from(T('dossiers')).update(row).eq('id',editingDossierId) : await db.from(T('dossiers')).insert(row);
@@ -1093,11 +1157,11 @@ function buildImportSpecs(){
   const as=A();
   const dossiers = PROJ.dossierType==='velo' ? {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','Région','Nb vélos','Tarif unitaire','Autres coûts','% manager','Commercial régie','% commission régie'],
-    example:['05/07/2026','EXEMPLE (supprimez)','France','10','80','0','5','JO','40'],
-    build(m){ if(_isEx(m)||!_has(m)) return null; return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'),
-      region:_pick(m,'Région')||'France', nb_velos:_pnum(_pick(m,'Nb vélos','Nombre de vélos')), tarif_unitaire:_pnum(_pick(m,'Tarif unitaire','Tarif'))||(_pick(m,'Région')==='Corse'?390:80),
-      autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:_pick(m,'Commercial régie','Régie'), regie_pct:_pnum(_pick(m,'% commission régie','% régie')) }; }
+    headers:['Date','Client','Région','Nb vélos','Tarif unitaire','Autres coûts','% manager','Commercial régie','Commission par vélo (€)','Interne (oui/non)'],
+    example:['05/07/2026','EXEMPLE (supprimez)','France','10','80','0','5','JO','15','non'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; const reg=_pick(m,'Région')||'France'; const it=(_pick(m,'Interne (oui/non)','Interne')||'').toString().trim().toLowerCase(); return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'),
+      region:reg, nb_velos:_pnum(_pick(m,'Nb vélos','Nombre de vélos')), tarif_unitaire:_pnum(_pick(m,'Tarif unitaire','Tarif'))||(VELO_TARIF_DEFAUT[reg]||80),
+      autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:_pick(m,'Commercial régie','Régie'), regie_montant_unitaire:_pnum(_pick(m,'Commission par vélo (€)','Commission par vélo','Commission')), regie_interne:(it==='oui'||it==='yes'||it==='true'||it==='1'), regie_pct:0 }; }
   } : {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
     headers:['Date','Client','N° dépôt','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','% manager','Commercial régie','% commission régie'],
