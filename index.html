@@ -138,7 +138,7 @@
       <div class="hint">Ce que rapportent les dossiers et ce qui se partage entre associés (marge nette, avant remboursement des investissements).</div>
       <div class="grid cards" id="db-renta-cards" style="margin-bottom:10px"></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Client</th><th>Type</th><th class="num">Marge nette</th><th class="num">Part / associé</th></tr></thead>
+        <thead><tr><th>Date</th><th>ID</th><th>Client</th><th>Type</th><th class="num">Marge nette</th><th class="num">Part / associé</th></tr></thead>
         <tbody id="db-renta-body"></tbody>
       </table></div>
     </section>
@@ -808,9 +808,9 @@ function refreshDashboard(){
         const type = d.regie_interne ? ('Interne'+(d.commercial_regie?' ('+d.commercial_regie+')':''))
           : ((d.commercial_regie||'').trim()? ('Régie ('+d.commercial_regie+')') : '—');
         const mn=Number(d.marge_nette||0);
-        return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${type}</td><td class="num ${mn>=0?'val-good':'val-bad'}">${eur(mn)}</td><td class="num">${eur(mn/as.length)}</td></tr>`;
-      }).join('') + `<tr style="border-top:2px solid var(--accent)"><td colspan="3"><b>Total (${nbTotal} dossier${nbTotal>1?'s':''})</b></td><td class="num"><b class="${margeNette>=0?'val-good':'val-bad'}">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
-    : `<tr><td colspan="5" class="empty">Aucun dossier</td></tr>`;
+        return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${type}</td><td class="num ${mn>=0?'val-good':'val-bad'}">${eur(mn)}</td><td class="num">${eur(mn/as.length)}</td></tr>`;
+      }).join('') + `<tr style="border-top:2px solid var(--accent)"><td colspan="4"><b>Total (${nbTotal} dossier${nbTotal>1?'s':''})</b></td><td class="num"><b class="${margeNette>=0?'val-good':'val-bad'}">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
+    : `<tr><td colspan="6" class="empty">Aucun dossier</td></tr>`;
   document.getElementById('db-inv-tot').textContent=eur(invTot);
   document.getElementById('db-marge').textContent=eur(margeNette);
   document.getElementById('db-regie').textContent=eur(regieTot);
