@@ -50,6 +50,12 @@
   td a{color:var(--accent);text-decoration:none;font-weight:600} td a:hover{text-decoration:underline}
   tr:hover td{background:rgba(255,255,255,.02)}
   .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;background:var(--panel2);border:1px solid var(--line)}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+  .b-ok{background:#12351f;color:#86efac;border:1px solid #2f6b43}
+  .b-wip{background:#3a2f0b;color:#fdba74;border:1px solid #7a5a12}
+  .b-lost{background:#3a1414;color:#fca5a5;border:1px solid #7a2a2a}
+  select.statut-sel{padding:5px 8px;font-size:12px;font-weight:700;border-radius:8px;width:auto;min-width:104px}
+  select.s-ok{color:#86efac;border-color:#2f6b43} select.s-wip{color:#fdba74;border-color:#7a5a12} select.s-lost{color:#fca5a5;border-color:#7a2a2a}
   .preview{background:var(--panel2);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--muted);margin-top:6px}
   .preview b{color:var(--txt);font-size:16px}
   .banner{background:#3b2f0b;border:1px solid #b4830f;color:#fde68a;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;display:none}
@@ -124,38 +130,44 @@
 
   <!-- DASHBOARD -->
   <div id="tab-dashboard">
-    <div class="grid cards" id="db-invest-cards"></div>
-    <div class="grid cards" style="margin-top:16px">
-      <div class="card good"><div class="label">Marge nette totale (dossiers)</div><div class="value val-good" id="db-marge">—</div></div>
-      <div class="card"><div class="label">Commissions de régie versées</div><div class="value" id="db-regie">—</div></div>
-      <div class="card"><div class="label">Part manager prélevée</div><div class="value" id="db-david">—</div></div>
-      <div class="card"><div class="label">Frais / dépenses (part société)</div><div class="value val-bad" id="db-frais">—</div></div>
-      <div class="card good"><div class="label">Résultat net société</div><div class="value val-good" id="db-resultat">—</div></div>
-    </div>
 
     <section class="panel">
       <h2>📈 Rentabilité des dossiers</h2>
-      <div class="hint">Ce que rapportent les dossiers et ce qui se partage entre associés (marge nette, avant remboursement des investissements).</div>
-      <div class="grid cards" id="db-renta-cards" style="margin-bottom:10px"></div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>ID</th><th>Client</th><th>Type</th><th class="num">Marge nette</th><th class="num">Part / associé</th></tr></thead>
+      <div class="hint">Chiffre d'affaires et marge selon le statut. Ce qui se partage entre associés est basé sur les dossiers <b>validés</b> (les « en cours » sont du potentiel).</div>
+      <div class="grid cards" id="db-stat-cards"></div>
+      <div class="grid cards" id="db-share-cards" style="margin-top:14px"></div>
+      <div class="table-wrap" style="margin-top:14px"><table>
+        <thead><tr><th>Date</th><th>ID</th><th>Client</th><th>Type</th><th>Statut</th><th class="num">CA</th><th class="num">Marge nette</th><th class="num">Part / assoc.</th></tr></thead>
         <tbody id="db-renta-body"></tbody>
       </table></div>
     </section>
 
     <section class="panel">
-      <h2>Où en est-on ?</h2>
-      <div class="hint">Un investissement fait par un associé est partagé à parts égales : les autres lui doivent leur part. <b>Solde</b> positif = il doit récupérer ; négatif = il doit encore rembourser aux autres.</div>
+      <h2>🏦 Résultat de la société</h2>
+      <div class="hint">Sur la base des dossiers validés, moins les frais / dépenses à charge de la société.</div>
+      <div class="grid cards">
+        <div class="card good"><div class="label">Marge nette validée</div><div class="value val-good" id="db-marge">—</div></div>
+        <div class="card"><div class="label">Commissions de régie versées</div><div class="value" id="db-regie">—</div></div>
+        <div class="card"><div class="label">Part manager prélevée</div><div class="value" id="db-david">—</div></div>
+        <div class="card"><div class="label">Frais / dépenses (part société)</div><div class="value val-bad" id="db-frais">—</div></div>
+        <div class="card good"><div class="label">Résultat net société</div><div class="value val-good" id="db-resultat">—</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>💰 Investissements — où en est-on ?</h2>
+      <div class="grid cards" id="db-invest-cards"></div>
+      <div class="hint" style="margin-top:14px">Un investissement fait par un associé est partagé à parts égales : les autres lui doivent leur part. <b>Solde</b> positif = il doit récupérer ; négatif = il doit encore rembourser aux autres.</div>
       <div class="table-wrap"><table>
         <thead><tr><th>Associé</th><th class="num">Investi (payé)</th><th class="num">Sa part (÷ nb associés)</th><th class="num">Déjà récupéré</th><th class="num">Solde</th></tr></thead>
         <tbody id="db-reste-body"></tbody>
       </table></div>
+      <div class="grid cards" style="margin-top:16px">
+        <div class="card good"><div class="label">Bénéfice à partager (après remboursement des investissements)</div><div class="value val-good" id="db-benef">—</div></div>
+        <div class="card"><div class="label">📅 Estimation : investissements couverts</div><div class="value" id="db-date" style="font-size:18px">—</div></div>
+      </div>
+      <div class="grid cards" id="db-benef-cards" style="margin-top:16px"></div>
     </section>
-    <div class="grid cards" style="margin-top:18px">
-      <div class="card good"><div class="label">Bénéfice à partager (après remboursement des investissements)</div><div class="value val-good" id="db-benef">—</div></div>
-      <div class="card"><div class="label">📅 Estimation : investissements couverts</div><div class="value" id="db-date" style="font-size:18px">—</div></div>
-    </div>
-    <div class="grid cards" id="db-benef-cards" style="margin-top:16px"></div>
 
     <section class="panel">
       <h2>💸 Récupérations d'argent</h2>
@@ -198,6 +210,7 @@
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
         <div class="field" style="max-width:230px"><label>Filtrer par régie / campagne</label><select id="dossiers-fregie" onchange="renderDossiers()"></select></div>
         <div class="field" id="dossiers-fregion-wrap" style="max-width:200px"><label>Filtrer par région</label><select id="dossiers-fregion" onchange="renderDossiers()"><option value="">Toutes les régions</option><option>France</option><option>Corse</option><option>DOM-TOM</option></select></div>
+        <div class="field" style="max-width:180px"><label>Filtrer par statut</label><select id="dossiers-fstatut" onchange="renderDossiers()"><option value="">Tous les statuts</option><option>En cours</option><option>Validé</option><option>Perdu</option></select></div>
       </div>
       <div class="table-wrap"><table>
         <thead><tr id="dossiers-head"></tr></thead>
@@ -423,6 +436,17 @@ const CRM_URL_TEMPLATE = { led:'https://nrj.koneckt.fr/crm/contact.php?id_contac
 function crmLink(id){ if(id==null||id===''||!PROJ) return null; const t=(CRM_URL_TEMPLATE[PROJ.key]||'').trim(); if(!t) return null; return t.includes('{id}')?t.replace(/\{id\}/g,encodeURIComponent(id)):(t+encodeURIComponent(id)); }
 function dossierIdCell(d){ const id=d.crm_id||''; if(!id) return '<td>—</td>'; const url=crmLink(id); return url?`<td><a href="${url}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${id} ↗</a></td>`:`<td>${id}</td>`; }
 
+const STATUTS=['En cours','Validé','Perdu'];
+function statutClass(s){ return s==='Validé'?'ok':s==='Perdu'?'lost':'wip'; }
+function statutBadge(s){ s=s||'En cours'; return `<span class="badge b-${statutClass(s)}">${s}</span>`; }
+function statutSelect(d){ const cur=d.statut||'En cours'; return `<select class="statut-sel s-${statutClass(cur)}" onchange="setDossierStatut('${d.id}',this.value)">`+STATUTS.map(s=>`<option${s===cur?' selected':''}>${s}</option>`).join('')+`</select>`; }
+async function setDossierStatut(id,statut){
+  const {error}=await db.from(T('dossiers')).update({statut}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  const d=(window._dossiers||[]).find(x=>x.id===id); if(d) d.statut=statut;
+  toast('Statut : '+statut); renderDossiers(); refreshDashboard();
+}
+
 const eur = n => new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(Number(n)||0);
 const num = n => new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(Number(n)||0);
 const fdate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('fr-FR') : '';
@@ -572,8 +596,8 @@ function veloDossierForm(){ return `
     <div class="field"><label>Tarif / vélo (€)</label><input type="number" step="0.01" id="d-tarif" value="80" oninput="dossierPreview()"></div>
     <div class="field"><label>Autres coûts (€)</label><input type="number" step="0.01" id="d-autrescouts" value="0" oninput="dossierPreview()"></div>
   </form>`; }
-function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>N° dépôt</th><th class="num">Prime</th><th class="num">Marge brute</th><th class="num">Manager</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th></th>`; }
-function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th></th>`; }
+function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>N° dépôt</th><th class="num">Prime</th><th class="num">Marge brute</th><th class="num">Manager</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
+function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
 function regionFromCP(cp){ cp=(cp||'').toString(); if(/^20/.test(cp)) return 'Corse'; if(/^9[78]/.test(cp)) return 'DOM-TOM'; return 'France'; }
 async function lookupSiret(){
@@ -598,16 +622,19 @@ async function lookupSiret(){
 }
 function onVeloRegion(){ document.getElementById('d-tarif').value = VELO_TARIF_DEFAUT[document.getElementById('d-region').value]||80; onDossierRegie(); }
 function managerRegieRow(){
+  const statutField=`<div class="field"><label>Statut</label><select id="d-statut"><option>En cours</option><option>Validé</option><option>Perdu</option></select></div>`;
   if(PROJ.dossierType==='velo') return `<form class="row" onsubmit="addDossier(event)">
     <div class="field"><label>% manager</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
     <div class="field"><label>Régie / Campagne</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
     <div class="field"><label>Commission / vélo (€)</label><input type="number" step="0.01" id="d-regie-montant" value="0" oninput="dossierPreview()"></div>
     <div class="field"><label>&nbsp;</label><label class="chk"><input type="checkbox" id="d-regie-interne" onchange="dossierPreview()"> Campagne interne (gardée)</label></div>
+    ${statutField}
   </form>`;
   return `<form class="row" onsubmit="addDossier(event)">
     <div class="field"><label>% manager</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
     <div class="field"><label>Régie</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
     <div class="field"><label>% commission régie</label><input type="number" step="0.01" id="d-regiepct" value="0" oninput="dossierPreview()"></div>
+    ${statutField}
   </form>`;
 }
 
@@ -744,19 +771,21 @@ function renderDossiers(){
   }
   const fRegie=(document.getElementById('dossiers-fregie')||{}).value||'';
   const fRegion=(document.getElementById('dossiers-fregion')||{}).value||'';
+  const fStatut=(document.getElementById('dossiers-fstatut')||{}).value||'';
   const rows=all.filter(d=>{
     const reg=(d.commercial_regie||'').trim();
     if(fRegie==='__none__'){ if(reg) return false; } else if(fRegie){ if(reg!==fRegie) return false; }
     if(fRegion && (d.region||'')!==fRegion) return false;
+    if(fStatut && (d.statut||'En cours')!==fStatut) return false;
     return matchSearch(term,[fdate(d.date),moisLabel(d.date),d.crm_id,d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette].join(' '));
   });
   document.getElementById('dossiers-body').innerHTML=rows.length? rows.map(d=>{
     const reg=`${d.commercial_regie||'—'}${velo?(d.regie_interne?` <span style="color:var(--muted);font-size:11px">(interne)</span>`:''):(d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:'')}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
-    const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td class="num"><button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
+    const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num"><button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
     return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
-  }).join('') : `<tr><td colspan="${velo?12:11}" class="empty">${(term||fRegie||fRegion)?'Aucun dossier ne correspond à la recherche / aux filtres':'Aucun dossier'}</td></tr>`;
+  }).join('') : `<tr><td colspan="${velo?13:12}" class="empty">${(term||fRegie||fRegion||fStatut)?'Aucun dossier ne correspond à la recherche / aux filtres':'Aucun dossier'}</td></tr>`;
 }
 async function loadRemboursements(){
   const {data,error}=await db.from(T('remboursements')).select('*').order('date',{ascending:false});
@@ -797,9 +826,10 @@ function refreshDashboard(){
   frais.forEach(f=>{ const src=SOURCES.find(x=>x.id===f.source_id); if(!src) return; as.forEach(a=>{ inv[a.k]+=Number(f.montant||0)*Number(src['part_'+a.k]||0)/100; }); });
   as.forEach(a=>{ rec[a.k]=remb.filter(r=>r.beneficiaire===a.remb).reduce((s,r)=>s+Number(r.montant||0),0); });
   const invTot=as.reduce((s,a)=>s+inv[a.k],0);
-  const margeNette=dossiers.reduce((s,d)=>s+Number(d.marge_nette||0),0);
-  const regieTot=dossiers.reduce((s,d)=>s+(d.regie_interne?0:Number(d.commission_regie||0)),0);
-  const davidTot=dossiers.reduce((s,d)=>s+Number(d.cout_david||0),0);
+  const valid=dossiers.filter(d=>(d.statut||'En cours')==='Validé');
+  const margeNette=valid.reduce((s,d)=>s+Number(d.marge_nette||0),0);
+  const regieTot=valid.reduce((s,d)=>s+(d.regie_interne?0:Number(d.commission_regie||0)),0);
+  const davidTot=valid.reduce((s,d)=>s+Number(d.cout_david||0),0);
   const fraisSociete=frais.reduce((s,f)=>s+Number(f.montant_societe||0),0);
   const marge=margeNette-fraisSociete;
   const fairShare=invTot/as.length;
@@ -813,25 +843,26 @@ function refreshDashboard(){
     if(solde>=-0.005){ el2.className='num val-good'; el2.textContent=eur(solde); }
     else { el2.className='num val-bad'; el2.textContent='doit '+eur(-solde); }
   });
-  // Rentabilité des dossiers
-  const nbTotal=dossiers.length;
-  const nbRegie=dossiers.filter(d=>(d.commercial_regie||'').trim() && !d.regie_interne).length;
-  const nbInterne=dossiers.filter(d=>d.regie_interne).length;
+  // Rentabilité par statut
+  const stat={'Validé':{n:0,ca:0,mn:0},'En cours':{n:0,ca:0,mn:0},'Perdu':{n:0,ca:0,mn:0}};
+  dossiers.forEach(d=>{ const s=(d.statut||'En cours'); const b=stat[s]||(stat[s]={n:0,ca:0,mn:0}); b.n++; b.ca+=Number(d.montant_prime||0); b.mn+=Number(d.marge_nette||0); });
   const partAssoc=margeNette/as.length;
-  document.getElementById('db-renta-cards').innerHTML =
-    `<div class="card"><div class="label">Nombre de dossiers</div><div class="value">${nbTotal}</div></div>`+
-    `<div class="card"><div class="label">Dont avec régie</div><div class="value">${nbRegie}</div></div>`+
-    `<div class="card"><div class="label">Dont campagnes internes</div><div class="value">${nbInterne}</div></div>`+
-    `<div class="card good"><div class="label">Marge nette à se partager</div><div class="value val-good">${eur(margeNette)}</div></div>`+
+  const statCard=(icon,label,o,good)=>`<div class="card${good?' good':''}"><div class="label">${icon} ${label}</div><div class="value ${good?'val-good':''}" style="font-size:21px">${eur(o.mn)}</div><div class="label" style="margin-top:6px">${o.n} dossier${o.n>1?'s':''} · CA ${eur(o.ca)}</div></div>`;
+  document.getElementById('db-stat-cards').innerHTML =
+    statCard('✅','Validé — marge nette',stat['Validé'],true)+
+    statCard('⏳','En cours — potentiel',stat['En cours'],false)+
+    statCard('❌','Perdu',stat['Perdu'],false);
+  document.getElementById('db-share-cards').innerHTML =
+    `<div class="card good"><div class="label">Marge nette validée à se partager</div><div class="value val-good">${eur(margeNette)}</div></div>`+
     `<div class="card"><div class="label">→ Part par associé (÷ ${as.length})</div><div class="value">${eur(partAssoc)}</div></div>`;
-  document.getElementById('db-renta-body').innerHTML = nbTotal
+  document.getElementById('db-renta-body').innerHTML = dossiers.length
     ? dossiers.map(d=>{
         const type = d.regie_interne ? ('Interne'+(d.commercial_regie?' ('+d.commercial_regie+')':''))
           : ((d.commercial_regie||'').trim()? ('Régie ('+d.commercial_regie+')') : '—');
-        const mn=Number(d.marge_nette||0);
-        return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${type}</td><td class="num ${mn>=0?'val-good':'val-bad'}">${eur(mn)}</td><td class="num">${eur(mn/as.length)}</td></tr>`;
-      }).join('') + `<tr style="border-top:2px solid var(--accent)"><td colspan="4"><b>Total (${nbTotal} dossier${nbTotal>1?'s':''})</b></td><td class="num"><b class="${margeNette>=0?'val-good':'val-bad'}">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
-    : `<tr><td colspan="6" class="empty">Aucun dossier</td></tr>`;
+        const mn=Number(d.marge_nette||0), ca=Number(d.montant_prime||0);
+        return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${type}</td><td>${statutBadge(d.statut)}</td><td class="num">${eur(ca)}</td><td class="num ${mn>=0?'val-good':'val-bad'}">${eur(mn)}</td><td class="num">${eur(mn/as.length)}</td></tr>`;
+      }).join('') + `<tr style="border-top:2px solid var(--accent)"><td colspan="5"><b>Validé (${stat['Validé'].n}/${dossiers.length})</b></td><td class="num"><b>${eur(stat['Validé'].ca)}</b></td><td class="num"><b class="val-good">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
+    : `<tr><td colspan="8" class="empty">Aucun dossier</td></tr>`;
   document.getElementById('db-inv-tot').textContent=eur(invTot);
   document.getElementById('db-marge').textContent=eur(margeNette);
   document.getElementById('db-regie').textContent=eur(regieTot);
@@ -941,7 +972,7 @@ let editingDossierId=null;
 function editDossier(id){
   const d=(window._dossiers||[]).find(x=>x.id===id); if(!d) return;
   const S=(i,val)=>{const el=document.getElementById(i); if(el) el.value=(val==null?'':val);};
-  S('d-date',d.date||today()); S('d-client',d.nom_client); S('d-depot',d.numero_depot); S('d-crmid',d.crm_id);
+  S('d-date',d.date||today()); S('d-client',d.nom_client); S('d-depot',d.numero_depot); S('d-crmid',d.crm_id); S('d-statut',d.statut||'En cours');
   S('d-davidpct',d.david_pct); S('d-regiepct',d.regie_pct);
   const csel=document.getElementById('d-commercial');
   if(d.commercial_regie && ![...csel.options].some(o=>o.value===d.commercial_regie)) csel.insertAdjacentHTML('beforeend',`<option value="${d.commercial_regie}">${d.commercial_regie}</option>`);
@@ -958,6 +989,7 @@ function cancelEditDossier(){
   editingDossierId=null;
   ['d-client','d-depot','d-crmid'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
   document.getElementById('d-commercial').value=''; document.getElementById('d-davidpct').value='5';
+  const st=document.getElementById('d-statut'); if(st) st.value='En cours';
   const rp=document.getElementById('d-regiepct'); if(rp) rp.value='0';
   if(PROJ.dossierType==='velo'){ ['d-nbvelos','d-autrescouts','d-regie-montant'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';}); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=false; }
   else ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';});
@@ -970,7 +1002,7 @@ async function addDossier(e){
   const g=id=>{const el=document.getElementById(id); return el?Number(el.value)||0:0;};
   const v=id=>{const el=document.getElementById(id); return el?el.value||null:null;};
   let row={ date:v('d-date')||today(), nom_client:v('d-client'), numero_depot:v('d-depot'), crm_id:v('d-crmid'),
-    david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
+    statut:v('d-statut')||'En cours', david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
   if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); row.regie_montant_unitaire=g('d-regie-montant'); row.regie_interne=!!(document.getElementById('d-regie-interne')||{}).checked; row.regie_pct=0; }
   else { row.montant_prime=g('d-prime'); row.cout_installation=g('d-install'); row.cout_materiel=g('d-materiel'); row.cout_nacelle=g('d-nacelle'); row.cout_hamid=g('d-hamid'); row.cout_livraison=g('d-livraison'); row.frais_supp=g('d-fraissupp'); row.cout_audit=g('d-audit'); }
   if(!editingDossierId){
@@ -1249,16 +1281,22 @@ function buildImportSpecs(){
   const as=A();
   const dossiers = PROJ.dossierType==='velo' ? {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','ID CRM','Région','Nb vélos','Tarif unitaire','Autres coûts','% manager','Commercial régie','Commission par vélo (€)','Interne (oui/non)'],
-    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','France','10','80','0','5','JO','15','non'],
-    build(m){ if(_isEx(m)||!_has(m)) return null; const reg=_pick(m,'Région')||'France'; const it=(_pick(m,'Interne (oui/non)','Interne')||'').toString().trim().toLowerCase(); return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'),
+    headers:['Date','Client','ID CRM','Région','Nb vélos','Tarif unitaire','Autres coûts','% manager','Commercial régie','Commission par vélo (€)','Interne (oui/non)','Statut'],
+    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','France','10','80','0','5','JO','','','En cours'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; const reg=_pick(m,'Région')||'France'; const regieName=_pick(m,'Commercial régie','Régie');
+      const itRaw=_pick(m,'Interne (oui/non)','Interne'); const it=(itRaw||'').toString().trim().toLowerCase();
+      const cfg=(REGIES_CFG||[]).find(r=>r.nom===regieName);
+      let mu=_pnum(_pick(m,'Commission par vélo (€)','Commission par vélo','Commission'));
+      let interne=(it==='oui'||it==='yes'||it==='true'||it==='1');
+      if(cfg){ if(!mu) mu=Number(reg==='France'?cfg.montant_france:reg==='Corse'?cfg.montant_corse:cfg.montant_domtom)||0; if(itRaw==null||itRaw==='') interne=!!cfg.interne; }
+      return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'),
       region:reg, nb_velos:_pnum(_pick(m,'Nb vélos','Nombre de vélos')), tarif_unitaire:_pnum(_pick(m,'Tarif unitaire','Tarif'))||(VELO_TARIF_DEFAUT[reg]||80),
-      autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:_pick(m,'Commercial régie','Régie'), regie_montant_unitaire:_pnum(_pick(m,'Commission par vélo (€)','Commission par vélo','Commission')), regie_interne:(it==='oui'||it==='yes'||it==='true'||it==='1'), regie_pct:0 }; }
+      autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:regieName, regie_montant_unitaire:mu, regie_interne:interne, regie_pct:0, statut:_pick(m,'Statut')||'En cours' }; }
   } : {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','ID CRM','N° dépôt','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','% manager','Commercial régie','% commission régie'],
-    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','14205','2255','0','1296','87','0','0','360','0','5','JO','40'],
-    build(m){ if(_isEx(m)||!_has(m)) return null; return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), numero_depot:_pick(m,'N° dépôt','Numéro de dépôt'),
+    headers:['Date','Client','ID CRM','N° dépôt','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','% manager','Commercial régie','% commission régie','Statut'],
+    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','14205','2255','0','1296','87','0','0','360','0','5','JO','40','En cours'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), numero_depot:_pick(m,'N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
       montant_prime:_pnum(_pick(m,'Prime HT','Prime')), cout_installation:_pnum(_pick(m,'Coût installation')), cout_materiel:_pnum(_pick(m,'Coût matériel')), cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
       cout_hamid:_pnum(_pick(m,'Coût Hamid')), cout_livraison:_pnum(_pick(m,'Coût livraison')), frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp')), cout_audit:_pnum(_pick(m,'Coût audit')),
       david_pct:(_pick(m,'% manager','% manager David')!=null?_pnum(_pick(m,'% manager','% manager David')):5), commercial_regie:_pick(m,'Commercial régie','Régie'), regie_pct:_pnum(_pick(m,'% commission régie','% régie')) }; }
