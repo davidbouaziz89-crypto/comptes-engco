@@ -132,6 +132,17 @@
       <div class="card"><div class="label">Frais / dépenses (part société)</div><div class="value val-bad" id="db-frais">—</div></div>
       <div class="card good"><div class="label">Résultat net société</div><div class="value val-good" id="db-resultat">—</div></div>
     </div>
+
+    <section class="panel">
+      <h2>📈 Rentabilité des dossiers</h2>
+      <div class="hint">Ce que rapportent les dossiers et ce qui se partage entre associés (marge nette, avant remboursement des investissements).</div>
+      <div class="grid cards" id="db-renta-cards" style="margin-bottom:10px"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Client</th><th>Type</th><th class="num">Marge nette</th><th class="num">Part / associé</th></tr></thead>
+        <tbody id="db-renta-body"></tbody>
+      </table></div>
+    </section>
+
     <section class="panel">
       <h2>Où en est-on ?</h2>
       <div class="hint">Un investissement fait par un associé est partagé à parts égales : les autres lui doivent leur part. <b>Solde</b> positif = il doit récupérer ; négatif = il doit encore rembourser aux autres.</div>
@@ -781,6 +792,25 @@ function refreshDashboard(){
     if(solde>=-0.005){ el2.className='num val-good'; el2.textContent=eur(solde); }
     else { el2.className='num val-bad'; el2.textContent='doit '+eur(-solde); }
   });
+  // Rentabilité des dossiers
+  const nbTotal=dossiers.length;
+  const nbRegie=dossiers.filter(d=>(d.commercial_regie||'').trim() && !d.regie_interne).length;
+  const nbInterne=dossiers.filter(d=>d.regie_interne).length;
+  const partAssoc=margeNette/as.length;
+  document.getElementById('db-renta-cards').innerHTML =
+    `<div class="card"><div class="label">Nombre de dossiers</div><div class="value">${nbTotal}</div></div>`+
+    `<div class="card"><div class="label">Dont avec régie</div><div class="value">${nbRegie}</div></div>`+
+    `<div class="card"><div class="label">Dont campagnes internes</div><div class="value">${nbInterne}</div></div>`+
+    `<div class="card good"><div class="label">Marge nette à se partager</div><div class="value val-good">${eur(margeNette)}</div></div>`+
+    `<div class="card"><div class="label">→ Part par associé (÷ ${as.length})</div><div class="value">${eur(partAssoc)}</div></div>`;
+  document.getElementById('db-renta-body').innerHTML = nbTotal
+    ? dossiers.map(d=>{
+        const type = d.regie_interne ? ('Interne'+(d.commercial_regie?' ('+d.commercial_regie+')':''))
+          : ((d.commercial_regie||'').trim()? ('Régie ('+d.commercial_regie+')') : '—');
+        const mn=Number(d.marge_nette||0);
+        return `<tr><td>${fdate(d.date)}</td><td>${d.nom_client||''}</td><td>${type}</td><td class="num ${mn>=0?'val-good':'val-bad'}">${eur(mn)}</td><td class="num">${eur(mn/as.length)}</td></tr>`;
+      }).join('') + `<tr style="border-top:2px solid var(--accent)"><td colspan="3"><b>Total (${nbTotal} dossier${nbTotal>1?'s':''})</b></td><td class="num"><b class="${margeNette>=0?'val-good':'val-bad'}">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
+    : `<tr><td colspan="5" class="empty">Aucun dossier</td></tr>`;
   document.getElementById('db-inv-tot').textContent=eur(invTot);
   document.getElementById('db-marge').textContent=eur(margeNette);
   document.getElementById('db-regie').textContent=eur(regieTot);
