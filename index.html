@@ -130,9 +130,9 @@
     </div>
     <section class="panel">
       <h2>Où en est-on ?</h2>
-      <div class="hint">Chacun récupère d'abord son investissement ; ensuite le bénéfice se partage à parts égales.</div>
+      <div class="hint">Un investissement fait par un associé est partagé à parts égales : les autres lui doivent leur part. <b>Solde</b> positif = il doit récupérer ; négatif = il doit encore rembourser aux autres.</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Associé</th><th class="num">Investi</th><th class="num">Déjà récupéré</th><th class="num">Reste à récupérer</th></tr></thead>
+        <thead><tr><th>Associé</th><th class="num">Investi (payé)</th><th class="num">Sa part (÷ nb associés)</th><th class="num">Déjà récupéré</th><th class="num">Solde</th></tr></thead>
         <tbody id="db-reste-body"></tbody>
       </table></div>
     </section>
@@ -477,7 +477,7 @@ function buildAssocUI(){
   document.getElementById('db-invest-cards').innerHTML =
     as.map(a=>`<div class="card"><div class="label">Investi par ${a.label}</div><div class="value" id="db-inv-${a.k}">—</div></div>`).join('')
     + `<div class="card"><div class="label">Total investi</div><div class="value" id="db-inv-tot">—</div></div>`;
-  document.getElementById('db-reste-body').innerHTML = as.map(a=>`<tr><td>${a.label}</td><td class="num" id="db-inv2-${a.k}">—</td><td class="num" id="db-rec-${a.k}">—</td><td class="num val-bad" id="db-reste-${a.k}">—</td></tr>`).join('');
+  document.getElementById('db-reste-body').innerHTML = as.map(a=>`<tr><td>${a.label}</td><td class="num" id="db-inv2-${a.k}">—</td><td class="num" id="db-part-${a.k}">—</td><td class="num" id="db-rec-${a.k}">—</td><td class="num" id="db-reste-${a.k}">—</td></tr>`).join('');
   const share=(100/as.length).toFixed(as.length===3?1:0);
   document.getElementById('db-benef-cards').innerHTML = as.map(a=>`<div class="card"><div class="label">→ Part ${a.label} (${share}%)</div><div class="value" id="db-benef-${a.k}">—</div></div>`).join('');
   document.getElementById('r-benef').innerHTML = as.map(a=>`<option value="${a.remb}">${a.label}</option>`).join('');
@@ -655,11 +655,16 @@ function refreshDashboard(){
   const davidTot=dossiers.reduce((s,d)=>s+Number(d.cout_david||0),0);
   const fraisSociete=frais.reduce((s,f)=>s+Number(f.montant_societe||0),0);
   const marge=margeNette-fraisSociete;
+  const fairShare=invTot/as.length;
   as.forEach(a=>{
     document.getElementById('db-inv-'+a.k).textContent=eur(inv[a.k]);
     document.getElementById('db-inv2-'+a.k).textContent=eur(inv[a.k]);
+    document.getElementById('db-part-'+a.k).textContent=eur(fairShare);
     document.getElementById('db-rec-'+a.k).textContent=eur(rec[a.k]);
-    document.getElementById('db-reste-'+a.k).textContent=eur(inv[a.k]-rec[a.k]);
+    const solde=inv[a.k]-fairShare-rec[a.k];
+    const el2=document.getElementById('db-reste-'+a.k);
+    if(solde>=-0.005){ el2.className='num val-good'; el2.textContent=eur(solde); }
+    else { el2.className='num val-bad'; el2.textContent='doit '+eur(-solde); }
   });
   document.getElementById('db-inv-tot').textContent=eur(invTot);
   document.getElementById('db-marge').textContent=eur(margeNette);
