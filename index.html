@@ -528,7 +528,6 @@ function veloDossierForm(){ return `
   <form class="row" onsubmit="addDossier(event)">
     <div class="field"><label>Date</label><input type="date" id="d-date" required></div>
     <div class="field"><label>Nom du client</label><input type="text" id="d-client"></div>
-    <div class="field"><label>N° de dépôt</label><input type="text" id="d-depot"></div>
     <div class="field"><label>Région</label><select id="d-region" onchange="onVeloRegion()"><option>France</option><option>Corse</option></select></div>
     <div class="field"><label>Nombre de vélos</label><input type="number" step="1" id="d-nbvelos" value="0" oninput="dossierPreview()"></div>
     <div class="field"><label>Tarif / vélo (€)</label><input type="number" step="0.01" id="d-tarif" value="80" oninput="dossierPreview()"></div>
@@ -1094,9 +1093,9 @@ function buildImportSpecs(){
   const as=A();
   const dossiers = PROJ.dossierType==='velo' ? {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','N° dépôt','Région','Nb vélos','Tarif unitaire','Autres coûts','% manager','Commercial régie','% commission régie'],
-    example:['05/07/2026','EXEMPLE (supprimez)','V001','France','10','80','0','5','JO','40'],
-    build(m){ if(_isEx(m)||!_has(m)) return null; return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), numero_depot:_pick(m,'N° dépôt','Numéro de dépôt'),
+    headers:['Date','Client','Région','Nb vélos','Tarif unitaire','Autres coûts','% manager','Commercial régie','% commission régie'],
+    example:['05/07/2026','EXEMPLE (supprimez)','France','10','80','0','5','JO','40'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'),
       region:_pick(m,'Région')||'France', nb_velos:_pnum(_pick(m,'Nb vélos','Nombre de vélos')), tarif_unitaire:_pnum(_pick(m,'Tarif unitaire','Tarif'))||(_pick(m,'Région')==='Corse'?390:80),
       autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:_pick(m,'Commercial régie','Régie'), regie_pct:_pnum(_pick(m,'% commission régie','% régie')) }; }
   } : {
