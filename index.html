@@ -391,28 +391,29 @@
   <!-- UTILISATEURS -->
   <div id="tab-users" class="hidden">
     <section class="panel">
-      <h2>Créer un utilisateur</h2>
+      <h2 id="u-title">Créer un utilisateur</h2>
       <div class="hint">La personne se connectera avec cet email et ce mot de passe. Coche le(s) projet(s) auxquels elle a accès.</div>
-      <form class="row" onsubmit="createUser(event)">
+      <form class="row" onsubmit="saveUser(event)">
         <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
         <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères" required></div>
         <div class="field"><label>Rôle</label>
-          <select id="u-role" onchange="document.getElementById('u-regie-field').style.display=(this.value==='regie')?'flex':'none'">
+          <select id="u-role" onchange="onRoleChange()">
             <option value="secretaire">Secrétaire</option><option value="regie">Régie</option><option value="admin">Admin</option>
           </select>
         </div>
-        <div class="field"><label>Projets</label>
+        <div class="field" id="u-projects-field"><label>Projets</label>
           <div style="display:flex;gap:14px;padding-top:8px" id="u-projects"></div>
         </div>
         <div class="field" id="u-regie-field" style="display:none"><label>Nom de la régie</label><input type="text" id="u-regie" placeholder="ex. JO, ADN"></div>
-        <div class="field"><button class="btn" type="submit">+ Créer</button></div>
+        <div class="field" id="u-admin-note" style="display:none;align-self:flex-end"><div class="hint">👑 Un administrateur a automatiquement accès à <b>tous</b> les projets.</div></div>
+        <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="u-submit">+ Créer</button> <button class="btn ghost" type="button" id="u-cancel" style="display:none" onclick="cancelEditUser()">Annuler</button></div>
       </form>
       <div class="preview" id="u-msg"></div>
     </section>
     <section class="panel">
       <h2>Utilisateurs &amp; accès</h2>
       <div class="table-wrap"><table>
-        <thead><tr><th>Email</th><th>Projet</th><th>Rôle</th><th>Régie</th></tr></thead>
+        <thead><tr><th>Email</th><th>Projets</th><th>Rôle</th><th class="num">Actions</th></tr></thead>
         <tbody id="users-body"></tbody>
       </table></div>
     </section>
@@ -556,10 +557,12 @@ async function afterAuth(session){
   if(!MY_MEMBERSHIPS.length){ document.getElementById('projpick').style.display='flex'; document.getElementById('projpick-list').innerHTML=''; document.getElementById('projpick-msg').textContent="Aucun accès n'a été configuré pour ce compte. Contacte l'administrateur."; return; }
   showProjectPicker();
 }
+function isAdminUser(){ return MY_MEMBERSHIPS.some(m=>m.role==='admin'); }
+function myProjectKeys(){ return isAdminUser() ? Object.keys(PROJECTS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>PROJECTS[k]); }
 function showProjectPicker(){
   const list=document.getElementById('projpick-list');
   document.getElementById('projpick-msg').textContent='';
-  const keys=MY_MEMBERSHIPS.map(m=>m.project_key).filter(k=>PROJECTS[k]);
+  const keys=myProjectKeys();
   if(keys.length===1){ enterProject(keys[0]); return; }
   list.innerHTML=keys.map(k=>`<button class="projbtn" onclick="enterProject('${k}')"><span class="ic">${PROJECTS[k].icon}</span>${PROJECTS[k].nom}</button>`).join('');
   document.getElementById('projpick').style.display='flex';
@@ -567,12 +570,12 @@ function showProjectPicker(){
 function enterProject(key){
   PROJ=PROJECTS[key];
   const mem=MY_MEMBERSHIPS.find(m=>m.project_key===key);
-  CURRENT_ROLE=mem.role; CURRENT_REGIE=mem.regie_name||null;
+  CURRENT_ROLE=mem?mem.role:(isAdminUser()?'admin':null); CURRENT_REGIE=(mem&&mem.regie_name)?mem.regie_name:null;
   document.getElementById('projpick').style.display='none';
   const roleLabel={admin:'Admin',secretaire:'Secrétaire',regie:'Régie '+(CURRENT_REGIE||'')}[CURRENT_ROLE]||CURRENT_ROLE;
   document.getElementById('proj-label').innerHTML=PROJ.icon+' '+PROJ.nom;
   document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">'+roleLabel+'</span>';
-  document.getElementById('btn-changeproj').style.display = MY_MEMBERSHIPS.length>1?'':'none';
+  document.getElementById('btn-changeproj').style.display = myProjectKeys().length>1?'':'none';
   buildAssocUI();
   applyRole(CURRENT_ROLE);
   if(CURRENT_ROLE==='regie'){ loadMonEspace(); } else { loadAll(); }
@@ -1315,29 +1318,104 @@ async function addRemboursement(e){
 }
 
 // ===== Utilisateurs =====
-async function createUser(e){
+let USERS_CACHE=[], editingUserId=null;
+function roleLabelOf(role){ return {admin:'Admin',secretaire:'Secrétaire',regie:'Régie'}[role]||role; }
+async function svcErr(data,error){
+  if(error){ let t=error.message; try{ const c=await error.context.json(); if(c&&c.error) t=c.error; }catch(_){} return t; }
+  if(data&&data.error) return data.error;
+  return null;
+}
+function onRoleChange(){
+  const role=document.getElementById('u-role').value;
+  document.getElementById('u-regie-field').style.display=(role==='regie')?'flex':'none';
+  document.getElementById('u-projects-field').style.display=(role==='admin')?'none':'';
+  document.getElementById('u-admin-note').style.display=(role==='admin')?'flex':'none';
+}
+async function saveUser(e){
   e.preventDefault();
-  const email=document.getElementById('u-email').value.trim(), password=document.getElementById('u-pass').value;
-  const role=document.getElementById('u-role').value, regie_name=document.getElementById('u-regie').value.trim()||null;
-  const projs=[...document.querySelectorAll('.u-proj:checked')].map(c=>c.value);
+  const email=document.getElementById('u-email').value.trim();
+  const password=document.getElementById('u-pass').value;
+  const role=document.getElementById('u-role').value;
+  const regie_name=role==='regie'?(document.getElementById('u-regie').value.trim()||null):null;
+  const projs = role==='admin' ? Object.keys(PROJECTS) : [...document.querySelectorAll('.u-proj:checked')].map(c=>c.value);
   const msg=document.getElementById('u-msg');
   if(!projs.length){ msg.innerHTML='<span class="val-bad">Coche au moins un projet.</span>'; return; }
-  msg.innerHTML='Création en cours…';
+  if(role==='regie' && !regie_name){ msg.innerHTML='<span class="val-bad">Indique le nom de la régie.</span>'; return; }
   const memberships=projs.map(p=>({project_key:p, role, regie_name}));
+
+  if(editingUserId){
+    msg.innerHTML='Enregistrement…';
+    const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'update',user_id:editingUserId,memberships,email,password:password||undefined}});
+    const errText=await svcErr(data,error);
+    if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
+    msg.innerHTML='<span class="val-good">Utilisateur modifié ✅</span>';
+    cancelEditUser(); loadUsers(); return;
+  }
+  msg.innerHTML='Création en cours…';
   const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,memberships}});
-  let errText=null;
-  if(error){ errText=error.message; try{ const c=await error.context.json(); if(c&&c.error) errText=c.error; }catch(_){} }
-  else if(data&&data.error){ errText=data.error; }
+  const errText=await svcErr(data,error);
   if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
   msg.innerHTML='<span class="val-good">Utilisateur créé ✅</span>';
-  document.getElementById('u-email').value=''; document.getElementById('u-pass').value=''; document.getElementById('u-regie').value='';
-  document.querySelectorAll('.u-proj:checked').forEach(c=>c.checked=false);
-  loadUsers();
+  cancelEditUser(); loadUsers();
+}
+function editUser(uid){
+  const u=USERS_CACHE.find(x=>x.user_id===uid); if(!u) return;
+  editingUserId=uid;
+  const isAdmin=u.mems.some(m=>m.role==='admin');
+  const role=isAdmin?'admin':(u.mems[0]?u.mems[0].role:'secretaire');
+  document.getElementById('u-email').value=u.email||'';
+  document.getElementById('u-email').readOnly=true;
+  const pass=document.getElementById('u-pass'); pass.value=''; pass.required=false; pass.placeholder='laisser vide = mot de passe inchangé';
+  document.getElementById('u-role').value=role;
+  onRoleChange();
+  const projSet=new Set(u.mems.map(m=>m.project_key));
+  document.querySelectorAll('.u-proj').forEach(c=>c.checked=projSet.has(c.value));
+  const rg=u.mems.find(m=>m.regie_name); document.getElementById('u-regie').value=rg?rg.regie_name:'';
+  document.getElementById('u-title').textContent="Modifier l'utilisateur";
+  document.getElementById('u-submit').textContent='💾 Enregistrer';
+  document.getElementById('u-cancel').style.display='';
+  document.getElementById('u-msg').innerHTML='';
+  document.getElementById('u-title').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditUser(){
+  editingUserId=null;
+  const em=document.getElementById('u-email'); em.value=''; em.readOnly=false;
+  const pass=document.getElementById('u-pass'); pass.value=''; pass.required=true; pass.placeholder='min. 6 caractères';
+  document.getElementById('u-regie').value='';
+  document.getElementById('u-role').value='secretaire'; onRoleChange();
+  document.querySelectorAll('.u-proj').forEach(c=>c.checked=false);
+  document.getElementById('u-title').textContent='Créer un utilisateur';
+  document.getElementById('u-submit').textContent='+ Créer';
+  document.getElementById('u-cancel').style.display='none';
+}
+async function delUser(uid,email){
+  if(SESSION && uid===SESSION.user.id){ alert("Tu ne peux pas supprimer ton propre compte."); return; }
+  if(!confirm("Supprimer définitivement l'utilisateur "+(email||'')+" ?\nIl ne pourra plus se connecter.")) return;
+  const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'delete',user_id:uid}});
+  const errText=await svcErr(data,error);
+  if(errText){ toast('Erreur : '+errText); return; }
+  toast('Utilisateur supprimé'); if(editingUserId===uid) cancelEditUser(); loadUsers();
 }
 async function loadUsers(){
   const {data,error}=await db.from('app_memberships').select('*').order('email');
   if(error){ return; }
-  document.getElementById('users-body').innerHTML=(data&&data.length)? data.map(u=>`<tr><td>${u.email||''}</td><td><span class="pill">${PROJECTS[u.project_key]?PROJECTS[u.project_key].nom:u.project_key}</span></td><td>${u.role}</td><td>${u.regie_name||'—'}</td></tr>`).join('') : `<tr><td colspan="4" class="empty">Aucun utilisateur</td></tr>`;
+  const byUser={};
+  (data||[]).forEach(m=>{ if(!byUser[m.user_id]) byUser[m.user_id]={user_id:m.user_id,email:m.email,mems:[]}; byUser[m.user_id].mems.push(m); });
+  USERS_CACHE=Object.values(byUser);
+  const body=document.getElementById('users-body');
+  if(!USERS_CACHE.length){ body.innerHTML=`<tr><td colspan="4" class="empty">Aucun utilisateur</td></tr>`; return; }
+  body.innerHTML=USERS_CACHE.map(u=>{
+    const isAdmin=u.mems.some(m=>m.role==='admin');
+    let projCell, roleCell;
+    if(isAdmin){ projCell='<span class="pill">👑 Tous les projets</span>'; roleCell='Admin'; }
+    else {
+      projCell=u.mems.map(m=>`<span class="pill">${PROJECTS[m.project_key]?PROJECTS[m.project_key].nom:m.project_key}${m.regie_name?' · '+m.regie_name:''}</span>`).join(' ');
+      roleCell=[...new Set(u.mems.map(m=>roleLabelOf(m.role)))].join(', ');
+    }
+    const emailEsc=(u.email||'').replace(/'/g,"\\'");
+    return `<tr><td>${u.email||''}</td><td>${projCell}</td><td>${roleCell}</td>`+
+      `<td class="num"><button class="btn ghost small" onclick="editUser('${u.user_id}')">✏️</button> <button class="btn danger small" onclick="delUser('${u.user_id}','${emailEsc}')">🗑️</button></td></tr>`;
+  }).join('');
 }
 
 // ===== Mon espace (régie) =====
