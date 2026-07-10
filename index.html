@@ -26,9 +26,9 @@
   .search-box .ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
   nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600}
   nav button.active{background:var(--panel2);color:var(--txt)}
-  #subnav{display:flex;gap:6px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel2);position:static;box-shadow:none;z-index:auto}
-  #subnav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
-  #subnav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
+  #subnav,#adminnav{display:flex;gap:6px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel2);position:static;box-shadow:none;z-index:auto}
+  #subnav button,#adminnav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  #subnav button.active,#adminnav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
   main{padding:22px;max-width:1150px;margin:0 auto}
   .grid{display:grid;gap:16px}
   .cards{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
@@ -129,6 +129,10 @@
   <button data-sub="statuts" onclick="showTab('statuts')">🏷️ Statuts</button>
   <button data-sub="regies" onclick="showTab('regies')">🤝 Régies</button>
   <button data-sub="sources" onclick="showTab('sources')">🏢 Sources</button>
+</nav>
+<nav id="adminnav" style="display:none">
+  <button data-admtab="users" onclick="showAdminTab('users')">👥 Utilisateurs</button>
+  <button data-admtab="roles" onclick="showAdminTab('roles')">🏷️ Rôles</button>
 </nav>
 
 <main>
@@ -418,6 +422,33 @@
     </section>
   </div>
 
+  <!-- ROLES -->
+  <div id="tab-roles" class="hidden">
+    <section class="panel">
+      <h2 id="role-title">Créer un rôle</h2>
+      <div class="hint">Donne un nom au rôle, puis coche ce qu'il a le droit de faire dans chaque zone. La suppression de données reste réservée à l'administrateur.</div>
+      <div class="row">
+        <div class="field"><label>Nom du rôle</label><input type="text" id="role-label" placeholder="ex. Comptable, Commercial"></div>
+      </div>
+      <div class="table-wrap" style="margin-top:6px"><table id="role-grid">
+        <thead><tr><th>Zone</th><th class="num">👁️ Voir</th><th class="num">➕ Ajouter</th><th class="num">✏️ Modifier</th><th class="num">🔁 Changer statut</th></tr></thead>
+        <tbody id="role-grid-body"></tbody>
+      </table></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="role-save" onclick="saveRole()">+ Créer le rôle</button>
+        <button class="btn ghost" id="role-cancel" style="display:none" onclick="cancelEditRole()">Annuler</button>
+      </div>
+      <div class="preview" id="role-msg"></div>
+    </section>
+    <section class="panel">
+      <h2>Rôles existants</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Rôle</th><th>Droits</th><th class="num">Actions</th></tr></thead>
+        <tbody id="roles-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
   <!-- MON ESPACE -->
   <div id="tab-monespace" class="hidden">
     <div class="grid cards">
@@ -525,7 +556,7 @@ function showTab(t){
   if(t==='parametres') t='statuts';
   const inParam=PARAM_SUBS.includes(t);
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t || (inParam && b.dataset.tab==='parametres')));
-  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
+  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
   const sn=document.getElementById('subnav'); if(sn) sn.style.display=inParam?'flex':'none';
   document.querySelectorAll('#subnav button').forEach(b=>b.classList.toggle('active',b.dataset.sub===t));
 }
@@ -568,21 +599,40 @@ function showProjectPicker(){
   list.innerHTML=html;
   document.getElementById('projpick').style.display='flex';
 }
-function openAdminUsers(){
+function openAdminUsers(){ openAdminConsole('users'); }
+async function openAdminConsole(which){
   ADMIN_MODE=true; PROJ=null; CURRENT_ROLE='admin';
   document.getElementById('projpick').style.display='none';
-  document.getElementById('proj-label').innerHTML='🛠️ Gestion des utilisateurs';
   document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">Admin</span>';
   document.getElementById('btn-changeproj').style.display='';
   document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='none');
   document.getElementById('subnav').style.display='none';
-  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden', x!=='users'); });
-  cancelEditUser();
-  loadUsers();
+  document.getElementById('adminnav').style.display='flex';
+  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('');
+  await loadRolesCfg();
+  fillRoleSelect();
+  showAdminTab(which||'users');
+}
+function showAdminTab(which){
+  document.getElementById('proj-label').innerHTML = (which==='roles')?'🏷️ Rôles':'🛠️ Gestion des utilisateurs';
+  document.querySelectorAll('#adminnav button').forEach(b=>b.classList.toggle('active',b.dataset.admtab===which));
+  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden', x!==which); });
+  if(which==='roles'){ cancelEditRole(); loadRoles(); } else { fillRoleSelect(); cancelEditUser(); loadUsers(); }
+}
+async function loadRolesCfg(){
+  const {data}=await db.from('app_roles').select('*').order('is_builtin',{ascending:false}).order('label');
+  ROLES_CFG=data||[];
+}
+function fillRoleSelect(){
+  const sel=document.getElementById('u-role'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML=ROLES_CFG.map(r=>`<option value="${r.role_key}">${r.label}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
 }
 function enterProject(key){
   ADMIN_MODE=false; PROJ=PROJECTS[key];
   document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='');
+  document.getElementById('adminnav').style.display='none';
   const mem=MY_MEMBERSHIPS.find(m=>m.project_key===key);
   CURRENT_ROLE=mem?mem.role:(isAdminUser()?'admin':null); CURRENT_REGIE=(mem&&mem.regie_name)?mem.regie_name:null;
   document.getElementById('projpick').style.display='none';
@@ -1332,28 +1382,30 @@ async function addRemboursement(e){
 
 // ===== Utilisateurs =====
 let USERS_CACHE=[], editingUserId=null;
-function roleLabelOf(role){ return {admin:'Admin',secretaire:'Secrétaire',regie:'Régie'}[role]||role; }
+function roleLabelOf(role){ const r=(ROLES_CFG||[]).find(x=>x.role_key===role); if(r) return r.label; return {admin:'Admin',secretaire:'Secrétaire',regie:'Régie'}[role]||role; }
 async function svcErr(data,error){
   if(error){ let t=error.message; try{ const c=await error.context.json(); if(c&&c.error) t=c.error; }catch(_){} return t; }
   if(data&&data.error) return data.error;
   return null;
 }
+function currentRoleCfg(){ const v=document.getElementById('u-role').value; return ROLES_CFG.find(r=>r.role_key===v)||{role_key:v}; }
 function onRoleChange(){
-  const role=document.getElementById('u-role').value;
-  document.getElementById('u-regie-field').style.display=(role==='regie')?'flex':'none';
-  document.getElementById('u-projects-field').style.display=(role==='admin')?'none':'';
-  document.getElementById('u-admin-note').style.display=(role==='admin')?'flex':'none';
+  const r=currentRoleCfg();
+  document.getElementById('u-regie-field').style.display=r.is_regie?'flex':'none';
+  document.getElementById('u-projects-field').style.display=(r.role_key==='admin')?'none':'';
+  document.getElementById('u-admin-note').style.display=(r.role_key==='admin')?'flex':'none';
 }
 async function saveUser(e){
   e.preventDefault();
   const email=document.getElementById('u-email').value.trim();
   const password=document.getElementById('u-pass').value;
-  const role=document.getElementById('u-role').value;
-  const regie_name=role==='regie'?(document.getElementById('u-regie').value.trim()||null):null;
+  const roleCfg=currentRoleCfg(); const role=roleCfg.role_key;
+  const regie_name=roleCfg.is_regie?(document.getElementById('u-regie').value.trim()||null):null;
   const projs = role==='admin' ? Object.keys(PROJECTS) : [...document.querySelectorAll('.u-proj:checked')].map(c=>c.value);
   const msg=document.getElementById('u-msg');
+  if(!role){ msg.innerHTML='<span class="val-bad">Choisis un rôle.</span>'; return; }
   if(!projs.length){ msg.innerHTML='<span class="val-bad">Coche au moins un projet.</span>'; return; }
-  if(role==='regie' && !regie_name){ msg.innerHTML='<span class="val-bad">Indique le nom de la régie.</span>'; return; }
+  if(roleCfg.is_regie && !regie_name){ msg.innerHTML='<span class="val-bad">Indique le nom de la régie.</span>'; return; }
   const memberships=projs.map(p=>({project_key:p, role, regie_name}));
 
   if(editingUserId){
@@ -1429,6 +1481,101 @@ async function loadUsers(){
     return `<tr><td>${u.email||''}</td><td>${projCell}</td><td>${roleCell}</td>`+
       `<td class="num"><button class="btn ghost small" onclick="editUser('${u.user_id}')">✏️</button> <button class="btn danger small" onclick="delUser('${u.user_id}','${emailEsc}')">🗑️</button></td></tr>`;
   }).join('');
+}
+
+// ===== Rôles =====
+let ROLES_CFG=[], editingRoleKey=null;
+const ROLE_ZONES=[
+  {key:'dashboard',label:'📊 Tableau de bord',acts:['voir']},
+  {key:'dossiers',label:'📁 Dossiers',acts:['voir','ajouter','modifier','statut']},
+  {key:'apports',label:'💶 Apports',acts:['voir','ajouter','modifier']},
+  {key:'frais',label:'🧾 Frais / Dépenses',acts:['voir','ajouter','modifier']},
+  {key:'params',label:'⚙️ Paramètres (statuts, régies, sources)',acts:['voir','ajouter','modifier']},
+];
+const ACT_COLS=['voir','ajouter','modifier','statut'];
+const ACT_LABEL={voir:'voir',ajouter:'ajouter',modifier:'modifier',statut:'statut'};
+function fillRoleGrid(perms){
+  perms=perms||{};
+  document.getElementById('role-grid-body').innerHTML=ROLE_ZONES.map(z=>{
+    const cells=ACT_COLS.map(a=>{
+      if(!z.acts.includes(a)) return '<td class="num">—</td>';
+      const on=!!(perms[z.key]&&perms[z.key][a]);
+      return `<td class="num"><input type="checkbox" class="perm-cb" data-zone="${z.key}" data-act="${a}" ${on?'checked':''}></td>`;
+    }).join('');
+    return `<tr><td>${z.label}</td>${cells}</tr>`;
+  }).join('');
+}
+function collectPerms(){
+  const p={};
+  document.querySelectorAll('#role-grid-body .perm-cb').forEach(cb=>{ if(cb.checked){ const z=cb.dataset.zone,a=cb.dataset.act; (p[z]=p[z]||{})[a]=true; } });
+  return p;
+}
+function permSummary(perms){
+  perms=perms||{}; const parts=[];
+  ROLE_ZONES.forEach(z=>{ const acts=z.acts.filter(a=>perms[z.key]&&perms[z.key][a]); if(acts.length){ parts.push(z.label.replace(/^\S+\s/,'')+' ('+acts.map(a=>ACT_LABEL[a]).join('/')+')'); } });
+  return parts.length?parts.join(' · '):'<span style="color:var(--muted)">aucun droit</span>';
+}
+async function loadRoles(){
+  const {data,error}=await db.from('app_roles').select('*').order('is_builtin',{ascending:false}).order('label');
+  if(error){ return; }
+  ROLES_CFG=data||[];
+  const body=document.getElementById('roles-body');
+  body.innerHTML=ROLES_CFG.length? ROLES_CFG.map(r=>{
+    const summary = r.role_key==='admin' ? '👑 Accès total (seul à pouvoir supprimer)' : r.is_regie ? 'Voit seulement son espace (lecture seule)' : permSummary(r.permissions);
+    const canEdit = r.role_key!=='admin' && !r.is_regie;
+    const canDel = !r.is_builtin;
+    const acts = (canEdit?`<button class="btn ghost small" onclick="editRole('${r.role_key}')">✏️</button> `:'') + (canDel?`<button class="btn danger small" onclick="delRole('${r.role_key}')">🗑️</button>`:'<span style="color:var(--muted)">protégé</span>');
+    return `<tr><td><b>${r.label}</b></td><td>${summary}</td><td class="num">${acts}</td></tr>`;
+  }).join('') : `<tr><td colspan="3" class="empty">Aucun rôle</td></tr>`;
+}
+function slugify(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
+async function saveRole(){
+  const label=document.getElementById('role-label').value.trim();
+  const msg=document.getElementById('role-msg');
+  if(!label){ msg.innerHTML='<span class="val-bad">Donne un nom au rôle.</span>'; return; }
+  const perms=collectPerms();
+  msg.innerHTML='Enregistrement…';
+  if(editingRoleKey){
+    const {error}=await db.from('app_roles').update({label,permissions:perms}).eq('role_key',editingRoleKey);
+    if(error){ msg.innerHTML='<span class="val-bad">Erreur : '+error.message+'</span>'; return; }
+    msg.innerHTML='<span class="val-good">Rôle modifié ✅</span>';
+  } else {
+    let base=slugify(label)||'role', key=base, i=2;
+    const existing=new Set(ROLES_CFG.map(r=>r.role_key));
+    while(existing.has(key)){ key=base+i; i++; }
+    const {error}=await db.from('app_roles').insert({role_key:key,label,permissions:perms,is_builtin:false,is_regie:false});
+    if(error){ msg.innerHTML='<span class="val-bad">Erreur : '+error.message+'</span>'; return; }
+    msg.innerHTML='<span class="val-good">Rôle créé ✅</span>';
+  }
+  cancelEditRole(); loadRoles();
+}
+function editRole(key){
+  const r=ROLES_CFG.find(x=>x.role_key===key); if(!r) return;
+  editingRoleKey=key;
+  document.getElementById('role-label').value=r.label;
+  fillRoleGrid(r.permissions);
+  document.getElementById('role-title').textContent='Modifier le rôle';
+  document.getElementById('role-save').textContent='💾 Enregistrer';
+  document.getElementById('role-cancel').style.display='';
+  document.getElementById('role-msg').innerHTML='';
+  document.getElementById('role-title').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditRole(){
+  editingRoleKey=null;
+  document.getElementById('role-label').value='';
+  fillRoleGrid({});
+  document.getElementById('role-title').textContent='Créer un rôle';
+  document.getElementById('role-save').textContent='+ Créer le rôle';
+  document.getElementById('role-cancel').style.display='none';
+}
+async function delRole(key){
+  const r=ROLES_CFG.find(x=>x.role_key===key); if(!r) return;
+  const {count}=await db.from('app_memberships').select('id',{count:'exact',head:true}).eq('role',key);
+  if(count&&count>0){ alert('Ce rôle est attribué à '+count+' utilisateur(s). Change-les d\'abord de rôle avant de supprimer ce rôle.'); return; }
+  if(!confirm('Supprimer le rôle « '+r.label+' » ?')) return;
+  const {error}=await db.from('app_roles').delete().eq('role_key',key);
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('Rôle supprimé'); if(editingRoleKey===key) cancelEditRole(); loadRoles();
 }
 
 // ===== Mon espace (régie) =====
