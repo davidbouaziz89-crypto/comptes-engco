@@ -682,32 +682,33 @@ function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>N�
 function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
 function regionFromCP(cp){ cp=(cp||'').toString(); if(/^20/.test(cp)) return 'Corse'; if(/^9[78]/.test(cp)) return 'DOM-TOM'; return 'France'; }
+async function fetchSiretInfo(siret){
+  siret=(siret||'').toString().replace(/\D/g,''); if(siret.length<9) return null;
+  try{
+    const res=await fetch('https://recherche-entreprises.api.gouv.fr/search?q='+encodeURIComponent(siret)+'&per_page=1');
+    if(!res.ok) return null;
+    const data=await res.json();
+    const r=(data.results||[])[0]; if(!r) return null;
+    const etab=(r.matching_etablissements||[]).find(e=>e.siret===siret) || r.siege || {};
+    const cp=(etab.code_postal||(r.siege&&r.siege.code_postal)||'');
+    const ville=(etab.libelle_commune||(r.siege&&r.siege.libelle_commune)||'');
+    let adresse=(etab.adresse||(r.siege&&r.siege.adresse)||'');
+    if(adresse){ if(cp) adresse=adresse.replace(cp,''); if(ville) adresse=adresse.replace(new RegExp(ville,'i'),''); adresse=adresse.replace(/\s{2,}/g,' ').trim().replace(/[,\s]+$/,''); }
+    return { nom:r.nom_complet||r.nom_raison_sociale||'', adresse, code_postal:cp, ville, region:regionFromCP(cp) };
+  }catch(e){ return null; }
+}
 async function lookupSiret(){
   const el=document.getElementById('d-siret'); if(!el) return;
   const siret=(el.value||'').replace(/\D/g,'');
   if(siret.length<9){ toast('Entre un SIRET (14 chiffres) ou un SIREN (9 chiffres)'); return; }
   toast('🔍 Recherche de l\'entreprise…');
-  try{
-    const res=await fetch('https://recherche-entreprises.api.gouv.fr/search?q='+encodeURIComponent(siret)+'&per_page=1');
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const data=await res.json();
-    const r=(data.results||[])[0];
-    if(!r){ toast('❌ Aucune entreprise trouvée pour ce numéro'); return; }
-    const etab=(r.matching_etablissements||[]).find(e=>e.siret===siret) || r.siege || {};
-    const nom=r.nom_complet||r.nom_raison_sociale||'';
-    const cp=(etab.code_postal||(r.siege&&r.siege.code_postal)||'');
-    const ville=(etab.libelle_commune||(r.siege&&r.siege.libelle_commune)||'');
-    const adresse=(etab.adresse||(r.siege&&r.siege.adresse)||'');
-    const setV=(id,val)=>{ const el=document.getElementById(id); if(el && val) el.value=val; };
-    if(nom) setV('d-client',nom);
-    setV('d-cp',cp); setV('d-ville',ville);
-    // adresse : on enlève le code postal + ville de la chaîne complète si présents pour ne garder que la rue
-    let rue=adresse; if(rue){ if(cp) rue=rue.replace(cp,''); if(ville) rue=rue.replace(new RegExp(ville,'i'),''); rue=rue.replace(/\s{2,}/g,' ').trim().replace(/[,\s]+$/,''); }
-    setV('d-adresse',rue||adresse);
-    const region=regionFromCP(cp);
-    const rsel=document.getElementById('d-region'); if(rsel){ rsel.value=region; onVeloRegion(); }
-    toast('✅ '+(nom||'Entreprise')+' — '+region+(cp?' ('+cp+(ville?' '+ville:'')+')':''));
-  }catch(e){ toast('⚠️ Impossible de contacter l\'annuaire des entreprises'); }
+  const info=await fetchSiretInfo(siret);
+  if(!info){ toast('⚠️ Aucune entreprise trouvée / annuaire injoignable'); return; }
+  const setV=(id,val)=>{ const e=document.getElementById(id); if(e && val) e.value=val; };
+  if(info.nom) setV('d-client',info.nom);
+  setV('d-cp',info.code_postal); setV('d-ville',info.ville); setV('d-adresse',info.adresse);
+  const rsel=document.getElementById('d-region'); if(rsel){ rsel.value=info.region; onVeloRegion(); }
+  toast('✅ '+(info.nom||'Entreprise')+' — '+info.region+(info.code_postal?' ('+info.code_postal+(info.ville?' '+info.ville:'')+')':''));
 }
 function onVeloRegion(){ document.getElementById('d-tarif').value = VELO_TARIF_DEFAUT[document.getElementById('d-region').value]||80; onDossierRegie(); }
 function managerRegieRow(){
@@ -1373,8 +1374,8 @@ function buildImportSpecs(){
   const as=A();
   const dossiers = PROJ.dossierType==='velo' ? {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','ID CRM','Adresse','Code postal','Ville','Téléphone','Email','Nombre de vélos','Commercial régie'],
-    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','12 rue des Fleurs','20000','Ajaccio','0600000000','client@email.fr','10','MADA'],
+    headers:['Date','Client','ID CRM','SIRET','Adresse','Code postal','Ville','Téléphone','Email','Nombre de vélos','Commercial régie'],
+    example:['05/07/2026','(rempli via SIRET)','ID-001','44306184100047','','','','0600000000','client@email.fr','10','MADA'],
     build(m){ if(_isEx(m)||!_has(m)) return null;
       const cp=_pick(m,'Code postal','CP');
       let reg=_pick(m,'Région'); if(!reg) reg=regionFromCP(cp); if(!reg) reg='France';
@@ -1384,7 +1385,7 @@ function buildImportSpecs(){
       let mu=_pnum(_pick(m,'Commission par vélo (€)','Commission par vélo','Commission'));
       let interne=(it==='oui'||it==='yes'||it==='true'||it==='1');
       if(cfg){ if(!mu) mu=Number(reg==='France'?cfg.montant_france:reg==='Corse'?cfg.montant_corse:cfg.montant_domtom)||0; if(itRaw==null||itRaw==='') interne=!!cfg.interne; }
-      return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), adresse:_pick(m,'Adresse'), code_postal:cp, ville:_pick(m,'Ville'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'),
+      return { _siret:_pick(m,'SIRET','Siret'), date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), adresse:_pick(m,'Adresse'), code_postal:cp, ville:_pick(m,'Ville'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'),
       region:reg, nb_velos:_pnum(_pick(m,'Nb vélos','Nombre de vélos')), tarif_unitaire:_pnum(_pick(m,'Tarif unitaire','Tarif'))||(VELO_TARIF_DEFAUT[reg]||80),
       autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:regieName, regie_montant_unitaire:mu, regie_interne:interne, regie_pct:0, statut:_pick(m,'Statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours') }; }
   } : {
@@ -1426,6 +1427,31 @@ async function importFile(type,file){
     const rows=raw.map(r=>{ const m={}; for(const k in r) m[_norm(k)]=r[k]; return m; });
     const built=[]; rows.forEach(m=>{ const o=spec.build(m); if(o) built.push(o); });
     if(!built.length){ toast('Aucune ligne à importer'); return; }
+    // Enrichissement SIRET (dossiers vélo) : remplit nom/adresse/CP/ville/région depuis l'annuaire des entreprises
+    if(type==='dossiers' && PROJ.dossierType==='velo'){
+      const toEnrich=built.filter(o=>o && o._siret);
+      if(toEnrich.length){
+        toast('🔍 Recherche de '+toEnrich.length+' entreprise(s) via SIRET…');
+        for(const o of toEnrich){
+          const hadCP=!!(o.code_postal && (''+o.code_postal).trim());
+          const info=await fetchSiretInfo(o._siret);
+          if(info){
+            if(!o.nom_client) o.nom_client=info.nom;
+            if(!o.adresse) o.adresse=info.adresse;
+            if(!o.ville) o.ville=info.ville;
+            if(!hadCP && info.code_postal){
+              o.code_postal=info.code_postal; o.region=info.region;
+              o.tarif_unitaire=VELO_TARIF_DEFAUT[info.region]||o.tarif_unitaire;
+              const cfg=(REGIES_CFG||[]).find(r=>r.nom===o.commercial_regie);
+              if(cfg) o.regie_montant_unitaire=Number(info.region==='France'?cfg.montant_france:info.region==='Corse'?cfg.montant_corse:cfg.montant_domtom)||0;
+            }
+          }
+          await new Promise(r=>setTimeout(r,180));
+        }
+      }
+    }
+    // retirer les champs temporaires (préfixe _) avant insertion
+    built.forEach(o=>{ if(o) Object.keys(o).forEach(k=>{ if(k[0]==='_') delete o[k]; }); });
     // Anti-doublons : contre les données existantes ET à l'intérieur du fichier
     const existing = type==='dossiers' ? (window._dossiers||[]) : type==='frais' ? (window._frais||[]) : [];
     const isDup=(o,list)=>{
