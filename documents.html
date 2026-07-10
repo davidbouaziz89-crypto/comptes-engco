@@ -7,6 +7,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
@@ -55,6 +57,9 @@
   .msg{margin-top:10px;font-size:14px}
   .val-good{color:var(--good)} .val-bad{color:var(--bad)}
   .soon{color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:26px;text-align:center}
+  .checkcol{width:34px;text-align:center}
+  .checkcol input{width:auto}
+  #batch-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 4px;padding:10px 12px;background:var(--panel2);border:1px solid var(--accent);border-radius:10px}
   /* Éditeur de modèle */
   #editor-view{flex-direction:column;align-items:stretch;justify-content:stretch;padding:0;background:var(--bg)}
   #ed-body{display:flex;flex:1;overflow:hidden}
@@ -140,11 +145,22 @@
         </form>
       </section>
       <section class="panel">
-        <h2>Clients</h2>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <h2 style="margin:0">Clients</h2>
+          <span class="spacer" style="margin-left:auto"></span>
+          <button class="btn ghost small" onclick="downloadImportTemplate()">⬇️ Modèle Excel</button>
+          <button class="btn small" onclick="openImport()">📥 Importer Excel</button>
+        </div>
         <input class="search" id="cli-search" placeholder="🔎 Rechercher…" oninput="renderClients()">
         <span id="cli-count" style="color:var(--muted);font-size:13px;margin-left:10px"></span>
+        <div id="batch-bar" class="hidden">
+          <b><span id="batch-count">0</span> client(s) sélectionné(s)</b>
+          <span class="spacer" style="margin-left:auto"></span>
+          <button class="btn small" onclick="openBatch()">🔁 Générer en lot</button>
+          <button class="btn ghost small" onclick="clearSelection()">Tout désélectionner</button>
+        </div>
         <div class="table-wrap" style="margin-top:12px"><table>
-          <thead><tr><th>Société</th><th>Contact</th><th>Email</th><th>Téléphone</th><th>Ville</th><th class="num">Actions</th></tr></thead>
+          <thead><tr><th class="checkcol"><input type="checkbox" id="cli-selall" onclick="toggleSelectAll(this.checked)"></th><th>Société</th><th>Contact</th><th>Email</th><th>Téléphone</th><th>Ville</th><th class="num">Actions</th></tr></thead>
           <tbody id="cli-body"></tbody>
         </table></div>
       </section>
@@ -213,7 +229,54 @@
     <div class="msg" id="gen-msg"></div>
     <div class="row" style="margin-top:16px;justify-content:flex-end">
       <button class="btn ghost" type="button" onclick="closeGenerate()">Annuler</button>
+      <button class="btn ghost" type="button" id="gen-preview" onclick="doPreview()">👁️ Aperçu</button>
       <button class="btn" type="button" id="gen-go" onclick="doGenerate()">⬇️ Générer &amp; télécharger</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL APERCU -->
+<div id="preview-modal" class="overlay hidden" style="background:rgba(0,0,0,.78);flex-direction:column;padding:20px">
+  <div style="width:100%;max-width:900px;display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <b id="preview-title" style="color:#fff"></b>
+    <span class="spacer" style="margin-left:auto"></span>
+    <button class="btn" type="button" onclick="downloadFromPreview()">⬇️ Télécharger</button>
+    <button class="btn ghost small" type="button" onclick="closePreview()">✕ Fermer</button>
+  </div>
+  <iframe id="preview-frame" style="width:100%;max-width:900px;flex:1;border:0;border-radius:10px;background:#fff"></iframe>
+</div>
+
+<!-- MODAL GENERATION EN LOT -->
+<div id="batch-modal" class="overlay hidden" style="background:rgba(0,0,0,.65)">
+  <div class="authcard" style="max-width:460px">
+    <h1 style="font-size:19px">🔁 Générer en lot</h1>
+    <div class="sub" id="batch-sub"></div>
+    <label>Modèle</label>
+    <select id="batch-template"></select>
+    <label>Format de sortie</label>
+    <select id="batch-output">
+      <option value="zip">ZIP — un fichier PDF par client</option>
+      <option value="merge">Un seul PDF — tous les clients à la suite</option>
+    </select>
+    <div class="msg" id="batch-msg"></div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn ghost" type="button" onclick="closeBatch()">Annuler</button>
+      <button class="btn" type="button" id="batch-go" onclick="doBatchGenerate()">⬇️ Générer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORT EXCEL -->
+<div id="import-modal" class="overlay hidden" style="background:rgba(0,0,0,.65)">
+  <div class="authcard" style="max-width:480px">
+    <h1 style="font-size:19px">📥 Importer des clients</h1>
+    <div class="sub">Fichier <b>Excel (.xlsx)</b> ou <b>CSV</b>. Colonnes reconnues : Société, Prénom, Nom, Email, Téléphone, SIRET, Adresse, Code postal, Ville, Pays, Catégorie. Seule la <b>Société</b> est obligatoire. Astuce : télécharge d'abord le « Modèle Excel ».</div>
+    <label>Fichier</label><input type="file" id="imp-file" accept=".xlsx,.xls,.csv">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--txt)"><input type="checkbox" id="imp-skipdup" checked style="width:auto"> Ignorer les sociétés déjà présentes (même nom)</label>
+    <div class="msg" id="imp-msg"></div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn ghost" type="button" onclick="closeImport()">Annuler</button>
+      <button class="btn" type="button" id="imp-go" onclick="doImport()">Importer</button>
     </div>
   </div>
 </div>
@@ -263,6 +326,7 @@ if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr
 
 let SESSION=null, CLIENTS=[], editingClientId=null, editingClientValues={};
 let CUSTOMFIELDS=[], editingCFId=null;
+let SELECTED=new Set();
 
 const STD_LABELS={company_name:'Société',first_name:'Prénom',last_name:'Nom',email:'Email',phone:'Téléphone',siret:'SIRET',address_line1:'Adresse',address_line2:'Complément adresse',zip:'Code postal',city:'Ville',country:'Pays',category:'Catégorie'};
 const SYS_LABELS={today_date:'Date du jour',date_edition:'Date & heure d\'édition'};
@@ -308,27 +372,39 @@ async function loadClients(){
     if(error){ document.getElementById('c-msg').innerHTML='<span class="val-bad">Erreur de chargement : '+error.message+'</span>'; break; }
     all=all.concat(data||[]); if(!data || data.length<page) break; from+=page;
   }
-  CLIENTS=all; renderClients();
+  CLIENTS=all;
+  const ids=new Set(all.map(c=>c.id)); SELECTED.forEach(id=>{ if(!ids.has(id)) SELECTED.delete(id); });
+  renderClients();
 }
 function matchSearch(term,text){
   term=(term||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   text=(text||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   return term.split(/\s+/).filter(Boolean).every(w=>text.includes(w));
 }
-function renderClients(){
+function filteredClients(){
   const term=document.getElementById('cli-search').value;
-  const filtered=CLIENTS.filter(c=>matchSearch(term,[c.company_name,c.first_name,c.last_name,c.email,c.phone,c.city,c.category].join(' ')));
+  return CLIENTS.filter(c=>matchSearch(term,[c.company_name,c.first_name,c.last_name,c.email,c.phone,c.city,c.category].join(' ')));
+}
+function renderClients(){
+  const filtered=filteredClients();
   const body=document.getElementById('cli-body');
   const CAP=300; const rows=filtered.slice(0,CAP);
   const cnt=document.getElementById('cli-count');
   if(cnt) cnt.textContent = filtered.length+' client'+(filtered.length>1?'s':'')+(filtered.length>CAP?' · affichage des '+CAP+' premiers, affine ta recherche':'');
-  if(!rows.length){ body.innerHTML='<tr><td colspan="6" class="empty">Aucun client</td></tr>'; return; }
-  body.innerHTML=rows.map(c=>{
+  if(!rows.length){ body.innerHTML='<tr><td colspan="7" class="empty">Aucun client</td></tr>'; }
+  else body.innerHTML=rows.map(c=>{
     const contact=[c.first_name,c.last_name].filter(Boolean).join(' ')||'—';
-    return `<tr><td><b>${esc(c.company_name)}</b></td><td>${esc(contact)}</td><td>${esc(c.email||'—')}</td><td>${esc(c.phone||'—')}</td><td>${esc(c.city||'—')}</td>`+
+    return `<tr><td class="checkcol"><input type="checkbox" ${SELECTED.has(c.id)?'checked':''} onclick="toggleSelect('${c.id}',this.checked)"></td><td><b>${esc(c.company_name)}</b></td><td>${esc(contact)}</td><td>${esc(c.email||'—')}</td><td>${esc(c.phone||'—')}</td><td>${esc(c.city||'—')}</td>`+
       `<td class="num"><button class="btn small" onclick="openGenerate('${c.id}')" title="Générer un document">📄</button> <button class="btn ghost small" onclick="editClient('${c.id}')">✏️</button> <button class="btn danger small" onclick="delClient('${c.id}')">🗑️</button></td></tr>`;
   }).join('');
+  const selall=document.getElementById('cli-selall');
+  if(selall){ const allSel=filtered.length>0 && filtered.every(c=>SELECTED.has(c.id)); selall.checked=allSel; }
+  updateBatchBar();
 }
+function toggleSelect(id,checked){ if(checked)SELECTED.add(id); else SELECTED.delete(id); updateBatchBar(); const selall=document.getElementById('cli-selall'); if(selall){ const f=filteredClients(); selall.checked=f.length>0 && f.every(c=>SELECTED.has(c.id)); } }
+function toggleSelectAll(checked){ const f=filteredClients(); if(checked) f.forEach(c=>SELECTED.add(c.id)); else f.forEach(c=>SELECTED.delete(c.id)); renderClients(); }
+function clearSelection(){ SELECTED.clear(); renderClients(); }
+function updateBatchBar(){ const bar=document.getElementById('batch-bar'); if(!bar) return; bar.classList.toggle('hidden',SELECTED.size===0); const c=document.getElementById('batch-count'); if(c) c.textContent=SELECTED.size; }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function clientForm(){
   return { company_name:v('c-company'), first_name:v('c-first')||null, last_name:v('c-last')||null,
@@ -403,7 +479,68 @@ async function delClient(id){
   const {error}=await db.from('doc_clients').delete().eq('id',id);
   if(error){ alert('Suppression refusée : '+error.message); return; }
   if(editingClientId===id) cancelEditClient();
+  SELECTED.delete(id);
   loadClients();
+}
+
+// ===== Import Excel =====
+function openImport(){ document.getElementById('imp-file').value=''; document.getElementById('imp-skipdup').checked=true; document.getElementById('imp-msg').innerHTML=''; document.getElementById('import-modal').classList.remove('hidden'); }
+function closeImport(){ document.getElementById('import-modal').classList.add('hidden'); }
+function downloadImportTemplate(){
+  const headers=['Société','Prénom','Nom','Email','Téléphone','SIRET','Adresse','Code postal','Ville','Pays','Catégorie'];
+  const example=['Exemple SARL','Jean','Dupont','jean@exemple.fr','0102030405','12345678900011','1 rue de la Paix','75001','Paris','France','Client'];
+  const ws=XLSX.utils.aoa_to_sheet([headers,example]);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Clients');
+  XLSX.writeFile(wb,'modele_import_clients.xlsx');
+}
+function mapHeader(h){
+  const s=slugify(h);
+  const M={societe:'company_name',raison_sociale:'company_name',entreprise:'company_name',company:'company_name',nom_societe:'company_name',societe_nom:'company_name',
+    prenom:'first_name',first_name:'first_name',prenom_contact:'first_name',
+    nom:'last_name',last_name:'last_name',nom_contact:'last_name',nom_de_famille:'last_name',
+    email:'email',mail:'email',courriel:'email',e_mail:'email',adresse_email:'email',
+    telephone:'phone',tel:'phone',phone:'phone',portable:'phone',mobile:'phone',numero:'phone',
+    siret:'siret',siren:'siret',
+    adresse:'address_line1',adresse_1:'address_line1',adresse1:'address_line1',rue:'address_line1',
+    code_postal:'zip',cp:'zip',zip:'zip',codepostal:'zip',
+    ville:'city',city:'city',commune:'city',
+    pays:'country',country:'country',
+    categorie:'category',category:'category',type:'category',tag:'category',tags:'category'};
+  return M[s]||null;
+}
+async function doImport(){
+  const file=document.getElementById('imp-file').files[0];
+  const skipDup=document.getElementById('imp-skipdup').checked;
+  const msg=document.getElementById('imp-msg');
+  if(!file){ msg.innerHTML='<span class="val-bad">Choisis un fichier.</span>'; return; }
+  const btn=document.getElementById('imp-go'); btn.disabled=true; msg.innerHTML='Lecture du fichier…';
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    const json=XLSX.utils.sheet_to_json(sheet,{defval:''});
+    if(!json.length){ msg.innerHTML='<span class="val-bad">Le fichier ne contient aucune ligne.</span>'; btn.disabled=false; return; }
+    const existing=new Set(CLIENTS.map(c=>(c.company_name||'').trim().toLowerCase()));
+    const rows=[]; let skipped=0, noCompany=0;
+    for(const r of json){
+      const row={country:'France'};
+      Object.keys(r).forEach(k=>{ const field=mapHeader(k); if(field){ const val=String(r[k]).trim(); if(val) row[field]=val; } });
+      if(!row.company_name){ noCompany++; continue; }
+      const nm=row.company_name.trim().toLowerCase();
+      if(skipDup && existing.has(nm)){ skipped++; continue; }
+      existing.add(nm); rows.push(row);
+    }
+    if(!rows.length){ msg.innerHTML='<span class="val-bad">Aucun client à importer ('+skipped+' déjà présents, '+noCompany+' sans société).</span>'; btn.disabled=false; return; }
+    for(let i=0;i<rows.length;i+=500){
+      const chunk=rows.slice(i,i+500);
+      const {error}=await db.from('doc_clients').insert(chunk);
+      if(error) throw error;
+      msg.innerHTML='Import… '+Math.min(i+500,rows.length)+' / '+rows.length;
+    }
+    msg.innerHTML='<span class="val-good">'+rows.length+' client(s) importés ✅'+(skipped?(' · '+skipped+' ignorés (déjà présents)'):'')+(noCompany?(' · '+noCompany+' sans société'):'')+'</span>';
+    await loadClients();
+  }catch(e){ msg.innerHTML='<span class="val-bad">Erreur : '+(e.message||e)+'</span>'; }
+  finally{ btn.disabled=false; }
 }
 
 // ===== Champs personnalisés =====
@@ -472,7 +609,7 @@ async function loadTemplates(){
   const {data:fc}=await db.from('doc_template_fields').select('template_id');
   const counts={}; (fc||[]).forEach(f=>counts[f.template_id]=(counts[f.template_id]||0)+1);
   TEMPLATES=(tpl||[]).map(t=>Object.assign({},t,{nb_fields:counts[t.id]||0}));
-  renderTemplatesTab(); fillGenTemplateSelect();
+  renderTemplatesTab(); fillTemplateSelect('gen-template');
 }
 function renderTemplatesTab(){
   const body=document.getElementById('modeles-body'); if(!body) return;
@@ -480,8 +617,8 @@ function renderTemplatesTab(){
   body.innerHTML=TEMPLATES.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.category||'—')}</td><td class="num">${t.nb_fields}</td><td>${t.source_pdf_path?'✅':'—'}</td>`+
     `<td class="num"><button class="btn small" onclick="openEditor('${t.id}')" title="Placer les champs">✏️ Éditer</button> <button class="btn danger small" onclick="delTemplate('${t.id}')">🗑️</button></td></tr>`).join('');
 }
-function fillGenTemplateSelect(){
-  const sel=document.getElementById('gen-template'); if(!sel) return;
+function fillTemplateSelect(id){
+  const sel=document.getElementById(id); if(!sel) return;
   const usable=TEMPLATES.filter(t=>t.source_pdf_path);
   sel.innerHTML=usable.length? usable.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('') : '<option value="">Aucun modèle disponible</option>';
 }
@@ -704,19 +841,17 @@ async function loadGenerated(){
 async function downloadGenerated(path){
   const {data,error}=await db.storage.from('doc-generated').download(path);
   if(error||!data){ alert('Fichier introuvable : '+((error&&error.message)||'')); return; }
-  const url=URL.createObjectURL(data); const a=document.createElement('a'); a.href=url;
-  a.download=path.split('/').pop()||'document.pdf'; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  triggerDownload(data,path.split('/').pop()||'document.pdf');
 }
 
 // ===== Génération PDF (portage fidèle de l'ancien DocuCRM / pdfRenderUtils) =====
-let genClientId=null;
+let genClientId=null, previewBlob=null, previewName='document.pdf', previewCtx=null;
 function openGenerate(id){
   genClientId=id;
   const c=CLIENTS.find(x=>x.id===id);
   document.getElementById('gen-client').textContent = c ? ('Client : '+(c.company_name||'')) : '';
   document.getElementById('gen-msg').innerHTML='';
-  fillGenTemplateSelect();
+  fillTemplateSelect('gen-template');
   document.getElementById('gen-modal').classList.remove('hidden');
 }
 function closeGenerate(){ document.getElementById('gen-modal').classList.add('hidden'); genClientId=null; }
@@ -769,49 +904,133 @@ function renderFieldToPdf(o){
     draw(value,fx,fy);
   }
 }
+function safeName(s){ return String(s||'document').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'')||'document'; }
+function triggerDownload(blob,fname){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }
+async function renderFilledPdf(tplBytes,fields,client,customMap){
+  const {PDFDocument,StandardFonts}=PDFLib;
+  const pdfDoc=await PDFDocument.load(tplBytes);
+  const font=await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const pages=pdfDoc.getPages();
+  for(const f of (fields||[])){
+    const pi=(f.page||1)-1; if(pi<0||pi>=pages.length) continue;
+    let value=getFieldValue(f.field_key,f.field_source,client,customMap);
+    if(f.fallback_value && !value) value=f.fallback_value;
+    value=applyTextTransform(value,f.transform||'none');
+    if(!value) continue;
+    renderFieldToPdf({value:String(value),fontSize:f.font_size||10,font,page:pages[pi],coords:{x:Number(f.x)||0,y:Number(f.y)||0,width:Number(f.width)||0.1,height:Number(f.height)||0.03},align:f.align||'left'});
+  }
+  return await pdfDoc.save();
+}
+async function loadTemplateForGen(templateId){
+  const tpl=TEMPLATES.find(t=>t.id===templateId); if(!tpl||!tpl.source_pdf_path) throw new Error('Ce modèle n\'a pas de PDF source.');
+  const {data:fields}=await db.from('doc_template_fields').select('*').eq('template_id',templateId);
+  const {data:pdfBlob,error}=await db.storage.from('doc-templates').download(tpl.source_pdf_path);
+  if(error||!pdfBlob) throw new Error('PDF source introuvable');
+  const tplBytes=new Uint8Array(await pdfBlob.arrayBuffer());
+  const {data:cfDefs}=await db.from('doc_custom_fields').select('id,key');
+  return {tpl,fields:fields||[],tplBytes,cfDefs:cfDefs||[]};
+}
+async function buildForClient(clientId,prep){
+  let client=CLIENTS.find(c=>c.id===clientId);
+  if(!client){ const {data}=await db.from('doc_clients').select('*').eq('id',clientId).single(); client=data; }
+  if(!client) throw new Error('client introuvable');
+  const {data:cvals}=await db.from('doc_client_values').select('field_id,value_text').eq('client_id',clientId);
+  const customMap={}; prep.cfDefs.forEach(f=>{ const vv=(cvals||[]).find(x=>x.field_id===f.id); customMap[f.key]=vv?vv.value_text:null; });
+  const bytes=await renderFilledPdf(prep.tplBytes,prep.fields,client,customMap);
+  return {bytes,client};
+}
+async function historySave(clientId,templateId,tplName,bytes){
+  try{
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const path=clientId+'/'+Date.now()+'-'+safeName(tplName)+'.pdf';
+    await db.storage.from('doc-generated').upload(path,blob,{contentType:'application/pdf'});
+    const {data:ud}=await db.auth.getUser();
+    await db.from('doc_generated').insert({client_id:clientId,template_id:templateId,pdf_path:path,generated_by:ud&&ud.user?ud.user.id:null,meta:{template_name:tplName}});
+  }catch(_){}
+}
 async function doGenerate(){
   const msg=document.getElementById('gen-msg');
   const templateId=document.getElementById('gen-template').value;
   if(!genClientId||!templateId){ msg.innerHTML='<span class="val-bad">Choisis un modèle.</span>'; return; }
-  const tpl=TEMPLATES.find(t=>t.id===templateId);
-  if(!tpl||!tpl.source_pdf_path){ msg.innerHTML='<span class="val-bad">Ce modèle n\'a pas de PDF source.</span>'; return; }
   const goBtn=document.getElementById('gen-go'); goBtn.disabled=true; msg.innerHTML='Génération en cours…';
   try{
-    const {data:client,error:cErr}=await db.from('doc_clients').select('*').eq('id',genClientId).single();
-    if(cErr||!client) throw new Error('client introuvable');
-    const {data:fields}=await db.from('doc_template_fields').select('*').eq('template_id',templateId);
-    const {data:cfDefs}=await db.from('doc_custom_fields').select('id,key');
-    const {data:cvals}=await db.from('doc_client_values').select('field_id,value_text').eq('client_id',genClientId);
-    const customMap={}; (cfDefs||[]).forEach(f=>{ const v=(cvals||[]).find(x=>x.field_id===f.id); customMap[f.key]=v?v.value_text:null; });
-    const {data:pdfBlob,error:dErr}=await db.storage.from('doc-templates').download(tpl.source_pdf_path);
-    if(dErr||!pdfBlob) throw new Error('PDF source introuvable');
-    const bytes=new Uint8Array(await pdfBlob.arrayBuffer());
-    const {PDFDocument,StandardFonts}=PDFLib;
-    const pdfDoc=await PDFDocument.load(bytes);
-    const font=await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const pages=pdfDoc.getPages();
-    for(const f of (fields||[])){
-      const pi=(f.page||1)-1; if(pi<0||pi>=pages.length) continue;
-      let value=getFieldValue(f.field_key,f.field_source,client,customMap);
-      if(f.fallback_value && !value) value=f.fallback_value;
-      value=applyTextTransform(value,f.transform||'none');
-      if(!value) continue;
-      renderFieldToPdf({value:String(value),fontSize:f.font_size||10,font,page:pages[pi],coords:{x:Number(f.x)||0,y:Number(f.y)||0,width:Number(f.width)||0.1,height:Number(f.height)||0.03},align:f.align||'left'});
-    }
-    const outBytes=await pdfDoc.save();
-    const blob=new Blob([outBytes],{type:'application/pdf'});
-    const fname=((client.company_name||'document').replace(/[^a-z0-9]+/gi,'_')+'_'+tpl.name.replace(/[^a-z0-9]+/gi,'_')+'.pdf');
-    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
-    try{
-      const path=genClientId+'/'+Date.now()+'-'+tpl.name.replace(/\s+/g,'_')+'.pdf';
-      await db.storage.from('doc-generated').upload(path,blob,{contentType:'application/pdf'});
-      const {data:ud}=await db.auth.getUser();
-      await db.from('doc_generated').insert({client_id:genClientId,template_id:templateId,pdf_path:path,generated_by:ud&&ud.user?ud.user.id:null,meta:{template_name:tpl.name}});
-    }catch(_){}
+    const prep=await loadTemplateForGen(templateId);
+    const {bytes,client}=await buildForClient(genClientId,prep);
+    triggerDownload(new Blob([bytes],{type:'application/pdf'}),safeName(client.company_name)+'_'+safeName(prep.tpl.name)+'.pdf');
+    historySave(genClientId,templateId,prep.tpl.name,bytes);
     msg.innerHTML='<span class="val-good">Document généré et téléchargé ✅</span>';
-  }catch(e){
-    msg.innerHTML='<span class="val-bad">Erreur : '+(e.message||e)+'</span>';
-  } finally { goBtn.disabled=false; }
+  }catch(e){ msg.innerHTML='<span class="val-bad">Erreur : '+(e.message||e)+'</span>'; }
+  finally{ goBtn.disabled=false; }
+}
+async function doPreview(){
+  const msg=document.getElementById('gen-msg');
+  const templateId=document.getElementById('gen-template').value;
+  if(!genClientId||!templateId){ msg.innerHTML='<span class="val-bad">Choisis un modèle.</span>'; return; }
+  const btn=document.getElementById('gen-preview'); btn.disabled=true; msg.innerHTML='Préparation de l\'aperçu…';
+  try{
+    const prep=await loadTemplateForGen(templateId);
+    const {bytes,client}=await buildForClient(genClientId,prep);
+    previewBlob=new Blob([bytes],{type:'application/pdf'});
+    previewName=safeName(client.company_name)+'_'+safeName(prep.tpl.name)+'.pdf';
+    previewCtx={clientId:genClientId,templateId,tplName:prep.tpl.name,bytes};
+    document.getElementById('preview-title').textContent=(client.company_name||'')+' — '+prep.tpl.name;
+    document.getElementById('preview-frame').src=URL.createObjectURL(previewBlob);
+    document.getElementById('preview-modal').classList.remove('hidden');
+    msg.innerHTML='';
+  }catch(e){ msg.innerHTML='<span class="val-bad">Erreur : '+(e.message||e)+'</span>'; }
+  finally{ btn.disabled=false; }
+}
+function closePreview(){ document.getElementById('preview-modal').classList.add('hidden'); document.getElementById('preview-frame').src='about:blank'; }
+function downloadFromPreview(){ if(!previewBlob) return; triggerDownload(previewBlob,previewName); if(previewCtx){ historySave(previewCtx.clientId,previewCtx.templateId,previewCtx.tplName,previewCtx.bytes); previewCtx=null; } }
+
+// ===== Génération en lot =====
+function openBatch(){
+  if(SELECTED.size===0) return;
+  fillTemplateSelect('batch-template');
+  document.getElementById('batch-sub').textContent=SELECTED.size+' client(s) sélectionné(s).';
+  document.getElementById('batch-msg').innerHTML='';
+  document.getElementById('batch-modal').classList.remove('hidden');
+}
+function closeBatch(){ document.getElementById('batch-modal').classList.add('hidden'); }
+async function doBatchGenerate(){
+  const templateId=document.getElementById('batch-template').value;
+  const output=document.getElementById('batch-output').value;
+  const msg=document.getElementById('batch-msg');
+  if(!templateId){ msg.innerHTML='<span class="val-bad">Choisis un modèle.</span>'; return; }
+  const ids=[...SELECTED];
+  if(!ids.length){ msg.innerHTML='<span class="val-bad">Aucun client sélectionné.</span>'; return; }
+  if(ids.length>300 && !confirm(ids.length+' documents vont être générés, cela peut prendre un moment. Continuer ?')) return;
+  const btn=document.getElementById('batch-go'); btn.disabled=true;
+  const keepHistory=ids.length<=50;
+  try{
+    const prep=await loadTemplateForGen(templateId);
+    const valsByClient={};
+    for(let i=0;i<ids.length;i+=200){
+      const chunk=ids.slice(i,i+200);
+      const {data:cvals}=await db.from('doc_client_values').select('client_id,field_id,value_text').in('client_id',chunk);
+      (cvals||[]).forEach(x=>{ (valsByClient[x.client_id]=valsByClient[x.client_id]||[]).push(x); });
+    }
+    const {PDFDocument}=PDFLib;
+    let zip=null, merged=null;
+    if(output==='zip') zip=new JSZip(); else merged=await PDFDocument.create();
+    const usedNames={}; let done=0;
+    for(const id of ids){
+      const client=CLIENTS.find(c=>c.id===id); if(!client) continue;
+      const customMap={}; prep.cfDefs.forEach(f=>{ const vv=(valsByClient[id]||[]).find(x=>x.field_id===f.id); customMap[f.key]=vv?vv.value_text:null; });
+      const bytes=await renderFilledPdf(prep.tplBytes,prep.fields,client,customMap);
+      let fname=safeName(client.company_name)+'_'+safeName(prep.tpl.name)+'.pdf';
+      if(usedNames[fname]){ usedNames[fname]++; fname=fname.replace(/\.pdf$/,'')+'_'+usedNames[fname]+'.pdf'; } else usedNames[fname]=1;
+      if(zip) zip.file(fname,bytes);
+      else { const src=await PDFDocument.load(bytes); const cp=await merged.copyPages(src,src.getPageIndices()); cp.forEach(pg=>merged.addPage(pg)); }
+      if(keepHistory) historySave(id,templateId,prep.tpl.name,bytes);
+      done++; msg.innerHTML='Génération… '+done+' / '+ids.length;
+      await new Promise(r=>setTimeout(r,0));
+    }
+    if(zip){ const content=await zip.generateAsync({type:'blob'}); triggerDownload(content,safeName(prep.tpl.name)+'_'+done+'_clients.zip'); }
+    else { const out=await merged.save(); triggerDownload(new Blob([out],{type:'application/pdf'}),safeName(prep.tpl.name)+'_'+done+'_clients.pdf'); }
+    msg.innerHTML='<span class="val-good">'+done+' document(s) générés ✅'+(keepHistory?'':' (historique non enregistré pour un lot de cette taille)')+'</span>';
+  }catch(e){ msg.innerHTML='<span class="val-bad">Erreur : '+(e.message||e)+'</span>'; }
+  finally{ btn.disabled=false; }
 }
 
 (async()=>{
