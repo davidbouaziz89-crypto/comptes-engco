@@ -14,6 +14,7 @@
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
   .hidden{display:none!important}
+  a{color:var(--accent)}
   .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(1200px 600px at 50% -10%,rgba(79,124,255,.15),transparent),var(--bg)}
   .authcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:30px 28px;width:100%;max-width:400px}
   .authcard h1{margin:0 0 4px;font-size:22px}
@@ -27,7 +28,7 @@
   header h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
   header .spacer{margin-left:auto}
   .who{color:var(--muted);font-size:14px}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none}
   .btn:hover{filter:brightness(1.08)}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
   .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
@@ -37,51 +38,75 @@
   nav{display:flex;gap:6px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
   nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
   nav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
-  main{max-width:1150px;margin:0 auto;padding:22px}
+  main{max-width:1200px;margin:0 auto;padding:22px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
   .panel h2{margin:0 0 14px;font-size:18px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
-  .field{display:flex;flex-direction:column;min-width:180px;flex:1}
+  .field{display:flex;flex-direction:column;min-width:170px;flex:1}
   .field.full{flex-basis:100%}
+  .field.sm{min-width:120px;flex:0 0 auto}
   .table-wrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse}
   th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:14px;white-space:nowrap}
   th{color:var(--muted);font-weight:600}
   td.num,th.num{text-align:right}
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover td{background:var(--panel2)}
   .empty{color:var(--muted);text-align:center;padding:24px}
-  .search{max-width:320px}
-  .soon{color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:26px;text-align:center}
-  /* KPI */
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+  .search{max-width:300px}
+  .hint{color:var(--muted);font-size:13px}
+  .pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+  .tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--muted)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
   .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
-  .kpi .k-val{font-size:26px;font-weight:800}
+  .kpi .k-val{font-size:24px;font-weight:800}
   .kpi .k-lab{color:var(--muted);font-size:13px;margin-top:4px}
-  /* Badges d'étape */
-  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700}
-  .stg-wip{background:rgba(79,124,255,.18);color:#a9c0ff}
-  .stg-hot{background:rgba(255,180,84,.18);color:#ffcf94}
-  .stg-ok{background:rgba(55,211,155,.18);color:#7ff0c8}
-  .stg-lost{background:rgba(255,107,107,.16);color:#ffb0b0}
-  .stage-sel{padding:5px 8px;font-size:13px;border-radius:8px}
+  /* stages */
+  .stage-sel{padding:5px 8px;font-size:13px;border-radius:8px;font-weight:600}
   /* Pipeline kanban */
   .kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
-  .kcol{flex:0 0 230px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:120px}
+  .kcol{flex:0 0 235px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:120px}
   .kcol.drag-over{border-color:var(--accent);box-shadow:0 0 0 2px rgba(79,124,255,.35)}
-  .kcol h3{margin:0 0 10px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
-  .kcol .kcount{color:var(--muted);font-weight:600}
+  .kcol h3{margin:0 0 10px;font-size:13px;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;letter-spacing:.03em}
+  .kcol .kcount{color:var(--muted)}
   .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:9px;cursor:grab}
   .kcard:active{cursor:grabbing}
   .kcard .kc-name{font-weight:700;font-size:14px}
   .kcard .kc-meta{color:var(--muted);font-size:12px;margin-top:3px}
   .kcard .kc-amt{color:var(--good);font-size:13px;font-weight:700;margin-top:4px}
-  /* Activités */
+  /* ===== FICHE LEAD ===== */
+  #lead-view{position:fixed;inset:0;background:var(--bg);overflow:auto;z-index:50}
+  .lead-head{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
+  .lead-head .lh-name{font-size:18px;font-weight:800}
+  .lead-head .lh-num{color:var(--muted);font-size:13px}
+  .lead-body{display:grid;grid-template-columns:1fr 2fr;gap:18px;max-width:1200px;margin:0 auto;padding:22px}
+  @media(max-width:820px){.lead-body{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .card h3{margin:0 0 14px;font-size:15px;color:var(--txt);display:flex;align-items:center;gap:8px}
+  .quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  /* Stepper parcours */
+  .stepper{position:relative;margin:6px 0 0}
+  .step{position:relative;padding:0 0 22px 42px;cursor:pointer}
+  .step:last-child{padding-bottom:0}
+  .step::before{content:'';position:absolute;left:14px;top:26px;bottom:-4px;width:2px;background:var(--line)}
+  .step:last-child::before{display:none}
+  .step .dot{position:absolute;left:2px;top:0;width:28px;height:28px;border-radius:50%;background:var(--panel2);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--muted)}
+  .step.done .dot{background:var(--good);border-color:var(--good);color:#052a1c}
+  .step.current .dot{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 0 4px rgba(79,124,255,.25)}
+  .step.done::before{background:var(--good)}
+  .step .s-title{font-weight:700;font-size:14px}
+  .step .s-sub{color:var(--muted);font-size:12px;margin-top:2px}
+  .step .s-extra{margin-top:8px}
+  .step .s-extra input{max-width:220px}
+  /* activités */
   .act{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
   .act .a-head{color:var(--muted);font-size:12px;margin-bottom:3px}
-  /* Toast */
-  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s;z-index:100;max-width:90vw}
+  .lf-row{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:7px}
+  .lf-row .lf-name{flex:1;font-size:14px}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;max-width:90vw}
   #toast.show{opacity:1}
-  .hint{color:var(--muted);font-size:13px}
-  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:2px 9px;font-size:12px;margin-right:4px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:600px){.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -121,70 +146,27 @@
     <button data-tab="leads" onclick="showTab('leads')">👥 Leads</button>
     <button data-tab="pipeline" onclick="showTab('pipeline')">🎯 Pipeline</button>
     <button data-tab="formations" onclick="showTab('formations')">🎓 Formations</button>
-    <button data-tab="facturer" onclick="showTab('facturer')">🧾 À facturer</button>
+    <button data-tab="params" onclick="showTab('params')">⚙️ Paramètres</button>
   </nav>
   <main>
 
-    <!-- ===== TABLEAU DE BORD ===== -->
+    <!-- ===== DASHBOARD ===== -->
     <div id="tab-dash">
-      <section class="panel">
-        <h2>Vue d'ensemble</h2>
-        <div class="kpis" id="kpi-grid"></div>
-      </section>
-      <section class="panel">
-        <h2>Répartition par étape</h2>
-        <div class="table-wrap"><table id="dash-stages"></table></div>
-      </section>
+      <section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
+      <section class="panel"><h2>Répartition par étape commerciale</h2><div class="table-wrap"><table id="dash-stages"></table></div></section>
     </div>
 
     <!-- ===== LEADS ===== -->
     <div id="tab-leads" class="hidden">
       <section class="panel">
-        <h2 id="lead-form-title">Ajouter un lead</h2>
-        <form onsubmit="saveLead(event)">
-          <div class="row">
-            <div class="field"><label>Nom du contact *</label><input id="l-name" required></div>
-            <div class="field"><label>Société</label><input id="l-company"></div>
-            <div class="field"><label>Email</label><input id="l-email" type="email"></div>
-            <div class="field"><label>Téléphone</label><input id="l-phone"></div>
-          </div>
-          <div class="row">
-            <div class="field"><label>Formation visée</label><select id="l-formation"></select></div>
-            <div class="field"><label>Montant (€)</label><input id="l-montant" type="number" step="0.01"></div>
-            <div class="field"><label>Étape</label><select id="l-stage"></select></div>
-            <div class="field"><label>Disponibilité</label><input id="l-dispo" placeholder="ex : soirs / lun-mer"></div>
-            <div class="field"><label>Source</label><input id="l-source" placeholder="ex : CALL IA, site, appel"></div>
-          </div>
-          <div class="row">
-            <div class="field full"><label>Notes</label><textarea id="l-notes"></textarea></div>
-          </div>
-          <div class="row" style="margin-top:12px">
-            <button class="btn" type="submit">💾 Enregistrer</button>
-            <button class="btn ghost" type="button" onclick="resetLeadForm()">Annuler</button>
-          </div>
-        </form>
-        <!-- Activités du lead (édition uniquement) -->
-        <div id="lead-activities" class="hidden" style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px">
-          <h2 style="font-size:16px">Notes &amp; activités</h2>
-          <div class="row">
-            <div class="field" style="max-width:160px"><label>Type</label>
-              <select id="act-type"><option value="note">📝 Note</option><option value="appel">📞 Appel</option><option value="email">✉️ Email</option><option value="rdv">📅 RDV</option></select>
-            </div>
-            <div class="field"><label>Contenu</label><input id="act-content" placeholder="Détail de l'échange…"></div>
-            <button class="btn small" type="button" onclick="addActivity()">Ajouter</button>
-          </div>
-          <div id="act-list" style="margin-top:12px"></div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2>Leads</h2>
-        <div class="row" style="margin-bottom:12px">
-          <input class="search" id="lead-search" placeholder="🔎 Rechercher (nom, société, email…)" oninput="renderLeads()">
-          <select id="lead-fstage" style="max-width:200px" onchange="renderLeads()"><option value="">Toutes les étapes</option></select>
+        <div class="row" style="margin-bottom:14px">
+          <input class="search" id="lead-search" placeholder="🔎 Rechercher un lead…" oninput="renderLeads()">
+          <select id="lead-fstage" class="field sm" onchange="renderLeads()"><option value="">Toutes étapes</option></select>
+          <select id="lead-fstatut" class="field sm" onchange="renderLeads()"><option value="">Tous statuts</option></select>
           <span class="spacer" style="flex:1"></span>
-          <button class="btn ghost small" type="button" onclick="downloadLeadsTemplate()">⬇️ Modèle Excel</button>
-          <label class="btn ghost small" style="margin:0;cursor:pointer">⬆️ Importer Excel/CSV<input type="file" id="lead-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importLeadsFile(event)"></label>
+          <button class="btn small" onclick="newLead()">＋ Nouveau lead</button>
+          <button class="btn ghost small" onclick="downloadLeadsTemplate()">⬇️ Modèle</button>
+          <label class="btn ghost small" style="margin:0;cursor:pointer">⬆️ Importer<input type="file" id="lead-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importLeadsFile(event)"></label>
         </div>
         <div class="table-wrap"><table id="leads-table"></table></div>
         <div class="hint" id="leads-count" style="margin-top:8px"></div>
@@ -195,7 +177,7 @@
     <div id="tab-pipeline" class="hidden">
       <section class="panel">
         <h2>Pipeline commercial</h2>
-        <div class="hint" style="margin-bottom:12px">Glissez une carte d'une colonne à l'autre pour changer l'étape. Cliquez une carte pour l'ouvrir.</div>
+        <div class="hint" style="margin-bottom:12px">Glissez une carte pour changer l'étape. Cliquez-la pour ouvrir la fiche.</div>
         <div class="kanban" id="kanban"></div>
       </section>
     </div>
@@ -207,9 +189,20 @@
         <form onsubmit="saveFormation(event)">
           <div class="row">
             <div class="field"><label>Intitulé *</label><input id="f-nom" required></div>
-            <div class="field"><label>Tarif (€)</label><input id="f-tarif" type="number" step="0.01"></div>
-            <div class="field"><label>Heures e-learning</label><input id="f-elearning" type="number" step="0.5"></div>
-            <div class="field"><label>Heures visio</label><input id="f-visio" type="number" step="0.5"></div>
+            <div class="field"><label>Catégorie</label><select id="f-categorie"></select></div>
+            <div class="field"><label>Organisme</label><select id="f-organisme"></select></div>
+          </div>
+          <div class="row">
+            <div class="field sm"><label>Tarif (€)</label><input id="f-tarif" type="number" step="0.01"></div>
+            <div class="field sm"><label>Prix min (€)</label><input id="f-prixmin" type="number" step="0.01"></div>
+            <div class="field sm"><label>Certification</label><input id="f-cert" placeholder="TOSA, LILATE…"></div>
+            <div class="field sm"><label>Type</label><select id="f-type"><option value="">—</option><option>Individuelle</option><option>Collectif</option></select></div>
+            <div class="field sm"><label>H. e-learning</label><input id="f-elearning" type="number" step="0.5"></div>
+            <div class="field sm"><label>H. visio</label><input id="f-visio" type="number" step="0.5"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Lien Calendly (positionnement)</label><input id="f-calendly"></div>
+            <div class="field"><label>Lien DOF / EDOF</label><input id="f-dof"></div>
           </div>
           <div class="row"><div class="field full"><label>Description</label><textarea id="f-desc"></textarea></div></div>
           <div class="row" style="margin-top:12px">
@@ -219,21 +212,112 @@
         </form>
       </section>
       <section class="panel">
-        <h2>Catalogue</h2>
+        <h2>Catalogue <span class="hint" id="formations-count"></span></h2>
+        <div class="row" style="margin-bottom:12px">
+          <input class="search" id="formation-search" placeholder="🔎 Rechercher…" oninput="renderFormations()">
+          <select id="formation-fcat" class="field sm" onchange="renderFormations()"><option value="">Toutes catégories</option></select>
+          <select id="formation-forg" class="field sm" onchange="renderFormations()"><option value="">Tous organismes</option></select>
+        </div>
         <div class="table-wrap"><table id="formations-table"></table></div>
       </section>
     </div>
 
-    <!-- ===== À FACTURER ===== -->
-    <div id="tab-facturer" class="hidden">
+    <!-- ===== PARAMETRES ===== -->
+    <div id="tab-params" class="hidden">
+      <div class="grid2">
+        <section class="panel">
+          <h2>🏢 Organismes</h2>
+          <form class="row" onsubmit="addRef(event,'crm_organismes','org-nom')" style="margin-bottom:12px">
+            <div class="field"><input id="org-nom" placeholder="Nom de l'organisme" required></div>
+            <button class="btn small" type="submit">Ajouter</button>
+          </form>
+          <div class="table-wrap"><table id="org-table"></table></div>
+        </section>
+        <section class="panel">
+          <h2>🗂️ Catégories</h2>
+          <form class="row" onsubmit="addRef(event,'crm_categories','cat-nom')" style="margin-bottom:12px">
+            <div class="field"><input id="cat-nom" placeholder="Nom de la catégorie" required></div>
+            <button class="btn small" type="submit">Ajouter</button>
+          </form>
+          <div class="table-wrap"><table id="cat-table"></table></div>
+        </section>
+      </div>
       <section class="panel">
-        <h2>Leads gagnés à facturer</h2>
-        <div class="hint" style="margin-bottom:12px">Les leads au stade « Gagné » pas encore marqués facturés.</div>
-        <div class="table-wrap"><table id="facturer-table"></table></div>
+        <h2>🎨 Statuts (couleurs)</h2>
+        <form class="row" onsubmit="addStatut(event)" style="margin-bottom:12px">
+          <div class="field"><label>Nom</label><input id="st-nom" placeholder="ex : À rappeler" required></div>
+          <div class="field sm"><label>Couleur</label><input id="st-couleur" type="color" value="#4f7cff" style="height:42px;padding:4px"></div>
+          <div class="field sm"><label>Ordre</label><input id="st-ordre" type="number" value="0"></div>
+          <button class="btn small" type="submit">Ajouter</button>
+        </form>
+        <div class="table-wrap"><table id="st-table"></table></div>
       </section>
     </div>
 
   </main>
+</div>
+
+<!-- ===== FICHE LEAD (plein écran) ===== -->
+<div id="lead-view" class="hidden">
+  <div class="lead-head">
+    <button class="btn ghost small" onclick="closeLead()">← Retour</button>
+    <div>
+      <div class="lh-name" id="lv-name">—</div>
+      <div class="lh-num" id="lv-num"></div>
+    </div>
+    <span class="spacer"></span>
+    <span class="pill" id="lv-statut-pill"></span>
+    <button class="btn danger small" onclick="deleteLead()">🗑️ Supprimer</button>
+  </div>
+  <div class="lead-body">
+    <!-- GAUCHE : fiche prospect -->
+    <div>
+      <div class="card">
+        <h3>👤 Prospect</h3>
+        <div class="grid2">
+          <div><label>Prénom</label><input id="lv-prenom" onchange="updLead('prenom',this.value)"></div>
+          <div><label>Nom</label><input id="lv-nom" onchange="updLead('nom',this.value)"></div>
+        </div>
+        <label>Entreprise</label><input id="lv-entreprise" onchange="updLead('entreprise',this.value)">
+        <label>Email</label><input id="lv-email" type="email" onchange="updLead('email',this.value)">
+        <label>Téléphone</label><input id="lv-telephone" onchange="updLead('telephone',this.value)">
+        <div class="quick" id="lv-quick"></div>
+      </div>
+      <div class="card">
+        <h3>🧭 Suivi</h3>
+        <label>Statut</label><select id="lv-statut" onchange="updLead('statut_id',this.value||null);refreshStatutPill()"></select>
+        <label>Étape commerciale (pipeline)</label><select id="lv-stage" onchange="updLead('stage',this.value)"></select>
+        <label>Organisme retenu</label><select id="lv-organisme" onchange="updLead('organisme',this.value||null)"></select>
+        <label>Source</label><input id="lv-source" onchange="updLead('source',this.value)" placeholder="ex : CALL IA, appel, site">
+        <label>Montant du devis (€)</label><input id="lv-montant" type="number" step="0.01" onchange="updLead('montant',this.value===''?null:Number(this.value))">
+      </div>
+    </div>
+    <!-- DROITE : parcours + formations + activités -->
+    <div>
+      <div class="card">
+        <h3>🚀 Parcours du prospect</h3>
+        <div class="stepper" id="lv-stepper"></div>
+      </div>
+      <div class="card">
+        <h3>🎓 Formations souhaitées</h3>
+        <div id="lv-formations"></div>
+        <div class="row" style="margin-top:6px">
+          <div class="field"><select id="lf-add-formation"></select></div>
+          <div class="field sm"><input id="lf-add-prix" type="number" step="0.01" placeholder="Prix (€)"></div>
+          <button class="btn small" type="button" onclick="addLeadFormation()">Ajouter</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>💬 Notes &amp; activités</h3>
+        <div class="row">
+          <div class="field sm"><select id="act-type"><option value="note">📝 Note</option><option value="appel">📞 Appel</option><option value="email">✉️ Email</option><option value="rdv">📅 RDV</option></select></div>
+          <div class="field"><input id="act-content" placeholder="Détail de l'échange…"></div>
+          <button class="btn small" type="button" onclick="addActivity()">Ajouter</button>
+        </div>
+        <div id="act-list" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -244,24 +328,34 @@ const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let SESSION=null, IS_ADMIN=false;
-let LEADS=[], FORMATIONS=[], editingLeadId=null, editingFormationId=null;
+let LEADS=[], FORMATIONS=[], ORGANISMES=[], CATEGORIES=[], STATUTS=[];
+let curLead=null, curLeadFormations=[], editingFormationId=null;
 
 const STAGES=[
-  {key:'nouveau',     label:'Nouveau',      cls:'stg-wip'},
-  {key:'contacte',    label:'Contacté',     cls:'stg-wip'},
-  {key:'qualifie',    label:'Qualifié',     cls:'stg-hot'},
-  {key:'devis_envoye',label:'Devis envoyé', cls:'stg-hot'},
-  {key:'gagne',       label:'Gagné',        cls:'stg-ok'},
-  {key:'perdu',       label:'Perdu',        cls:'stg-lost'},
+  {key:'nouveau',      label:'Nouveau',      color:'#3b82f6'},
+  {key:'contacte',     label:'Contacté',     color:'#6366f1'},
+  {key:'qualifie',     label:'Qualifié',     color:'#8b5cf6'},
+  {key:'devis_envoye', label:'Devis envoyé', color:'#f59e0b'},
+  {key:'gagne',        label:'Gagné',        color:'#10b981'},
+  {key:'perdu',        label:'Perdu',        color:'#ef4444'},
 ];
 const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
-const stageLabel=k=>stageOf(k).label;
-const stageBadge=k=>`<span class="badge ${stageOf(k).cls}">${stageLabel(k)}</span>`;
+// Parcours (champ crm_leads.etape). dateField = colonne date associée ; flag = colonne bool.
+const PARCOURS=[
+  {key:'organisme',           title:'Organisme choisi',       sub:'Choisir l\'organisme de formation'},
+  {key:'lien_edof',           title:'Lien EDOF envoyé',       sub:'Lien Mon Compte Formation transmis'},
+  {key:'test_positionnement', title:'Test de positionnement', sub:'Test réalisé', dateField:'date_test_positionnement'},
+  {key:'entree_formation',    title:'Entrée en formation',    sub:'Démarrage', dateField:'date_entree_formation'},
+  {key:'facture',             title:'Facturé',                sub:'Vente facturée', flag:'facture'},
+];
+const parcoursIndex=k=>{ const i=PARCOURS.findIndex(p=>p.key===k); return i<0?0:i; };
+
 function eur(n){ if(n==null||n===''||isNaN(Number(n))) return '—'; return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €'; }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function fmtDate(d){ if(!d) return '—'; const x=new Date(d); return x.toLocaleDateString('fr-FR'); }
-let _tt;
-function toast(m){ const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2600); }
+function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('fr-FR'); }
+function leadName(l){ return ((l.prenom||'')+' '+(l.nom||'')).trim()||l.entreprise||l.email||'(sans nom)'; }
+function statutOf(id){ return STATUTS.find(s=>s.id===id); }
+let _tt; function toast(m){ const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2600); }
 
 /* ---------- AUTH ---------- */
 async function doLogin(e){
@@ -285,327 +379,364 @@ async function afterAuth(session){
   document.getElementById('noaccess-view').classList.add('hidden');
   document.getElementById('app-view').classList.remove('hidden');
   document.getElementById('who').textContent=session.user.email||'';
-  fillStageSelects();
-  await loadFormations();
-  await loadLeads();
+  await loadAll();
   showTab('dash');
 }
-
+async function loadAll(){
+  const [o,c,s,f,l]=await Promise.all([
+    db.from('crm_organismes').select('*').order('nom'),
+    db.from('crm_categories').select('*').order('nom'),
+    db.from('crm_statuts').select('*').order('ordre'),
+    db.from('crm_formations').select('*').order('categorie').order('nom'),
+    db.from('crm_leads').select('*').order('created_at',{ascending:false}),
+  ]);
+  ORGANISMES=o.data||[]; CATEGORIES=c.data||[]; STATUTS=s.data||[]; FORMATIONS=f.data||[]; LEADS=l.data||[];
+  fillAllSelects();
+  renderLeads();
+}
+function fillAllSelects(){
+  const stageOpts=STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
+  const statutOpts='<option value="">— Aucun —</option>'+STATUTS.map(s=>`<option value="${s.id}">${esc(s.nom)}</option>`).join('');
+  const orgOpts='<option value="">— Aucun —</option>'+ORGANISMES.filter(o=>o.actif!==false).map(o=>`<option value="${esc(o.nom)}">${esc(o.nom)}</option>`).join('');
+  const catOpts='<option value="">— Aucune —</option>'+CATEGORIES.filter(c=>c.actif!==false).map(c=>`<option value="${esc(c.nom)}">${esc(c.nom)}</option>`).join('');
+  const formOpts='<option value="">— Choisir une formation —</option>'+FORMATIONS.filter(f=>f.actif!==false).map(f=>`<option value="${f.id}">${esc(f.nom)}${f.organisme?' · '+esc(f.organisme):''}</option>`).join('');
+  const set=(id,html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
+  // filtres leads
+  set('lead-fstage','<option value="">Toutes étapes</option>'+stageOpts);
+  set('lead-fstatut','<option value="">Tous statuts</option>'+STATUTS.map(s=>`<option value="${s.id}">${esc(s.nom)}</option>`).join(''));
+  // fiche lead
+  set('lv-stage',stageOpts); set('lv-statut',statutOpts); set('lv-organisme',orgOpts); set('lf-add-formation',formOpts);
+  // formations
+  set('f-categorie',catOpts); set('f-organisme',orgOpts);
+  set('formation-fcat','<option value="">Toutes catégories</option>'+CATEGORIES.map(c=>`<option value="${esc(c.nom)}">${esc(c.nom)}</option>`).join(''));
+  set('formation-forg','<option value="">Tous organismes</option>'+ORGANISMES.map(o=>`<option value="${esc(o.nom)}">${esc(o.nom)}</option>`).join(''));
+}
 function showTab(t){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dash','leads','pipeline','formations','facturer'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  ['dash','leads','pipeline','formations','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
   if(t==='dash') renderDashboard();
   if(t==='pipeline') renderPipeline();
   if(t==='formations') renderFormations();
-  if(t==='facturer') renderFacturer();
+  if(t==='params') renderParams();
 }
 
-function fillStageSelects(){
-  const opts=STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
-  document.getElementById('l-stage').innerHTML=opts;
-  document.getElementById('lead-fstage').innerHTML='<option value="">Toutes les étapes</option>'+opts;
+/* ---------- LEADS : liste ---------- */
+function statutPill(id){ const s=statutOf(id); if(!s) return '<span class="hint">—</span>'; const col=s.couleur||'#4f7cff'; return `<span class="pill" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(s.nom)}</span>`; }
+function filteredLeads(){
+  const q=(document.getElementById('lead-search').value||'').toLowerCase().trim();
+  const fs=document.getElementById('lead-fstage').value, fst=document.getElementById('lead-fstatut').value;
+  return LEADS.filter(l=>{
+    if(fs&&l.stage!==fs) return false;
+    if(fst&&l.statut_id!==fst) return false;
+    if(!q) return true;
+    return [leadName(l),l.email,l.telephone,l.entreprise,l.source].some(v=>(v||'').toLowerCase().includes(q));
+  });
+}
+function renderLeads(){
+  const rows=filteredLeads(), t=document.getElementById('leads-table');
+  document.getElementById('leads-count').textContent=rows.length+' lead(s) · '+LEADS.length+' au total';
+  if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucun lead. Cliquez « ＋ Nouveau lead ».</td></tr>'; return; }
+  t.innerHTML='<tr><th>#</th><th>Nom</th><th>Entreprise</th><th>Statut</th><th>Étape</th><th class="num">Montant</th><th>Créé le</th></tr>'+
+    rows.map(l=>{ const st=stageOf(l.stage);
+      return `<tr class="clickable" onclick="openLead('${l.id}')">
+        <td class="hint">${l.numero||''}</td>
+        <td><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</td>
+        <td>${esc(l.entreprise||'')}</td>
+        <td>${statutPill(l.statut_id)}</td>
+        <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
+        <td class="num">${eur(l.montant)}</td>
+        <td>${fmtDate(l.created_at)}</td>
+      </tr>`; }).join('');
+}
+async function newLead(){
+  const {data,error}=await db.from('crm_leads').insert({prenom:'',nom:'Nouveau lead',stage:'nouveau',etape:'organisme'}).select().single();
+  if(error){ toast('Erreur : '+error.message); return; }
+  LEADS.unshift(data); renderLeads(); openLead(data.id);
 }
 
-/* ---------- FORMATIONS ---------- */
-async function loadFormations(){
-  const {data,error}=await db.from('crm_formations').select('*').order('nom');
-  if(error){ toast('Erreur formations : '+error.message); return; }
-  FORMATIONS=data||[];
-  fillFormationSelect();
+/* ---------- FICHE LEAD ---------- */
+async function openLead(id){
+  const l=LEADS.find(x=>x.id===id); if(!l) return;
+  curLead=l;
+  document.getElementById('lv-name').textContent=leadName(l);
+  document.getElementById('lv-num').textContent=l.numero?('Lead #'+l.numero):'';
+  const g=id2=>document.getElementById(id2);
+  g('lv-prenom').value=l.prenom||''; g('lv-nom').value=l.nom||''; g('lv-entreprise').value=l.entreprise||'';
+  g('lv-email').value=l.email||''; g('lv-telephone').value=l.telephone||'';
+  g('lv-statut').value=l.statut_id||''; g('lv-stage').value=l.stage||'nouveau';
+  g('lv-organisme').value=l.organisme||''; g('lv-source').value=l.source||''; g('lv-montant').value=l.montant??'';
+  refreshStatutPill(); renderQuick(); renderStepper();
+  document.getElementById('lead-view').classList.remove('hidden');
+  window.scrollTo(0,0);
+  await Promise.all([loadLeadFormations(id), loadActivities(id)]);
 }
-function fillFormationSelect(){
-  const sel=document.getElementById('l-formation'); if(!sel) return;
-  const cur=sel.value;
-  sel.innerHTML='<option value="">— Aucune —</option>'+FORMATIONS.filter(f=>f.actif!==false).map(f=>`<option value="${f.id}">${esc(f.nom)}</option>`).join('');
-  if(cur) sel.value=cur;
+function closeLead(){ document.getElementById('lead-view').classList.add('hidden'); curLead=null; renderLeads(); }
+function refreshStatutPill(){ document.getElementById('lv-statut-pill').outerHTML=`<span class="pill" id="lv-statut-pill" style="${statutStyle(curLead&&curLead.statut_id)}">${statutText(curLead&&curLead.statut_id)}</span>`; }
+function statutStyle(id){ const s=statutOf(id); if(!s) return 'display:none'; const c=s.couleur||'#4f7cff'; return `background:${c}22;color:${c};border:1px solid ${c}66`; }
+function statutText(id){ const s=statutOf(id); return s?esc(s.nom):''; }
+function renderQuick(){
+  const l=curLead, q=[];
+  if(l.telephone) q.push(`<a class="btn ghost small" href="tel:${esc(l.telephone)}">📞 Appeler</a>`);
+  if(l.email) q.push(`<a class="btn ghost small" href="mailto:${esc(l.email)}">✉️ Email</a>`);
+  document.getElementById('lv-quick').innerHTML=q.join('');
 }
-function formationName(id){ const f=FORMATIONS.find(x=>x.id===id); return f?f.nom:''; }
+async function updLead(field,val){
+  if(!curLead) return;
+  const patch={}; patch[field]=val; patch.updated_at=new Date().toISOString();
+  const {error}=await db.from('crm_leads').update(patch).eq('id',curLead.id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  curLead[field]=val;
+  if(field==='prenom'||field==='nom'||field==='entreprise'){ document.getElementById('lv-name').textContent=leadName(curLead); }
+  if(field==='telephone'||field==='email') renderQuick();
+  toast('Enregistré ✓');
+}
+function renderStepper(){
+  const l=curLead, cur=parcoursIndex(l.etape);
+  document.getElementById('lv-stepper').innerHTML=PARCOURS.map((p,i)=>{
+    const cls=i<cur?'done':(i===cur?'current':'');
+    let extra='';
+    if(p.dateField){ const v=l[p.dateField]?String(l[p.dateField]).slice(0,10):''; extra=`<div class="s-extra"><input type="date" value="${v}" onclick="event.stopPropagation()" onchange="updLead('${p.dateField}',this.value||null)"></div>`; }
+    if(p.flag){ const chk=l[p.flag]?'checked':''; extra=`<div class="s-extra"><label style="display:flex;gap:8px;align-items:center;margin:0;color:var(--txt)"><input type="checkbox" style="width:auto" ${chk} onclick="event.stopPropagation()" onchange="updLead('${p.flag}',this.checked)"> Marquer facturé</label></div>`; }
+    return `<div class="step ${cls}" onclick="setEtape('${p.key}')">
+      <div class="dot">${i<cur?'✓':i+1}</div>
+      <div class="s-title">${p.title}</div>
+      <div class="s-sub">${p.sub}</div>${extra}
+    </div>`;
+  }).join('');
+}
+async function setEtape(key){ await updLead('etape',key); renderStepper(); }
+
+/* ---------- Formations d'un lead (crm_lead_formations) ---------- */
+async function loadLeadFormations(leadId){
+  const {data}=await db.from('crm_lead_formations').select('*').eq('lead_id',leadId).order('created_at');
+  curLeadFormations=data||[]; renderLeadFormations();
+}
+function renderLeadFormations(){
+  const box=document.getElementById('lv-formations');
+  if(!curLeadFormations.length){ box.innerHTML='<div class="hint">Aucune formation ajoutée.</div>'; return; }
+  box.innerHTML=curLeadFormations.map(lf=>{ const f=FORMATIONS.find(x=>x.id===lf.formation_id);
+    return `<div class="lf-row"><span class="lf-name">${esc(f?f.nom:'(formation supprimée)')}${f&&f.organisme?` <span class="tag">${esc(f.organisme)}</span>`:''}</span><span>${eur(lf.prix)}</span><button class="btn danger small" onclick="delLeadFormation('${lf.id}')">✕</button></div>`;
+  }).join('');
+}
+async function addLeadFormation(){
+  const fid=document.getElementById('lf-add-formation').value; if(!fid){ toast('Choisis une formation.'); return; }
+  const prixEl=document.getElementById('lf-add-prix'); let prix=prixEl.value===''?null:Number(prixEl.value);
+  if(prix==null){ const f=FORMATIONS.find(x=>x.id===fid); if(f&&f.tarif!=null) prix=Number(f.tarif); }
+  const {error}=await db.from('crm_lead_formations').insert({lead_id:curLead.id,formation_id:fid,prix});
+  if(error){ toast('Erreur : '+error.message); return; }
+  prixEl.value=''; document.getElementById('lf-add-formation').value='';
+  await loadLeadFormations(curLead.id); toast('Formation ajoutée');
+}
+async function delLeadFormation(id){
+  const {error}=await db.from('crm_lead_formations').delete().eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  await loadLeadFormations(curLead.id);
+}
+
+/* ---------- Activités ---------- */
+async function loadActivities(leadId){
+  const {data,error}=await db.from('crm_activities').select('*').eq('lead_id',leadId).order('created_at',{ascending:false});
+  const box=document.getElementById('act-list');
+  if(error){ box.innerHTML='<div class="hint">Erreur : '+esc(error.message)+'</div>'; return; }
+  if(!data||!data.length){ box.innerHTML='<div class="hint">Aucune activité.</div>'; return; }
+  const ic={note:'📝',appel:'📞',email:'✉️',rdv:'📅'};
+  box.innerHTML=data.map(a=>`<div class="act"><div class="a-head">${ic[a.type]||''} ${new Date(a.created_at).toLocaleString('fr-FR')}</div><div>${esc(a.contenu||'')}</div></div>`).join('');
+}
+async function addActivity(){
+  if(!curLead) return;
+  const contenu=document.getElementById('act-content').value.trim(); if(!contenu){ toast('Écris un contenu.'); return; }
+  const type=document.getElementById('act-type').value;
+  const {error}=await db.from('crm_activities').insert({lead_id:curLead.id,type,contenu});
+  if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('act-content').value=''; loadActivities(curLead.id);
+}
+async function deleteLead(){
+  if(!curLead) return;
+  if(!confirm('Supprimer définitivement le lead « '+leadName(curLead)+' » ? (Admin uniquement.)')) return;
+  const {error}=await db.from('crm_leads').delete().eq('id',curLead.id);
+  if(error){ toast('Suppression refusée : '+error.message); return; }
+  LEADS=LEADS.filter(x=>x.id!==curLead.id); toast('Lead supprimé'); closeLead();
+}
+
+/* ---------- PIPELINE ---------- */
+function renderPipeline(){
+  document.getElementById('kanban').innerHTML=STAGES.map(s=>{
+    const cards=LEADS.filter(l=>l.stage===s.key);
+    return `<div class="kcol" data-stage="${s.key}" ondragover="kOver(event)" ondragleave="kLeave(event)" ondrop="kDrop(event)">
+      <h3><span style="color:${s.color}">${s.label}</span><span class="kcount">${cards.length}</span></h3>
+      ${cards.map(l=>`<div class="kcard" draggable="true" ondragstart="kStart(event,'${l.id}')" onclick="openLead('${l.id}')">
+        <div class="kc-name">${esc(leadName(l))}</div>
+        <div class="kc-meta">${esc(l.entreprise||statutText(l.statut_id)||'')}</div>
+        ${l.montant?`<div class="kc-amt">${eur(l.montant)}</div>`:''}
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+let _drag=null;
+function kStart(e,id){ _drag=id; e.dataTransfer.effectAllowed='move'; }
+function kOver(e){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function kLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+async function kDrop(e){
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  const stage=e.currentTarget.dataset.stage, id=_drag; _drag=null;
+  const l=LEADS.find(x=>x.id===id); if(!l||l.stage===stage) return;
+  const {error}=await db.from('crm_leads').update({stage,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  l.stage=stage; renderPipeline(); toast('Étape : '+stageOf(stage).label);
+}
+
+/* ---------- DASHBOARD ---------- */
+function renderDashboard(){
+  const total=LEADS.length;
+  const won=LEADS.filter(l=>l.stage==='gagne'), open=LEADS.filter(l=>l.stage!=='gagne'&&l.stage!=='perdu');
+  const wonAmt=won.reduce((s,l)=>s+(Number(l.montant)||0),0), openAmt=open.reduce((s,l)=>s+(Number(l.montant)||0),0);
+  const toBill=won.filter(l=>!l.facture).length;
+  const kpi=[
+    {v:total,l:'Leads au total'},{v:open.length,l:'En cours'},{v:won.length,l:'Gagnés'},
+    {v:(total?Math.round(won.length/total*100):0)+' %',l:'Conversion'},
+    {v:eur(wonAmt),l:'CA gagné'},{v:eur(openAmt),l:'Pipeline en cours'},
+    {v:toBill,l:'À facturer'},{v:FORMATIONS.length,l:'Formations au catalogue'},
+  ];
+  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+  document.getElementById('dash-stages').innerHTML='<tr><th>Étape</th><th class="num">Nombre</th><th class="num">Montant cumulé</th></tr>'+
+    STAGES.map(s=>{ const r=LEADS.filter(l=>l.stage===s.key); const amt=r.reduce((a,l)=>a+(Number(l.montant)||0),0);
+      return `<tr><td><span class="pill" style="background:${s.color}22;color:${s.color}">${s.label}</span></td><td class="num">${r.length}</td><td class="num">${eur(amt)}</td></tr>`; }).join('');
+}
+
+/* ---------- FORMATIONS (catalogue) ---------- */
 function renderFormations(){
+  const q=(document.getElementById('formation-search').value||'').toLowerCase().trim();
+  const fc=document.getElementById('formation-fcat').value, fo=document.getElementById('formation-forg').value;
+  const rows=FORMATIONS.filter(f=>{
+    if(fc&&f.categorie!==fc) return false; if(fo&&f.organisme!==fo) return false;
+    if(!q) return true; return [f.nom,f.categorie,f.organisme,f.certification].some(v=>(v||'').toLowerCase().includes(q));
+  });
+  document.getElementById('formations-count').textContent='· '+rows.length+'/'+FORMATIONS.length;
   const t=document.getElementById('formations-table');
-  if(!FORMATIONS.length){ t.innerHTML='<tr><td class="empty">Aucune formation. Ajoutez-en une ci-dessus.</td></tr>'; return; }
-  t.innerHTML='<tr><th>Intitulé</th><th class="num">Tarif</th><th class="num">e-learning</th><th class="num">Visio</th><th>Description</th><th></th></tr>'+
-    FORMATIONS.map(f=>`<tr>
-      <td>${esc(f.nom)}</td>
-      <td class="num">${eur(f.tarif)}</td>
-      <td class="num">${f.heures_elearning??'—'}</td>
-      <td class="num">${f.heures_visio??'—'}</td>
-      <td style="white-space:normal;max-width:340px">${esc(f.description||'')}</td>
+  if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucune formation.</td></tr>'; return; }
+  t.innerHTML='<tr><th>Intitulé</th><th>Catégorie</th><th>Organisme</th><th>Certif.</th><th>Type</th><th class="num">Tarif</th><th class="num">Prix min</th><th class="num">Heures</th><th></th></tr>'+
+    rows.map(f=>`<tr>
+      <td><b>${esc(f.nom)}</b></td><td>${esc(f.categorie||'')}</td><td>${esc(f.organisme||'')}</td>
+      <td>${f.certification?`<span class="tag">${esc(f.certification)}</span>`:'—'}</td>
+      <td>${esc(f.type_formation||'')}</td>
+      <td class="num">${eur(f.tarif)}</td><td class="num">${f.prix_min!=null?eur(f.prix_min):'—'}</td>
+      <td class="num hint">${(f.heures_elearning||0)}e / ${(f.heures_visio||0)}v</td>
       <td class="num"><button class="btn ghost small" onclick="editFormation('${f.id}')">✏️</button> <button class="btn danger small" onclick="delFormation('${f.id}')">Suppr.</button></td>
     </tr>`).join('');
 }
+function numOrNull(id){ const v=document.getElementById(id).value; return v===''?null:Number(v); }
 async function saveFormation(e){
   e.preventDefault();
   const payload={
     nom:document.getElementById('f-nom').value.trim(),
-    tarif:numOrNull('f-tarif'),
-    heures_elearning:numOrNull('f-elearning'),
-    heures_visio:numOrNull('f-visio'),
+    categorie:document.getElementById('f-categorie').value||null,
+    organisme:document.getElementById('f-organisme').value||null,
+    tarif:numOrNull('f-tarif'), prix_min:numOrNull('f-prixmin'),
+    certification:document.getElementById('f-cert').value.trim()||null,
+    type_formation:document.getElementById('f-type').value||null,
+    heures_elearning:numOrNull('f-elearning'), heures_visio:numOrNull('f-visio'),
+    lien_calendly_positionnement:document.getElementById('f-calendly').value.trim()||null,
+    lien_dof:document.getElementById('f-dof').value.trim()||null,
     description:document.getElementById('f-desc').value.trim()||null,
   };
   let error;
   if(editingFormationId){ ({error}=await db.from('crm_formations').update(payload).eq('id',editingFormationId)); }
   else { ({error}=await db.from('crm_formations').insert(payload)); }
   if(error){ toast('Erreur : '+error.message); return; }
-  toast(editingFormationId?'Formation modifiée':'Formation ajoutée');
-  resetFormationForm(); await loadFormations(); renderFormations();
+  toast(editingFormationId?'Formation modifiée':'Formation ajoutée'); resetFormationForm();
+  const {data}=await db.from('crm_formations').select('*').order('categorie').order('nom'); FORMATIONS=data||[]; fillAllSelects(); renderFormations();
 }
 function editFormation(id){
-  const f=FORMATIONS.find(x=>x.id===id); if(!f) return;
-  editingFormationId=id;
+  const f=FORMATIONS.find(x=>x.id===id); if(!f) return; editingFormationId=id;
   document.getElementById('formation-form-title').textContent='Modifier la formation';
-  document.getElementById('f-nom').value=f.nom||'';
-  document.getElementById('f-tarif').value=f.tarif??'';
-  document.getElementById('f-elearning').value=f.heures_elearning??'';
-  document.getElementById('f-visio').value=f.heures_visio??'';
-  document.getElementById('f-desc').value=f.description||'';
+  const set=(i,v)=>document.getElementById(i).value=v??'';
+  set('f-nom',f.nom); set('f-categorie',f.categorie||''); set('f-organisme',f.organisme||'');
+  set('f-tarif',f.tarif); set('f-prixmin',f.prix_min); set('f-cert',f.certification);
+  set('f-type',f.type_formation||''); set('f-elearning',f.heures_elearning); set('f-visio',f.heures_visio);
+  set('f-calendly',f.lien_calendly_positionnement); set('f-dof',f.lien_dof); set('f-desc',f.description);
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function resetFormationForm(){
-  editingFormationId=null;
-  document.getElementById('formation-form-title').textContent='Ajouter une formation';
-  ['f-nom','f-tarif','f-elearning','f-visio','f-desc'].forEach(i=>document.getElementById(i).value='');
+  editingFormationId=null; document.getElementById('formation-form-title').textContent='Ajouter une formation';
+  ['f-nom','f-tarif','f-prixmin','f-cert','f-elearning','f-visio','f-calendly','f-dof','f-desc'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('f-categorie').value=''; document.getElementById('f-organisme').value=''; document.getElementById('f-type').value='';
 }
 async function delFormation(id){
   const f=FORMATIONS.find(x=>x.id===id);
   if(!confirm('Supprimer la formation « '+(f?f.nom:'')+' » ? (Admin uniquement.)')) return;
   const {error}=await db.from('crm_formations').delete().eq('id',id);
   if(error){ toast('Suppression refusée : '+error.message); return; }
-  toast('Formation supprimée'); await loadFormations(); renderFormations();
+  FORMATIONS=FORMATIONS.filter(x=>x.id!==id); fillAllSelects(); renderFormations(); toast('Formation supprimée');
 }
 
-/* ---------- LEADS ---------- */
-function numOrNull(id){ const v=document.getElementById(id).value; return v===''?null:Number(v); }
-async function loadLeads(){
-  const {data,error}=await db.from('crm_leads').select('*').order('created_at',{ascending:false});
-  if(error){ toast('Erreur leads : '+error.message); return; }
-  LEADS=data||[]; renderLeads();
+/* ---------- PARAMETRES (organismes / catégories / statuts) ---------- */
+function renderParams(){ renderRef('crm_organismes','org-table',ORGANISMES); renderRef('crm_categories','cat-table',CATEGORIES); renderStatuts(); }
+function renderRef(table,tid,arr){
+  const t=document.getElementById(tid);
+  if(!arr.length){ t.innerHTML='<tr><td class="empty">Vide</td></tr>'; return; }
+  t.innerHTML=arr.map(r=>`<tr><td>${esc(r.nom)}</td><td class="num"><button class="btn danger small" onclick="delRef('${table}','${r.id}')">Suppr.</button></td></tr>`).join('');
 }
-function filteredLeads(){
-  const q=(document.getElementById('lead-search').value||'').toLowerCase().trim();
-  const fs=document.getElementById('lead-fstage').value;
-  return LEADS.filter(l=>{
-    if(fs && l.stage!==fs) return false;
-    if(!q) return true;
-    return [l.name,l.company,l.email,l.phone,l.source,formationName(l.formation_id)].some(v=>(v||'').toLowerCase().includes(q));
-  });
-}
-function renderLeads(){
-  const t=document.getElementById('leads-table');
-  const rows=filteredLeads();
-  document.getElementById('leads-count').textContent=rows.length+' lead(s) affiché(s) · '+LEADS.length+' au total';
-  if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucun lead.</td></tr>'; return; }
-  t.innerHTML='<tr><th>Nom</th><th>Société</th><th>Formation</th><th>Étape</th><th class="num">Montant</th><th>Source</th><th>Créé le</th><th></th></tr>'+
-    rows.map(l=>`<tr>
-      <td>${esc(l.name)}${l.email?`<br><span class="hint">${esc(l.email)}</span>`:''}</td>
-      <td>${esc(l.company||'')}</td>
-      <td>${esc(formationName(l.formation_id)||'—')}</td>
-      <td><select class="stage-sel ${stageOf(l.stage).cls}" onchange="setStage('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.key}"${s.key===l.stage?' selected':''}>${s.label}</option>`).join('')}</select></td>
-      <td class="num">${eur(l.montant)}</td>
-      <td>${esc(l.source||'')}</td>
-      <td>${fmtDate(l.created_at)}</td>
-      <td class="num"><button class="btn ghost small" onclick="editLead('${l.id}')">✏️</button> <button class="btn danger small" onclick="delLead('${l.id}')">Suppr.</button></td>
-    </tr>`).join('');
-}
-async function saveLead(e){
-  e.preventDefault();
-  const payload={
-    name:document.getElementById('l-name').value.trim(),
-    company:document.getElementById('l-company').value.trim()||null,
-    email:document.getElementById('l-email').value.trim()||null,
-    phone:document.getElementById('l-phone').value.trim()||null,
-    formation_id:document.getElementById('l-formation').value||null,
-    montant:numOrNull('l-montant'),
-    stage:document.getElementById('l-stage').value,
-    disponibilite:document.getElementById('l-dispo').value.trim()||null,
-    source:document.getElementById('l-source').value.trim()||null,
-    notes:document.getElementById('l-notes').value.trim()||null,
-  };
-  let error;
-  if(editingLeadId){ ({error}=await db.from('crm_leads').update(payload).eq('id',editingLeadId)); }
-  else { ({error}=await db.from('crm_leads').insert(payload)); }
+async function addRef(e,table,inputId){
+  e.preventDefault(); const nom=document.getElementById(inputId).value.trim(); if(!nom) return;
+  const {error}=await db.from(table).insert({nom});
   if(error){ toast('Erreur : '+error.message); return; }
-  toast(editingLeadId?'Lead modifié':'Lead ajouté');
-  resetLeadForm(); await loadLeads();
+  document.getElementById(inputId).value=''; await reloadRefs(); toast('Ajouté');
 }
-function editLead(id){
-  const l=LEADS.find(x=>x.id===id); if(!l) return;
-  editingLeadId=id;
-  document.getElementById('lead-form-title').textContent='Modifier le lead';
-  document.getElementById('l-name').value=l.name||'';
-  document.getElementById('l-company').value=l.company||'';
-  document.getElementById('l-email').value=l.email||'';
-  document.getElementById('l-phone').value=l.phone||'';
-  document.getElementById('l-formation').value=l.formation_id||'';
-  document.getElementById('l-montant').value=l.montant??'';
-  document.getElementById('l-stage').value=l.stage||'nouveau';
-  document.getElementById('l-dispo').value=l.disponibilite||'';
-  document.getElementById('l-source').value=l.source||'';
-  document.getElementById('l-notes').value=l.notes||'';
-  document.getElementById('lead-activities').classList.remove('hidden');
-  loadActivities(id);
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-function resetLeadForm(){
-  editingLeadId=null;
-  document.getElementById('lead-form-title').textContent='Ajouter un lead';
-  ['l-name','l-company','l-email','l-phone','l-montant','l-dispo','l-source','l-notes'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('l-formation').value='';
-  document.getElementById('l-stage').value='nouveau';
-  document.getElementById('lead-activities').classList.add('hidden');
-  document.getElementById('act-list').innerHTML='';
-}
-async function delLead(id){
-  const l=LEADS.find(x=>x.id===id);
-  if(!confirm('Supprimer le lead « '+(l?l.name:'')+' » ? (Admin uniquement.)')) return;
-  const {error}=await db.from('crm_leads').delete().eq('id',id);
+async function delRef(table,id){
+  if(!confirm('Supprimer cet élément ?')) return;
+  const {error}=await db.from(table).delete().eq('id',id);
   if(error){ toast('Suppression refusée : '+error.message); return; }
-  toast('Lead supprimé'); if(editingLeadId===id) resetLeadForm(); await loadLeads();
+  await reloadRefs();
 }
-async function setStage(id,stage){
-  const {error}=await db.from('crm_leads').update({stage}).eq('id',id);
+function renderStatuts(){
+  const t=document.getElementById('st-table');
+  if(!STATUTS.length){ t.innerHTML='<tr><td class="empty">Vide</td></tr>'; return; }
+  t.innerHTML='<tr><th>Nom</th><th>Couleur</th><th class="num">Ordre</th><th></th></tr>'+
+    STATUTS.map(s=>`<tr><td>${statutPill(s.id)}</td><td><span class="tag" style="background:${s.couleur||'#333'};color:#fff">${esc(s.couleur||'')}</span></td><td class="num">${s.ordre}</td><td class="num"><button class="btn danger small" onclick="delRef('crm_statuts','${s.id}')">Suppr.</button></td></tr>`).join('');
+}
+async function addStatut(e){
+  e.preventDefault();
+  const nom=document.getElementById('st-nom').value.trim(); if(!nom) return;
+  const couleur=document.getElementById('st-couleur').value, ordre=Number(document.getElementById('st-ordre').value)||0;
+  const {error}=await db.from('crm_statuts').insert({nom,couleur,ordre});
   if(error){ toast('Erreur : '+error.message); return; }
-  const l=LEADS.find(x=>x.id===id); if(l) l.stage=stage;
-  toast('Étape : '+stageLabel(stage));
-  renderLeads();
+  document.getElementById('st-nom').value=''; await reloadRefs(); toast('Statut ajouté');
 }
-
-/* ---------- ACTIVITÉS ---------- */
-async function loadActivities(leadId){
-  const {data,error}=await db.from('crm_activities').select('*').eq('lead_id',leadId).order('created_at',{ascending:false});
-  const box=document.getElementById('act-list');
-  if(error){ box.innerHTML='<div class="hint">Erreur : '+esc(error.message)+'</div>'; return; }
-  if(!data||!data.length){ box.innerHTML='<div class="hint">Aucune activité pour l\'instant.</div>'; return; }
-  const ic={note:'📝',appel:'📞',email:'✉️',rdv:'📅'};
-  box.innerHTML=data.map(a=>`<div class="act"><div class="a-head">${ic[a.type]||''} ${esc(a.user_email||'')} · ${new Date(a.created_at).toLocaleString('fr-FR')}</div><div>${esc(a.content||'')}</div></div>`).join('');
-}
-async function addActivity(){
-  if(!editingLeadId) return;
-  const content=document.getElementById('act-content').value.trim();
-  if(!content){ toast('Écris un contenu.'); return; }
-  const type=document.getElementById('act-type').value;
-  const {error}=await db.from('crm_activities').insert({lead_id:editingLeadId,type,content,user_email:SESSION.user.email});
-  if(error){ toast('Erreur : '+error.message); return; }
-  document.getElementById('act-content').value='';
-  loadActivities(editingLeadId);
-}
-
-/* ---------- PIPELINE (kanban) ---------- */
-function renderPipeline(){
-  const k=document.getElementById('kanban');
-  k.innerHTML=STAGES.map(s=>{
-    const cards=LEADS.filter(l=>l.stage===s.key);
-    return `<div class="kcol" data-stage="${s.key}" ondragover="kDragOver(event)" ondragleave="kDragLeave(event)" ondrop="kDrop(event)">
-      <h3><span>${s.label}</span><span class="kcount">${cards.length}</span></h3>
-      ${cards.map(l=>`<div class="kcard" draggable="true" ondragstart="kDragStart(event,'${l.id}')" onclick="editLeadFromPipeline('${l.id}')">
-        <div class="kc-name">${esc(l.name)}</div>
-        <div class="kc-meta">${esc(l.company||formationName(l.formation_id)||'')}</div>
-        ${l.montant?`<div class="kc-amt">${eur(l.montant)}</div>`:''}
-      </div>`).join('')}
-    </div>`;
-  }).join('');
-}
-let _dragId=null;
-function kDragStart(e,id){ _dragId=id; e.dataTransfer.effectAllowed='move'; }
-function kDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
-function kDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
-async function kDrop(e){
-  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
-  const stage=e.currentTarget.dataset.stage;
-  if(!_dragId) return;
-  const l=LEADS.find(x=>x.id===_dragId); const id=_dragId; _dragId=null;
-  if(!l||l.stage===stage) return;
-  await setStage(id,stage); renderPipeline();
-}
-function editLeadFromPipeline(id){ showTab('leads'); editLead(id); }
-
-/* ---------- TABLEAU DE BORD ---------- */
-function renderDashboard(){
-  const total=LEADS.length;
-  const won=LEADS.filter(l=>l.stage==='gagne');
-  const lost=LEADS.filter(l=>l.stage==='perdu');
-  const open=LEADS.filter(l=>l.stage!=='gagne'&&l.stage!=='perdu');
-  const wonAmt=won.reduce((s,l)=>s+(Number(l.montant)||0),0);
-  const openAmt=open.reduce((s,l)=>s+(Number(l.montant)||0),0);
-  const conv=total?Math.round(won.length/total*100):0;
-  const toBill=won.filter(l=>!l.invoiced).length;
-  const kpi=[
-    {v:total,l:'Leads au total'},
-    {v:open.length,l:'En cours'},
-    {v:won.length,l:'Gagnés'},
-    {v:conv+' %',l:'Taux de conversion'},
-    {v:eur(wonAmt),l:'CA gagné'},
-    {v:eur(openAmt),l:'Pipeline en cours'},
-    {v:toBill,l:'À facturer'},
-    {v:lost.length,l:'Perdus'},
-  ];
-  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
-  const st=document.getElementById('dash-stages');
-  st.innerHTML='<tr><th>Étape</th><th class="num">Nombre</th><th class="num">Montant cumulé</th></tr>'+
-    STAGES.map(s=>{ const rows=LEADS.filter(l=>l.stage===s.key); const amt=rows.reduce((a,l)=>a+(Number(l.montant)||0),0);
-      return `<tr><td>${stageBadge(s.key)}</td><td class="num">${rows.length}</td><td class="num">${eur(amt)}</td></tr>`; }).join('');
-}
-
-/* ---------- À FACTURER ---------- */
-function renderFacturer(){
-  const t=document.getElementById('facturer-table');
-  const rows=LEADS.filter(l=>l.stage==='gagne'&&!l.invoiced);
-  if(!rows.length){ t.innerHTML='<tr><td class="empty">Rien à facturer 🎉</td></tr>'; return; }
-  t.innerHTML='<tr><th>Nom</th><th>Société</th><th>Formation</th><th class="num">Montant</th><th>Gagné le</th><th></th></tr>'+
-    rows.map(l=>`<tr>
-      <td>${esc(l.name)}</td><td>${esc(l.company||'')}</td><td>${esc(formationName(l.formation_id)||'—')}</td>
-      <td class="num">${eur(l.montant)}</td><td>${fmtDate(l.created_at)}</td>
-      <td class="num"><button class="btn small" onclick="markInvoiced('${l.id}')">✅ Marquer facturé</button></td>
-    </tr>`).join('');
-}
-async function markInvoiced(id){
-  const {error}=await db.from('crm_leads').update({invoiced:true}).eq('id',id);
-  if(error){ toast('Erreur : '+error.message); return; }
-  const l=LEADS.find(x=>x.id===id); if(l) l.invoiced=true;
-  toast('Marqué comme facturé'); renderFacturer(); renderDashboard();
-}
-
-/* ---------- IMPORT EXCEL / CSV ---------- */
-function downloadLeadsTemplate(){
-  const ws=XLSX.utils.aoa_to_sheet([
-    ['nom','societe','email','telephone','formation','montant','source','etape'],
-    ['Jean Dupont','ACME SARL','jean@acme.fr','0600000000','Anglais professionnel','1500','CALL IA','nouveau'],
+async function reloadRefs(){
+  const [o,c,s]=await Promise.all([
+    db.from('crm_organismes').select('*').order('nom'),
+    db.from('crm_categories').select('*').order('nom'),
+    db.from('crm_statuts').select('*').order('ordre'),
   ]);
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Leads');
-  XLSX.writeFile(wb,'modele-leads-crm.xlsx');
+  ORGANISMES=o.data||[]; CATEGORIES=c.data||[]; STATUTS=s.data||[]; fillAllSelects(); renderParams();
+}
+
+/* ---------- IMPORT EXCEL / CSV des leads ---------- */
+function downloadLeadsTemplate(){
+  const ws=XLSX.utils.aoa_to_sheet([['prenom','nom','email','telephone','entreprise','source','montant'],
+    ['Jean','Dupont','jean@acme.fr','0600000000','ACME','CALL IA','1500']]);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Leads'); XLSX.writeFile(wb,'modele-leads-crm.xlsx');
 }
 async function importLeadsFile(e){
   const file=e.target.files[0]; if(!file) return;
   try{
-    const buf=await file.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array'});
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-    if(!rows.length){ toast('Fichier vide.'); e.target.value=''; return; }
-    const stageKeys=STAGES.map(s=>s.key);
     const get=(r,keys)=>{ for(const k of Object.keys(r)){ if(keys.includes(k.toLowerCase().trim())) return r[k]; } return ''; };
     const payload=rows.map(r=>{
-      const fname=String(get(r,['formation','formation visée','formation visee'])).trim();
-      const f=FORMATIONS.find(x=>x.nom.toLowerCase()===fname.toLowerCase());
-      let stage=String(get(r,['etape','étape','stage'])).toLowerCase().trim();
-      if(!stageKeys.includes(stage)) stage='nouveau';
-      const montant=String(get(r,['montant','prix'])).replace(/[^\d.,-]/g,'').replace(',','.');
-      return {
-        name:String(get(r,['nom','name','contact','nom du contact'])).trim(),
-        company:String(get(r,['societe','société','company','entreprise'])).trim()||null,
-        email:String(get(r,['email','mail','e-mail'])).trim()||null,
-        phone:String(get(r,['telephone','téléphone','tel','phone'])).trim()||null,
-        formation_id:f?f.id:null,
-        montant:montant?Number(montant):null,
-        source:String(get(r,['source','origine'])).trim()||null,
-        stage,
-      };
-    }).filter(p=>p.name);
-    if(!payload.length){ toast('Aucune ligne avec un nom. Vérifie la colonne "nom".'); e.target.value=''; return; }
+      const m=String(get(r,['montant','prix'])).replace(/[^\d.,-]/g,'').replace(',','.');
+      return { prenom:String(get(r,['prenom','prénom'])).trim()||null, nom:String(get(r,['nom','name'])).trim()||null,
+        email:String(get(r,['email','mail'])).trim()||null, telephone:String(get(r,['telephone','téléphone','tel','phone'])).trim()||null,
+        entreprise:String(get(r,['entreprise','societe','société','company'])).trim()||null,
+        source:String(get(r,['source','origine'])).trim()||null, montant:m?Number(m):null, stage:'nouveau', etape:'organisme' };
+    }).filter(p=>p.nom||p.prenom||p.email);
+    if(!payload.length){ toast('Aucune ligne exploitable.'); e.target.value=''; return; }
     if(!confirm('Importer '+payload.length+' lead(s) ?')){ e.target.value=''; return; }
     const {error}=await db.from('crm_leads').insert(payload);
     if(error){ toast('Erreur import : '+error.message); e.target.value=''; return; }
-    toast(payload.length+' lead(s) importé(s)');
-    e.target.value=''; await loadLeads(); showTab('leads');
-  }catch(err){ toast('Erreur lecture fichier : '+err.message); e.target.value=''; }
+    toast(payload.length+' lead(s) importé(s)'); e.target.value='';
+    const {data}=await db.from('crm_leads').select('*').order('created_at',{ascending:false}); LEADS=data||[]; renderLeads(); showTab('leads');
+  }catch(err){ toast('Erreur fichier : '+err.message); e.target.value=''; }
 }
 
 /* ---------- INIT ---------- */
