@@ -1113,13 +1113,16 @@ function refreshDashboard(){
   document.getElementById('db-share-cards').innerHTML =
     `<div class="card good"><div class="label">Marge nette validée à se partager</div><div class="value val-good">${eur(margeNette)}</div></div>`+
     `<div class="card"><div class="label">→ Part par associé (÷ ${as.length})</div><div class="value">${eur(partAssoc)}</div></div>`;
+  const rentaShown = dossiers.slice(0, 12);
   document.getElementById('db-renta-body').innerHTML = dossiers.length
-    ? dossiers.map(d=>{
+    ? rentaShown.map(d=>{
         const type = d.regie_interne ? ('Interne'+(d.commercial_regie?' ('+d.commercial_regie+')':''))
           : ((d.commercial_regie||'').trim()? ('Régie ('+d.commercial_regie+')') : '—');
         const mn=Number(d.marge_nette||0), ca=Number(d.montant_prime||0);
         return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${type}</td><td>${statutBadge(d.statut)}</td><td class="num">${eur(ca)}</td><td class="num ${mn>=0?'val-good':'val-bad'}">${eur(mn)}</td><td class="num">${eur(mn/as.length)}</td></tr>`;
-      }).join('') + `<tr style="border-top:2px solid var(--accent)"><td colspan="5"><b>Réalisé (${cat.realise.n}/${dossiers.length})</b></td><td class="num"><b>${eur(cat.realise.ca)}</b></td><td class="num"><b class="val-good">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
+      }).join('')
+      + (dossiers.length>rentaShown.length ? `<tr><td colspan="8" class="empty">12 dossiers les plus récents affichés — voir l'onglet 📁 Dossiers pour la liste complète et la recherche (${dossiers.length} au total)</td></tr>` : '')
+      + `<tr style="border-top:2px solid var(--accent)"><td colspan="5"><b>TOTAL — Réalisé (${cat.realise.n} / ${dossiers.length} dossiers)</b></td><td class="num"><b>${eur(cat.realise.ca)}</b></td><td class="num"><b class="val-good">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
     : `<tr><td colspan="8" class="empty">Aucun dossier</td></tr>`;
   document.getElementById('db-inv-tot').textContent=eur(invTot);
   document.getElementById('db-marge').textContent=eur(margeNette);
