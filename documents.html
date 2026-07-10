@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Générateur de documents</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
@@ -105,6 +106,7 @@
           <div class="row">
             <div class="field"><label>Email</label><input type="email" id="c-email"></div>
             <div class="field"><label>Téléphone</label><input id="c-phone"></div>
+            <div class="field"><label>SIRET</label><input id="c-siret"></div>
             <div class="field"><label>Catégorie</label><input id="c-cat" placeholder="ex. Client, Prospect"></div>
           </div>
           <div class="row">
@@ -132,15 +134,37 @@
         </table></div>
       </section>
     </div>
-    <!-- MODELES (a venir) -->
+    <!-- MODELES -->
     <div id="tab-modeles" class="hidden">
-      <div class="soon">📄 <b>Modèles de documents</b><br>Prochaine étape : importer un PDF et y placer les champs. (En construction)</div>
+      <section class="panel">
+        <h2>Modèles de documents</h2>
+        <div style="color:var(--muted);font-size:14px;margin-bottom:12px">Tes modèles PDF récupérés, avec le nombre de champs placés. Pour <b>générer un document rempli</b>, va dans l'onglet <b>Clients</b> et clique sur <b>📄</b> en face d'un client.</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Modèle</th><th>Catégorie</th><th class="num">Champs placés</th><th>PDF source</th></tr></thead>
+          <tbody id="modeles-body"></tbody>
+        </table></div>
+      </section>
     </div>
     <!-- DOCS (a venir) -->
     <div id="tab-docs" class="hidden">
       <div class="soon">🗂️ <b>Documents générés</b><br>Étape suivante : choisir un client + un modèle pour générer le PDF rempli. (En construction)</div>
     </div>
   </main>
+</div>
+
+<!-- MODAL GENERATION -->
+<div id="gen-modal" class="overlay hidden" style="background:rgba(0,0,0,.65)">
+  <div class="authcard" style="max-width:460px">
+    <h1 style="font-size:19px">📄 Générer un document</h1>
+    <div class="sub" id="gen-client"></div>
+    <label>Modèle</label>
+    <select id="gen-template"></select>
+    <div class="msg" id="gen-msg"></div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn ghost" type="button" onclick="closeGenerate()">Annuler</button>
+      <button class="btn" type="button" id="gen-go" onclick="doGenerate()">⬇️ Générer &amp; télécharger</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -174,6 +198,7 @@ async function afterAuth(session){
   document.getElementById('who').textContent=session.user.email||'';
   showTab('clients');
   loadClients();
+  loadTemplates();
 }
 
 function showTab(t){
@@ -207,13 +232,13 @@ function renderClients(){
   body.innerHTML=rows.map(c=>{
     const contact=[c.first_name,c.last_name].filter(Boolean).join(' ')||'—';
     return `<tr><td><b>${esc(c.company_name)}</b></td><td>${esc(contact)}</td><td>${esc(c.email||'—')}</td><td>${esc(c.phone||'—')}</td><td>${esc(c.city||'—')}</td>`+
-      `<td class="num"><button class="btn ghost small" onclick="editClient('${c.id}')">✏️</button> <button class="btn danger small" onclick="delClient('${c.id}')">🗑️</button></td></tr>`;
+      `<td class="num"><button class="btn small" onclick="openGenerate('${c.id}')" title="Générer un document">📄</button> <button class="btn ghost small" onclick="editClient('${c.id}')">✏️</button> <button class="btn danger small" onclick="delClient('${c.id}')">🗑️</button></td></tr>`;
   }).join('');
 }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function clientForm(){
   return { company_name:v('c-company'), first_name:v('c-first')||null, last_name:v('c-last')||null,
-    email:v('c-email')||null, phone:v('c-phone')||null, category:v('c-cat')||null,
+    email:v('c-email')||null, phone:v('c-phone')||null, siret:v('c-siret')||null, category:v('c-cat')||null,
     address_line1:v('c-addr')||null, zip:v('c-zip')||null, city:v('c-city')||null, country:v('c-country')||'France' };
 }
 function v(id){ return document.getElementById(id).value.trim(); }
@@ -238,6 +263,7 @@ function editClient(id){
   document.getElementById('c-last').value=c.last_name||'';
   document.getElementById('c-email').value=c.email||'';
   document.getElementById('c-phone').value=c.phone||'';
+  document.getElementById('c-siret').value=c.siret||'';
   document.getElementById('c-cat').value=c.category||'';
   document.getElementById('c-addr').value=c.address_line1||'';
   document.getElementById('c-zip').value=c.zip||'';
@@ -250,7 +276,7 @@ function editClient(id){
 }
 function cancelEditClient(){
   editingClientId=null;
-  ['c-company','c-first','c-last','c-email','c-phone','c-cat','c-addr','c-zip','c-city'].forEach(id=>document.getElementById(id).value='');
+  ['c-company','c-first','c-last','c-email','c-phone','c-siret','c-cat','c-addr','c-zip','c-city'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('c-country').value='France';
   document.getElementById('cli-title').textContent='Ajouter un client';
   document.getElementById('c-save').textContent='+ Ajouter';
@@ -263,6 +289,131 @@ async function delClient(id){
   if(error){ alert('Suppression refusée : '+error.message); return; }
   if(editingClientId===id) cancelEditClient();
   loadClients();
+}
+
+// ===== Modèles =====
+let TEMPLATES=[];
+async function loadTemplates(){
+  const {data:tpl}=await db.from('doc_templates').select('*').order('name');
+  const {data:fc}=await db.from('doc_template_fields').select('template_id');
+  const counts={}; (fc||[]).forEach(f=>counts[f.template_id]=(counts[f.template_id]||0)+1);
+  TEMPLATES=(tpl||[]).map(t=>Object.assign({},t,{nb_fields:counts[t.id]||0}));
+  renderTemplatesTab(); fillGenTemplateSelect();
+}
+function renderTemplatesTab(){
+  const body=document.getElementById('modeles-body'); if(!body) return;
+  if(!TEMPLATES.length){ body.innerHTML='<tr><td colspan="4" class="empty">Aucun modèle</td></tr>'; return; }
+  body.innerHTML=TEMPLATES.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.category||'—')}</td><td class="num">${t.nb_fields}</td><td>${t.source_pdf_path?'✅':'—'}</td></tr>`).join('');
+}
+function fillGenTemplateSelect(){
+  const sel=document.getElementById('gen-template'); if(!sel) return;
+  const usable=TEMPLATES.filter(t=>t.source_pdf_path);
+  sel.innerHTML=usable.length? usable.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('') : '<option value="">Aucun modèle disponible</option>';
+}
+
+// ===== Génération PDF (portage fidèle de l'ancien DocuCRM / pdfRenderUtils) =====
+let genClientId=null;
+function openGenerate(id){
+  genClientId=id;
+  const c=CLIENTS.find(x=>x.id===id);
+  document.getElementById('gen-client').textContent = c ? ('Client : '+(c.company_name||'')) : '';
+  document.getElementById('gen-msg').innerHTML='';
+  fillGenTemplateSelect();
+  document.getElementById('gen-modal').classList.remove('hidden');
+}
+function closeGenerate(){ document.getElementById('gen-modal').classList.add('hidden'); genClientId=null; }
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function formatDateFR(d){ return pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear(); }
+function formatDateTimeFR(d){ return formatDateFR(d)+' '+pad2(d.getHours())+':'+pad2(d.getMinutes()); }
+function applyTextTransform(value,t){ switch(t){ case 'uppercase':return value.toUpperCase(); case 'lowercase':return value.toLowerCase(); case 'capitalize':return value.replace(/\b\w/g,c=>c.toUpperCase()); default:return value; } }
+function getFieldValue(fieldKey,fieldSource,client,customMap){
+  if(fieldSource==='system'){ if(fieldKey==='today_date')return formatDateFR(new Date()); if(fieldKey==='date_edition')return formatDateTimeFR(new Date()); return ''; }
+  if(fieldSource==='custom'){ const v=customMap[fieldKey]; return v==null?'':String(v); }
+  const v=client[fieldKey]; return v==null?'':String(v);
+}
+function sanitizePdfText(s){ return (s||'').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...').replace(/[^\x00-\xFF]/g,'?'); }
+function normalizedToPdfPoints(coords,pageWidth,pageHeight){
+  const x_pt=coords.x*pageWidth;
+  const width_pt=(coords.width||0.1)*pageWidth;
+  const height_pt=(coords.height||0.03)*pageHeight;
+  const y_top_from_bottom=pageHeight-(coords.y*pageHeight);
+  return {x_pt,y_pt:y_top_from_bottom,width_pt,height_pt};
+}
+function calculateTextBaseline(fieldTopY,fontSize){ return fieldTopY-fontSize; }
+function wrapText(text,font,fontSize,maxWidth){
+  const words=text.split(' '); const lines=[]; let cur='';
+  for(const w of words){ const test=cur?cur+' '+w:w; if(font.widthOfTextAtSize(test,fontSize)>maxWidth && cur){ lines.push(cur); cur=w; } else cur=test; }
+  if(cur) lines.push(cur); return lines;
+}
+function renderFieldToPdf(o){
+  const {rgb}=PDFLib;
+  const {value,fontSize,font,page,coords,align='left'}=o;
+  if(!value) return;
+  const sz=page.getSize(), pageWidth=sz.width, pageHeight=sz.height;
+  const p=normalizedToPdfPoints(coords,pageWidth,pageHeight);
+  const x_pt=p.x_pt, y_pt=p.y_pt, width_pt=p.width_pt, height_pt=p.height_pt;
+  const lineHeight=fontSize*1.3; const maxLines=Math.max(1,Math.floor(height_pt/lineHeight)); const isMulti=maxLines>1;
+  const firstBaseline=calculateTextBaseline(y_pt,fontSize);
+  const draw=(txt,x,y)=>{ try{ page.drawText(txt,{x,y,size:fontSize,font,color:rgb(0,0,0)}); }catch(e){ try{ page.drawText(sanitizePdfText(txt),{x,y,size:fontSize,font,color:rgb(0,0,0)}); }catch(_){} } };
+  if(isMulti){
+    const lines=wrapText(value,font,fontSize,width_pt-4).slice(0,maxLines);
+    for(let i=0;i<lines.length;i++){
+      const lineY=firstBaseline-i*lineHeight; const lw=font.widthOfTextAtSize(lines[i],fontSize);
+      let lx=x_pt; if(align==='center') lx=x_pt+(width_pt-lw)/2; else if(align==='right') lx=x_pt+width_pt-lw;
+      lx=Math.max(2,Math.min(lx,pageWidth-lw-2)); const cy=Math.max(2,Math.min(lineY,pageHeight-fontSize-2));
+      draw(lines[i],lx,cy);
+    }
+  } else {
+    const tw=font.widthOfTextAtSize(value,fontSize);
+    let fx=x_pt; if(align==='center') fx=x_pt+(width_pt-tw)/2; else if(align==='right') fx=x_pt+width_pt-tw;
+    fx=Math.max(2,Math.min(fx,pageWidth-tw-2)); const fy=Math.max(2,Math.min(firstBaseline,pageHeight-fontSize-2));
+    draw(value,fx,fy);
+  }
+}
+async function doGenerate(){
+  const msg=document.getElementById('gen-msg');
+  const templateId=document.getElementById('gen-template').value;
+  if(!genClientId||!templateId){ msg.innerHTML='<span class="val-bad">Choisis un modèle.</span>'; return; }
+  const tpl=TEMPLATES.find(t=>t.id===templateId);
+  if(!tpl||!tpl.source_pdf_path){ msg.innerHTML='<span class="val-bad">Ce modèle n\'a pas de PDF source.</span>'; return; }
+  const goBtn=document.getElementById('gen-go'); goBtn.disabled=true; msg.innerHTML='Génération en cours…';
+  try{
+    const {data:client,error:cErr}=await db.from('doc_clients').select('*').eq('id',genClientId).single();
+    if(cErr||!client) throw new Error('client introuvable');
+    const {data:fields}=await db.from('doc_template_fields').select('*').eq('template_id',templateId);
+    const {data:cfDefs}=await db.from('doc_custom_fields').select('id,key');
+    const {data:cvals}=await db.from('doc_client_values').select('field_id,value_text').eq('client_id',genClientId);
+    const customMap={}; (cfDefs||[]).forEach(f=>{ const v=(cvals||[]).find(x=>x.field_id===f.id); customMap[f.key]=v?v.value_text:null; });
+    const {data:pdfBlob,error:dErr}=await db.storage.from('doc-templates').download(tpl.source_pdf_path);
+    if(dErr||!pdfBlob) throw new Error('PDF source introuvable');
+    const bytes=new Uint8Array(await pdfBlob.arrayBuffer());
+    const {PDFDocument,StandardFonts}=PDFLib;
+    const pdfDoc=await PDFDocument.load(bytes);
+    const font=await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const pages=pdfDoc.getPages();
+    for(const f of (fields||[])){
+      const pi=(f.page||1)-1; if(pi<0||pi>=pages.length) continue;
+      let value=getFieldValue(f.field_key,f.field_source,client,customMap);
+      if(f.fallback_value && !value) value=f.fallback_value;
+      value=applyTextTransform(value,f.transform||'none');
+      if(!value) continue;
+      renderFieldToPdf({value:String(value),fontSize:f.font_size||10,font,page:pages[pi],coords:{x:Number(f.x)||0,y:Number(f.y)||0,width:Number(f.width)||0.1,height:Number(f.height)||0.03},align:f.align||'left'});
+    }
+    const outBytes=await pdfDoc.save();
+    const blob=new Blob([outBytes],{type:'application/pdf'});
+    const fname=((client.company_name||'document').replace(/[^a-z0-9]+/gi,'_')+'_'+tpl.name.replace(/[^a-z0-9]+/gi,'_')+'.pdf');
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+    try{
+      const path=genClientId+'/'+Date.now()+'-'+tpl.name.replace(/\s+/g,'_')+'.pdf';
+      await db.storage.from('doc-generated').upload(path,blob,{contentType:'application/pdf'});
+      const {data:ud}=await db.auth.getUser();
+      await db.from('doc_generated').insert({client_id:genClientId,template_id:templateId,pdf_path:path,generated_by:ud&&ud.user?ud.user.id:null,meta:{template_name:tpl.name}});
+    }catch(_){}
+    msg.innerHTML='<span class="val-good">Document généré et téléchargé ✅</span>';
+  }catch(e){
+    msg.innerHTML='<span class="val-bad">Erreur : '+(e.message||e)+'</span>';
+  } finally { goBtn.disabled=false; }
 }
 
 (async()=>{
