@@ -245,7 +245,7 @@
     </section>
     <section class="panel">
       <h2>Liste des dossiers</h2>
-      <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, n° dépôt, régie, région…" oninput="renderDossiers()"></div>
+      <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, n° dépôt, régie, région…" oninput="onDossierSearch()"></div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
         <div class="field" style="max-width:230px"><label>Filtrer par régie / campagne</label><select id="dossiers-fregie" onchange="renderDossiers()"></select></div>
         <div class="field" id="dossiers-fregion-wrap" style="max-width:200px"><label>Filtrer par région</label><select id="dossiers-fregion" onchange="renderDossiers()"><option value="">Toutes les régions</option><option>France</option><option>Corse</option><option>DOM-TOM</option></select></div>
@@ -991,38 +991,59 @@ function renderApports(){
   }).join('') : `<tr><td colspan="${as.length+8}" class="empty">${term?'Aucun apport ne correspond à la recherche':'Aucun apport'}</td></tr>`;
 }
 async function loadDossiers(){
-  const {data,error}=await db.from(T('dossiers')).select('*').order('date',{ascending:false});
-  if(error){showError(error);return;}
-  window._dossiers=data||[]; renderDossiers(); refreshDashboard(); renderRegies();
-}
-function renderDossiers(){
-  const velo=PROJ.dossierType==='velo'; const term=(document.getElementById('dossiers-search')||{}).value||'';
-  const all=window._dossiers||[];
-  // remplir le filtre régie (en conservant la sélection)
-  const freg=document.getElementById('dossiers-fregie');
-  if(freg){
-    const cur=freg.value;
-    const regies=[...new Set(all.map(d=>(d.commercial_regie||'').trim()).filter(Boolean))].sort();
-    freg.innerHTML='<option value="">Toutes les régies</option>'+regies.map(r=>`<option value="${r}">${r}</option>`).join('')+'<option value="__none__">— sans régie —</option>';
-    if([...freg.options].some(o=>o.value===cur)) freg.value=cur;
+  // chargement par pages de 1000 (la base limite chaque requête à 1000 lignes)
+  let list=[], from=0; const PAGE=1000;
+  while(true){
+    const {data,error}=await db.from(T('dossiers')).select('*').order('date',{ascending:false}).range(from,from+PAGE-1);
+    if(error){showError(error);return;}
+    list=list.concat(data||[]);
+    if(!data || data.length<PAGE) break;
+    from+=PAGE;
   }
+  // texte de recherche pré-calculé (accents retirés) une seule fois par dossier → recherche rapide
+  list.forEach(d=>{ d._hay=searchNorm([fdate(d.date),moisLabel(d.date),d.crm_id,d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette,d.adresse,d.code_postal,d.ville,d.telephone,d.email].join(' ')); });
+  window._dossiers=list; fillDossierRegieFilter(); renderDossiers(); refreshDashboard(); renderRegies();
+}
+function fillDossierRegieFilter(){
+  const freg=document.getElementById('dossiers-fregie'); if(!freg) return;
+  const cur=freg.value;
+  const regies=[...new Set((window._dossiers||[]).map(d=>(d.commercial_regie||'').trim()).filter(Boolean))].sort();
+  freg.innerHTML='<option value="">Toutes les régies</option>'+regies.map(r=>`<option value="${r}">${r}</option>`).join('')+'<option value="__none__">— sans régie —</option>';
+  if([...freg.options].some(o=>o.value===cur)) freg.value=cur;
+}
+let _dossSearchT=null;
+function onDossierSearch(){ clearTimeout(_dossSearchT); _dossSearchT=setTimeout(renderDossiers,180); }
+const DOSSIER_ROW_CAP=300;
+function renderDossiers(){
+  if(!PROJ) return;
+  const velo=PROJ.dossierType==='velo';
+  const all=window._dossiers||[];
+  const term=(document.getElementById('dossiers-search')||{}).value||'';
+  const nt=searchNorm(term).trim(); const words=nt?nt.split(/\s+/):[];
   const fRegie=(document.getElementById('dossiers-fregie')||{}).value||'';
   const fRegion=(document.getElementById('dossiers-fregion')||{}).value||'';
   const fStatut=(document.getElementById('dossiers-fstatut')||{}).value||'';
-  const rows=all.filter(d=>{
+  const rows=[];
+  for(const d of all){
     const reg=(d.commercial_regie||'').trim();
-    if(fRegie==='__none__'){ if(reg) return false; } else if(fRegie){ if(reg!==fRegie) return false; }
-    if(fRegion && (d.region||'')!==fRegion) return false;
-    if(fStatut && (d.statut||'En cours')!==fStatut) return false;
-    return matchSearch(term,[fdate(d.date),moisLabel(d.date),d.crm_id,d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette,d.adresse,d.code_postal,d.ville,d.telephone,d.email].join(' '));
-  });
-  document.getElementById('dossiers-body').innerHTML=rows.length? rows.map(d=>{
+    if(fRegie==='__none__'){ if(reg) continue; } else if(fRegie){ if(reg!==fRegie) continue; }
+    if(fRegion && (d.region||'')!==fRegion) continue;
+    if(fStatut && (d.statut||'En cours')!==fStatut) continue;
+    if(words.length){ const hay=d._hay||''; let ok=true; for(const w of words){ if(hay.indexOf(w)<0){ ok=false; break; } } if(!ok) continue; }
+    rows.push(d);
+  }
+  const body=document.getElementById('dossiers-body');
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="${velo?13:12}" class="empty">${(term||fRegie||fRegion||fStatut)?'Aucun dossier ne correspond à la recherche / aux filtres':'Aucun dossier'}</td></tr>`; return; }
+  const shown=rows.length>DOSSIER_ROW_CAP?rows.slice(0,DOSSIER_ROW_CAP):rows;
+  let html=shown.map(d=>{
     const reg=`${d.commercial_regie||'—'}${velo?(d.regie_interne?` <span style="color:var(--muted);font-size:11px">(interne)</span>`:''):(d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:'')}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
     const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num"><button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
     return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
-  }).join('') : `<tr><td colspan="${velo?13:12}" class="empty">${(term||fRegie||fRegion||fStatut)?'Aucun dossier ne correspond à la recherche / aux filtres':'Aucun dossier'}</td></tr>`;
+  }).join('');
+  if(rows.length>shown.length) html+=`<tr><td colspan="${velo?13:12}" class="empty">${shown.length} dossiers affichés sur ${rows.length}. Affine ta recherche (client, ville, ID…) pour voir les autres.</td></tr>`;
+  body.innerHTML=html;
 }
 async function loadRemboursements(){
   const {data,error}=await db.from(T('remboursements')).select('*').order('date',{ascending:false});
