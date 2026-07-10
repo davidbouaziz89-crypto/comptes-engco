@@ -6,6 +6,7 @@
 <title>Générateur de documents</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
@@ -34,7 +35,8 @@
   .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
   .btn.danger{background:transparent;border:1px solid var(--line);color:var(--bad);font-weight:600}
   .btn.small{padding:5px 10px;font-size:13px}
-  nav{display:flex;gap:6px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--panel2)}
+  .btn:disabled{opacity:.55;cursor:default}
+  nav{display:flex;gap:6px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
   nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
   nav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
   main{max-width:1050px;margin:0 auto;padding:22px}
@@ -53,6 +55,17 @@
   .msg{margin-top:10px;font-size:14px}
   .val-good{color:var(--good)} .val-bad{color:var(--bad)}
   .soon{color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:26px;text-align:center}
+  /* Éditeur de modèle */
+  #editor-view{flex-direction:column;align-items:stretch;justify-content:stretch;padding:0;background:var(--bg)}
+  #ed-body{display:flex;flex:1;overflow:hidden}
+  #ed-stage{flex:1;overflow:auto;padding:20px;display:flex;justify-content:center;align-items:flex-start;background:#0a0d12}
+  #ed-page{position:relative;box-shadow:0 6px 30px rgba(0,0,0,.5);background:#fff}
+  #ed-canvas{display:block}
+  #ed-props{width:310px;flex-shrink:0;border-left:1px solid var(--line);padding:16px;overflow:auto;background:var(--panel)}
+  .fbox{position:absolute;border:1.5px solid var(--accent);background:rgba(79,124,255,.14);cursor:move;overflow:hidden;border-radius:2px;display:flex;align-items:center}
+  .fbox.selected{border-color:var(--good);background:rgba(55,211,155,.18);box-shadow:0 0 0 2px rgba(55,211,155,.45)}
+  .fbox-label{display:block;pointer-events:none;color:#0a2540;white-space:nowrap;overflow:hidden;padding:0 2px;line-height:1.15;width:100%;font-weight:600}
+  .fbox-h{position:absolute;right:-5px;bottom:-5px;width:13px;height:13px;background:var(--good);border:2px solid #fff;border-radius:3px;cursor:nwse-resize}
 </style>
 </head>
 <body>
@@ -90,6 +103,7 @@
   <nav>
     <button data-tab="clients" class="active" onclick="showTab('clients')">📇 Clients</button>
     <button data-tab="modeles" onclick="showTab('modeles')">📄 Modèles</button>
+    <button data-tab="champs" onclick="showTab('champs')">🏷️ Champs personnalisés</button>
     <button data-tab="docs" onclick="showTab('docs')">🗂️ Documents générés</button>
   </nav>
   <main>
@@ -117,6 +131,7 @@
             <div class="field"><label>Ville</label><input id="c-city"></div>
             <div class="field"><label>Pays</label><input id="c-country" value="France"></div>
           </div>
+          <div class="row" id="c-custom"></div>
           <div class="row" style="margin-top:12px">
             <button class="btn" type="submit" id="c-save">+ Ajouter</button>
             <button class="btn ghost" type="button" id="c-cancel" style="display:none" onclick="cancelEditClient()">Annuler</button>
@@ -137,17 +152,53 @@
     <!-- MODELES -->
     <div id="tab-modeles" class="hidden">
       <section class="panel">
-        <h2>Modèles de documents</h2>
-        <div style="color:var(--muted);font-size:14px;margin-bottom:12px">Tes modèles PDF récupérés, avec le nombre de champs placés. Pour <b>générer un document rempli</b>, va dans l'onglet <b>Clients</b> et clique sur <b>📄</b> en face d'un client.</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <h2 style="margin:0">Modèles de documents</h2>
+          <span class="spacer" style="margin-left:auto"></span>
+          <button class="btn" onclick="openNewTemplate()">➕ Nouveau modèle</button>
+        </div>
+        <div style="color:var(--muted);font-size:14px;margin-bottom:12px">Crée un modèle en important un PDF, puis place les champs dessus (glisser-déposer). Pour <b>générer un document rempli</b>, va dans l'onglet <b>Clients</b> et clique sur <b>📄</b> en face d'un client.</div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Modèle</th><th>Catégorie</th><th class="num">Champs placés</th><th>PDF source</th></tr></thead>
+          <thead><tr><th>Modèle</th><th>Catégorie</th><th class="num">Champs placés</th><th>PDF</th><th class="num">Actions</th></tr></thead>
           <tbody id="modeles-body"></tbody>
         </table></div>
       </section>
     </div>
-    <!-- DOCS (a venir) -->
+    <!-- CHAMPS PERSONNALISES -->
+    <div id="tab-champs" class="hidden">
+      <section class="panel">
+        <h2 id="cf-title">Ajouter un champ personnalisé</h2>
+        <div style="color:var(--muted);font-size:14px;margin-bottom:12px">Les champs personnalisés (ex. Qualité du signataire, N° de devis…) complètent les données standard du client. Tu peux ensuite les <b>placer sur tes modèles</b> et les <b>remplir sur chaque fiche client</b>.</div>
+        <form onsubmit="saveCustomField(event)">
+          <div class="row">
+            <div class="field"><label>Libellé * <span style="color:var(--muted)">(ce que tu vois)</span></label><input id="cf-label" placeholder="ex. Qualité du signataire" required></div>
+            <div class="field"><label>Identifiant <span style="color:var(--muted)">(sans espaces, auto)</span></label><input id="cf-key" placeholder="ex. qualite_signataire"></div>
+            <div class="field"><label>Valeur par défaut</label><input id="cf-default"></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn" type="submit" id="cf-save">+ Ajouter</button>
+            <button class="btn ghost" type="button" id="cf-cancel" style="display:none" onclick="cancelEditCF()">Annuler</button>
+          </div>
+          <div class="msg" id="cf-msg"></div>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Champs personnalisés</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Libellé</th><th>Identifiant</th><th>Valeur par défaut</th><th class="num">Actions</th></tr></thead>
+          <tbody id="cf-body"></tbody>
+        </table></div>
+      </section>
+    </div>
+    <!-- DOCS -->
     <div id="tab-docs" class="hidden">
-      <div class="soon">🗂️ <b>Documents générés</b><br>Étape suivante : choisir un client + un modèle pour générer le PDF rempli. (En construction)</div>
+      <section class="panel">
+        <h2>Documents générés</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Date</th><th>Client</th><th>Modèle</th><th class="num">Actions</th></tr></thead>
+          <tbody id="docs-body"></tbody>
+        </table></div>
+      </section>
     </div>
   </main>
 </div>
@@ -167,12 +218,54 @@
   </div>
 </div>
 
+<!-- MODAL NOUVEAU MODELE -->
+<div id="newtpl-modal" class="overlay hidden" style="background:rgba(0,0,0,.65)">
+  <div class="authcard" style="max-width:460px">
+    <h1 style="font-size:19px">➕ Nouveau modèle</h1>
+    <div class="sub">Importe le PDF vierge, puis tu placeras les champs dessus.</div>
+    <label>Nom du modèle *</label><input id="nt-name" placeholder="ex. Attestation de propriété">
+    <label>Catégorie</label><input id="nt-cat" placeholder="(facultatif)">
+    <label>Fichier PDF *</label><input type="file" id="nt-file" accept="application/pdf">
+    <div class="msg" id="nt-msg"></div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn ghost" type="button" onclick="closeNewTemplate()">Annuler</button>
+      <button class="btn" type="button" id="nt-go" onclick="createTemplate()">Créer &amp; placer les champs</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDITEUR DE MODELE (plein écran) -->
+<div id="editor-view" class="overlay hidden">
+  <header>
+    <h1 id="ed-title">✏️ Modèle</h1>
+    <span class="spacer"></span>
+    <button class="btn ghost small" id="ed-prev" onclick="edPage(-1)">◀</button>
+    <span id="ed-pagelabel" style="color:var(--muted);font-size:14px">Page 1</span>
+    <button class="btn ghost small" id="ed-next" onclick="edPage(1)">▶</button>
+    <button class="btn small" onclick="addField()">➕ Ajouter un champ</button>
+    <span id="ed-status" class="msg" style="margin:0"></span>
+    <button class="btn" id="ed-save" onclick="saveEditor()">💾 Enregistrer</button>
+    <button class="btn ghost small" onclick="closeEditor()">✕ Fermer</button>
+  </header>
+  <div id="ed-body">
+    <div id="ed-stage" onmousedown="if(event.target.id==='ed-stage'||event.target.id==='ed-page')deselectField()">
+      <div id="ed-page"><canvas id="ed-canvas"></canvas></div>
+    </div>
+    <div id="ed-props"></div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
-let SESSION=null, CLIENTS=[], editingClientId=null;
+let SESSION=null, CLIENTS=[], editingClientId=null, editingClientValues={};
+let CUSTOMFIELDS=[], editingCFId=null;
+
+const STD_LABELS={company_name:'Société',first_name:'Prénom',last_name:'Nom',email:'Email',phone:'Téléphone',siret:'SIRET',address_line1:'Adresse',address_line2:'Complément adresse',zip:'Code postal',city:'Ville',country:'Pays',category:'Catégorie'};
+const SYS_LABELS={today_date:'Date du jour',date_edition:'Date & heure d\'édition'};
 
 async function doLogin(e){
   e.preventDefault();
@@ -188,7 +281,6 @@ async function doLogout(){ await db.auth.signOut(); location.reload(); }
 
 async function afterAuth(session){
   SESSION=session;
-  // vérifier l'accès (membership docucrm ou admin)
   const {data:mems}=await db.from('app_memberships').select('project_key,role').eq('user_id',session.user.id);
   const hasAccess=(mems||[]).some(m=>m.project_key==='docucrm'||m.role==='admin');
   document.getElementById('login-view').classList.add('hidden');
@@ -197,13 +289,15 @@ async function afterAuth(session){
   document.getElementById('app-view').classList.remove('hidden');
   document.getElementById('who').textContent=session.user.email||'';
   showTab('clients');
+  await loadCustomFields();
   loadClients();
   loadTemplates();
 }
 
 function showTab(t){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['clients','modeles','docs'].forEach(x=>{ document.getElementById('tab-'+x).classList.toggle('hidden',x!==t); });
+  ['clients','modeles','champs','docs'].forEach(x=>{ document.getElementById('tab-'+x).classList.toggle('hidden',x!==t); });
+  if(t==='docs') loadGenerated();
 }
 
 // ===== Clients =====
@@ -242,20 +336,36 @@ function clientForm(){
     address_line1:v('c-addr')||null, zip:v('c-zip')||null, city:v('c-city')||null, country:v('c-country')||'France' };
 }
 function v(id){ return document.getElementById(id).value.trim(); }
+function renderClientCustomInputs(){
+  const box=document.getElementById('c-custom'); if(!box) return;
+  if(!CUSTOMFIELDS.length){ box.innerHTML=''; return; }
+  box.innerHTML='<div style="flex-basis:100%;color:var(--muted);font-size:13px;margin:6px 0 0">Champs personnalisés</div>'+
+    CUSTOMFIELDS.map(cf=>`<div class="field"><label>${esc(cf.label)}</label><input id="cf-in-${cf.id}"></div>`).join('');
+}
 async function saveClient(e){
   e.preventDefault();
   const row=clientForm();
   const msg=document.getElementById('c-msg');
   if(!row.company_name){ msg.innerHTML='<span class="val-bad">La société est obligatoire.</span>'; return; }
   msg.innerHTML='Enregistrement…';
-  let res;
-  if(editingClientId) res=await db.from('doc_clients').update(row).eq('id',editingClientId);
-  else res=await db.from('doc_clients').insert(row);
+  let res, clientId;
+  if(editingClientId){ res=await db.from('doc_clients').update(row).eq('id',editingClientId); clientId=editingClientId; }
+  else { res=await db.from('doc_clients').insert(row).select().single(); clientId=res.data&&res.data.id; }
   if(res.error){ msg.innerHTML='<span class="val-bad">Erreur : '+res.error.message+'</span>'; return; }
+  try{ await saveClientCustomValues(clientId); }catch(err){ msg.innerHTML='<span class="val-bad">Client enregistré, mais erreur sur les champs perso : '+err.message+'</span>'; cancelEditClient(); loadClients(); return; }
   msg.innerHTML='<span class="val-good">'+(editingClientId?'Client modifié ✅':'Client ajouté ✅')+'</span>';
   cancelEditClient(); loadClients();
 }
-function editClient(id){
+async function saveClientCustomValues(clientId){
+  if(!clientId) return;
+  for(const cf of CUSTOMFIELDS){
+    const el=document.getElementById('cf-in-'+cf.id); if(!el) continue;
+    const val=el.value.trim(); const ex=editingClientValues[cf.id];
+    if(ex&&ex.id){ if(val!==(ex.value||'')){ const r=await db.from('doc_client_values').update({value_text:val}).eq('id',ex.id); if(r.error) throw r.error; } }
+    else if(val){ const r=await db.from('doc_client_values').insert({client_id:clientId,field_id:cf.id,value_text:val}); if(r.error) throw r.error; }
+  }
+}
+async function editClient(id){
   const c=CLIENTS.find(x=>x.id===id); if(!c) return;
   editingClientId=id;
   document.getElementById('c-company').value=c.company_name||'';
@@ -269,15 +379,20 @@ function editClient(id){
   document.getElementById('c-zip').value=c.zip||'';
   document.getElementById('c-city').value=c.city||'';
   document.getElementById('c-country').value=c.country||'France';
+  editingClientValues={};
+  const {data:vals}=await db.from('doc_client_values').select('id,field_id,value_text').eq('client_id',id);
+  (vals||[]).forEach(x=>editingClientValues[x.field_id]={id:x.id,value:x.value_text});
+  CUSTOMFIELDS.forEach(cf=>{ const el=document.getElementById('cf-in-'+cf.id); if(el) el.value=(editingClientValues[cf.id]&&editingClientValues[cf.id].value)||''; });
   document.getElementById('cli-title').textContent="Modifier le client";
   document.getElementById('c-save').textContent='💾 Enregistrer';
   document.getElementById('c-cancel').style.display='';
   document.getElementById('cli-title').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function cancelEditClient(){
-  editingClientId=null;
+  editingClientId=null; editingClientValues={};
   ['c-company','c-first','c-last','c-email','c-phone','c-siret','c-cat','c-addr','c-zip','c-city'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('c-country').value='France';
+  CUSTOMFIELDS.forEach(cf=>{ const el=document.getElementById('cf-in-'+cf.id); if(el) el.value=''; });
   document.getElementById('cli-title').textContent='Ajouter un client';
   document.getElementById('c-save').textContent='+ Ajouter';
   document.getElementById('c-cancel').style.display='none';
@@ -291,6 +406,65 @@ async function delClient(id){
   loadClients();
 }
 
+// ===== Champs personnalisés =====
+async function loadCustomFields(){
+  const {data}=await db.from('doc_custom_fields').select('*').order('sort_order');
+  CUSTOMFIELDS=data||[];
+  renderCustomFieldsTab(); renderClientCustomInputs();
+}
+function renderCustomFieldsTab(){
+  const body=document.getElementById('cf-body'); if(!body) return;
+  if(!CUSTOMFIELDS.length){ body.innerHTML='<tr><td colspan="4" class="empty">Aucun champ personnalisé</td></tr>'; return; }
+  body.innerHTML=CUSTOMFIELDS.map(f=>`<tr><td><b>${esc(f.label)}</b></td><td><code style="color:var(--muted)">${esc(f.key)}</code></td><td>${esc(f.default_value||'—')}</td>`+
+    `<td class="num"><button class="btn ghost small" onclick="editCF('${f.id}')">✏️</button> <button class="btn danger small" onclick="delCF('${f.id}')">🗑️</button></td></tr>`).join('');
+}
+function slugify(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
+async function saveCustomField(e){
+  e.preventDefault();
+  const label=v('cf-label'); let key=v('cf-key'); const def=v('cf-default');
+  const msg=document.getElementById('cf-msg');
+  if(!label){ msg.innerHTML='<span class="val-bad">Le libellé est obligatoire.</span>'; return; }
+  if(!key) key=slugify(label);
+  key=slugify(key);
+  const dup=CUSTOMFIELDS.find(f=>f.key===key && f.id!==editingCFId);
+  if(dup){ msg.innerHTML='<span class="val-bad">Cet identifiant existe déjà.</span>'; return; }
+  msg.innerHTML='Enregistrement…';
+  const row={key,label,type:'text',default_value:def||null};
+  let res;
+  if(editingCFId) res=await db.from('doc_custom_fields').update(row).eq('id',editingCFId);
+  else res=await db.from('doc_custom_fields').insert(Object.assign({},row,{sort_order:(CUSTOMFIELDS.length+1)}));
+  if(res.error){ msg.innerHTML='<span class="val-bad">Erreur : '+res.error.message+'</span>'; return; }
+  msg.innerHTML='<span class="val-good">'+(editingCFId?'Champ modifié ✅':'Champ ajouté ✅')+'</span>';
+  cancelEditCF(); loadCustomFields();
+}
+function editCF(id){
+  const f=CUSTOMFIELDS.find(x=>x.id===id); if(!f) return;
+  editingCFId=id;
+  document.getElementById('cf-label').value=f.label||'';
+  document.getElementById('cf-key').value=f.key||'';
+  document.getElementById('cf-default').value=f.default_value||'';
+  document.getElementById('cf-title').textContent='Modifier le champ';
+  document.getElementById('cf-save').textContent='💾 Enregistrer';
+  document.getElementById('cf-cancel').style.display='';
+  document.getElementById('cf-title').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditCF(){
+  editingCFId=null;
+  ['cf-label','cf-key','cf-default'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cf-title').textContent='Ajouter un champ personnalisé';
+  document.getElementById('cf-save').textContent='+ Ajouter';
+  document.getElementById('cf-cancel').style.display='none';
+}
+async function delCF(id){
+  const f=CUSTOMFIELDS.find(x=>x.id===id); if(!f) return;
+  if(!confirm('Supprimer le champ « '+(f.label||'')+' » ? Les valeurs saisies chez les clients seront perdues. (Admin uniquement.)')) return;
+  await db.from('doc_client_values').delete().eq('field_id',id);
+  const {error}=await db.from('doc_custom_fields').delete().eq('id',id);
+  if(error){ alert('Suppression refusée : '+error.message); return; }
+  if(editingCFId===id) cancelEditCF();
+  loadCustomFields();
+}
+
 // ===== Modèles =====
 let TEMPLATES=[];
 async function loadTemplates(){
@@ -302,13 +476,237 @@ async function loadTemplates(){
 }
 function renderTemplatesTab(){
   const body=document.getElementById('modeles-body'); if(!body) return;
-  if(!TEMPLATES.length){ body.innerHTML='<tr><td colspan="4" class="empty">Aucun modèle</td></tr>'; return; }
-  body.innerHTML=TEMPLATES.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.category||'—')}</td><td class="num">${t.nb_fields}</td><td>${t.source_pdf_path?'✅':'—'}</td></tr>`).join('');
+  if(!TEMPLATES.length){ body.innerHTML='<tr><td colspan="5" class="empty">Aucun modèle — clique « ➕ Nouveau modèle »</td></tr>'; return; }
+  body.innerHTML=TEMPLATES.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.category||'—')}</td><td class="num">${t.nb_fields}</td><td>${t.source_pdf_path?'✅':'—'}</td>`+
+    `<td class="num"><button class="btn small" onclick="openEditor('${t.id}')" title="Placer les champs">✏️ Éditer</button> <button class="btn danger small" onclick="delTemplate('${t.id}')">🗑️</button></td></tr>`).join('');
 }
 function fillGenTemplateSelect(){
   const sel=document.getElementById('gen-template'); if(!sel) return;
   const usable=TEMPLATES.filter(t=>t.source_pdf_path);
   sel.innerHTML=usable.length? usable.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('') : '<option value="">Aucun modèle disponible</option>';
+}
+function openNewTemplate(){
+  document.getElementById('nt-name').value=''; document.getElementById('nt-cat').value='';
+  document.getElementById('nt-file').value=''; document.getElementById('nt-msg').innerHTML='';
+  document.getElementById('newtpl-modal').classList.remove('hidden');
+}
+function closeNewTemplate(){ document.getElementById('newtpl-modal').classList.add('hidden'); }
+async function createTemplate(){
+  const name=v('nt-name'); const cat=v('nt-cat'); const file=document.getElementById('nt-file').files[0];
+  const msg=document.getElementById('nt-msg');
+  if(!name){ msg.innerHTML='<span class="val-bad">Donne un nom au modèle.</span>'; return; }
+  if(!file){ msg.innerHTML='<span class="val-bad">Choisis un fichier PDF.</span>'; return; }
+  if(file.type && file.type!=='application/pdf'){ msg.innerHTML='<span class="val-bad">Le fichier doit être un PDF.</span>'; return; }
+  const btn=document.getElementById('nt-go'); btn.disabled=true; msg.innerHTML='Téléversement…';
+  const id=(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
+  const path='templates/'+id+'.pdf';
+  const up=await db.storage.from('doc-templates').upload(path,file,{contentType:'application/pdf',upsert:true});
+  if(up.error){ msg.innerHTML='<span class="val-bad">Erreur d\'envoi : '+up.error.message+'</span>'; btn.disabled=false; return; }
+  const ins=await db.from('doc_templates').insert({id,name,category:cat||null,source_pdf_path:path}).select().single();
+  if(ins.error){ msg.innerHTML='<span class="val-bad">Erreur : '+ins.error.message+'</span>'; btn.disabled=false; return; }
+  btn.disabled=false; closeNewTemplate();
+  await loadTemplates(); openEditor(id);
+}
+async function delTemplate(id){
+  const t=TEMPLATES.find(x=>x.id===id); if(!t) return;
+  if(!confirm('Supprimer le modèle « '+(t.name||'')+' » et tous ses champs ? (Admin uniquement.)')) return;
+  await db.from('doc_template_fields').delete().eq('template_id',id);
+  const {error}=await db.from('doc_templates').delete().eq('id',id);
+  if(error){ alert('Suppression refusée : '+error.message); return; }
+  loadTemplates();
+}
+
+// ===== Éditeur visuel de modèle =====
+let ed={}, dragState=null;
+function fieldLabel(source,key){
+  if(source==='standard') return STD_LABELS[key]||key;
+  if(source==='system') return SYS_LABELS[key]||key;
+  const cf=CUSTOMFIELDS.find(c=>c.key===key); return cf?cf.label:(key||'(champ)');
+}
+async function openEditor(templateId){
+  const tpl=TEMPLATES.find(t=>t.id===templateId);
+  if(!tpl){ alert('Modèle introuvable'); return; }
+  if(!tpl.source_pdf_path){ alert('Ce modèle n\'a pas de PDF source.'); return; }
+  ed={templateId,tpl,fields:[],page:1,sel:-1,scale:1,pageW:0,pageH:0,pdf:null,pageCount:1};
+  document.getElementById('editor-view').classList.remove('hidden');
+  document.getElementById('ed-title').textContent='✏️ '+tpl.name;
+  document.getElementById('ed-status').textContent='';
+  document.getElementById('ed-props').innerHTML='<div style="color:var(--muted)">Chargement du PDF…</div>';
+  const {data:fs}=await db.from('doc_template_fields').select('*').eq('template_id',templateId);
+  ed.fields=(fs||[]).map(f=>({id:f.id,field_source:f.field_source||'standard',field_key:f.field_key,page:f.page||1,
+    x:Number(f.x)||0,y:Number(f.y)||0,width:Number(f.width)||0.25,height:Number(f.height)||0.03,
+    font_size:f.font_size||10,align:f.align||'left',transform:f.transform||'none',fallback_value:f.fallback_value||''}));
+  const {data:blob,error}=await db.storage.from('doc-templates').download(tpl.source_pdf_path);
+  if(error||!blob){ document.getElementById('ed-props').innerHTML='<div class="val-bad">PDF introuvable : '+((error&&error.message)||'')+'</div>'; return; }
+  try{
+    const bytes=new Uint8Array(await blob.arrayBuffer());
+    ed.pdf=await pdfjsLib.getDocument({data:bytes}).promise;
+    ed.pageCount=ed.pdf.numPages;
+  }catch(e){ document.getElementById('ed-props').innerHTML='<div class="val-bad">Impossible de lire le PDF : '+(e.message||e)+'</div>'; return; }
+  await renderEditorPage(); buildProps();
+}
+function closeEditor(){ document.getElementById('editor-view').classList.add('hidden'); ed={}; dragState=null; }
+async function renderEditorPage(){
+  if(!ed.pdf) return;
+  const page=await ed.pdf.getPage(ed.page);
+  const vp1=page.getViewport({scale:1});
+  const stageW=(document.getElementById('ed-stage').clientWidth||820)-40;
+  ed.scale=Math.min(1.6, Math.max(0.4, stageW/vp1.width));
+  const vp=page.getViewport({scale:ed.scale});
+  const canvas=document.getElementById('ed-canvas');
+  canvas.width=vp.width; canvas.height=vp.height;
+  ed.pageW=vp.width; ed.pageH=vp.height;
+  await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+  const holder=document.getElementById('ed-page');
+  holder.style.width=vp.width+'px'; holder.style.height=vp.height+'px';
+  renderEditorFields(); updatePageLabel();
+}
+function updatePageLabel(){
+  document.getElementById('ed-pagelabel').textContent='Page '+ed.page+' / '+ed.pageCount;
+  document.getElementById('ed-prev').disabled=ed.page<=1;
+  document.getElementById('ed-next').disabled=ed.page>=ed.pageCount;
+}
+function edPage(d){ const np=ed.page+d; if(np<1||np>ed.pageCount) return; ed.page=np; ed.sel=-1; renderEditorPage(); buildProps(); }
+function renderEditorFields(){
+  const holder=document.getElementById('ed-page');
+  holder.querySelectorAll('.fbox').forEach(el=>el.remove());
+  ed.fields.forEach((f,idx)=>{
+    if((f.page||1)!==ed.page) return;
+    const el=document.createElement('div');
+    el.className='fbox'+(idx===ed.sel?' selected':'');
+    el.dataset.idx=idx;
+    el.innerHTML='<span class="fbox-label"></span><span class="fbox-h"></span>';
+    positionBox(el,f);
+    el.addEventListener('mousedown',e=>{ if(e.target.classList.contains('fbox-h')) return; startDrag(e,idx,'move'); });
+    el.querySelector('.fbox-h').addEventListener('mousedown',e=>{ e.stopPropagation(); startDrag(e,idx,'resize'); });
+    holder.appendChild(el);
+  });
+}
+function positionBox(el,f){
+  el.style.left=(f.x*ed.pageW)+'px'; el.style.top=(f.y*ed.pageH)+'px';
+  el.style.width=(f.width*ed.pageW)+'px'; el.style.height=(f.height*ed.pageH)+'px';
+  const lbl=el.querySelector('.fbox-label');
+  if(lbl){ lbl.textContent=fieldLabel(f.field_source,f.field_key);
+    lbl.style.fontSize=Math.max(7,f.font_size*ed.scale)+'px';
+    lbl.style.textAlign=f.align||'left'; }
+}
+function startDrag(e,idx,mode){
+  e.preventDefault(); selectField(idx);
+  const f=ed.fields[idx];
+  dragState={idx,mode,mx:e.clientX,my:e.clientY,L:f.x*ed.pageW,T:f.y*ed.pageH,W:f.width*ed.pageW,H:f.height*ed.pageH,
+    el:document.querySelector('.fbox[data-idx="'+idx+'"]')};
+}
+document.addEventListener('mousemove',e=>{
+  if(!dragState) return;
+  const f=ed.fields[dragState.idx]; if(!f){ dragState=null; return; }
+  const dx=e.clientX-dragState.mx, dy=e.clientY-dragState.my;
+  if(dragState.mode==='move'){
+    let L=dragState.L+dx, T=dragState.T+dy;
+    L=Math.max(0,Math.min(L,ed.pageW-10)); T=Math.max(0,Math.min(T,ed.pageH-8));
+    f.x=L/ed.pageW; f.y=T/ed.pageH;
+  } else {
+    let W=dragState.W+dx, H=dragState.H+dy;
+    W=Math.max(24,Math.min(W,ed.pageW-dragState.L)); H=Math.max(12,Math.min(H,ed.pageH-dragState.T));
+    f.width=W/ed.pageW; f.height=H/ed.pageH;
+  }
+  if(dragState.el) positionBox(dragState.el,f);
+});
+document.addEventListener('mouseup',()=>{ dragState=null; });
+function selectField(idx){ ed.sel=idx; markSelection(); buildProps(); }
+function deselectField(){ ed.sel=-1; markSelection(); buildProps(); }
+function markSelection(){ document.querySelectorAll('.fbox').forEach(el=>el.classList.toggle('selected',Number(el.dataset.idx)===ed.sel)); }
+function addField(){
+  const f={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.floor(Math.random()*1e6))),
+    field_source:'standard',field_key:'company_name',page:ed.page,x:0.3,y:0.4,width:0.35,height:0.035,font_size:11,align:'left',transform:'none',fallback_value:''};
+  ed.fields.push(f); renderEditorFields(); selectField(ed.fields.length-1);
+}
+function deleteField(){
+  if(ed.sel<0) return;
+  ed.fields.splice(ed.sel,1); ed.sel=-1; renderEditorFields(); buildProps();
+}
+function opt(val,lbl,cur){ return `<option value="${esc(val)}"${val===cur?' selected':''}>${esc(lbl)}</option>`; }
+function buildProps(){
+  const p=document.getElementById('ed-props');
+  if(ed.sel<0){
+    p.innerHTML='<div style="color:var(--muted);font-size:14px;line-height:1.6">Clique <b>« ➕ Ajouter un champ »</b>, puis <b>glisse-le</b> à l\'endroit voulu sur le document.<br><br>La poignée <span style="color:var(--good)">verte</span> en bas à droite permet de <b>redimensionner</b>.<br><br>Sélectionne un champ pour changer sa donnée, sa taille, son alignement…</div>';
+    return;
+  }
+  const f=ed.fields[ed.sel];
+  let keyOpts;
+  if(f.field_source==='standard') keyOpts=Object.keys(STD_LABELS).map(k=>opt(k,STD_LABELS[k],f.field_key)).join('');
+  else if(f.field_source==='system') keyOpts=Object.keys(SYS_LABELS).map(k=>opt(k,SYS_LABELS[k],f.field_key)).join('');
+  else keyOpts=CUSTOMFIELDS.length?CUSTOMFIELDS.map(c=>opt(c.key,c.label,f.field_key)).join(''):'<option value="">(aucun — crée un champ dans l\'onglet Champs)</option>';
+  p.innerHTML=`
+   <h3 style="margin:0 0 12px;font-size:15px">Propriétés du champ</h3>
+   <label>Type de donnée</label>
+   <select onchange="updateField('field_source',this.value)">${opt('standard','Donnée client',f.field_source)}${opt('custom','Champ personnalisé',f.field_source)}${opt('system','Date automatique',f.field_source)}</select>
+   <label>Champ</label>
+   <select onchange="updateField('field_key',this.value)">${keyOpts}</select>
+   <label>Page</label>
+   <input type="number" min="1" max="${ed.pageCount}" value="${f.page}" onchange="updateField('page',parseInt(this.value)||1)">
+   <label>Taille du texte</label>
+   <input type="number" min="5" max="48" value="${f.font_size}" onchange="updateField('font_size',parseInt(this.value)||10)">
+   <label>Alignement</label>
+   <select onchange="updateField('align',this.value)">${opt('left','Gauche',f.align)}${opt('center','Centre',f.align)}${opt('right','Droite',f.align)}</select>
+   <label>Transformation</label>
+   <select onchange="updateField('transform',this.value)">${opt('none','Aucune',f.transform)}${opt('uppercase','MAJUSCULES',f.transform)}${opt('lowercase','minuscules',f.transform)}${opt('capitalize','Première Lettre',f.transform)}</select>
+   <label>Valeur par défaut (si vide)</label>
+   <input value="${esc(f.fallback_value||'')}" onchange="updateField('fallback_value',this.value)">
+   <button class="btn danger small" style="margin-top:18px;width:100%" onclick="deleteField()">🗑️ Supprimer ce champ</button>`;
+}
+function updateField(prop,val){
+  if(ed.sel<0) return;
+  const f=ed.fields[ed.sel]; f[prop]=val;
+  if(prop==='field_source'){
+    if(val==='standard') f.field_key='company_name';
+    else if(val==='system') f.field_key='today_date';
+    else f.field_key=CUSTOMFIELDS[0]?CUSTOMFIELDS[0].key:'';
+    buildProps();
+  }
+  if(prop==='page'){ f.page=Math.min(Math.max(1,val),ed.pageCount); if(f.page!==ed.page){ ed.page=f.page; renderEditorPage(); } else renderEditorFields(); markSelection(); return; }
+  const el=document.querySelector('.fbox[data-idx="'+ed.sel+'"]'); if(el) positionBox(el,f);
+}
+async function saveEditor(){
+  const btn=document.getElementById('ed-save'); btn.disabled=true;
+  const status=document.getElementById('ed-status'); status.innerHTML='Enregistrement…';
+  try{
+    const del=await db.from('doc_template_fields').delete().eq('template_id',ed.templateId);
+    if(del.error) throw del.error;
+    if(ed.fields.length){
+      const rows=ed.fields.map(f=>({id:f.id,template_id:ed.templateId,field_source:f.field_source,field_key:f.field_key,
+        page:f.page||1,x:f.x,y:f.y,width:f.width,height:f.height,font_size:f.font_size||10,align:f.align||'left',
+        transform:f.transform||'none',fallback_value:f.fallback_value||null}));
+      const ins=await db.from('doc_template_fields').insert(rows);
+      if(ins.error) throw ins.error;
+    }
+    status.innerHTML='<span class="val-good">Enregistré ✅</span>';
+    loadTemplates();
+  }catch(e){ status.innerHTML='<span class="val-bad">Erreur : '+(e.message||e)+'</span>'; }
+  finally{ btn.disabled=false; }
+}
+
+// ===== Documents générés (historique) =====
+async function loadGenerated(){
+  const body=document.getElementById('docs-body'); if(!body) return;
+  body.innerHTML='<tr><td colspan="4" class="empty">Chargement…</td></tr>';
+  const {data,error}=await db.from('doc_generated').select('*').order('created_at',{ascending:false}).limit(200);
+  if(error){ body.innerHTML='<tr><td colspan="4" class="empty">Erreur : '+error.message+'</td></tr>'; return; }
+  if(!data||!data.length){ body.innerHTML='<tr><td colspan="4" class="empty">Aucun document généré pour l\'instant</td></tr>'; return; }
+  const cliMap={}; CLIENTS.forEach(c=>cliMap[c.id]=c.company_name);
+  body.innerHTML=data.map(d=>{
+    const dt=d.created_at?new Date(d.created_at):null;
+    const dstr=dt?(pad2(dt.getDate())+'/'+pad2(dt.getMonth()+1)+'/'+dt.getFullYear()+' '+pad2(dt.getHours())+':'+pad2(dt.getMinutes())):'—';
+    const cli=cliMap[d.client_id]||'—';
+    const tn=(d.meta&&d.meta.template_name)||'—';
+    return `<tr><td>${esc(dstr)}</td><td>${esc(cli)}</td><td>${esc(tn)}</td><td class="num"><button class="btn ghost small" onclick="downloadGenerated('${esc(d.pdf_path)}')">⬇️ Télécharger</button></td></tr>`;
+  }).join('');
+}
+async function downloadGenerated(path){
+  const {data,error}=await db.storage.from('doc-generated').download(path);
+  if(error||!data){ alert('Fichier introuvable : '+((error&&error.message)||'')); return; }
+  const url=URL.createObjectURL(data); const a=document.createElement('a'); a.href=url;
+  a.download=path.split('/').pop()||'document.pdf'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
 }
 
 // ===== Génération PDF (portage fidèle de l'ancien DocuCRM / pdfRenderUtils) =====
