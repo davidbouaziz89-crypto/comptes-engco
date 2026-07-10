@@ -523,6 +523,10 @@ const PROJECTS = {
   velo:{ key:'velo', nom:'Vélo', icon:'🚴', prefix:'velo_', dossierType:'velo',
     associes:[{k:'david',label:'David',remb:'David'},{k:'dan',label:'Dan',remb:'Dan'},{k:'kevin',label:'Kevin',remb:'Kevin'},{k:'simon',label:'Simon',remb:'Simon'}] },
 };
+// Outils externes : tuile sur l'ecran de choix, ouverture dans un nouvel onglet. Acces via l'ecran Utilisateurs.
+const EXTERNAL_TOOLS = {
+  docucrm:{ key:'docucrm', nom:'Générateur de documents', icon:'📄', url:'https://fill-forge-forms.lovable.app' },
+};
 let PROJ=null, CURRENT_ROLE=null, CURRENT_REGIE=null, SESSION=null, MY_MEMBERSHIPS=[], ADMIN_MODE=false;
 let SOURCES=[], REGIES_CFG=[];
 function T(name){ return PROJ.prefix+name; }
@@ -632,12 +636,16 @@ async function afterAuth(session){
 }
 function isAdminUser(){ return MY_MEMBERSHIPS.some(m=>m.role==='admin'); }
 function myProjectKeys(){ return isAdminUser() ? Object.keys(PROJECTS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>PROJECTS[k]); }
+function myToolKeys(){ return isAdminUser() ? Object.keys(EXTERNAL_TOOLS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>EXTERNAL_TOOLS[k]); }
+function openTool(k){ const t=EXTERNAL_TOOLS[k]; if(t&&t.url) window.open(t.url,'_blank','noopener'); }
 function showProjectPicker(){
   const list=document.getElementById('projpick-list');
   document.getElementById('projpick-msg').textContent='';
   const keys=myProjectKeys();
-  if(keys.length===1 && !isAdminUser()){ enterProject(keys[0]); return; }
+  const tools=myToolKeys();
+  if(keys.length===1 && tools.length===0 && !isAdminUser()){ enterProject(keys[0]); return; }
   let html=keys.map(k=>`<button class="projbtn" onclick="enterProject('${k}')"><span class="ic">${PROJECTS[k].icon}</span>${PROJECTS[k].nom}</button>`).join('');
+  tools.forEach(k=>{ const t=EXTERNAL_TOOLS[k]; html+=`<button class="projbtn" onclick="openTool('${k}')"><span class="ic">${t.icon}</span>${t.nom}</button>`; });
   if(isAdminUser()){ html+=`<button class="projbtn" onclick="openAdminUsers()"><span class="ic">👥</span>Utilisateurs</button>`; }
   list.innerHTML=html;
   document.getElementById('projpick').style.display='flex';
@@ -651,7 +659,7 @@ async function openAdminConsole(which){
   document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='none');
   document.getElementById('subnav').style.display='none';
   document.getElementById('adminnav').style.display='flex';
-  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('');
+  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('') + Object.values(EXTERNAL_TOOLS).map(t=>`<label class="chk"><input type="checkbox" class="u-proj" value="${t.key}"> ${t.icon} ${t.nom}</label>`).join('');
   await loadRolesCfg();
   fillRoleSelect();
   showAdminTab(which||'users');
@@ -766,7 +774,7 @@ function buildAssocUI(){
     ? `<th>Régie / Campagne</th><th class="num">€/vélo France</th><th class="num">€/vélo Corse</th><th class="num">€/vélo DOM-TOM</th><th>Interne</th><th></th>`
     : `<th>Régie</th><th class="num">% par défaut</th><th></th>`;
   // users projects checkboxes
-  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('');
+  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('') + Object.values(EXTERNAL_TOOLS).map(t=>`<label class="chk"><input type="checkbox" class="u-proj" value="${t.key}"> ${t.icon} ${t.nom}</label>`).join('');
   buildImportSpecs();
   document.getElementById('rc-mois').value=today().slice(0,7);
   const dd=document.getElementById('d-date'); if(dd) dd.value=today();
