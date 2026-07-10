@@ -308,10 +308,10 @@
         </div>
       </div>
       <div class="card">
-        <h3>💬 Notes &amp; activités</h3>
+        <h3>💬 Commentaires</h3>
         <div class="row">
           <div class="field sm"><select id="act-type"><option value="note">📝 Note</option><option value="appel">📞 Appel</option><option value="email">✉️ Email</option><option value="rdv">📅 RDV</option></select></div>
-          <div class="field"><input id="act-content" placeholder="Détail de l'échange…"></div>
+          <div class="field"><input id="act-content" placeholder="Écrire un commentaire…"></div>
           <button class="btn small" type="button" onclick="addActivity()">Ajouter</button>
         </div>
         <div id="act-list" style="margin-top:12px"></div>
@@ -538,17 +538,26 @@ async function loadActivities(leadId){
   const {data,error}=await db.from('crm_activities').select('*').eq('lead_id',leadId).order('created_at',{ascending:false});
   const box=document.getElementById('act-list');
   if(error){ box.innerHTML='<div class="hint">Erreur : '+esc(error.message)+'</div>'; return; }
-  if(!data||!data.length){ box.innerHTML='<div class="hint">Aucune activité.</div>'; return; }
+  if(!data||!data.length){ box.innerHTML='<div class="hint">Aucun commentaire.</div>'; return; }
   const ic={note:'📝',appel:'📞',email:'✉️',rdv:'📅'};
-  box.innerHTML=data.map(a=>`<div class="act"><div class="a-head">${ic[a.type]||''} ${new Date(a.created_at).toLocaleString('fr-FR')}</div><div>${esc(a.contenu||'')}</div></div>`).join('');
+  box.innerHTML=data.map(a=>{
+    const del=IS_ADMIN?`<button class="btn danger small" style="float:right;padding:2px 8px" onclick="delActivity('${a.id}')" title="Supprimer (admin)">✕</button>`:'';
+    return `<div class="act">${del}<div class="a-head">${ic[a.type]||''} <b style="color:var(--txt)">${esc(a.user_email||'?')}</b> · ${new Date(a.created_at).toLocaleString('fr-FR')}</div><div>${esc(a.contenu||'')}</div></div>`;
+  }).join('');
 }
 async function addActivity(){
   if(!curLead) return;
-  const contenu=document.getElementById('act-content').value.trim(); if(!contenu){ toast('Écris un contenu.'); return; }
+  const contenu=document.getElementById('act-content').value.trim(); if(!contenu){ toast('Écris un commentaire.'); return; }
   const type=document.getElementById('act-type').value;
-  const {error}=await db.from('crm_activities').insert({lead_id:curLead.id,type,contenu});
+  const {error}=await db.from('crm_activities').insert({lead_id:curLead.id,type,contenu,user_email:SESSION.user.email});
   if(error){ toast('Erreur : '+error.message); return; }
   document.getElementById('act-content').value=''; loadActivities(curLead.id);
+}
+async function delActivity(id){
+  if(!confirm('Supprimer ce commentaire ? (Réservé à l\'admin.)')) return;
+  const {error}=await db.from('crm_activities').delete().eq('id',id);
+  if(error){ toast('Suppression refusée : '+error.message); return; }
+  loadActivities(curLead.id); toast('Commentaire supprimé');
 }
 async function deleteLead(){
   if(!curLead) return;
