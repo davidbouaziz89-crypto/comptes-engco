@@ -4,12 +4,18 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Comptes — Multi-projets</title>
+<script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <style>
   :root{
     --bg:#0f172a; --panel:#111c33; --panel2:#16233f; --line:#25324f;
     --txt:#e8eefc; --muted:#93a1c0; --accent:#3b82f6; --accent2:#22c55e;
     --danger:#ef4444; --radius:14px;
   }
+  :root[data-theme="light"]{
+    --bg:#f4f6fb; --panel:#ffffff; --panel2:#eef1f7; --line:#dde3ec;
+    --txt:#1a2230; --muted:#5b6675; --accent:#3b82f6; --accent2:#16a34a; --danger:#dc2626;
+  }
+  :root[data-theme="light"] header{background:linear-gradient(120deg,#eef2fb,#e3e9f6)}
   *{box-sizing:border-box}
   body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);}
   header{padding:16px 22px;background:linear-gradient(120deg,#0b1224,#16233f);
@@ -140,6 +146,7 @@
   <div class="userbox">
     <span id="user-email"></span>
     <button class="btn ghost small" id="btn-changeproj" onclick="showProjectPicker()" style="display:none">🔀 Changer de projet</button>
+    <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
     <button class="btn ghost small" onclick="reloadData()">🔄 Rafraîchir</button>
     <button class="btn ghost small" onclick="changePassword()">🔑 Mot de passe</button>
     <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
@@ -516,6 +523,9 @@
 const SUPABASE_URL = "https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+function toggleTheme(){ const light=document.documentElement.getAttribute('data-theme')!=='light'; if(light) document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme'); try{ localStorage.setItem('pfp-theme',light?'light':'dark'); }catch(e){} updateThemeBtn(); }
+function updateThemeBtn(){ const b=document.getElementById('theme-btn'); if(b) b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙'; }
+updateThemeBtn();
 
 const PROJECTS = {
   led:{ key:'led', nom:'LED intérieure', icon:'🔌', prefix:'engco_', dossierType:'led',

@@ -4,12 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CRM Formation</title>
+<script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
     --accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;
+    --accent:#4f7cff;--accent2:#8a5cff;--good:#16a34a;--bad:#dc2626;--warn:#d97706;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
@@ -132,6 +137,7 @@
   <header>
     <h1>🎓 CRM Formation</h1><span class="spacer"></span>
     <span class="who" id="who"></span>
+    <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
     <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
     <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
   </header>
@@ -323,6 +329,16 @@ function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString(
 function leadName(l){ return ((l.prenom||'')+' '+(l.nom||'')).trim()||l.entreprise||l.email||'(sans nom)'; }
 function statutOf(id){ return STATUTS.find(s=>s.id===id); }
 let _tt; function toast(m){ const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2600); }
+
+/* ---------- THÈME clair / sombre ---------- */
+function toggleTheme(){
+  const light=document.documentElement.getAttribute('data-theme')!=='light';
+  if(light) document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme');
+  try{ localStorage.setItem('pfp-theme',light?'light':'dark'); }catch(e){}
+  updateThemeBtn();
+}
+function updateThemeBtn(){ const b=document.getElementById('theme-btn'); if(b) b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙'; }
+updateThemeBtn();
 
 /* ---------- AUTH ---------- */
 async function doLogin(e){

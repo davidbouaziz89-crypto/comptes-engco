@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Générateur de documents</title>
+<script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -13,6 +14,10 @@
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
     --accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;
+    --accent:#4f7cff;--accent2:#8a5cff;--good:#16a34a;--bad:#dc2626;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
@@ -102,6 +107,7 @@
     <h1>📄 Générateur de documents</h1>
     <span class="spacer"></span>
     <span class="who" id="who"></span>
+    <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
     <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
     <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
   </header>
@@ -323,6 +329,9 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+function toggleTheme(){ const light=document.documentElement.getAttribute('data-theme')!=='light'; if(light) document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme'); try{ localStorage.setItem('pfp-theme',light?'light':'dark'); }catch(e){} updateThemeBtn(); }
+function updateThemeBtn(){ const b=document.getElementById('theme-btn'); if(b) b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙'; }
+updateThemeBtn();
 
 let SESSION=null, CLIENTS=[], editingClientId=null, editingClientValues={};
 let CUSTOMFIELDS=[], editingCFId=null;
