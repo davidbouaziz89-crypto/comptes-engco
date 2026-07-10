@@ -815,10 +815,15 @@ function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>N�
 function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
 function regionFromCP(cp){ cp=(cp||'').toString(); if(/^20/.test(cp)) return 'Corse'; if(/^9[78]/.test(cp)) return 'DOM-TOM'; return 'France'; }
+function fetchWithTimeout(url, ms){
+  let ctrl=null, t=null;
+  try{ ctrl=new AbortController(); t=setTimeout(()=>{ try{ctrl.abort();}catch(_){}}, ms); }catch(_){}
+  return fetch(url, ctrl?{signal:ctrl.signal}:undefined).finally(()=>{ if(t) clearTimeout(t); });
+}
 async function fetchSiretInfo(siret){
   siret=(siret||'').toString().replace(/\D/g,''); if(siret.length<9) return null;
   try{
-    const res=await fetch('https://recherche-entreprises.api.gouv.fr/search?q='+encodeURIComponent(siret)+'&per_page=1');
+    const res=await fetchWithTimeout('https://recherche-entreprises.api.gouv.fr/search?q='+encodeURIComponent(siret)+'&per_page=1', 8000);
     if(!res.ok) return null;
     const data=await res.json();
     const r=(data.results||[])[0]; if(!r) return null;
@@ -1777,25 +1782,32 @@ async function importFile(type,file){
     impProgress('✔️ '+rows.length+' ligne(s) lue(s) — '+built.length+' exploitable(s).');
     await new Promise(r=>setTimeout(r,120));
     if(!built.length){ impDone('<div class="imp-line imp-warn">Aucune ligne à importer.</div><div class="imp-hint">Vérifie que ton fichier suit bien le modèle : la 1ʳᵉ ligne = les en-têtes, puis au moins une ligne de données (autre que la ligne « EXEMPLE »). Astuce : re-télécharge le modèle et remplis-le.</div>'); return; }
-    // Enrichissement SIRET (dossiers vélo)
+    // Enrichissement SIRET (dossiers vélo) — seulement les lignes incomplètes ; robuste (timeout, parallèle limité, arrêt si l'annuaire bloque)
+    let siretMsg='';
     if(type==='dossiers' && PROJ.dossierType==='velo'){
-      const toEnrich=built.filter(o=>o && o._siret);
-      for(let i=0;i<toEnrich.length;i++){
-        impProgress('🔍 Recherche des entreprises via SIRET… <b>'+(i+1)+' / '+toEnrich.length+'</b>');
-        const o=toEnrich[i]; const hadCP=!!(o.code_postal && (''+o.code_postal).trim());
-        const info=await fetchSiretInfo(o._siret);
-        if(info){
-          if(!o.nom_client) o.nom_client=info.nom;
-          if(!o.adresse) o.adresse=info.adresse;
-          if(!o.ville) o.ville=info.ville;
-          if(!hadCP && info.code_postal){
-            o.code_postal=info.code_postal; o.region=info.region;
-            o.tarif_unitaire=VELO_TARIF_DEFAUT[info.region]||o.tarif_unitaire;
-            const cfg=(REGIES_CFG||[]).find(r=>r.nom===o.commercial_regie);
-            if(cfg) o.regie_montant_unitaire=Number(info.region==='France'?cfg.montant_france:info.region==='Corse'?cfg.montant_corse:cfg.montant_domtom)||0;
+      const toEnrich=built.filter(o=>o && o._siret && (!o.nom_client || !o.ville || !o.adresse || !(o.code_postal&&(''+o.code_postal).trim())));
+      const total=toEnrich.length;
+      if(total){
+        const applyInfo=(o,info)=>{ if(!info) return; const hadCP=!!(o.code_postal && (''+o.code_postal).trim());
+          if(!o.nom_client) o.nom_client=info.nom; if(!o.adresse) o.adresse=info.adresse; if(!o.ville) o.ville=info.ville;
+          if(!hadCP && info.code_postal){ o.code_postal=info.code_postal; o.region=info.region; o.tarif_unitaire=VELO_TARIF_DEFAUT[info.region]||o.tarif_unitaire;
+            const cfg=(REGIES_CFG||[]).find(r=>r.nom===o.commercial_regie); if(cfg) o.regie_montant_unitaire=Number(info.region==='France'?cfg.montant_france:info.region==='Corse'?cfg.montant_corse:cfg.montant_domtom)||0; } };
+        let launched=0, done=0, ok=0, fail=0, consec=0, stopped=false;
+        const upd=()=>impProgress('🔍 Recherche des entreprises via SIRET… <b>'+done+' / '+total+'</b>'+(fail?' <span style="color:var(--muted)">— '+fail+' non trouvé(s)</span>':'')+'<div class="imp-hint">Sur un gros fichier ça peut prendre quelques minutes. Laisse la fenêtre ouverte.</div>');
+        upd();
+        const worker=async()=>{
+          while(!stopped){
+            const i=launched++; if(i>=total) break;
+            const info=await fetchSiretInfo(toEnrich[i]._siret);
+            if(info){ applyInfo(toEnrich[i],info); ok++; consec=0; } else { fail++; consec++; if(consec>=8) stopped=true; }
+            done++; if(done%2===0||done===total) upd();
+            await new Promise(r=>setTimeout(r,140));
           }
-        }
-        await new Promise(r=>setTimeout(r,150));
+        };
+        await Promise.all(Array.from({length:Math.min(2,total)},()=>worker()));
+        if(ok) siretMsg+='<div class="imp-line imp-ok">🔎 '+ok+' fiche(s) complétée(s) via SIRET</div>';
+        if(stopped) siretMsg+='<div class="imp-line imp-warn">⚠️ L\'annuaire des entreprises a limité les requêtes — '+(total-ok)+' fiche(s) non complétée(s). Elles sont importées avec les infos du fichier ; réessaie plus tard pour compléter, ou remplis Client/Code postal/Ville dans le fichier.</div>';
+        else if(fail) siretMsg+='<div class="imp-line imp-warn">⚠️ '+fail+' SIRET introuvable(s) — ces lignes gardent les infos du fichier.</div>';
       }
     }
     built.forEach(o=>{ if(o) Object.keys(o).forEach(k=>{ if(k[0]==='_') delete o[k]; }); });
@@ -1811,7 +1823,7 @@ async function importFile(type,file){
       const {error}=await db.from(spec.table).insert(toInsert);
       if(error){ impDone('<div class="imp-line imp-err">❌ Erreur d\'enregistrement : '+error.message+'</div>', dups); return; }
     }
-    let html='<div class="imp-line imp-ok">✅ <b>'+toInsert.length+'</b> ligne(s) importée(s)'+(toInsert.length?' avec succès':'')+'</div>';
+    let html=siretMsg+'<div class="imp-line imp-ok">✅ <b>'+toInsert.length+'</b> ligne(s) importée(s)'+(toInsert.length?' avec succès':'')+'</div>';
     if(dups.length) html+='<div class="imp-line imp-warn">⚠️ <b>'+dups.length+'</b> doublon(s) ignoré(s) — déjà présents, non réimportés</div>';
     if(!toInsert.length && !dups.length) html+='<div class="imp-line imp-warn">Rien de nouveau à importer.</div>';
     impDone(html, dups);
