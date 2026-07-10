@@ -125,6 +125,7 @@
       <section class="panel">
         <h2>Clients</h2>
         <input class="search" id="cli-search" placeholder="🔎 Rechercher…" oninput="renderClients()">
+        <span id="cli-count" style="color:var(--muted);font-size:13px;margin-left:10px"></span>
         <div class="table-wrap" style="margin-top:12px"><table>
           <thead><tr><th>Société</th><th>Contact</th><th>Email</th><th>Téléphone</th><th>Ville</th><th class="num">Actions</th></tr></thead>
           <tbody id="cli-body"></tbody>
@@ -182,9 +183,13 @@ function showTab(t){
 
 // ===== Clients =====
 async function loadClients(){
-  const {data,error}=await db.from('doc_clients').select('*').order('company_name');
-  if(error){ document.getElementById('c-msg').innerHTML='<span class="val-bad">Erreur de chargement : '+error.message+'</span>'; return; }
-  CLIENTS=data||[]; renderClients();
+  let all=[], from=0; const page=1000;
+  while(true){
+    const {data,error}=await db.from('doc_clients').select('*').order('company_name').range(from,from+page-1);
+    if(error){ document.getElementById('c-msg').innerHTML='<span class="val-bad">Erreur de chargement : '+error.message+'</span>'; break; }
+    all=all.concat(data||[]); if(!data || data.length<page) break; from+=page;
+  }
+  CLIENTS=all; renderClients();
 }
 function matchSearch(term,text){
   term=(term||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -193,8 +198,11 @@ function matchSearch(term,text){
 }
 function renderClients(){
   const term=document.getElementById('cli-search').value;
-  const rows=CLIENTS.filter(c=>matchSearch(term,[c.company_name,c.first_name,c.last_name,c.email,c.phone,c.city,c.category].join(' ')));
+  const filtered=CLIENTS.filter(c=>matchSearch(term,[c.company_name,c.first_name,c.last_name,c.email,c.phone,c.city,c.category].join(' ')));
   const body=document.getElementById('cli-body');
+  const CAP=300; const rows=filtered.slice(0,CAP);
+  const cnt=document.getElementById('cli-count');
+  if(cnt) cnt.textContent = filtered.length+' client'+(filtered.length>1?'s':'')+(filtered.length>CAP?' · affichage des '+CAP+' premiers, affine ta recherche':'');
   if(!rows.length){ body.innerHTML='<tr><td colspan="6" class="empty">Aucun client</td></tr>'; return; }
   body.innerHTML=rows.map(c=>{
     const contact=[c.first_name,c.last_name].filter(Boolean).join(' ')||'—';
