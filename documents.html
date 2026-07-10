@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Générateur de documents</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
+    --accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  .hidden{display:none!important}
+  /* Connexion */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(1200px 600px at 50% -10%,rgba(79,124,255,.15),transparent),var(--bg)}
+  .authcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:30px 28px;width:100%;max-width:400px}
+  .authcard h1{margin:0 0 4px;font-size:22px}
+  .authcard .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}
+  input,select{width:100%;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--txt);font-size:14px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
+  /* En-tête */
+  header{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
+  header .spacer{margin-left:auto}
+  .who{color:var(--muted);font-size:14px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
+  .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
+  .btn.danger{background:transparent;border:1px solid var(--line);color:var(--bad);font-weight:600}
+  .btn.small{padding:5px 10px;font-size:13px}
+  nav{display:flex;gap:6px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--panel2)}
+  nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  nav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
+  main{max-width:1050px;margin:0 auto;padding:22px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+  .panel h2{margin:0 0 14px;font-size:18px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;min-width:180px;flex:1}
+  .field.full{flex-basis:100%}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:14px;white-space:nowrap}
+  th{color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right}
+  .empty{color:var(--muted);text-align:center;padding:24px}
+  .search{max-width:320px}
+  .msg{margin-top:10px;font-size:14px}
+  .val-good{color:var(--good)} .val-bad{color:var(--bad)}
+  .soon{color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:26px;text-align:center}
+</style>
+</head>
+<body>
+
+<!-- CONNEXION -->
+<div id="login-view" class="overlay hidden">
+  <form class="authcard" onsubmit="doLogin(event)">
+    <h1>📄 Générateur de documents</h1>
+    <div class="sub">Connecte-toi pour accéder à l'outil.</div>
+    <label>Email</label><input type="email" id="login-email" autocomplete="username" required>
+    <label>Mot de passe</label><input type="password" id="login-pass" autocomplete="current-password" required>
+    <button class="btn" type="submit" style="width:100%;margin-top:16px">Se connecter</button>
+    <div class="err" id="login-err"></div>
+  </form>
+</div>
+
+<!-- PAS D'ACCES -->
+<div id="noaccess-view" class="overlay hidden">
+  <div class="authcard">
+    <h1>Accès non autorisé</h1>
+    <div class="sub">Ton compte n'a pas accès au Générateur de documents. Contacte l'administrateur.</div>
+    <button class="btn ghost" style="width:100%" onclick="location.href='./index.html'">← Retour au portail</button>
+  </div>
+</div>
+
+<!-- APPLI -->
+<div id="app-view" class="hidden">
+  <header>
+    <h1>📄 Générateur de documents</h1>
+    <span class="spacer"></span>
+    <span class="who" id="who"></span>
+    <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
+    <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
+  </header>
+  <nav>
+    <button data-tab="clients" class="active" onclick="showTab('clients')">📇 Clients</button>
+    <button data-tab="modeles" onclick="showTab('modeles')">📄 Modèles</button>
+    <button data-tab="docs" onclick="showTab('docs')">🗂️ Documents générés</button>
+  </nav>
+  <main>
+    <!-- CLIENTS -->
+    <div id="tab-clients">
+      <section class="panel">
+        <h2 id="cli-title">Ajouter un client</h2>
+        <form onsubmit="saveClient(event)">
+          <div class="row">
+            <div class="field"><label>Société *</label><input id="c-company" required></div>
+            <div class="field"><label>Prénom</label><input id="c-first"></div>
+            <div class="field"><label>Nom</label><input id="c-last"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Email</label><input type="email" id="c-email"></div>
+            <div class="field"><label>Téléphone</label><input id="c-phone"></div>
+            <div class="field"><label>Catégorie</label><input id="c-cat" placeholder="ex. Client, Prospect"></div>
+          </div>
+          <div class="row">
+            <div class="field full"><label>Adresse</label><input id="c-addr"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Code postal</label><input id="c-zip"></div>
+            <div class="field"><label>Ville</label><input id="c-city"></div>
+            <div class="field"><label>Pays</label><input id="c-country" value="France"></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn" type="submit" id="c-save">+ Ajouter</button>
+            <button class="btn ghost" type="button" id="c-cancel" style="display:none" onclick="cancelEditClient()">Annuler</button>
+          </div>
+          <div class="msg" id="c-msg"></div>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Clients</h2>
+        <input class="search" id="cli-search" placeholder="🔎 Rechercher…" oninput="renderClients()">
+        <div class="table-wrap" style="margin-top:12px"><table>
+          <thead><tr><th>Société</th><th>Contact</th><th>Email</th><th>Téléphone</th><th>Ville</th><th class="num">Actions</th></tr></thead>
+          <tbody id="cli-body"></tbody>
+        </table></div>
+      </section>
+    </div>
+    <!-- MODELES (a venir) -->
+    <div id="tab-modeles" class="hidden">
+      <div class="soon">📄 <b>Modèles de documents</b><br>Prochaine étape : importer un PDF et y placer les champs. (En construction)</div>
+    </div>
+    <!-- DOCS (a venir) -->
+    <div id="tab-docs" class="hidden">
+      <div class="soon">🗂️ <b>Documents générés</b><br>Étape suivante : choisir un client + un modèle pour générer le PDF rempli. (En construction)</div>
+    </div>
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
+const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let SESSION=null, CLIENTS=[], editingClientId=null;
+
+async function doLogin(e){
+  e.preventDefault();
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-pass').value;
+  document.getElementById('login-err').textContent='Connexion…';
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error){ document.getElementById('login-err').textContent='Email ou mot de passe incorrect.'; return; }
+  document.getElementById('login-err').textContent='';
+  await afterAuth(data.session);
+}
+async function doLogout(){ await db.auth.signOut(); location.reload(); }
+
+async function afterAuth(session){
+  SESSION=session;
+  // vérifier l'accès (membership docucrm ou admin)
+  const {data:mems}=await db.from('app_memberships').select('project_key,role').eq('user_id',session.user.id);
+  const hasAccess=(mems||[]).some(m=>m.project_key==='docucrm'||m.role==='admin');
+  document.getElementById('login-view').classList.add('hidden');
+  if(!hasAccess){ document.getElementById('noaccess-view').classList.remove('hidden'); return; }
+  document.getElementById('noaccess-view').classList.add('hidden');
+  document.getElementById('app-view').classList.remove('hidden');
+  document.getElementById('who').textContent=session.user.email||'';
+  showTab('clients');
+  loadClients();
+}
+
+function showTab(t){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  ['clients','modeles','docs'].forEach(x=>{ document.getElementById('tab-'+x).classList.toggle('hidden',x!==t); });
+}
+
+// ===== Clients =====
+async function loadClients(){
+  const {data,error}=await db.from('doc_clients').select('*').order('company_name');
+  if(error){ document.getElementById('c-msg').innerHTML='<span class="val-bad">Erreur de chargement : '+error.message+'</span>'; return; }
+  CLIENTS=data||[]; renderClients();
+}
+function matchSearch(term,text){
+  term=(term||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  text=(text||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  return term.split(/\s+/).filter(Boolean).every(w=>text.includes(w));
+}
+function renderClients(){
+  const term=document.getElementById('cli-search').value;
+  const rows=CLIENTS.filter(c=>matchSearch(term,[c.company_name,c.first_name,c.last_name,c.email,c.phone,c.city,c.category].join(' ')));
+  const body=document.getElementById('cli-body');
+  if(!rows.length){ body.innerHTML='<tr><td colspan="6" class="empty">Aucun client</td></tr>'; return; }
+  body.innerHTML=rows.map(c=>{
+    const contact=[c.first_name,c.last_name].filter(Boolean).join(' ')||'—';
+    return `<tr><td><b>${esc(c.company_name)}</b></td><td>${esc(contact)}</td><td>${esc(c.email||'—')}</td><td>${esc(c.phone||'—')}</td><td>${esc(c.city||'—')}</td>`+
+      `<td class="num"><button class="btn ghost small" onclick="editClient('${c.id}')">✏️</button> <button class="btn danger small" onclick="delClient('${c.id}')">🗑️</button></td></tr>`;
+  }).join('');
+}
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function clientForm(){
+  return { company_name:v('c-company'), first_name:v('c-first')||null, last_name:v('c-last')||null,
+    email:v('c-email')||null, phone:v('c-phone')||null, category:v('c-cat')||null,
+    address_line1:v('c-addr')||null, zip:v('c-zip')||null, city:v('c-city')||null, country:v('c-country')||'France' };
+}
+function v(id){ return document.getElementById(id).value.trim(); }
+async function saveClient(e){
+  e.preventDefault();
+  const row=clientForm();
+  const msg=document.getElementById('c-msg');
+  if(!row.company_name){ msg.innerHTML='<span class="val-bad">La société est obligatoire.</span>'; return; }
+  msg.innerHTML='Enregistrement…';
+  let res;
+  if(editingClientId) res=await db.from('doc_clients').update(row).eq('id',editingClientId);
+  else res=await db.from('doc_clients').insert(row);
+  if(res.error){ msg.innerHTML='<span class="val-bad">Erreur : '+res.error.message+'</span>'; return; }
+  msg.innerHTML='<span class="val-good">'+(editingClientId?'Client modifié ✅':'Client ajouté ✅')+'</span>';
+  cancelEditClient(); loadClients();
+}
+function editClient(id){
+  const c=CLIENTS.find(x=>x.id===id); if(!c) return;
+  editingClientId=id;
+  document.getElementById('c-company').value=c.company_name||'';
+  document.getElementById('c-first').value=c.first_name||'';
+  document.getElementById('c-last').value=c.last_name||'';
+  document.getElementById('c-email').value=c.email||'';
+  document.getElementById('c-phone').value=c.phone||'';
+  document.getElementById('c-cat').value=c.category||'';
+  document.getElementById('c-addr').value=c.address_line1||'';
+  document.getElementById('c-zip').value=c.zip||'';
+  document.getElementById('c-city').value=c.city||'';
+  document.getElementById('c-country').value=c.country||'France';
+  document.getElementById('cli-title').textContent="Modifier le client";
+  document.getElementById('c-save').textContent='💾 Enregistrer';
+  document.getElementById('c-cancel').style.display='';
+  document.getElementById('cli-title').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditClient(){
+  editingClientId=null;
+  ['c-company','c-first','c-last','c-email','c-phone','c-cat','c-addr','c-zip','c-city'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('c-country').value='France';
+  document.getElementById('cli-title').textContent='Ajouter un client';
+  document.getElementById('c-save').textContent='+ Ajouter';
+  document.getElementById('c-cancel').style.display='none';
+}
+async function delClient(id){
+  const c=CLIENTS.find(x=>x.id===id); if(!c) return;
+  if(!confirm('Supprimer le client « '+(c.company_name||'')+' » ? (Seul l\'admin peut supprimer.)')) return;
+  const {error}=await db.from('doc_clients').delete().eq('id',id);
+  if(error){ alert('Suppression refusée : '+error.message); return; }
+  if(editingClientId===id) cancelEditClient();
+  loadClients();
+}
+
+(async()=>{
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){ document.getElementById('login-view').classList.remove('hidden'); return; }
+  await afterAuth(session);
+})();
+</script>
+</body>
+</html>
