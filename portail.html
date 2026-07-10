@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portail — Pro Formation Plus</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
+    --accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+  a{text-decoration:none;color:inherit}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(1200px 600px at 50% -10%,rgba(79,124,255,.15),transparent),var(--bg)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:30px 28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .card h1{margin:0 0 4px;font-size:22px}
+  .card .sub{color:var(--muted);font-size:14px;margin-bottom:20px}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+  input{width:100%;padding:11px 13px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);font-size:15px}
+  input:focus{outline:none;border-color:var(--accent)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:18px;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;border-radius:10px;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .err{color:#ff7676;font-size:13px;min-height:18px;margin-top:10px}
+  header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header .brand{font-weight:800;font-size:18px;display:flex;align-items:center;gap:10px}
+  header .brand .dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:inline-flex}
+  header .spacer{margin-left:auto}
+  .who{color:var(--muted);font-size:14px;display:flex;align-items:center;gap:8px}
+  .badge{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--good);font-weight:700}
+  .lnk{background:transparent;border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600}
+  .lnk:hover{color:var(--txt);border-color:var(--accent)}
+  main{max-width:1050px;margin:0 auto;padding:34px 22px}
+  main h2{font-size:24px;margin:0 0 4px}
+  main .hint{color:var(--muted);margin:0 0 26px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:8px;transition:transform .12s,border-color .12s,box-shadow .12s;min-height:150px}
+  .tile:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 14px 34px rgba(0,0,0,.35)}
+  .tile-ic{font-size:36px;line-height:1}
+  .tile-name{font-weight:700;font-size:17px;margin-top:auto}
+  .tile-cat{color:var(--muted);font-size:13px}
+  .empty{color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:14px;padding:30px;text-align:center}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- CONNEXION -->
+<div id="login-view" class="overlay hidden">
+  <form class="card" onsubmit="doLogin(event)">
+    <h1>🔐 Portail</h1>
+    <div class="sub">Connecte-toi pour accéder à tes outils.</div>
+    <label>Email</label>
+    <input type="email" id="login-email" autocomplete="username" required>
+    <label>Mot de passe</label>
+    <input type="password" id="login-pass" autocomplete="current-password" required>
+    <button class="btn" type="submit">Se connecter</button>
+    <div class="err" id="login-err"></div>
+  </form>
+</div>
+
+<!-- PORTAIL -->
+<div id="portal-view" class="hidden">
+  <header>
+    <span class="brand"><span class="dot"></span> <span id="portal-name">Portail</span></span>
+    <span class="spacer"></span>
+    <span class="who"><span id="user-email"></span> <span class="badge hidden" id="admin-badge">Admin</span></span>
+    <button class="lnk" onclick="doLogout()">Se déconnecter</button>
+  </header>
+  <main>
+    <h2>Tes outils</h2>
+    <p class="hint">Choisis un outil pour l'ouvrir. Tu ne vois que ceux auxquels tu as accès.</p>
+    <div class="grid" id="tiles"></div>
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
+const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const CAT_EMOJI={Marketing:'📣',RH:'👥',Documents:'📄',Finance:'💶',CRM:'📇','Analyse IA':'🤖',Signature:'✍️','Site vitrine':'🌐'};
+let SESSION=null, IS_ADMIN=false, HAS_COMPTES=false, MY_TOOLS=new Set();
+
+async function doLogin(e){
+  e.preventDefault();
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-pass').value;
+  document.getElementById('login-err').textContent='Connexion…';
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error){ document.getElementById('login-err').textContent='Email ou mot de passe incorrect.'; return; }
+  document.getElementById('login-err').textContent='';
+  await afterAuth(data.session);
+}
+async function doLogout(){ await db.auth.signOut(); location.reload(); }
+
+async function afterAuth(session){
+  SESSION=session;
+  const {data:mems}=await db.from('app_memberships').select('role').eq('user_id',session.user.id);
+  HAS_COMPTES=(mems||[]).length>0;
+  IS_ADMIN=(mems||[]).some(m=>m.role==='admin');
+  const {data:grants}=await db.from('tool_access').select('tool_slug').eq('user_id',session.user.id);
+  MY_TOOLS=new Set((grants||[]).map(g=>g.tool_slug));
+  try{ const {data:ps}=await db.from('portal_settings').select('portal_name').limit(1).maybeSingle(); if(ps&&ps.portal_name) document.getElementById('portal-name').textContent=ps.portal_name; }catch(_){}
+  await renderPortal();
+}
+
+async function renderPortal(){
+  document.getElementById('login-view').classList.add('hidden');
+  document.getElementById('portal-view').classList.remove('hidden');
+  document.getElementById('user-email').textContent=SESSION.user.email||'';
+  document.getElementById('admin-badge').classList.toggle('hidden',!IS_ADMIN);
+
+  const tiles=[];
+  if(HAS_COMPTES||IS_ADMIN){ tiles.push({name:'Comptes LED / Vélo',cat:'Finance',emoji:'💼',url:'./index.html',external:false}); }
+  const {data:projs}=await db.from('projects').select('*').eq('is_active',true).order('sort_order');
+  (projs||[]).forEach(p=>{
+    const url=(p.url||'').trim();
+    if(!url||url.indexOf('REPLACE-ME')>=0||url.indexOf('localhost')>=0) return;
+    if(!(IS_ADMIN||MY_TOOLS.has(p.slug))) return;
+    tiles.push({name:p.name,cat:p.category||'',emoji:CAT_EMOJI[p.category]||'🧩',url,external:true});
+  });
+
+  const grid=document.getElementById('tiles');
+  if(!tiles.length){ grid.innerHTML='<div class="empty">Aucun outil ne t\'a encore été attribué.<br>Contacte l\'administrateur pour obtenir des accès.</div>'; return; }
+  grid.innerHTML=tiles.map(t=>
+    `<a class="tile" href="${t.url}"${t.external?' target="_blank" rel="noopener"':''}>`+
+    `<div class="tile-ic">${t.emoji}</div>`+
+    `<div class="tile-name">${t.name}</div>`+
+    `<div class="tile-cat">${t.cat}${t.external?' · ouvre dans un onglet ↗':' · ici'}</div></a>`
+  ).join('');
+}
+
+(async()=>{
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){ document.getElementById('login-view').classList.remove('hidden'); return; }
+  await afterAuth(session);
+})();
+</script>
+</body>
+</html>
