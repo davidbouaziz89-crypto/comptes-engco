@@ -26,9 +26,9 @@
   .search-box .ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
   nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600}
   nav button.active{background:var(--panel2);color:var(--txt)}
-  #subnav{display:flex;gap:6px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel2);position:static;box-shadow:none;z-index:auto}
-  #subnav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
-  #subnav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
+  #subnav,#adminnav{display:flex;gap:6px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel2);position:static;box-shadow:none;z-index:auto}
+  #subnav button,#adminnav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  #subnav button.active,#adminnav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
   main{padding:22px;max-width:1150px;margin:0 auto}
   .grid{display:grid;gap:16px}
   .cards{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
@@ -58,6 +58,20 @@
   .b-wip{background:#3a2f0b;color:#fdba74;border:1px solid #7a5a12}
   .b-lost{background:#3a1414;color:#fca5a5;border:1px solid #7a2a2a}
   select.statut-sel{padding:5px 8px;font-size:12px;font-weight:700;border-radius:8px;width:auto;min-width:104px}
+  /* Verrouillage des droits selon le rôle (classes posées sur <body>) */
+  .nd-del button.danger{display:none!important}
+  .nd-status select.statut-sel{pointer-events:none;opacity:.55}
+  .nd-add-dossiers form[onsubmit^="addDossier"]{display:none!important}
+  .nd-edit-dossiers button[onclick^="editDossier"]{display:none!important}
+  .nd-add-apports form[onsubmit^="addApport"],.nd-add-apports form[onsubmit^="addRemboursement"]{display:none!important}
+  .nd-edit-apports button[onclick^="editApport"],.nd-edit-apports button[onclick^="editRemboursement"]{display:none!important}
+  .nd-add-frais form[onsubmit^="addFrais"]{display:none!important}
+  .nd-edit-frais button[onclick^="editFrais"]{display:none!important}
+  .nd-add-params form[onsubmit^="addStatut"],.nd-add-params form[onsubmit^="addSource"],.nd-add-params form[onsubmit^="addRegieConfig"],.nd-add-params form[onsubmit^="addRecurrent"]{display:none!important}
+  .nd-edit-params button[onclick^="editStatut"],.nd-edit-params button[onclick^="editSource"],.nd-edit-params button[onclick^="editRegieCfg"],.nd-edit-params button[onclick^="editRecurrent"]{display:none!important}
+  .nd-add-dossiers section:has(button[onclick*="downloadTemplate('dossiers')"]){display:none!important}
+  .nd-add-apports section:has(button[onclick*="downloadTemplate('apports')"]){display:none!important}
+  .nd-add-frais section:has(button[onclick*="downloadTemplate('frais')"]){display:none!important}
   select.s-ok{color:#86efac;border-color:#2f6b43} select.s-wip{color:#fdba74;border-color:#7a5a12} select.s-lost{color:#fca5a5;border-color:#7a2a2a}
   .preview{background:var(--panel2);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--muted);margin-top:6px}
   .preview b{color:var(--txt);font-size:16px}
@@ -144,7 +158,10 @@
   <button data-sub="statuts" onclick="showTab('statuts')">🏷️ Statuts</button>
   <button data-sub="regies" onclick="showTab('regies')">🤝 Régies</button>
   <button data-sub="sources" onclick="showTab('sources')">🏢 Sources</button>
-  <button data-sub="users" id="subnav-users" onclick="showTab('users')">👤 Utilisateurs</button>
+</nav>
+<nav id="adminnav" style="display:none">
+  <button data-admtab="users" onclick="showAdminTab('users')">👥 Utilisateurs</button>
+  <button data-admtab="roles" onclick="showAdminTab('roles')">🏷️ Rôles</button>
 </nav>
 
 <main>
@@ -406,29 +423,57 @@
   <!-- UTILISATEURS -->
   <div id="tab-users" class="hidden">
     <section class="panel">
-      <h2>Créer un utilisateur</h2>
+      <h2 id="u-title">Créer un utilisateur</h2>
       <div class="hint">La personne se connectera avec cet email et ce mot de passe. Coche le(s) projet(s) auxquels elle a accès.</div>
-      <form class="row" onsubmit="createUser(event)">
+      <form class="row" onsubmit="saveUser(event)">
         <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
         <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères" required></div>
         <div class="field"><label>Rôle</label>
-          <select id="u-role" onchange="document.getElementById('u-regie-field').style.display=(this.value==='regie')?'flex':'none'">
+          <select id="u-role" onchange="onRoleChange()">
             <option value="secretaire">Secrétaire</option><option value="regie">Régie</option><option value="admin">Admin</option>
           </select>
         </div>
-        <div class="field"><label>Projets</label>
+        <div class="field" id="u-projects-field"><label>Projets</label>
           <div style="display:flex;gap:14px;padding-top:8px" id="u-projects"></div>
         </div>
         <div class="field" id="u-regie-field" style="display:none"><label>Nom de la régie</label><input type="text" id="u-regie" placeholder="ex. JO, ADN"></div>
-        <div class="field"><button class="btn" type="submit">+ Créer</button></div>
+        <div class="field" id="u-admin-note" style="display:none;align-self:flex-end"><div class="hint">👑 Un administrateur a automatiquement accès à <b>tous</b> les projets.</div></div>
+        <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="u-submit">+ Créer</button> <button class="btn ghost" type="button" id="u-cancel" style="display:none" onclick="cancelEditUser()">Annuler</button></div>
       </form>
       <div class="preview" id="u-msg"></div>
     </section>
     <section class="panel">
       <h2>Utilisateurs &amp; accès</h2>
       <div class="table-wrap"><table>
-        <thead><tr><th>Email</th><th>Projet</th><th>Rôle</th><th>Régie</th></tr></thead>
+        <thead><tr><th>Email</th><th>Projets</th><th>Rôle</th><th class="num">Actions</th></tr></thead>
         <tbody id="users-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- ROLES -->
+  <div id="tab-roles" class="hidden">
+    <section class="panel">
+      <h2 id="role-title">Créer un rôle</h2>
+      <div class="hint">Donne un nom au rôle, puis coche ce qu'il a le droit de faire dans chaque zone. La suppression de données reste réservée à l'administrateur.</div>
+      <div class="row">
+        <div class="field"><label>Nom du rôle</label><input type="text" id="role-label" placeholder="ex. Comptable, Commercial"></div>
+      </div>
+      <div class="table-wrap" style="margin-top:6px"><table id="role-grid">
+        <thead><tr><th>Zone</th><th class="num">👁️ Voir</th><th class="num">➕ Ajouter</th><th class="num">✏️ Modifier</th><th class="num">🔁 Changer statut</th></tr></thead>
+        <tbody id="role-grid-body"></tbody>
+      </table></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="role-save" onclick="saveRole()">+ Créer le rôle</button>
+        <button class="btn ghost" id="role-cancel" style="display:none" onclick="cancelEditRole()">Annuler</button>
+      </div>
+      <div class="preview" id="role-msg"></div>
+    </section>
+    <section class="panel">
+      <h2>Rôles existants</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Rôle</th><th>Droits</th><th class="num">Actions</th></tr></thead>
+        <tbody id="roles-body"></tbody>
       </table></div>
     </section>
   </div>
@@ -478,7 +523,7 @@ const PROJECTS = {
   velo:{ key:'velo', nom:'Vélo', icon:'🚴', prefix:'velo_', dossierType:'velo',
     associes:[{k:'david',label:'David',remb:'David'},{k:'dan',label:'Dan',remb:'Dan'},{k:'kevin',label:'Kevin',remb:'Kevin'},{k:'simon',label:'Simon',remb:'Simon'}] },
 };
-let PROJ=null, CURRENT_ROLE=null, CURRENT_REGIE=null, SESSION=null, MY_MEMBERSHIPS=[];
+let PROJ=null, CURRENT_ROLE=null, CURRENT_REGIE=null, SESSION=null, MY_MEMBERSHIPS=[], ADMIN_MODE=false;
 let SOURCES=[], REGIES_CFG=[];
 function T(name){ return PROJ.prefix+name; }
 function A(){ return PROJ.associes; }
@@ -548,12 +593,12 @@ function searchNorm(s){ return (s==null?'':s.toString()).toLowerCase().normalize
 function matchSearch(term,text){ const t=searchNorm(term).trim(); if(!t) return true; const hay=searchNorm(text); return t.split(/\s+/).every(w=>hay.includes(w)); }
 function toast(msg){ const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(window._tt);window._tt=setTimeout(()=>el.style.display='none',2600); }
 function showError(e){ const b=document.getElementById('loaderr');b.style.display='block';b.textContent="⚠️ Souci de connexion : "+(e.message||e); }
-const PARAM_SUBS=['statuts','regies','sources','users'];
+const PARAM_SUBS=['statuts','regies','sources'];
 function showTab(t){
   if(t==='parametres') t='statuts';
   const inParam=PARAM_SUBS.includes(t);
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t || (inParam && b.dataset.tab==='parametres')));
-  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
+  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
   const sn=document.getElementById('subnav'); if(sn) sn.style.display=inParam?'flex':'none';
   document.querySelectorAll('#subnav button').forEach(b=>b.classList.toggle('active',b.dataset.sub===t));
 }
@@ -579,46 +624,106 @@ async function afterAuth(session){
   SESSION=session;
   const {data:mems}=await db.from('app_memberships').select('*').eq('user_id',session.user.id);
   MY_MEMBERSHIPS=mems||[];
+  await loadRolesCfg();
   document.getElementById('auth').style.display='none';
   document.getElementById('user-email').innerHTML=(session.user.email||'');
   if(!MY_MEMBERSHIPS.length){ document.getElementById('projpick').style.display='flex'; document.getElementById('projpick-list').innerHTML=''; document.getElementById('projpick-msg').textContent="Aucun accès n'a été configuré pour ce compte. Contacte l'administrateur."; return; }
   showProjectPicker();
 }
+function isAdminUser(){ return MY_MEMBERSHIPS.some(m=>m.role==='admin'); }
+function myProjectKeys(){ return isAdminUser() ? Object.keys(PROJECTS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>PROJECTS[k]); }
 function showProjectPicker(){
   const list=document.getElementById('projpick-list');
   document.getElementById('projpick-msg').textContent='';
-  const keys=MY_MEMBERSHIPS.map(m=>m.project_key).filter(k=>PROJECTS[k]);
-  if(keys.length===1){ enterProject(keys[0]); return; }
-  list.innerHTML=keys.map(k=>`<button class="projbtn" onclick="enterProject('${k}')"><span class="ic">${PROJECTS[k].icon}</span>${PROJECTS[k].nom}</button>`).join('');
+  const keys=myProjectKeys();
+  if(keys.length===1 && !isAdminUser()){ enterProject(keys[0]); return; }
+  let html=keys.map(k=>`<button class="projbtn" onclick="enterProject('${k}')"><span class="ic">${PROJECTS[k].icon}</span>${PROJECTS[k].nom}</button>`).join('');
+  if(isAdminUser()){ html+=`<button class="projbtn" onclick="openAdminUsers()"><span class="ic">👥</span>Utilisateurs</button>`; }
+  list.innerHTML=html;
   document.getElementById('projpick').style.display='flex';
 }
+function openAdminUsers(){ openAdminConsole('users'); }
+async function openAdminConsole(which){
+  ADMIN_MODE=true; PROJ=null; CURRENT_ROLE='admin'; applyPermClasses();
+  document.getElementById('projpick').style.display='none';
+  document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">Admin</span>';
+  document.getElementById('btn-changeproj').style.display='';
+  document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='none');
+  document.getElementById('subnav').style.display='none';
+  document.getElementById('adminnav').style.display='flex';
+  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('');
+  await loadRolesCfg();
+  fillRoleSelect();
+  showAdminTab(which||'users');
+}
+function showAdminTab(which){
+  document.getElementById('proj-label').innerHTML = (which==='roles')?'🏷️ Rôles':'🛠️ Gestion des utilisateurs';
+  document.querySelectorAll('#adminnav button').forEach(b=>b.classList.toggle('active',b.dataset.admtab===which));
+  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden', x!==which); });
+  if(which==='roles'){ cancelEditRole(); loadRoles(); } else { fillRoleSelect(); cancelEditUser(); loadUsers(); }
+}
+async function loadRolesCfg(){
+  const {data}=await db.from('app_roles').select('*').order('is_builtin',{ascending:false}).order('label');
+  ROLES_CFG=data||[];
+}
+function fillRoleSelect(){
+  const sel=document.getElementById('u-role'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML=ROLES_CFG.map(r=>`<option value="${r.role_key}">${r.label}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
 function enterProject(key){
-  PROJ=PROJECTS[key];
+  ADMIN_MODE=false; PROJ=PROJECTS[key];
+  document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='');
+  document.getElementById('adminnav').style.display='none';
   const mem=MY_MEMBERSHIPS.find(m=>m.project_key===key);
-  CURRENT_ROLE=mem.role; CURRENT_REGIE=mem.regie_name||null;
+  CURRENT_ROLE=mem?mem.role:(isAdminUser()?'admin':null); CURRENT_REGIE=(mem&&mem.regie_name)?mem.regie_name:null;
+  const rc=ROLES_CFG.find(r=>r.role_key===CURRENT_ROLE); PERM=(rc&&rc.permissions)||{};
   document.getElementById('projpick').style.display='none';
   const roleLabel={admin:'Admin',secretaire:'Secrétaire',regie:'Régie '+(CURRENT_REGIE||'')}[CURRENT_ROLE]||CURRENT_ROLE;
   document.getElementById('proj-label').innerHTML=PROJ.icon+' '+PROJ.nom;
   document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">'+roleLabel+'</span>';
-  document.getElementById('btn-changeproj').style.display = MY_MEMBERSHIPS.length>1?'':'none';
+  document.getElementById('btn-changeproj').style.display = myProjectKeys().length>1?'':'none';
   buildAssocUI();
   applyRole(CURRENT_ROLE);
   if(CURRENT_ROLE==='regie'){ loadMonEspace(); } else { loadAll(); }
+}
+let PERM={};
+function can(zone,act){ if(CURRENT_ROLE==='admin') return true; return !!(PERM[zone]&&PERM[zone][act]); }
+function applyPermClasses(){
+  const b=document.body, admin=(CURRENT_ROLE==='admin');
+  b.classList.toggle('nd-del', !admin);
+  b.classList.toggle('nd-add-dossiers', !can('dossiers','ajouter'));
+  b.classList.toggle('nd-edit-dossiers', !can('dossiers','modifier'));
+  b.classList.toggle('nd-status', !(can('dossiers','statut')||can('dossiers','modifier')));
+  b.classList.toggle('nd-add-apports', !can('apports','ajouter'));
+  b.classList.toggle('nd-edit-apports', !can('apports','modifier'));
+  b.classList.toggle('nd-add-frais', !can('frais','ajouter'));
+  b.classList.toggle('nd-edit-frais', !can('frais','modifier'));
+  b.classList.toggle('nd-add-params', !can('params','ajouter'));
+  b.classList.toggle('nd-edit-params', !can('params','modifier'));
 }
 function applyRole(role){
   const btns={}; document.querySelectorAll('#mainnav button').forEach(b=>btns[b.dataset.tab]=b);
   const show=(t,v)=>{ if(btns[t]) btns[t].style.display=v?'':'none'; };
   ['dashboard','dossiers','apports','frais','parametres','monespace'].forEach(t=>show(t,false));
-  const uBtn=document.getElementById('subnav-users'); if(uBtn) uBtn.style.display=(role==='admin')?'':'none';
-  if(role==='regie'){ show('monespace',true); showTab('monespace'); }
-  else { ['dashboard','dossiers','apports','frais','parametres'].forEach(t=>show(t,true)); showTab('dashboard'); }
+  if(role==='regie'){ show('monespace',true); applyPermClasses(); showTab('monespace'); return; }
+  show('dashboard', can('dashboard','voir'));
+  show('dossiers', can('dossiers','voir'));
+  show('apports', can('apports','voir'));
+  show('frais', can('frais','voir'));
+  show('parametres', can('params','voir'));
+  applyPermClasses();
+  const order=['dashboard','dossiers','apports','frais','parametres'];
+  const first=order.find(t=>btns[t] && btns[t].style.display!=='none');
+  showTab(first||'dashboard');
 }
 function changePassword(){
   const p=prompt('Nouveau mot de passe (6 caractères minimum) :'); if(!p) return;
   if(p.length<6){ alert('Trop court.'); return; }
   db.auth.updateUser({password:p}).then(({error})=>{ alert(error?('Erreur : '+error.message):'Mot de passe changé ✅'); });
 }
-function reloadData(){ if(CURRENT_ROLE==='regie') loadMonEspace(); else loadAll(); }
+function reloadData(){ if(ADMIN_MODE){ loadUsers(); return; } if(CURRENT_ROLE==='regie') loadMonEspace(); else loadAll(); }
 
 // ===== Construction de l'UI selon les associés du projet =====
 function buildAssocUI(){
@@ -1344,29 +1449,201 @@ async function addRemboursement(e){
 }
 
 // ===== Utilisateurs =====
-async function createUser(e){
+let USERS_CACHE=[], editingUserId=null;
+function roleLabelOf(role){ const r=(ROLES_CFG||[]).find(x=>x.role_key===role); if(r) return r.label; return {admin:'Admin',secretaire:'Secrétaire',regie:'Régie'}[role]||role; }
+async function svcErr(data,error){
+  if(error){ let t=error.message; try{ const c=await error.context.json(); if(c&&c.error) t=c.error; }catch(_){} return t; }
+  if(data&&data.error) return data.error;
+  return null;
+}
+function currentRoleCfg(){ const v=document.getElementById('u-role').value; return ROLES_CFG.find(r=>r.role_key===v)||{role_key:v}; }
+function onRoleChange(){
+  const r=currentRoleCfg();
+  document.getElementById('u-regie-field').style.display=r.is_regie?'flex':'none';
+  document.getElementById('u-projects-field').style.display=(r.role_key==='admin')?'none':'';
+  document.getElementById('u-admin-note').style.display=(r.role_key==='admin')?'flex':'none';
+}
+async function saveUser(e){
   e.preventDefault();
-  const email=document.getElementById('u-email').value.trim(), password=document.getElementById('u-pass').value;
-  const role=document.getElementById('u-role').value, regie_name=document.getElementById('u-regie').value.trim()||null;
-  const projs=[...document.querySelectorAll('.u-proj:checked')].map(c=>c.value);
+  const email=document.getElementById('u-email').value.trim();
+  const password=document.getElementById('u-pass').value;
+  const roleCfg=currentRoleCfg(); const role=roleCfg.role_key;
+  const regie_name=roleCfg.is_regie?(document.getElementById('u-regie').value.trim()||null):null;
+  const projs = role==='admin' ? Object.keys(PROJECTS) : [...document.querySelectorAll('.u-proj:checked')].map(c=>c.value);
   const msg=document.getElementById('u-msg');
+  if(!role){ msg.innerHTML='<span class="val-bad">Choisis un rôle.</span>'; return; }
   if(!projs.length){ msg.innerHTML='<span class="val-bad">Coche au moins un projet.</span>'; return; }
-  msg.innerHTML='Création en cours…';
+  if(roleCfg.is_regie && !regie_name){ msg.innerHTML='<span class="val-bad">Indique le nom de la régie.</span>'; return; }
   const memberships=projs.map(p=>({project_key:p, role, regie_name}));
+
+  if(editingUserId){
+    msg.innerHTML='Enregistrement…';
+    const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'update',user_id:editingUserId,memberships,email,password:password||undefined}});
+    const errText=await svcErr(data,error);
+    if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
+    msg.innerHTML='<span class="val-good">Utilisateur modifié ✅</span>';
+    cancelEditUser(); loadUsers(); return;
+  }
+  msg.innerHTML='Création en cours…';
   const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,memberships}});
-  let errText=null;
-  if(error){ errText=error.message; try{ const c=await error.context.json(); if(c&&c.error) errText=c.error; }catch(_){} }
-  else if(data&&data.error){ errText=data.error; }
+  const errText=await svcErr(data,error);
   if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
   msg.innerHTML='<span class="val-good">Utilisateur créé ✅</span>';
-  document.getElementById('u-email').value=''; document.getElementById('u-pass').value=''; document.getElementById('u-regie').value='';
-  document.querySelectorAll('.u-proj:checked').forEach(c=>c.checked=false);
-  loadUsers();
+  cancelEditUser(); loadUsers();
+}
+function editUser(uid){
+  const u=USERS_CACHE.find(x=>x.user_id===uid); if(!u) return;
+  editingUserId=uid;
+  const isAdmin=u.mems.some(m=>m.role==='admin');
+  const role=isAdmin?'admin':(u.mems[0]?u.mems[0].role:'secretaire');
+  document.getElementById('u-email').value=u.email||'';
+  document.getElementById('u-email').readOnly=true;
+  const pass=document.getElementById('u-pass'); pass.value=''; pass.required=false; pass.placeholder='laisser vide = mot de passe inchangé';
+  document.getElementById('u-role').value=role;
+  onRoleChange();
+  const projSet=new Set(u.mems.map(m=>m.project_key));
+  document.querySelectorAll('.u-proj').forEach(c=>c.checked=projSet.has(c.value));
+  const rg=u.mems.find(m=>m.regie_name); document.getElementById('u-regie').value=rg?rg.regie_name:'';
+  document.getElementById('u-title').textContent="Modifier l'utilisateur";
+  document.getElementById('u-submit').textContent='💾 Enregistrer';
+  document.getElementById('u-cancel').style.display='';
+  document.getElementById('u-msg').innerHTML='';
+  document.getElementById('u-title').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditUser(){
+  editingUserId=null;
+  const em=document.getElementById('u-email'); em.value=''; em.readOnly=false;
+  const pass=document.getElementById('u-pass'); pass.value=''; pass.required=true; pass.placeholder='min. 6 caractères';
+  document.getElementById('u-regie').value='';
+  document.getElementById('u-role').value='secretaire'; onRoleChange();
+  document.querySelectorAll('.u-proj').forEach(c=>c.checked=false);
+  document.getElementById('u-title').textContent='Créer un utilisateur';
+  document.getElementById('u-submit').textContent='+ Créer';
+  document.getElementById('u-cancel').style.display='none';
+}
+async function delUser(uid,email){
+  if(SESSION && uid===SESSION.user.id){ alert("Tu ne peux pas supprimer ton propre compte."); return; }
+  if(!confirm("Supprimer définitivement l'utilisateur "+(email||'')+" ?\nIl ne pourra plus se connecter.")) return;
+  const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'delete',user_id:uid}});
+  const errText=await svcErr(data,error);
+  if(errText){ toast('Erreur : '+errText); return; }
+  toast('Utilisateur supprimé'); if(editingUserId===uid) cancelEditUser(); loadUsers();
 }
 async function loadUsers(){
   const {data,error}=await db.from('app_memberships').select('*').order('email');
   if(error){ return; }
-  document.getElementById('users-body').innerHTML=(data&&data.length)? data.map(u=>`<tr><td>${u.email||''}</td><td><span class="pill">${PROJECTS[u.project_key]?PROJECTS[u.project_key].nom:u.project_key}</span></td><td>${u.role}</td><td>${u.regie_name||'—'}</td></tr>`).join('') : `<tr><td colspan="4" class="empty">Aucun utilisateur</td></tr>`;
+  const byUser={};
+  (data||[]).forEach(m=>{ if(!byUser[m.user_id]) byUser[m.user_id]={user_id:m.user_id,email:m.email,mems:[]}; byUser[m.user_id].mems.push(m); });
+  USERS_CACHE=Object.values(byUser);
+  const body=document.getElementById('users-body');
+  if(!USERS_CACHE.length){ body.innerHTML=`<tr><td colspan="4" class="empty">Aucun utilisateur</td></tr>`; return; }
+  body.innerHTML=USERS_CACHE.map(u=>{
+    const isAdmin=u.mems.some(m=>m.role==='admin');
+    let projCell, roleCell;
+    if(isAdmin){ projCell='<span class="pill">👑 Tous les projets</span>'; roleCell='Admin'; }
+    else {
+      projCell=u.mems.map(m=>`<span class="pill">${PROJECTS[m.project_key]?PROJECTS[m.project_key].nom:m.project_key}${m.regie_name?' · '+m.regie_name:''}</span>`).join(' ');
+      roleCell=[...new Set(u.mems.map(m=>roleLabelOf(m.role)))].join(', ');
+    }
+    const emailEsc=(u.email||'').replace(/'/g,"\\'");
+    return `<tr><td>${u.email||''}</td><td>${projCell}</td><td>${roleCell}</td>`+
+      `<td class="num"><button class="btn ghost small" onclick="editUser('${u.user_id}')">✏️</button> <button class="btn danger small" onclick="delUser('${u.user_id}','${emailEsc}')">🗑️</button></td></tr>`;
+  }).join('');
+}
+
+// ===== Rôles =====
+let ROLES_CFG=[], editingRoleKey=null;
+const ROLE_ZONES=[
+  {key:'dashboard',label:'📊 Tableau de bord',acts:['voir']},
+  {key:'dossiers',label:'📁 Dossiers',acts:['voir','ajouter','modifier','statut']},
+  {key:'apports',label:'💶 Apports',acts:['voir','ajouter','modifier']},
+  {key:'frais',label:'🧾 Frais / Dépenses',acts:['voir','ajouter','modifier']},
+  {key:'params',label:'⚙️ Paramètres (statuts, régies, sources)',acts:['voir','ajouter','modifier']},
+];
+const ACT_COLS=['voir','ajouter','modifier','statut'];
+const ACT_LABEL={voir:'voir',ajouter:'ajouter',modifier:'modifier',statut:'statut'};
+function fillRoleGrid(perms){
+  perms=perms||{};
+  document.getElementById('role-grid-body').innerHTML=ROLE_ZONES.map(z=>{
+    const cells=ACT_COLS.map(a=>{
+      if(!z.acts.includes(a)) return '<td class="num">—</td>';
+      const on=!!(perms[z.key]&&perms[z.key][a]);
+      return `<td class="num"><input type="checkbox" class="perm-cb" data-zone="${z.key}" data-act="${a}" ${on?'checked':''}></td>`;
+    }).join('');
+    return `<tr><td>${z.label}</td>${cells}</tr>`;
+  }).join('');
+}
+function collectPerms(){
+  const p={};
+  document.querySelectorAll('#role-grid-body .perm-cb').forEach(cb=>{ if(cb.checked){ const z=cb.dataset.zone,a=cb.dataset.act; (p[z]=p[z]||{})[a]=true; } });
+  return p;
+}
+function permSummary(perms){
+  perms=perms||{}; const parts=[];
+  ROLE_ZONES.forEach(z=>{ const acts=z.acts.filter(a=>perms[z.key]&&perms[z.key][a]); if(acts.length){ parts.push(z.label.replace(/^\S+\s/,'')+' ('+acts.map(a=>ACT_LABEL[a]).join('/')+')'); } });
+  return parts.length?parts.join(' · '):'<span style="color:var(--muted)">aucun droit</span>';
+}
+async function loadRoles(){
+  const {data,error}=await db.from('app_roles').select('*').order('is_builtin',{ascending:false}).order('label');
+  if(error){ return; }
+  ROLES_CFG=data||[];
+  const body=document.getElementById('roles-body');
+  body.innerHTML=ROLES_CFG.length? ROLES_CFG.map(r=>{
+    const summary = r.role_key==='admin' ? '👑 Accès total (seul à pouvoir supprimer)' : r.is_regie ? 'Voit seulement son espace (lecture seule)' : permSummary(r.permissions);
+    const canEdit = r.role_key!=='admin' && !r.is_regie;
+    const canDel = !r.is_builtin;
+    const acts = (canEdit?`<button class="btn ghost small" onclick="editRole('${r.role_key}')">✏️</button> `:'') + (canDel?`<button class="btn danger small" onclick="delRole('${r.role_key}')">🗑️</button>`:'<span style="color:var(--muted)">protégé</span>');
+    return `<tr><td><b>${r.label}</b></td><td>${summary}</td><td class="num">${acts}</td></tr>`;
+  }).join('') : `<tr><td colspan="3" class="empty">Aucun rôle</td></tr>`;
+}
+function slugify(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
+async function saveRole(){
+  const label=document.getElementById('role-label').value.trim();
+  const msg=document.getElementById('role-msg');
+  if(!label){ msg.innerHTML='<span class="val-bad">Donne un nom au rôle.</span>'; return; }
+  const perms=collectPerms();
+  msg.innerHTML='Enregistrement…';
+  if(editingRoleKey){
+    const {error}=await db.from('app_roles').update({label,permissions:perms}).eq('role_key',editingRoleKey);
+    if(error){ msg.innerHTML='<span class="val-bad">Erreur : '+error.message+'</span>'; return; }
+    msg.innerHTML='<span class="val-good">Rôle modifié ✅</span>';
+  } else {
+    let base=slugify(label)||'role', key=base, i=2;
+    const existing=new Set(ROLES_CFG.map(r=>r.role_key));
+    while(existing.has(key)){ key=base+i; i++; }
+    const {error}=await db.from('app_roles').insert({role_key:key,label,permissions:perms,is_builtin:false,is_regie:false});
+    if(error){ msg.innerHTML='<span class="val-bad">Erreur : '+error.message+'</span>'; return; }
+    msg.innerHTML='<span class="val-good">Rôle créé ✅</span>';
+  }
+  cancelEditRole(); loadRoles();
+}
+function editRole(key){
+  const r=ROLES_CFG.find(x=>x.role_key===key); if(!r) return;
+  editingRoleKey=key;
+  document.getElementById('role-label').value=r.label;
+  fillRoleGrid(r.permissions);
+  document.getElementById('role-title').textContent='Modifier le rôle';
+  document.getElementById('role-save').textContent='💾 Enregistrer';
+  document.getElementById('role-cancel').style.display='';
+  document.getElementById('role-msg').innerHTML='';
+  document.getElementById('role-title').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function cancelEditRole(){
+  editingRoleKey=null;
+  document.getElementById('role-label').value='';
+  fillRoleGrid({});
+  document.getElementById('role-title').textContent='Créer un rôle';
+  document.getElementById('role-save').textContent='+ Créer le rôle';
+  document.getElementById('role-cancel').style.display='none';
+}
+async function delRole(key){
+  const r=ROLES_CFG.find(x=>x.role_key===key); if(!r) return;
+  const {count}=await db.from('app_memberships').select('id',{count:'exact',head:true}).eq('role',key);
+  if(count&&count>0){ alert('Ce rôle est attribué à '+count+' utilisateur(s). Change-les d\'abord de rôle avant de supprimer ce rôle.'); return; }
+  if(!confirm('Supprimer le rôle « '+r.label+' » ?')) return;
+  const {error}=await db.from('app_roles').delete().eq('role_key',key);
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('Rôle supprimé'); if(editingRoleKey===key) cancelEditRole(); loadRoles();
 }
 
 // ===== Mon espace (régie) =====
