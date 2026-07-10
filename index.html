@@ -26,6 +26,9 @@
   .search-box .ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
   nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600}
   nav button.active{background:var(--panel2);color:var(--txt)}
+  #subnav{display:flex;gap:6px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel2);position:static;box-shadow:none;z-index:auto}
+  #subnav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  #subnav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
   main{padding:22px;max-width:1150px;margin:0 auto}
   .grid{display:grid;gap:16px}
   .cards{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
@@ -117,12 +120,16 @@
 <nav id="mainnav">
   <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">📊 Tableau de bord</button>
   <button data-tab="dossiers" onclick="showTab('dossiers')">📁 Dossiers</button>
-  <button data-tab="regies" onclick="showTab('regies')">🤝 Régies</button>
   <button data-tab="apports" onclick="showTab('apports')">💶 Apports</button>
   <button data-tab="frais" onclick="showTab('frais')">🧾 Frais / Dépenses</button>
-  <button data-tab="sources" onclick="showTab('sources')">🏢 Sources</button>
-  <button data-tab="users" onclick="showTab('users')">👤 Utilisateurs</button>
+  <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
   <button data-tab="monespace" onclick="showTab('monespace')">🤝 Mon espace</button>
+</nav>
+<nav id="subnav" style="display:none">
+  <button data-sub="statuts" onclick="showTab('statuts')">🏷️ Statuts</button>
+  <button data-sub="regies" onclick="showTab('regies')">🤝 Régies</button>
+  <button data-sub="sources" onclick="showTab('sources')">🏢 Sources</button>
+  <button data-sub="users" id="subnav-users" onclick="showTab('users')">👤 Utilisateurs</button>
 </nav>
 
 <main>
@@ -210,7 +217,7 @@
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
         <div class="field" style="max-width:230px"><label>Filtrer par régie / campagne</label><select id="dossiers-fregie" onchange="renderDossiers()"></select></div>
         <div class="field" id="dossiers-fregion-wrap" style="max-width:200px"><label>Filtrer par région</label><select id="dossiers-fregion" onchange="renderDossiers()"><option value="">Toutes les régions</option><option>France</option><option>Corse</option><option>DOM-TOM</option></select></div>
-        <div class="field" style="max-width:180px"><label>Filtrer par statut</label><select id="dossiers-fstatut" onchange="renderDossiers()"><option value="">Tous les statuts</option><option>En cours</option><option>Validé</option><option>Perdu</option></select></div>
+        <div class="field" style="max-width:180px"><label>Filtrer par statut</label><select id="dossiers-fstatut" onchange="renderDossiers()"></select></div>
       </div>
       <div class="table-wrap"><table>
         <thead><tr id="dossiers-head"></tr></thead>
@@ -341,6 +348,24 @@
     </section>
   </div>
 
+  <!-- STATUTS -->
+  <div id="tab-statuts" class="hidden">
+    <section class="panel">
+      <h2>🏷️ Statuts des dossiers</h2>
+      <div class="hint">Crée tes propres statuts. « Compte comme » indique comment le tableau de bord classe le dossier : <b>Gagné</b> = compté dans le résultat et ce qui se partage ; <b>En cours</b> = potentiel (pas encore compté) ; <b>Perdu</b> = mis de côté.</div>
+      <form class="row" onsubmit="addStatut(event)">
+        <div class="field"><label>Nom du statut</label><input type="text" id="st-nom" placeholder="ex. Signé, En attente…" required></div>
+        <div class="field"><label>Compte comme</label><select id="st-cat"><option value="realise">✅ Gagné / validé</option><option value="potentiel">⏳ En cours (potentiel)</option><option value="perdu">❌ Perdu</option></select></div>
+        <div class="field"><button class="btn" type="submit" id="st-savebtn">+ Ajouter</button></div>
+        <div class="field"><button class="btn ghost" type="button" id="st-cancelbtn" onclick="cancelEditStatut()" style="display:none">Annuler</button></div>
+      </form>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Statut</th><th>Compte comme</th><th></th></tr></thead>
+        <tbody id="statuts-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
   <!-- SOURCES -->
   <div id="tab-sources" class="hidden">
     <section class="panel">
@@ -436,15 +461,55 @@ const CRM_URL_TEMPLATE = { led:'https://nrj.koneckt.fr/crm/contact.php?id_contac
 function crmLink(id){ if(id==null||id===''||!PROJ) return null; const t=(CRM_URL_TEMPLATE[PROJ.key]||'').trim(); if(!t) return null; return t.includes('{id}')?t.replace(/\{id\}/g,encodeURIComponent(id)):(t+encodeURIComponent(id)); }
 function dossierIdCell(d){ const id=d.crm_id||''; if(!id) return '<td>—</td>'; const url=crmLink(id); return url?`<td><a href="${url}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${id} ↗</a></td>`:`<td>${id}</td>`; }
 
-const STATUTS=['En cours','Validé','Perdu'];
-function statutClass(s){ return s==='Validé'?'ok':s==='Perdu'?'lost':'wip'; }
-function statutBadge(s){ s=s||'En cours'; return `<span class="badge b-${statutClass(s)}">${s}</span>`; }
-function statutSelect(d){ const cur=d.statut||'En cours'; return `<select class="statut-sel s-${statutClass(cur)}" onchange="setDossierStatut('${d.id}',this.value)">`+STATUTS.map(s=>`<option${s===cur?' selected':''}>${s}</option>`).join('')+`</select>`; }
+let STATUTS_CFG=[{nom:'En cours',categorie:'potentiel'},{nom:'Validé',categorie:'realise'},{nom:'Perdu',categorie:'perdu'}];
+function statutCat(nom){ const s=STATUTS_CFG.find(x=>x.nom===nom); return s?s.categorie:(nom==='Validé'?'realise':nom==='Perdu'?'perdu':'potentiel'); }
+function statutClass(nom){ const c=statutCat(nom); return c==='realise'?'ok':c==='perdu'?'lost':'wip'; }
+function statutBadge(s){ s=s||(STATUTS_CFG[0]&&STATUTS_CFG[0].nom)||'En cours'; return `<span class="badge b-${statutClass(s)}">${s}</span>`; }
+function statutSelect(d){ const names=STATUTS_CFG.map(s=>s.nom); const cur=d.statut||names[0]||'En cours'; const list=names.includes(cur)?names:[cur].concat(names); return `<select class="statut-sel s-${statutClass(cur)}" onchange="setDossierStatut('${d.id}',this.value)">`+list.map(n=>`<option${n===cur?' selected':''}>${n}</option>`).join('')+`</select>`; }
 async function setDossierStatut(id,statut){
   const {error}=await db.from(T('dossiers')).update({statut}).eq('id',id);
   if(error){ toast('Erreur : '+error.message); return; }
   const d=(window._dossiers||[]).find(x=>x.id===id); if(d) d.statut=statut;
   toast('Statut : '+statut); renderDossiers(); refreshDashboard();
+}
+// ===== Statuts configurables =====
+let editingStatutId=null;
+const STATUT_CAT_LABEL={realise:'✅ Gagné / validé',potentiel:'⏳ En cours (potentiel)',perdu:'❌ Perdu'};
+async function loadStatuts(){
+  const {data,error}=await db.from('app_statuts').select('*').eq('project_key',PROJ.key).order('ordre').order('nom');
+  if(!error && data && data.length) STATUTS_CFG=data.map(s=>({id:s.id,nom:s.nom,categorie:s.categorie}));
+  else STATUTS_CFG=[{nom:'En cours',categorie:'potentiel'},{nom:'Validé',categorie:'realise'},{nom:'Perdu',categorie:'perdu'}];
+  fillStatutUI(); renderStatutsConfig();
+}
+function fillStatutUI(){
+  const names=STATUTS_CFG.map(s=>s.nom);
+  const dsel=document.getElementById('d-statut'); if(dsel){ const cur=dsel.value; dsel.innerHTML=names.map(n=>`<option>${n}</option>`).join(''); if(names.includes(cur)) dsel.value=cur; }
+  const fsel=document.getElementById('dossiers-fstatut'); if(fsel){ const cur=fsel.value; fsel.innerHTML='<option value="">Tous les statuts</option>'+names.map(n=>`<option>${n}</option>`).join(''); if([...fsel.options].some(o=>o.value===cur)) fsel.value=cur; }
+}
+function renderStatutsConfig(){
+  const body=document.getElementById('statuts-body'); if(!body) return;
+  body.innerHTML=STATUTS_CFG.length? STATUTS_CFG.map(s=>`<tr><td>${statutBadge(s.nom)}</td><td>${STATUT_CAT_LABEL[s.categorie]||s.categorie}</td>
+    <td class="num">${s.id?`<button class="btn ghost small" onclick="editStatut('${s.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_statuts','${s.id}')">Suppr.</button>`:'<span style="color:var(--muted)">défaut</span>'}</td></tr>`).join('') : `<tr><td colspan="3" class="empty">Aucun statut</td></tr>`;
+}
+function editStatut(id){
+  const s=STATUTS_CFG.find(x=>x.id===id); if(!s) return;
+  document.getElementById('st-nom').value=s.nom; document.getElementById('st-cat').value=s.categorie;
+  editingStatutId=id; document.getElementById('st-savebtn').textContent='💾 Modifier'; document.getElementById('st-cancelbtn').style.display='';
+}
+function cancelEditStatut(){
+  editingStatutId=null; document.getElementById('st-nom').value=''; document.getElementById('st-cat').value='potentiel';
+  document.getElementById('st-savebtn').textContent='+ Ajouter'; document.getElementById('st-cancelbtn').style.display='none';
+}
+async function addStatut(e){
+  e.preventDefault();
+  const nom=document.getElementById('st-nom').value.trim(); if(!nom){toast('Indique un nom');return;}
+  const categorie=document.getElementById('st-cat').value;
+  const wasEdit=!!editingStatutId;
+  const res= wasEdit ? await db.from('app_statuts').update({nom,categorie}).eq('id',editingStatutId)
+                     : await db.from('app_statuts').insert({project_key:PROJ.key,nom,categorie,ordre:STATUTS_CFG.length+1});
+  if(res.error){toast('Erreur : '+res.error.message);return;}
+  cancelEditStatut(); toast(wasEdit?'Statut modifié ✅':'Statut ajouté ✅');
+  await loadStatuts(); renderDossiers(); refreshDashboard();
 }
 
 const eur = n => new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(Number(n)||0);
@@ -455,9 +520,14 @@ function searchNorm(s){ return (s==null?'':s.toString()).toLowerCase().normalize
 function matchSearch(term,text){ const t=searchNorm(term).trim(); if(!t) return true; const hay=searchNorm(text); return t.split(/\s+/).every(w=>hay.includes(w)); }
 function toast(msg){ const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(window._tt);window._tt=setTimeout(()=>el.style.display='none',2600); }
 function showError(e){ const b=document.getElementById('loaderr');b.style.display='block';b.textContent="⚠️ Souci de connexion : "+(e.message||e); }
+const PARAM_SUBS=['statuts','regies','sources','users'];
 function showTab(t){
-  document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dashboard','dossiers','regies','apports','frais','sources','users','monespace'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  if(t==='parametres') t='statuts';
+  const inParam=PARAM_SUBS.includes(t);
+  document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t || (inParam && b.dataset.tab==='parametres')));
+  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
+  const sn=document.getElementById('subnav'); if(sn) sn.style.display=inParam?'flex':'none';
+  document.querySelectorAll('#subnav button').forEach(b=>b.classList.toggle('active',b.dataset.sub===t));
 }
 
 // ===== Connexion / projets / rôles =====
@@ -510,9 +580,10 @@ function enterProject(key){
 function applyRole(role){
   const btns={}; document.querySelectorAll('#mainnav button').forEach(b=>btns[b.dataset.tab]=b);
   const show=(t,v)=>{ if(btns[t]) btns[t].style.display=v?'':'none'; };
-  ['dashboard','dossiers','regies','apports','frais','sources','users','monespace'].forEach(t=>show(t,false));
+  ['dashboard','dossiers','apports','frais','parametres','monespace'].forEach(t=>show(t,false));
+  const uBtn=document.getElementById('subnav-users'); if(uBtn) uBtn.style.display=(role==='admin')?'':'none';
   if(role==='regie'){ show('monespace',true); showTab('monespace'); }
-  else { ['dashboard','dossiers','regies','apports','frais','sources'].forEach(t=>show(t,true)); if(role==='admin') show('users',true); showTab('dashboard'); }
+  else { ['dashboard','dossiers','apports','frais','parametres'].forEach(t=>show(t,true)); showTab('dashboard'); }
 }
 function changePassword(){
   const p=prompt('Nouveau mot de passe (6 caractères minimum) :'); if(!p) return;
@@ -567,6 +638,7 @@ function buildAssocUI(){
   document.getElementById('rc-mois').value=today().slice(0,7);
   const dd=document.getElementById('d-date'); if(dd) dd.value=today();
   const ad=document.getElementById('a-date'); if(ad) ad.value=today();
+  fillStatutUI();
   dossierPreview();
 }
 function ledDossierForm(){ return `
@@ -639,7 +711,7 @@ async function lookupSiret(){
 }
 function onVeloRegion(){ document.getElementById('d-tarif').value = VELO_TARIF_DEFAUT[document.getElementById('d-region').value]||80; onDossierRegie(); }
 function managerRegieRow(){
-  const statutField=`<div class="field"><label>Statut</label><select id="d-statut"><option>En cours</option><option>Validé</option><option>Perdu</option></select></div>`;
+  const statutField=`<div class="field"><label>Statut</label><select id="d-statut"></select></div>`;
   if(PROJ.dossierType==='velo') return `<form class="row" onsubmit="addDossier(event)">
     <div class="field"><label>% manager</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
     <div class="field"><label>Régie / Campagne</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
@@ -660,6 +732,7 @@ async function loadAll(){
   document.getElementById('loaderr').style.display='none';
   await loadSources();
   await loadRegiesConfig();
+  await loadStatuts();
   await Promise.all([loadApports(), loadDossiers(), loadRemboursements(), loadFrais()]);
   renderRegies(); loadRecurrents();
   if(CURRENT_ROLE==='admin') loadUsers();
@@ -843,7 +916,7 @@ function refreshDashboard(){
   frais.forEach(f=>{ const src=SOURCES.find(x=>x.id===f.source_id); if(!src) return; as.forEach(a=>{ inv[a.k]+=Number(f.montant||0)*Number(src['part_'+a.k]||0)/100; }); });
   as.forEach(a=>{ rec[a.k]=remb.filter(r=>r.beneficiaire===a.remb).reduce((s,r)=>s+Number(r.montant||0),0); });
   const invTot=as.reduce((s,a)=>s+inv[a.k],0);
-  const valid=dossiers.filter(d=>(d.statut||'En cours')==='Validé');
+  const valid=dossiers.filter(d=>statutCat(d.statut||'')==='realise');
   const margeNette=valid.reduce((s,d)=>s+Number(d.marge_nette||0),0);
   const regieTot=valid.reduce((s,d)=>s+(d.regie_interne?0:Number(d.commission_regie||0)),0);
   const davidTot=valid.reduce((s,d)=>s+Number(d.cout_david||0),0);
@@ -861,14 +934,14 @@ function refreshDashboard(){
     else { el2.className='num val-bad'; el2.textContent='doit '+eur(-solde); }
   });
   // Rentabilité par statut
-  const stat={'Validé':{n:0,ca:0,mn:0},'En cours':{n:0,ca:0,mn:0},'Perdu':{n:0,ca:0,mn:0}};
-  dossiers.forEach(d=>{ const s=(d.statut||'En cours'); const b=stat[s]||(stat[s]={n:0,ca:0,mn:0}); b.n++; b.ca+=Number(d.montant_prime||0); b.mn+=Number(d.marge_nette||0); });
+  const cat={realise:{n:0,ca:0,mn:0},potentiel:{n:0,ca:0,mn:0},perdu:{n:0,ca:0,mn:0}};
+  dossiers.forEach(d=>{ const c=statutCat(d.statut||''); const b=cat[c]||cat.potentiel; b.n++; b.ca+=Number(d.montant_prime||0); b.mn+=Number(d.marge_nette||0); });
   const partAssoc=margeNette/as.length;
   const statCard=(icon,label,o,good)=>`<div class="card${good?' good':''}"><div class="label">${icon} ${label}</div><div class="value ${good?'val-good':''}" style="font-size:21px">${eur(o.mn)}</div><div class="label" style="margin-top:6px">${o.n} dossier${o.n>1?'s':''} · CA ${eur(o.ca)}</div></div>`;
   document.getElementById('db-stat-cards').innerHTML =
-    statCard('✅','Validé — marge nette',stat['Validé'],true)+
-    statCard('⏳','En cours — potentiel',stat['En cours'],false)+
-    statCard('❌','Perdu',stat['Perdu'],false);
+    statCard('✅','Réalisé — marge nette',cat.realise,true)+
+    statCard('⏳','En cours — potentiel',cat.potentiel,false)+
+    statCard('❌','Perdu',cat.perdu,false);
   document.getElementById('db-share-cards').innerHTML =
     `<div class="card good"><div class="label">Marge nette validée à se partager</div><div class="value val-good">${eur(margeNette)}</div></div>`+
     `<div class="card"><div class="label">→ Part par associé (÷ ${as.length})</div><div class="value">${eur(partAssoc)}</div></div>`;
@@ -878,7 +951,7 @@ function refreshDashboard(){
           : ((d.commercial_regie||'').trim()? ('Régie ('+d.commercial_regie+')') : '—');
         const mn=Number(d.marge_nette||0), ca=Number(d.montant_prime||0);
         return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${type}</td><td>${statutBadge(d.statut)}</td><td class="num">${eur(ca)}</td><td class="num ${mn>=0?'val-good':'val-bad'}">${eur(mn)}</td><td class="num">${eur(mn/as.length)}</td></tr>`;
-      }).join('') + `<tr style="border-top:2px solid var(--accent)"><td colspan="5"><b>Validé (${stat['Validé'].n}/${dossiers.length})</b></td><td class="num"><b>${eur(stat['Validé'].ca)}</b></td><td class="num"><b class="val-good">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
+      }).join('') + `<tr style="border-top:2px solid var(--accent)"><td colspan="5"><b>Réalisé (${cat.realise.n}/${dossiers.length})</b></td><td class="num"><b>${eur(cat.realise.ca)}</b></td><td class="num"><b class="val-good">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
     : `<tr><td colspan="8" class="empty">Aucun dossier</td></tr>`;
   document.getElementById('db-inv-tot').textContent=eur(invTot);
   document.getElementById('db-marge').textContent=eur(margeNette);
@@ -1007,7 +1080,7 @@ function cancelEditDossier(){
   editingDossierId=null;
   ['d-client','d-depot','d-crmid','d-adresse','d-cp','d-ville','d-tel','d-email'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
   document.getElementById('d-commercial').value=''; document.getElementById('d-davidpct').value='5';
-  const st=document.getElementById('d-statut'); if(st) st.value='En cours';
+  const st=document.getElementById('d-statut'); if(st) st.value=(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours');
   const rp=document.getElementById('d-regiepct'); if(rp) rp.value='0';
   if(PROJ.dossierType==='velo'){ ['d-nbvelos','d-autrescouts','d-regie-montant'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';}); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=false; }
   else ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';});
@@ -1021,7 +1094,7 @@ async function addDossier(e){
   const v=id=>{const el=document.getElementById(id); return el?el.value||null:null;};
   let row={ date:v('d-date')||today(), nom_client:v('d-client'), numero_depot:v('d-depot'), crm_id:v('d-crmid'),
     adresse:v('d-adresse'), code_postal:v('d-cp'), ville:v('d-ville'), telephone:v('d-tel'), email:v('d-email'),
-    statut:v('d-statut')||'En cours', david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
+    statut:v('d-statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours'), david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
   if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); row.regie_montant_unitaire=g('d-regie-montant'); row.regie_interne=!!(document.getElementById('d-regie-interne')||{}).checked; row.regie_pct=0; }
   else { row.montant_prime=g('d-prime'); row.cout_installation=g('d-install'); row.cout_materiel=g('d-materiel'); row.cout_nacelle=g('d-nacelle'); row.cout_hamid=g('d-hamid'); row.cout_livraison=g('d-livraison'); row.frais_supp=g('d-fraissupp'); row.cout_audit=g('d-audit'); }
   if(!editingDossierId){
