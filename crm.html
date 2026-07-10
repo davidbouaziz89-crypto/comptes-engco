@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM Formation</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
+    --accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  .hidden{display:none!important}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(1200px 600px at 50% -10%,rgba(79,124,255,.15),transparent),var(--bg)}
+  .authcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:30px 28px;width:100%;max-width:400px}
+  .authcard h1{margin:0 0 4px;font-size:22px}
+  .authcard .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}
+  input,select,textarea{width:100%;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--txt);font-size:14px;font-family:inherit}
+  textarea{resize:vertical;min-height:70px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
+  header{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
+  header .spacer{margin-left:auto}
+  .who{color:var(--muted);font-size:14px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
+  .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
+  .btn.danger{background:transparent;border:1px solid var(--line);color:var(--bad);font-weight:600}
+  .btn.small{padding:5px 10px;font-size:13px}
+  .btn:disabled{opacity:.55;cursor:default}
+  nav{display:flex;gap:6px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
+  nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  nav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
+  main{max-width:1150px;margin:0 auto;padding:22px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+  .panel h2{margin:0 0 14px;font-size:18px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;min-width:180px;flex:1}
+  .field.full{flex-basis:100%}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:14px;white-space:nowrap}
+  th{color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right}
+  .empty{color:var(--muted);text-align:center;padding:24px}
+  .search{max-width:320px}
+  .soon{color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:26px;text-align:center}
+  /* KPI */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .kpi .k-val{font-size:26px;font-weight:800}
+  .kpi .k-lab{color:var(--muted);font-size:13px;margin-top:4px}
+  /* Badges d'étape */
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700}
+  .stg-wip{background:rgba(79,124,255,.18);color:#a9c0ff}
+  .stg-hot{background:rgba(255,180,84,.18);color:#ffcf94}
+  .stg-ok{background:rgba(55,211,155,.18);color:#7ff0c8}
+  .stg-lost{background:rgba(255,107,107,.16);color:#ffb0b0}
+  .stage-sel{padding:5px 8px;font-size:13px;border-radius:8px}
+  /* Pipeline kanban */
+  .kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+  .kcol{flex:0 0 230px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:120px}
+  .kcol.drag-over{border-color:var(--accent);box-shadow:0 0 0 2px rgba(79,124,255,.35)}
+  .kcol h3{margin:0 0 10px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+  .kcol .kcount{color:var(--muted);font-weight:600}
+  .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:9px;cursor:grab}
+  .kcard:active{cursor:grabbing}
+  .kcard .kc-name{font-weight:700;font-size:14px}
+  .kcard .kc-meta{color:var(--muted);font-size:12px;margin-top:3px}
+  .kcard .kc-amt{color:var(--good);font-size:13px;font-weight:700;margin-top:4px}
+  /* Activités */
+  .act{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
+  .act .a-head{color:var(--muted);font-size:12px;margin-bottom:3px}
+  /* Toast */
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s;z-index:100;max-width:90vw}
+  #toast.show{opacity:1}
+  .hint{color:var(--muted);font-size:13px}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:2px 9px;font-size:12px;margin-right:4px}
+</style>
+</head>
+<body>
+
+<!-- CONNEXION -->
+<div id="login-view" class="overlay hidden">
+  <form class="authcard" onsubmit="doLogin(event)">
+    <h1>🎓 CRM Formation</h1>
+    <div class="sub">Connecte-toi pour accéder au CRM.</div>
+    <label>Email</label><input type="email" id="login-email" autocomplete="username" required>
+    <label>Mot de passe</label><input type="password" id="login-pass" autocomplete="current-password" required>
+    <button class="btn" type="submit" style="width:100%;margin-top:16px">Se connecter</button>
+    <div class="err" id="login-err"></div>
+  </form>
+</div>
+
+<!-- PAS D'ACCES -->
+<div id="noaccess-view" class="overlay hidden">
+  <div class="authcard">
+    <h1>Accès non autorisé</h1>
+    <div class="sub">Ton compte n'a pas accès au CRM Formation. Contacte l'administrateur.</div>
+    <button class="btn ghost" style="width:100%" onclick="location.href='./index.html'">← Retour au portail</button>
+  </div>
+</div>
+
+<!-- APPLI -->
+<div id="app-view" class="hidden">
+  <header>
+    <h1>🎓 CRM Formation</h1>
+    <span class="spacer"></span>
+    <span class="who" id="who"></span>
+    <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
+    <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
+  </header>
+  <nav>
+    <button data-tab="dash" class="active" onclick="showTab('dash')">📊 Tableau de bord</button>
+    <button data-tab="leads" onclick="showTab('leads')">👥 Leads</button>
+    <button data-tab="pipeline" onclick="showTab('pipeline')">🎯 Pipeline</button>
+    <button data-tab="formations" onclick="showTab('formations')">🎓 Formations</button>
+    <button data-tab="facturer" onclick="showTab('facturer')">🧾 À facturer</button>
+  </nav>
+  <main>
+
+    <!-- ===== TABLEAU DE BORD ===== -->
+    <div id="tab-dash">
+      <section class="panel">
+        <h2>Vue d'ensemble</h2>
+        <div class="kpis" id="kpi-grid"></div>
+      </section>
+      <section class="panel">
+        <h2>Répartition par étape</h2>
+        <div class="table-wrap"><table id="dash-stages"></table></div>
+      </section>
+    </div>
+
+    <!-- ===== LEADS ===== -->
+    <div id="tab-leads" class="hidden">
+      <section class="panel">
+        <h2 id="lead-form-title">Ajouter un lead</h2>
+        <form onsubmit="saveLead(event)">
+          <div class="row">
+            <div class="field"><label>Nom du contact *</label><input id="l-name" required></div>
+            <div class="field"><label>Société</label><input id="l-company"></div>
+            <div class="field"><label>Email</label><input id="l-email" type="email"></div>
+            <div class="field"><label>Téléphone</label><input id="l-phone"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Formation visée</label><select id="l-formation"></select></div>
+            <div class="field"><label>Montant (€)</label><input id="l-montant" type="number" step="0.01"></div>
+            <div class="field"><label>Étape</label><select id="l-stage"></select></div>
+            <div class="field"><label>Disponibilité</label><input id="l-dispo" placeholder="ex : soirs / lun-mer"></div>
+            <div class="field"><label>Source</label><input id="l-source" placeholder="ex : CALL IA, site, appel"></div>
+          </div>
+          <div class="row">
+            <div class="field full"><label>Notes</label><textarea id="l-notes"></textarea></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn" type="submit">💾 Enregistrer</button>
+            <button class="btn ghost" type="button" onclick="resetLeadForm()">Annuler</button>
+          </div>
+        </form>
+        <!-- Activités du lead (édition uniquement) -->
+        <div id="lead-activities" class="hidden" style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px">
+          <h2 style="font-size:16px">Notes &amp; activités</h2>
+          <div class="row">
+            <div class="field" style="max-width:160px"><label>Type</label>
+              <select id="act-type"><option value="note">📝 Note</option><option value="appel">📞 Appel</option><option value="email">✉️ Email</option><option value="rdv">📅 RDV</option></select>
+            </div>
+            <div class="field"><label>Contenu</label><input id="act-content" placeholder="Détail de l'échange…"></div>
+            <button class="btn small" type="button" onclick="addActivity()">Ajouter</button>
+          </div>
+          <div id="act-list" style="margin-top:12px"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Leads</h2>
+        <div class="row" style="margin-bottom:12px">
+          <input class="search" id="lead-search" placeholder="🔎 Rechercher (nom, société, email…)" oninput="renderLeads()">
+          <select id="lead-fstage" style="max-width:200px" onchange="renderLeads()"><option value="">Toutes les étapes</option></select>
+          <span class="spacer" style="flex:1"></span>
+          <button class="btn ghost small" type="button" onclick="downloadLeadsTemplate()">⬇️ Modèle Excel</button>
+          <label class="btn ghost small" style="margin:0;cursor:pointer">⬆️ Importer Excel/CSV<input type="file" id="lead-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importLeadsFile(event)"></label>
+        </div>
+        <div class="table-wrap"><table id="leads-table"></table></div>
+        <div class="hint" id="leads-count" style="margin-top:8px"></div>
+      </section>
+    </div>
+
+    <!-- ===== PIPELINE ===== -->
+    <div id="tab-pipeline" class="hidden">
+      <section class="panel">
+        <h2>Pipeline commercial</h2>
+        <div class="hint" style="margin-bottom:12px">Glissez une carte d'une colonne à l'autre pour changer l'étape. Cliquez une carte pour l'ouvrir.</div>
+        <div class="kanban" id="kanban"></div>
+      </section>
+    </div>
+
+    <!-- ===== FORMATIONS ===== -->
+    <div id="tab-formations" class="hidden">
+      <section class="panel">
+        <h2 id="formation-form-title">Ajouter une formation</h2>
+        <form onsubmit="saveFormation(event)">
+          <div class="row">
+            <div class="field"><label>Intitulé *</label><input id="f-nom" required></div>
+            <div class="field"><label>Tarif (€)</label><input id="f-tarif" type="number" step="0.01"></div>
+            <div class="field"><label>Heures e-learning</label><input id="f-elearning" type="number" step="0.5"></div>
+            <div class="field"><label>Heures visio</label><input id="f-visio" type="number" step="0.5"></div>
+          </div>
+          <div class="row"><div class="field full"><label>Description</label><textarea id="f-desc"></textarea></div></div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn" type="submit">💾 Enregistrer</button>
+            <button class="btn ghost" type="button" onclick="resetFormationForm()">Annuler</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Catalogue</h2>
+        <div class="table-wrap"><table id="formations-table"></table></div>
+      </section>
+    </div>
+
+    <!-- ===== À FACTURER ===== -->
+    <div id="tab-facturer" class="hidden">
+      <section class="panel">
+        <h2>Leads gagnés à facturer</h2>
+        <div class="hint" style="margin-bottom:12px">Les leads au stade « Gagné » pas encore marqués facturés.</div>
+        <div class="table-wrap"><table id="facturer-table"></table></div>
+      </section>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
+const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let SESSION=null, IS_ADMIN=false;
+let LEADS=[], FORMATIONS=[], editingLeadId=null, editingFormationId=null;
+
+const STAGES=[
+  {key:'nouveau',     label:'Nouveau',      cls:'stg-wip'},
+  {key:'contacte',    label:'Contacté',     cls:'stg-wip'},
+  {key:'qualifie',    label:'Qualifié',     cls:'stg-hot'},
+  {key:'devis_envoye',label:'Devis envoyé', cls:'stg-hot'},
+  {key:'gagne',       label:'Gagné',        cls:'stg-ok'},
+  {key:'perdu',       label:'Perdu',        cls:'stg-lost'},
+];
+const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
+const stageLabel=k=>stageOf(k).label;
+const stageBadge=k=>`<span class="badge ${stageOf(k).cls}">${stageLabel(k)}</span>`;
+function eur(n){ if(n==null||n===''||isNaN(Number(n))) return '—'; return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €'; }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtDate(d){ if(!d) return '—'; const x=new Date(d); return x.toLocaleDateString('fr-FR'); }
+let _tt;
+function toast(m){ const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2600); }
+
+/* ---------- AUTH ---------- */
+async function doLogin(e){
+  e.preventDefault();
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-pass').value;
+  document.getElementById('login-err').textContent='Connexion…';
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error){ document.getElementById('login-err').textContent='Email ou mot de passe incorrect.'; return; }
+  document.getElementById('login-err').textContent='';
+  await afterAuth(data.session);
+}
+async function doLogout(){ await db.auth.signOut(); location.reload(); }
+async function afterAuth(session){
+  SESSION=session;
+  const {data:mems}=await db.from('app_memberships').select('project_key,role').eq('user_id',session.user.id);
+  IS_ADMIN=(mems||[]).some(m=>m.role==='admin');
+  const hasAccess=IS_ADMIN||(mems||[]).some(m=>m.project_key==='crmformation');
+  document.getElementById('login-view').classList.add('hidden');
+  if(!hasAccess){ document.getElementById('noaccess-view').classList.remove('hidden'); return; }
+  document.getElementById('noaccess-view').classList.add('hidden');
+  document.getElementById('app-view').classList.remove('hidden');
+  document.getElementById('who').textContent=session.user.email||'';
+  fillStageSelects();
+  await loadFormations();
+  await loadLeads();
+  showTab('dash');
+}
+
+function showTab(t){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  ['dash','leads','pipeline','formations','facturer'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  if(t==='dash') renderDashboard();
+  if(t==='pipeline') renderPipeline();
+  if(t==='formations') renderFormations();
+  if(t==='facturer') renderFacturer();
+}
+
+function fillStageSelects(){
+  const opts=STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
+  document.getElementById('l-stage').innerHTML=opts;
+  document.getElementById('lead-fstage').innerHTML='<option value="">Toutes les étapes</option>'+opts;
+}
+
+/* ---------- FORMATIONS ---------- */
+async function loadFormations(){
+  const {data,error}=await db.from('crm_formations').select('*').order('nom');
+  if(error){ toast('Erreur formations : '+error.message); return; }
+  FORMATIONS=data||[];
+  fillFormationSelect();
+}
+function fillFormationSelect(){
+  const sel=document.getElementById('l-formation'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Aucune —</option>'+FORMATIONS.filter(f=>f.actif!==false).map(f=>`<option value="${f.id}">${esc(f.nom)}</option>`).join('');
+  if(cur) sel.value=cur;
+}
+function formationName(id){ const f=FORMATIONS.find(x=>x.id===id); return f?f.nom:''; }
+function renderFormations(){
+  const t=document.getElementById('formations-table');
+  if(!FORMATIONS.length){ t.innerHTML='<tr><td class="empty">Aucune formation. Ajoutez-en une ci-dessus.</td></tr>'; return; }
+  t.innerHTML='<tr><th>Intitulé</th><th class="num">Tarif</th><th class="num">e-learning</th><th class="num">Visio</th><th>Description</th><th></th></tr>'+
+    FORMATIONS.map(f=>`<tr>
+      <td>${esc(f.nom)}</td>
+      <td class="num">${eur(f.tarif)}</td>
+      <td class="num">${f.heures_elearning??'—'}</td>
+      <td class="num">${f.heures_visio??'—'}</td>
+      <td style="white-space:normal;max-width:340px">${esc(f.description||'')}</td>
+      <td class="num"><button class="btn ghost small" onclick="editFormation('${f.id}')">✏️</button> <button class="btn danger small" onclick="delFormation('${f.id}')">Suppr.</button></td>
+    </tr>`).join('');
+}
+async function saveFormation(e){
+  e.preventDefault();
+  const payload={
+    nom:document.getElementById('f-nom').value.trim(),
+    tarif:numOrNull('f-tarif'),
+    heures_elearning:numOrNull('f-elearning'),
+    heures_visio:numOrNull('f-visio'),
+    description:document.getElementById('f-desc').value.trim()||null,
+  };
+  let error;
+  if(editingFormationId){ ({error}=await db.from('crm_formations').update(payload).eq('id',editingFormationId)); }
+  else { ({error}=await db.from('crm_formations').insert(payload)); }
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast(editingFormationId?'Formation modifiée':'Formation ajoutée');
+  resetFormationForm(); await loadFormations(); renderFormations();
+}
+function editFormation(id){
+  const f=FORMATIONS.find(x=>x.id===id); if(!f) return;
+  editingFormationId=id;
+  document.getElementById('formation-form-title').textContent='Modifier la formation';
+  document.getElementById('f-nom').value=f.nom||'';
+  document.getElementById('f-tarif').value=f.tarif??'';
+  document.getElementById('f-elearning').value=f.heures_elearning??'';
+  document.getElementById('f-visio').value=f.heures_visio??'';
+  document.getElementById('f-desc').value=f.description||'';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function resetFormationForm(){
+  editingFormationId=null;
+  document.getElementById('formation-form-title').textContent='Ajouter une formation';
+  ['f-nom','f-tarif','f-elearning','f-visio','f-desc'].forEach(i=>document.getElementById(i).value='');
+}
+async function delFormation(id){
+  const f=FORMATIONS.find(x=>x.id===id);
+  if(!confirm('Supprimer la formation « '+(f?f.nom:'')+' » ? (Admin uniquement.)')) return;
+  const {error}=await db.from('crm_formations').delete().eq('id',id);
+  if(error){ toast('Suppression refusée : '+error.message); return; }
+  toast('Formation supprimée'); await loadFormations(); renderFormations();
+}
+
+/* ---------- LEADS ---------- */
+function numOrNull(id){ const v=document.getElementById(id).value; return v===''?null:Number(v); }
+async function loadLeads(){
+  const {data,error}=await db.from('crm_leads').select('*').order('created_at',{ascending:false});
+  if(error){ toast('Erreur leads : '+error.message); return; }
+  LEADS=data||[]; renderLeads();
+}
+function filteredLeads(){
+  const q=(document.getElementById('lead-search').value||'').toLowerCase().trim();
+  const fs=document.getElementById('lead-fstage').value;
+  return LEADS.filter(l=>{
+    if(fs && l.stage!==fs) return false;
+    if(!q) return true;
+    return [l.name,l.company,l.email,l.phone,l.source,formationName(l.formation_id)].some(v=>(v||'').toLowerCase().includes(q));
+  });
+}
+function renderLeads(){
+  const t=document.getElementById('leads-table');
+  const rows=filteredLeads();
+  document.getElementById('leads-count').textContent=rows.length+' lead(s) affiché(s) · '+LEADS.length+' au total';
+  if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucun lead.</td></tr>'; return; }
+  t.innerHTML='<tr><th>Nom</th><th>Société</th><th>Formation</th><th>Étape</th><th class="num">Montant</th><th>Source</th><th>Créé le</th><th></th></tr>'+
+    rows.map(l=>`<tr>
+      <td>${esc(l.name)}${l.email?`<br><span class="hint">${esc(l.email)}</span>`:''}</td>
+      <td>${esc(l.company||'')}</td>
+      <td>${esc(formationName(l.formation_id)||'—')}</td>
+      <td><select class="stage-sel ${stageOf(l.stage).cls}" onchange="setStage('${l.id}',this.value)">${STAGES.map(s=>`<option value="${s.key}"${s.key===l.stage?' selected':''}>${s.label}</option>`).join('')}</select></td>
+      <td class="num">${eur(l.montant)}</td>
+      <td>${esc(l.source||'')}</td>
+      <td>${fmtDate(l.created_at)}</td>
+      <td class="num"><button class="btn ghost small" onclick="editLead('${l.id}')">✏️</button> <button class="btn danger small" onclick="delLead('${l.id}')">Suppr.</button></td>
+    </tr>`).join('');
+}
+async function saveLead(e){
+  e.preventDefault();
+  const payload={
+    name:document.getElementById('l-name').value.trim(),
+    company:document.getElementById('l-company').value.trim()||null,
+    email:document.getElementById('l-email').value.trim()||null,
+    phone:document.getElementById('l-phone').value.trim()||null,
+    formation_id:document.getElementById('l-formation').value||null,
+    montant:numOrNull('l-montant'),
+    stage:document.getElementById('l-stage').value,
+    disponibilite:document.getElementById('l-dispo').value.trim()||null,
+    source:document.getElementById('l-source').value.trim()||null,
+    notes:document.getElementById('l-notes').value.trim()||null,
+  };
+  let error;
+  if(editingLeadId){ ({error}=await db.from('crm_leads').update(payload).eq('id',editingLeadId)); }
+  else { ({error}=await db.from('crm_leads').insert(payload)); }
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast(editingLeadId?'Lead modifié':'Lead ajouté');
+  resetLeadForm(); await loadLeads();
+}
+function editLead(id){
+  const l=LEADS.find(x=>x.id===id); if(!l) return;
+  editingLeadId=id;
+  document.getElementById('lead-form-title').textContent='Modifier le lead';
+  document.getElementById('l-name').value=l.name||'';
+  document.getElementById('l-company').value=l.company||'';
+  document.getElementById('l-email').value=l.email||'';
+  document.getElementById('l-phone').value=l.phone||'';
+  document.getElementById('l-formation').value=l.formation_id||'';
+  document.getElementById('l-montant').value=l.montant??'';
+  document.getElementById('l-stage').value=l.stage||'nouveau';
+  document.getElementById('l-dispo').value=l.disponibilite||'';
+  document.getElementById('l-source').value=l.source||'';
+  document.getElementById('l-notes').value=l.notes||'';
+  document.getElementById('lead-activities').classList.remove('hidden');
+  loadActivities(id);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function resetLeadForm(){
+  editingLeadId=null;
+  document.getElementById('lead-form-title').textContent='Ajouter un lead';
+  ['l-name','l-company','l-email','l-phone','l-montant','l-dispo','l-source','l-notes'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('l-formation').value='';
+  document.getElementById('l-stage').value='nouveau';
+  document.getElementById('lead-activities').classList.add('hidden');
+  document.getElementById('act-list').innerHTML='';
+}
+async function delLead(id){
+  const l=LEADS.find(x=>x.id===id);
+  if(!confirm('Supprimer le lead « '+(l?l.name:'')+' » ? (Admin uniquement.)')) return;
+  const {error}=await db.from('crm_leads').delete().eq('id',id);
+  if(error){ toast('Suppression refusée : '+error.message); return; }
+  toast('Lead supprimé'); if(editingLeadId===id) resetLeadForm(); await loadLeads();
+}
+async function setStage(id,stage){
+  const {error}=await db.from('crm_leads').update({stage}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  const l=LEADS.find(x=>x.id===id); if(l) l.stage=stage;
+  toast('Étape : '+stageLabel(stage));
+  renderLeads();
+}
+
+/* ---------- ACTIVITÉS ---------- */
+async function loadActivities(leadId){
+  const {data,error}=await db.from('crm_activities').select('*').eq('lead_id',leadId).order('created_at',{ascending:false});
+  const box=document.getElementById('act-list');
+  if(error){ box.innerHTML='<div class="hint">Erreur : '+esc(error.message)+'</div>'; return; }
+  if(!data||!data.length){ box.innerHTML='<div class="hint">Aucune activité pour l\'instant.</div>'; return; }
+  const ic={note:'📝',appel:'📞',email:'✉️',rdv:'📅'};
+  box.innerHTML=data.map(a=>`<div class="act"><div class="a-head">${ic[a.type]||''} ${esc(a.user_email||'')} · ${new Date(a.created_at).toLocaleString('fr-FR')}</div><div>${esc(a.content||'')}</div></div>`).join('');
+}
+async function addActivity(){
+  if(!editingLeadId) return;
+  const content=document.getElementById('act-content').value.trim();
+  if(!content){ toast('Écris un contenu.'); return; }
+  const type=document.getElementById('act-type').value;
+  const {error}=await db.from('crm_activities').insert({lead_id:editingLeadId,type,content,user_email:SESSION.user.email});
+  if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('act-content').value='';
+  loadActivities(editingLeadId);
+}
+
+/* ---------- PIPELINE (kanban) ---------- */
+function renderPipeline(){
+  const k=document.getElementById('kanban');
+  k.innerHTML=STAGES.map(s=>{
+    const cards=LEADS.filter(l=>l.stage===s.key);
+    return `<div class="kcol" data-stage="${s.key}" ondragover="kDragOver(event)" ondragleave="kDragLeave(event)" ondrop="kDrop(event)">
+      <h3><span>${s.label}</span><span class="kcount">${cards.length}</span></h3>
+      ${cards.map(l=>`<div class="kcard" draggable="true" ondragstart="kDragStart(event,'${l.id}')" onclick="editLeadFromPipeline('${l.id}')">
+        <div class="kc-name">${esc(l.name)}</div>
+        <div class="kc-meta">${esc(l.company||formationName(l.formation_id)||'')}</div>
+        ${l.montant?`<div class="kc-amt">${eur(l.montant)}</div>`:''}
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+let _dragId=null;
+function kDragStart(e,id){ _dragId=id; e.dataTransfer.effectAllowed='move'; }
+function kDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function kDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+async function kDrop(e){
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  const stage=e.currentTarget.dataset.stage;
+  if(!_dragId) return;
+  const l=LEADS.find(x=>x.id===_dragId); const id=_dragId; _dragId=null;
+  if(!l||l.stage===stage) return;
+  await setStage(id,stage); renderPipeline();
+}
+function editLeadFromPipeline(id){ showTab('leads'); editLead(id); }
+
+/* ---------- TABLEAU DE BORD ---------- */
+function renderDashboard(){
+  const total=LEADS.length;
+  const won=LEADS.filter(l=>l.stage==='gagne');
+  const lost=LEADS.filter(l=>l.stage==='perdu');
+  const open=LEADS.filter(l=>l.stage!=='gagne'&&l.stage!=='perdu');
+  const wonAmt=won.reduce((s,l)=>s+(Number(l.montant)||0),0);
+  const openAmt=open.reduce((s,l)=>s+(Number(l.montant)||0),0);
+  const conv=total?Math.round(won.length/total*100):0;
+  const toBill=won.filter(l=>!l.invoiced).length;
+  const kpi=[
+    {v:total,l:'Leads au total'},
+    {v:open.length,l:'En cours'},
+    {v:won.length,l:'Gagnés'},
+    {v:conv+' %',l:'Taux de conversion'},
+    {v:eur(wonAmt),l:'CA gagné'},
+    {v:eur(openAmt),l:'Pipeline en cours'},
+    {v:toBill,l:'À facturer'},
+    {v:lost.length,l:'Perdus'},
+  ];
+  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+  const st=document.getElementById('dash-stages');
+  st.innerHTML='<tr><th>Étape</th><th class="num">Nombre</th><th class="num">Montant cumulé</th></tr>'+
+    STAGES.map(s=>{ const rows=LEADS.filter(l=>l.stage===s.key); const amt=rows.reduce((a,l)=>a+(Number(l.montant)||0),0);
+      return `<tr><td>${stageBadge(s.key)}</td><td class="num">${rows.length}</td><td class="num">${eur(amt)}</td></tr>`; }).join('');
+}
+
+/* ---------- À FACTURER ---------- */
+function renderFacturer(){
+  const t=document.getElementById('facturer-table');
+  const rows=LEADS.filter(l=>l.stage==='gagne'&&!l.invoiced);
+  if(!rows.length){ t.innerHTML='<tr><td class="empty">Rien à facturer 🎉</td></tr>'; return; }
+  t.innerHTML='<tr><th>Nom</th><th>Société</th><th>Formation</th><th class="num">Montant</th><th>Gagné le</th><th></th></tr>'+
+    rows.map(l=>`<tr>
+      <td>${esc(l.name)}</td><td>${esc(l.company||'')}</td><td>${esc(formationName(l.formation_id)||'—')}</td>
+      <td class="num">${eur(l.montant)}</td><td>${fmtDate(l.created_at)}</td>
+      <td class="num"><button class="btn small" onclick="markInvoiced('${l.id}')">✅ Marquer facturé</button></td>
+    </tr>`).join('');
+}
+async function markInvoiced(id){
+  const {error}=await db.from('crm_leads').update({invoiced:true}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  const l=LEADS.find(x=>x.id===id); if(l) l.invoiced=true;
+  toast('Marqué comme facturé'); renderFacturer(); renderDashboard();
+}
+
+/* ---------- IMPORT EXCEL / CSV ---------- */
+function downloadLeadsTemplate(){
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['nom','societe','email','telephone','formation','montant','source','etape'],
+    ['Jean Dupont','ACME SARL','jean@acme.fr','0600000000','Anglais professionnel','1500','CALL IA','nouveau'],
+  ]);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Leads');
+  XLSX.writeFile(wb,'modele-leads-crm.xlsx');
+}
+async function importLeadsFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+    if(!rows.length){ toast('Fichier vide.'); e.target.value=''; return; }
+    const stageKeys=STAGES.map(s=>s.key);
+    const get=(r,keys)=>{ for(const k of Object.keys(r)){ if(keys.includes(k.toLowerCase().trim())) return r[k]; } return ''; };
+    const payload=rows.map(r=>{
+      const fname=String(get(r,['formation','formation visée','formation visee'])).trim();
+      const f=FORMATIONS.find(x=>x.nom.toLowerCase()===fname.toLowerCase());
+      let stage=String(get(r,['etape','étape','stage'])).toLowerCase().trim();
+      if(!stageKeys.includes(stage)) stage='nouveau';
+      const montant=String(get(r,['montant','prix'])).replace(/[^\d.,-]/g,'').replace(',','.');
+      return {
+        name:String(get(r,['nom','name','contact','nom du contact'])).trim(),
+        company:String(get(r,['societe','société','company','entreprise'])).trim()||null,
+        email:String(get(r,['email','mail','e-mail'])).trim()||null,
+        phone:String(get(r,['telephone','téléphone','tel','phone'])).trim()||null,
+        formation_id:f?f.id:null,
+        montant:montant?Number(montant):null,
+        source:String(get(r,['source','origine'])).trim()||null,
+        stage,
+      };
+    }).filter(p=>p.name);
+    if(!payload.length){ toast('Aucune ligne avec un nom. Vérifie la colonne "nom".'); e.target.value=''; return; }
+    if(!confirm('Importer '+payload.length+' lead(s) ?')){ e.target.value=''; return; }
+    const {error}=await db.from('crm_leads').insert(payload);
+    if(error){ toast('Erreur import : '+error.message); e.target.value=''; return; }
+    toast(payload.length+' lead(s) importé(s)');
+    e.target.value=''; await loadLeads(); showTab('leads');
+  }catch(err){ toast('Erreur lecture fichier : '+err.message); e.target.value=''; }
+}
+
+/* ---------- INIT ---------- */
+(async()=>{
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){ document.getElementById('login-view').classList.remove('hidden'); return; }
+  await afterAuth(session);
+})();
+</script>
+</body>
+</html>
