@@ -130,7 +130,28 @@
   </main>
 </div>
 
-<!-- FICHE EMPLOYÉ -->
+<!-- ESPACE EMPLOYÉ -->
+<div id="emp-view" class="hidden">
+  <header>
+    <h1>⏱️ TimeGuard Pro</h1><span class="spacer"></span>
+    <span class="who" id="emp-who"></span>
+    <button class="btn ghost small" id="theme-btn2" onclick="toggleTheme();document.getElementById('theme-btn2').textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙'" title="Thème">🌙</button>
+    <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
+    <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
+  </header>
+  <main style="max-width:640px">
+    <section class="panel" id="emp-clock" style="text-align:center">
+      <h2>Mon pointage</h2>
+      <div id="clock-body"><div class="hint">Chargement…</div></div>
+    </section>
+    <section class="panel">
+      <h2>Mes heures <span class="hint" id="emp-month-label"></span></h2>
+      <div class="table-wrap"><table id="emp-month"></table></div>
+    </section>
+  </main>
+</div>
+
+<!-- FICHE EMPLOYÉ (admin) -->
 <div id="detail-view" class="hidden">
   <div class="dhead"><button class="btn ghost small" onclick="closeDetail()">← Retour</button>
     <h1 id="d-name" style="font-size:18px;margin:0"></h1></div>
@@ -179,7 +200,7 @@ async function afterAuth(session){
   MYROLE=rset.includes('admin')?'admin':rset.includes('manager')?'manager':rset.includes('comptable')?'comptable':rset.includes('employee')?'employee':null;
   document.getElementById('login-view').classList.add('hidden');
   if(!MYROLE){document.getElementById('noaccess-view').classList.remove('hidden');return;}
-  if(MYROLE==='employee'){document.getElementById('noaccess-msg').textContent="L'écran employé (pointer) arrive bientôt. Pour l'instant, seul l'espace admin est disponible.";document.getElementById('noaccess-view').classList.remove('hidden');return;}
+  if(MYROLE==='employee'){ await initEmployee(session); return; }
   document.getElementById('noaccess-view').classList.add('hidden');
   document.getElementById('app-view').classList.remove('hidden');
   document.getElementById('who').textContent=session.user.email||'';
@@ -327,6 +348,105 @@ async function openFile(fileUrl){
     if(error||!data){toast('Fichier indisponible : '+(error?error.message:''));return;}
     window.open(data.signedUrl,'_blank');
   }catch(e){toast('Erreur : '+e.message);}
+}
+
+/* ===== ESPACE EMPLOYÉ ===== */
+const GPS_MARGIN=50;
+let EMP=null, EMP_CUR=null, EMP_PAUSE=null, EMP_ZONES=[], empTimer=null, empBusy=false;
+async function initEmployee(session){
+  document.getElementById('login-view').classList.add('hidden');
+  document.getElementById('noaccess-view').classList.add('hidden');
+  const {data:emp}=await db.from('employees').select('*').eq('user_id',session.user.id).maybeSingle();
+  document.getElementById('emp-view').classList.remove('hidden');
+  document.getElementById('emp-who').textContent=session.user.email||'';
+  if(!emp){document.getElementById('clock-body').innerHTML='<div class="hint">Votre profil employé n\'est pas encore configuré. Contactez l\'administrateur.</div>';return;}
+  EMP=emp;
+  await refreshEmpState(); await loadMyMonth();
+}
+async function refreshEmpState(){
+  const today=new Date().toISOString().slice(0,10);
+  const {data:cur}=await db.from('pointages').select('*').eq('employee_id',EMP.id).eq('date',today).eq('status','in_progress').maybeSingle();
+  EMP_CUR=cur||null; EMP_PAUSE=null;
+  if(EMP_CUR){const {data:pa}=await db.from('pauses').select('*').eq('pointage_id',EMP_CUR.id).is('pause_fin',null).maybeSingle();EMP_PAUSE=pa||null;}
+  renderClock();
+}
+function empStatus(){ if(!EMP_CUR)return'non_pointe'; if(EMP_PAUSE)return'en_pause'; if(EMP_CUR.heure_fin)return'termine'; return'en_cours'; }
+function renderClock(){
+  const st=empStatus(), body=document.getElementById('clock-body');
+  if(empTimer){clearInterval(empTimer);empTimer=null;}
+  if(st==='non_pointe'){
+    body.innerHTML=`<button class="btn" style="width:100%;height:64px;font-size:17px" ${empBusy?'disabled':''} onclick="empArrivee()">${empBusy?'Vérification GPS…':'▶️ Commencer ma journée'}</button>`;
+    return;
+  }
+  body.innerHTML=`
+    <div style="padding:20px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;margin-bottom:14px">
+      <div style="font-size:18px;font-weight:700;color:var(--accent)">${st==='en_pause'?'⏸️ En pause':'Journée en cours'}</div>
+      <div class="hint" style="margin:6px 0">Commencée à <b style="color:var(--txt)">${fmtTime(EMP_CUR.heure_debut)}</b></div>
+      <div class="hint">Temps écoulé</div><div id="emp-elapsed" style="font-size:30px;font-weight:800;color:var(--accent)">00:00:00</div>
+    </div>
+    <div class="row" style="justify-content:center">
+      <button class="btn ghost" style="flex:1;height:52px" ${empBusy?'disabled':''} onclick="empTogglePause()">${st==='en_pause'?'▶️ Reprendre':'⏸️ Pause'}</button>
+      <button class="btn" style="flex:1;height:52px;background:linear-gradient(135deg,var(--bad),#c0392b)" ${empBusy||st==='en_pause'?'disabled':''} onclick="empDepart()">⏹️ Finir ma journée</button>
+    </div>`;
+  const tick=()=>{const el=document.getElementById('emp-elapsed');if(!el||!EMP_CUR)return;const d=Date.now()-new Date(EMP_CUR.heure_debut).getTime();const h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000),s=Math.floor((d%60000)/1000);el.textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;};
+  tick();empTimer=setInterval(tick,1000);
+}
+function empGetLocation(){
+  return new Promise((res,rej)=>{
+    if(!navigator.geolocation){rej(new Error("Géolocalisation non supportée"));return;}
+    const attempt=(left)=>navigator.geolocation.getCurrentPosition(
+      p=>res({lat:p.coords.latitude,lng:p.coords.longitude}),
+      e=>{ if(left>0){setTimeout(()=>attempt(left-1),2000);} else {
+        let m="Impossible de déterminer votre position.";
+        if(e.code===e.PERMISSION_DENIED)m="Vous avez refusé la géolocalisation. Activez-la dans votre navigateur.";
+        else if(e.code===e.POSITION_UNAVAILABLE)m="Position GPS non disponible. Rapprochez-vous d'une fenêtre.";
+        else if(e.code===e.TIMEOUT)m="Le GPS met trop de temps à répondre.";
+        rej(new Error(m)); } },
+      {enableHighAccuracy:true,timeout:30000,maximumAge:0});
+    attempt(2);
+  });
+}
+function haversine(a,b){const R=6371e3,φ1=a.lat*Math.PI/180,φ2=b.lat*Math.PI/180,Δφ=(b.lat-a.lat)*Math.PI/180,Δλ=(b.lng-a.lng)*Math.PI/180;const x=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+async function empCheckGps(){
+  const {data:zones}=await db.from('zones_gps').select('*').eq('employee_id',EMP.id).eq('active',true);
+  if(!zones||!zones.length){ try{return {valid:true,location:await empGetLocation()};}catch(e){return {valid:true};} }
+  const loc=await empGetLocation();
+  let inside=false,closest=Infinity,cz=null;
+  for(const z of zones){const d=haversine(loc,{lat:z.latitude,lng:z.longitude});if(d<closest){closest=d;cz=z;}if(d<=z.rayon_m+GPS_MARGIN)inside=true;}
+  if(!inside){toast(`Pointage refusé : vous êtes à ${closest.toFixed(0)}m de la zone "${cz&&cz.nom_zone}" (rayon ${(cz?cz.rayon_m:0)+GPS_MARGIN}m).`);return {valid:false};}
+  return {valid:true,location:loc};
+}
+async function empArrivee(){
+  if(empBusy)return; empBusy=true; renderClock();
+  try{
+    const g=await empCheckGps(); if(!g.valid){empBusy=false;renderClock();return;}
+    const {error}=await db.from('pointages').insert({employee_id:EMP.id,date:new Date().toISOString().slice(0,10),heure_debut:new Date().toISOString(),status:'in_progress',location_lat:g.location?g.location.lat:null,location_lng:g.location?g.location.lng:null});
+    if(error){toast('Erreur : '+error.message);} else toast('Journée commencée ✓');
+  }catch(e){toast(e.message);}
+  empBusy=false; await refreshEmpState(); loadMyMonth();
+}
+async function empDepart(){
+  if(empBusy||!EMP_CUR)return; empBusy=true;
+  const {error}=await db.from('pointages').update({heure_fin:new Date().toISOString(),status:'completed'}).eq('id',EMP_CUR.id);
+  if(error)toast('Erreur : '+error.message); else toast('Journée terminée. À demain !');
+  empBusy=false; await refreshEmpState(); loadMyMonth();
+}
+async function empTogglePause(){
+  if(empBusy||!EMP_CUR)return; empBusy=true;
+  if(EMP_PAUSE){const {error}=await db.from('pauses').update({pause_fin:new Date().toISOString()}).eq('id',EMP_PAUSE.id);if(error)toast('Erreur : '+error.message);else toast('Reprise du travail');}
+  else {const {error}=await db.from('pauses').insert({pointage_id:EMP_CUR.id,pause_debut:new Date().toISOString()});if(error)toast('Erreur : '+error.message);else toast('Pause commencée');}
+  empBusy=false; await refreshEmpState();
+}
+async function loadMyMonth(){
+  if(!EMP)return;
+  const ym=new Date().toISOString().slice(0,7);
+  const {data}=await db.from('pointages').select('*').eq('employee_id',EMP.id).gte('date',ym+'-01').order('date',{ascending:false});
+  const rows=data||[]; document.getElementById('emp-month-label').textContent='· '+new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  const tot=rows.reduce((s,p)=>s+(Number(p.temps_net)||0),0);
+  const t=document.getElementById('emp-month');
+  t.innerHTML='<tr><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th></tr>'+
+    (rows.map(p=>`<tr><td>${fmtDate(p.date)}</td><td>${fmtTime(p.heure_debut)}</td><td>${fmtTime(p.heure_fin)}</td><td>${statutPill(p.status)}</td><td class="num">${mins(p.temps_net)}</td></tr>`).join('')||'<tr><td class="empty">Aucun pointage ce mois-ci</td></tr>')
+    +`<tr><td colspan="4" style="text-align:right;font-weight:700">Total du mois</td><td class="num" style="font-weight:800;color:var(--accent)">${mins(tot)}</td></tr>`;
 }
 
 /* INIT */
