@@ -90,6 +90,7 @@
     <button data-tab="dash" class="active" onclick="showTab('dash')">📊 Tableau de bord</button>
     <button data-tab="employes" onclick="showTab('employes')">👥 Employés</button>
     <button data-tab="pointages" onclick="showTab('pointages')">⏱️ Pointages</button>
+    <button data-tab="demandes" onclick="showTab('demandes')">📨 Demandes</button>
     <button data-tab="documents" onclick="showTab('documents')">📄 Documents</button>
     <button data-tab="bulletins" onclick="showTab('bulletins')">🧾 Bulletins</button>
     <button data-tab="zones" onclick="showTab('zones')">📍 Zones GPS</button>
@@ -112,6 +113,14 @@
       </div>
       <div class="table-wrap"><table id="pt-table"></table></div>
       <div class="hint" id="pt-count" style="margin-top:8px"></div></section></div>
+
+    <div id="tab-demandes" class="hidden"><section class="panel">
+      <div class="row" style="margin-bottom:12px">
+        <input class="search" id="req-search" placeholder="🔎 Rechercher…" oninput="renderDemandes()">
+        <select id="req-fstatus" class="field" onchange="renderDemandes()"><option value="">Tous statuts</option><option value="pending">En attente</option><option value="approved">Approuvées</option><option value="rejected">Refusées</option></select>
+        <span class="hint" id="req-count"></span>
+      </div>
+      <div class="table-wrap"><table id="req-table"></table></div></section></div>
 
     <div id="tab-documents" class="hidden"><section class="panel">
       <div class="row" style="margin-bottom:12px"><input class="search" id="doc-search" placeholder="🔎 Rechercher…" oninput="renderDocuments()"><span class="hint" id="doc-count"></span></div>
@@ -148,6 +157,20 @@
       <h2>Mes heures <span class="hint" id="emp-month-label"></span></h2>
       <div class="table-wrap"><table id="emp-month"></table></div>
     </section>
+    <section class="panel">
+      <h2>Mes demandes</h2>
+      <form onsubmit="submitMyRequest(event)" style="margin-bottom:14px">
+        <div class="row">
+          <div class="field" style="flex:1"><label>Type de demande</label><select id="myreq-cat" required></select></div>
+          <div class="field"><label>Du</label><input type="date" id="myreq-start"></div>
+          <div class="field"><label>Au</label><input type="date" id="myreq-end"></div>
+          <div class="field" style="min-width:120px"><label>Demi-journée ?</label><select id="myreq-half"><option value="">Non</option><option value="matin">Matin</option><option value="apres-midi">Après-midi</option></select></div>
+        </div>
+        <div class="row" style="margin-top:8px"><div class="field" style="flex:1"><label>Message</label><input id="myreq-msg" placeholder="Précisez votre demande…"></div>
+          <button class="btn small" type="submit">Envoyer la demande</button></div>
+      </form>
+      <div id="myreq-list"></div>
+    </section>
   </main>
 </div>
 
@@ -168,6 +191,7 @@ const db=sb.schema('pointage');   // toutes les tables sont dans le schéma "poi
 
 let SESSION=null, MYROLE=null;
 let PROFILES=[], EMPLOYES=[], EQUIPES=[], POINTAGES=[], DOCUMENTS=[], BULLETINS=[], ZONES=[], COMPANY=null;
+let REQUESTS=[], REQCATS=[];
 let profByUser={}, empById={};
 
 function toggleTheme(){const l=document.documentElement.getAttribute('data-theme')!=='light';if(l)document.documentElement.setAttribute('data-theme','light');else document.documentElement.removeAttribute('data-theme');try{localStorage.setItem('pfp-theme',l?'light':'dark');}catch(e){}updateThemeBtn();}
@@ -208,7 +232,7 @@ async function afterAuth(session){
   await loadAll();showTab('dash');
 }
 async function loadAll(){
-  const [p,e,q,pt,dc,bl,z,co]=await Promise.all([
+  const [p,e,q,pt,dc,bl,z,co,rq,rc]=await Promise.all([
     db.from('profiles').select('*'),
     db.from('employees').select('*'),
     db.from('equipes').select('*'),
@@ -217,8 +241,11 @@ async function loadAll(){
     db.from('employee_payslips').select('*').order('month',{ascending:false}),
     db.from('zones_gps').select('*'),
     db.from('company_settings').select('*').limit(1),
+    db.from('employee_requests').select('*').order('created_at',{ascending:false}),
+    db.from('request_categories').select('*').order('name'),
   ]);
   PROFILES=p.data||[];EMPLOYES=e.data||[];EQUIPES=q.data||[];POINTAGES=pt.data||[];DOCUMENTS=dc.data||[];BULLETINS=bl.data||[];ZONES=z.data||[];COMPANY=(co.data||[])[0]||null;
+  REQUESTS=rq.data||[];REQCATS=rc.data||[];
   profByUser={};PROFILES.forEach(x=>profByUser[x.user_id]=x);
   empById={};EMPLOYES.forEach(x=>empById[x.id]=x);
   const sel=document.getElementById('pt-emp');
@@ -227,7 +254,7 @@ async function loadAll(){
 }
 function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   ['dash','employes','pointages','documents','bulletins','zones','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
-  ({dash:renderDash,employes:renderEmployes,pointages:renderPointages,documents:renderDocuments,bulletins:renderBulletins,zones:renderZones,params:renderParams}[t])();}
+  ({dash:renderDash,employes:renderEmployes,pointages:renderPointages,demandes:renderDemandes,documents:renderDocuments,bulletins:renderBulletins,zones:renderZones,params:renderParams}[t])();}
 
 /* DASHBOARD */
 function renderDash(){
@@ -310,6 +337,65 @@ function renderPointages(){
     rows.slice(0,500).map(p=>{const e=empById[p.employee_id];return `<tr class="clickable" onclick="openEmp('${p.employee_id}')"><td>${esc(e?empName(e):'—')}</td><td>${fmtDate(p.date)}</td><td>${fmtTime(p.heure_debut)}</td><td>${fmtTime(p.heure_fin)}</td><td>${statutPill(p.status)}</td><td class="num">${mins(p.temps_net)}</td><td>${p.saisi_manuellement?'✍️ manuel':(p.auto_depointage?'⏲️ auto':'')}</td><td class="hint">${p.location_lat?'📍':''}</td></tr>`;}).join('');
 }
 
+/* DEMANDES (admin) */
+function reqPill(s){const m={pending:['En attente','var(--warn)'],approved:['Approuvée','var(--good)'],rejected:['Refusée','var(--bad)']};const x=m[s]||[s||'—','var(--muted)'];return `<span class="pill" style="background:${x[1]}22;color:${x[1]}">${x[0]}</span>`;}
+function reqPeriode(r){if(!r.start_date&&!r.end_date)return'—';let s=fmtDate(r.start_date);if(r.end_date&&r.end_date!==r.start_date)s+=' → '+fmtDate(r.end_date);if(r.half_day)s+=' (½ j'+(r.half_day_period?' '+r.half_day_period:'')+')';return s;}
+function renderDemandes(){
+  const q=(document.getElementById('req-search').value||'').toLowerCase().trim(),fs=document.getElementById('req-fstatus').value;
+  const rows=REQUESTS.filter(r=>{if(fs&&r.status!==fs)return false;const e=empById[r.employee_id];return !q||[e?empName(e):'',r.category,r.message].some(v=>(v||'').toLowerCase().includes(q));});
+  document.getElementById('req-count').textContent=rows.length+' demande(s)';
+  const t=document.getElementById('req-table');
+  if(!rows.length){t.innerHTML='<tr><td class="empty">Aucune demande.</td></tr>';return;}
+  t.innerHTML='<tr><th>Employé</th><th>Catégorie</th><th>Période</th><th>Message</th><th>Statut</th><th>Date</th></tr>'+
+    rows.map(r=>{const e=empById[r.employee_id];return `<tr class="clickable" onclick="openRequest('${r.id}')"><td><b>${esc(e?empName(e):'—')}</b></td><td>${esc(r.category||'')}</td><td>${esc(reqPeriode(r))}</td><td style="white-space:normal;max-width:280px">${esc((r.message||'').slice(0,80))}</td><td>${reqPill(r.status)}</td><td>${fmtDate(r.created_at)}</td></tr>`;}).join('');
+}
+async function openRequest(id){
+  const r=REQUESTS.find(x=>x.id===id);if(!r)return;const e=empById[r.employee_id];
+  document.getElementById('d-name').textContent='📨 Demande — '+(e?empName(e):'');
+  const kv=(k,v)=>`<div class="kv"><span class="k">${k} :</span> ${esc(v==null||v===''?'—':v)}</div>`;
+  document.getElementById('detail-body').innerHTML=`
+    <div class="card"><h3>Demande</h3><div class="grid2">
+      ${kv('Employé',e?empName(e):'—')}${kv('Catégorie',r.category)}${kv('Période',reqPeriode(r))}${kv('Statut',{pending:'En attente',approved:'Approuvée',rejected:'Refusée'}[r.status]||r.status)}
+      ${kv('Créée le',fmtDate(r.created_at))}${kv('Décidée le',r.decided_at?fmtDate(r.decided_at):'—')}</div>
+      <div style="margin-top:10px"><span class="k hint">Message de l'employé :</span><div style="white-space:pre-wrap;margin-top:4px">${esc(r.message||'—')}</div></div>
+    </div>
+    <div class="card"><h3>Décision</h3>
+      <label>Réponse admin (optionnel)</label><input id="req-reply" value="${esc(r.admin_reply||'')}">
+      <div class="row" style="margin-top:12px">
+        <button class="btn" style="background:linear-gradient(135deg,var(--good),#0f9d58)" onclick="decideRequest('${r.id}','approved')">✅ Approuver</button>
+        <button class="btn" style="background:linear-gradient(135deg,var(--bad),#c0392b)" onclick="decideRequest('${r.id}','rejected')">❌ Refuser</button>
+        <button class="btn ghost" onclick="decideRequest('${r.id}','pending')">↩︁ Remettre en attente</button>
+      </div>
+    </div>
+    <div class="card"><h3>💬 Messages</h3><div id="req-thread"><div class="hint">Chargement…</div></div>
+      <div class="row" style="margin-top:10px"><div class="field" style="flex:1"><input id="req-msg" placeholder="Écrire un message à l'employé…"></div><button class="btn small" onclick="sendReqMsg('${r.id}')">Envoyer</button></div>
+    </div>`;
+  document.getElementById('detail-view').classList.remove('hidden');window.scrollTo(0,0);
+  loadReqThread(id);
+}
+async function decideRequest(id,status){
+  const reply=document.getElementById('req-reply')?document.getElementById('req-reply').value.trim():null;
+  const patch={status,admin_reply:reply||null};
+  if(status!=='pending'){patch.decided_at=new Date().toISOString();patch.decided_by_user_id=SESSION.user.id;}else{patch.decided_at=null;}
+  const {error}=await db.from('employee_requests').update(patch).eq('id',id);
+  if(error){toast('Erreur : '+error.message);return;}
+  const r=REQUESTS.find(x=>x.id===id);if(r)Object.assign(r,patch);
+  toast('Demande '+({approved:'approuvée',rejected:'refusée',pending:'remise en attente'}[status]));
+  renderDemandes();
+}
+async function loadReqThread(id){
+  const {data}=await db.from('employee_request_messages').select('*').eq('request_id',id).order('created_at');
+  const box=document.getElementById('req-thread');if(!box)return;
+  if(!data||!data.length){box.innerHTML='<div class="hint">Aucun message.</div>';return;}
+  box.innerHTML=data.map(m=>`<div style="margin-bottom:8px;padding:8px 11px;border-radius:9px;background:${m.sender_type==='admin'?'rgba(79,124,255,.12)':'var(--panel2)'};border:1px solid var(--line)"><div class="hint">${m.sender_type==='admin'?'👤 Admin':'🧑 Employé'} · ${new Date(m.created_at).toLocaleString('fr-FR')}</div><div style="white-space:pre-wrap">${esc(m.message||'')}</div></div>`).join('');
+}
+async function sendReqMsg(id){
+  const el=document.getElementById('req-msg');const msg=el.value.trim();if(!msg){toast('Écris un message.');return;}
+  const {error}=await db.from('employee_request_messages').insert({request_id:id,sender_type:'admin',sender_id:SESSION.user.id,message:msg});
+  if(error){toast('Erreur : '+error.message);return;}
+  el.value='';loadReqThread(id);
+}
+
 /* DOCUMENTS / BULLETINS */
 function renderDocuments(){
   const q=(document.getElementById('doc-search').value||'').toLowerCase().trim();
@@ -361,7 +447,33 @@ async function initEmployee(session){
   document.getElementById('emp-who').textContent=session.user.email||'';
   if(!emp){document.getElementById('clock-body').innerHTML='<div class="hint">Votre profil employé n\'est pas encore configuré. Contactez l\'administrateur.</div>';return;}
   EMP=emp;
-  await refreshEmpState(); await loadMyMonth();
+  const {data:cats}=await db.from('request_categories').select('*').order('name');
+  document.getElementById('myreq-cat').innerHTML='<option value="">— Choisir —</option>'+(cats||[]).map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('');
+  await refreshEmpState(); await loadMyMonth(); await loadMyRequests();
+}
+async function loadMyRequests(){
+  if(!EMP)return;
+  const {data}=await db.from('employee_requests').select('*').eq('employee_id',EMP.id).order('created_at',{ascending:false});
+  const rows=data||[];const box=document.getElementById('myreq-list');
+  if(!rows.length){box.innerHTML='<div class="hint">Aucune demande.</div>';return;}
+  box.innerHTML=rows.map(r=>`<div style="border:1px solid var(--line);border-radius:10px;padding:11px;margin-bottom:9px;background:var(--panel2)">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(r.category||'')}</b> ${reqPill(r.status)} <span class="hint">${esc(reqPeriode(r))}</span></div>
+    ${r.message?`<div style="margin-top:5px;font-size:14px">${esc(r.message)}</div>`:''}
+    ${r.admin_reply?`<div style="margin-top:6px;font-size:13px;color:var(--accent)">↳ Réponse admin : ${esc(r.admin_reply)}</div>`:''}
+    <div class="hint" style="margin-top:4px">Demandée le ${fmtDate(r.created_at)}</div></div>`).join('');
+}
+async function submitMyRequest(e){
+  e.preventDefault();
+  const cat=document.getElementById('myreq-cat').value;if(!cat){toast('Choisis un type.');return;}
+  const half=document.getElementById('myreq-half').value;
+  const payload={employee_id:EMP.id,category:cat,message:document.getElementById('myreq-msg').value.trim()||null,
+    start_date:document.getElementById('myreq-start').value||null,end_date:document.getElementById('myreq-end').value||null,
+    half_day:!!half,half_day_period:half||null,status:'pending'};
+  const {error}=await db.from('employee_requests').insert(payload);
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Demande envoyée ✓');
+  document.getElementById('myreq-msg').value='';document.getElementById('myreq-start').value='';document.getElementById('myreq-end').value='';document.getElementById('myreq-cat').value='';document.getElementById('myreq-half').value='';
+  loadMyRequests();
 }
 async function refreshEmpState(){
   const today=new Date().toISOString().slice(0,10);
