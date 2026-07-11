@@ -6,6 +6,7 @@
 <title>TimeGuard Pro — Pointage</title>
 <script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{--bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;--accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;}
   :root[data-theme="light"]{--bg:#f4f6fb;--panel:#fff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;--accent:#4f7cff;--accent2:#8a5cff;--good:#16a34a;--bad:#dc2626;--warn:#d97706;}
@@ -110,6 +111,7 @@
         <div class="field"><label>Date</label><input type="date" id="pt-date" onchange="renderPointages()"></div>
         <div class="field"><label>Employé</label><select id="pt-emp" onchange="renderPointages()"><option value="">Tous</option></select></div>
         <div class="field"><label>Mois entier ?</label><select id="pt-mode" onchange="renderPointages()"><option value="day">Ce jour</option><option value="month">Tout le mois</option></select></div>
+        <button class="btn ghost small" onclick="exportPointages()">⬇️ Export Excel</button>
       </div>
       <div class="table-wrap"><table id="pt-table"></table></div>
       <div class="hint" id="pt-count" style="margin-top:8px"></div></section></div>
@@ -122,11 +124,25 @@
       </div>
       <div class="table-wrap"><table id="req-table"></table></div></section></div>
 
-    <div id="tab-documents" class="hidden"><section class="panel">
+    <div id="tab-documents" class="hidden">
+      <section class="panel"><h2>Ajouter un document</h2>
+        <div class="row"><div class="field"><label>Employé</label><select id="updoc-emp"></select></div>
+          <div class="field"><label>Catégorie</label><input id="updoc-cat" placeholder="ex : RIB, Contrat…"></div>
+          <div class="field"><label>Fichier (PDF/image)</label><input type="file" id="updoc-file" accept=".pdf,.jpg,.jpeg,.png"></div>
+          <button class="btn small" onclick="uploadDocument()">⬆️ Ajouter</button></div>
+      </section>
+      <section class="panel">
       <div class="row" style="margin-bottom:12px"><input class="search" id="doc-search" placeholder="🔎 Rechercher…" oninput="renderDocuments()"><span class="hint" id="doc-count"></span></div>
       <div class="table-wrap"><table id="doc-table"></table></div></section></div>
 
-    <div id="tab-bulletins" class="hidden"><section class="panel">
+    <div id="tab-bulletins" class="hidden">
+      <section class="panel"><h2>Ajouter un bulletin</h2>
+        <div class="row"><div class="field"><label>Employé</label><select id="upbul-emp"></select></div>
+          <div class="field" style="max-width:150px"><label>Mois</label><input type="month" id="upbul-month"></div>
+          <div class="field"><label>Fichier PDF</label><input type="file" id="upbul-file" accept=".pdf"></div>
+          <button class="btn small" onclick="uploadBulletin()">⬆️ Ajouter</button></div>
+      </section>
+      <section class="panel">
       <div class="row" style="margin-bottom:12px"><input class="search" id="bul-search" placeholder="🔎 Rechercher…" oninput="renderBulletins()"><span class="hint" id="bul-count"></span></div>
       <div class="table-wrap"><table id="bul-table"></table></div></section></div>
 
@@ -248,8 +264,10 @@ async function loadAll(){
   REQUESTS=rq.data||[];REQCATS=rc.data||[];
   profByUser={};PROFILES.forEach(x=>profByUser[x.user_id]=x);
   empById={};EMPLOYES.forEach(x=>empById[x.id]=x);
-  const sel=document.getElementById('pt-emp');
-  sel.innerHTML='<option value="">Tous</option>'+EMPLOYES.slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
+  const empOpts=EMPLOYES.slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
+  document.getElementById('pt-emp').innerHTML='<option value="">Tous</option>'+empOpts;
+  document.getElementById('updoc-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
+  document.getElementById('upbul-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
   document.getElementById('pt-date').value=new Date().toISOString().slice(0,10);
 }
 function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
@@ -422,6 +440,45 @@ function renderParams(){
   document.getElementById('params-body').innerHTML=`<div class="grid2">${kv('Société',c.company_name)}${kv('SIRET',c.siret)}${kv('Adresse',c.company_address)}${kv('Email',c.company_email)}${kv('Téléphone',c.company_phone)}${kv('Pays',c.country)}</div>`;
   document.getElementById('equipes-table').innerHTML='<tr><th>Nom</th><th>Société</th><th>Pays</th><th>Fuseau</th><th>Devise</th></tr>'+
     (EQUIPES.map(q=>`<tr><td>${esc(q.nom||'')}</td><td>${esc(q.nom_societe||'')}</td><td>${esc(q.country||'')}</td><td>${esc(q.timezone||'')}</td><td>${esc(q.currency||'')}</td></tr>`).join('')||'<tr><td class="empty">Aucune</td></tr>');
+}
+
+/* EXPORT EXCEL des pointages */
+function exportPointages(){
+  const mode=document.getElementById('pt-mode').value,date=document.getElementById('pt-date').value,emp=document.getElementById('pt-emp').value;
+  let rows=POINTAGES.slice();
+  if(emp)rows=rows.filter(p=>p.employee_id===emp);
+  if(mode==='day'&&date)rows=rows.filter(p=>p.date===date);else if(mode==='month'&&date)rows=rows.filter(p=>(p.date||'').slice(0,7)===date.slice(0,7));
+  if(!rows.length){toast('Aucun pointage à exporter.');return;}
+  const aoa=[['Employé','Date','Début','Fin','Statut','Temps net (h)','Saisi manuel','Auto-dépointage','GPS lat','GPS lng']];
+  rows.forEach(p=>{const e=empById[p.employee_id];aoa.push([e?empName(e):'',p.date,fmtTime(p.heure_debut),fmtTime(p.heure_fin),p.status,p.temps_net!=null?mins(p.temps_net):'',p.saisi_manuellement?'oui':'',p.auto_depointage?'oui':'',p.location_lat||'',p.location_lng||'']);});
+  const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Pointages');
+  XLSX.writeFile(wb,'pointages-'+(date||'export')+'.xlsx');
+}
+/* UPLOAD document / bulletin (admin) */
+async function uploadDocument(){
+  const empId=document.getElementById('updoc-emp').value,file=document.getElementById('updoc-file').files[0],cat=document.getElementById('updoc-cat').value.trim();
+  if(!empId||!file){toast('Choisis un employé et un fichier.');return;}
+  const ext=(file.name.split('.').pop()||'pdf').toLowerCase();const path=`${empId}/${Date.now()}.${ext}`;
+  const {error:upErr}=await sb.storage.from('employee-documents').upload(path,file,{contentType:file.type||'application/octet-stream',upsert:true});
+  if(upErr){toast('Erreur upload : '+upErr.message);return;}
+  const url=`${SUPABASE_URL}/storage/v1/object/public/employee-documents/${path}`;
+  const {error}=await db.from('employee_documents').insert({employee_id:empId,uploaded_by:SESSION.user.id,file_name:file.name,file_url:url,file_type:file.type,file_size:file.size,category:cat||null});
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Document ajouté ✓');document.getElementById('updoc-file').value='';document.getElementById('updoc-cat').value='';
+  const {data}=await db.from('employee_documents').select('*').order('created_at',{ascending:false});DOCUMENTS=data||[];renderDocuments();
+}
+async function uploadBulletin(){
+  const empId=document.getElementById('upbul-emp').value,file=document.getElementById('upbul-file').files[0],month=document.getElementById('upbul-month').value;
+  if(!empId||!file||!month){toast('Choisis employé, mois et fichier.');return;}
+  const path=`${empId}/${month}.pdf`;
+  const {error:upErr}=await sb.storage.from('payslips').upload(path,file,{contentType:'application/pdf',upsert:true});
+  if(upErr){toast('Erreur upload : '+upErr.message);return;}
+  const url=`${SUPABASE_URL}/storage/v1/object/public/payslips/${path}`;
+  const emp=empById[empId];
+  const {error}=await db.from('employee_payslips').insert({employee_id:empId,month,file_name:file.name,file_url:url,uploaded_by:SESSION.user.id,team_id:emp?emp.equipe_id:null});
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Bulletin ajouté ✓');document.getElementById('upbul-file').value='';
+  const {data}=await db.from('employee_payslips').select('*').order('month',{ascending:false});BULLETINS=data||[];renderBulletins();
 }
 
 /* FICHIERS (URL signée car buckets privés) */
