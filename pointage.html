@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TimeGuard Pro — Pointage</title>
+<script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;--accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;}
+  :root[data-theme="light"]{--bg:#f4f6fb;--panel:#fff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;--accent:#4f7cff;--accent2:#8a5cff;--good:#16a34a;--bad:#dc2626;--warn:#d97706;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  .hidden{display:none!important}
+  a{color:var(--accent)}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(1200px 600px at 50% -10%,rgba(79,124,255,.15),transparent),var(--bg)}
+  .authcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:30px 28px;width:100%;max-width:400px}
+  .authcard h1{margin:0 0 4px;font-size:22px}.authcard .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}
+  input,select{width:100%;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--txt);font-size:14px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
+  header{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
+  header .spacer{margin-left:auto}.who{color:var(--muted);font-size:14px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
+  .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
+  .btn.small{padding:5px 10px;font-size:13px}
+  nav{display:flex;gap:6px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
+  nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  nav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
+  main{max-width:1200px;margin:0 auto;padding:22px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+  .panel h2{margin:0 0 14px;font-size:18px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;min-width:150px}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:14px;white-space:nowrap}
+  th{color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right}
+  tr.clickable{cursor:pointer}tr.clickable:hover td{background:var(--panel2)}
+  .empty{color:var(--muted);text-align:center;padding:24px}
+  .hint{color:var(--muted);font-size:13px}
+  .pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .kpi .k-val{font-size:24px;font-weight:800}.kpi .k-lab{color:var(--muted);font-size:13px;margin-top:4px}
+  .search{max-width:280px}
+  #detail-view{position:fixed;inset:0;background:var(--bg);overflow:auto;z-index:50}
+  .dhead{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .card h3{margin:0 0 12px;font-size:15px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kv{font-size:13px}.kv .k{color:var(--muted)}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s;z-index:200}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div id="login-view" class="overlay hidden">
+  <form class="authcard" onsubmit="doLogin(event)">
+    <h1>⏱️ TimeGuard Pro</h1><div class="sub">Connecte-toi pour accéder au pointage.</div>
+    <label>Email</label><input type="email" id="login-email" autocomplete="username" required>
+    <label>Mot de passe</label><input type="password" id="login-pass" autocomplete="current-password" required>
+    <button class="btn" type="submit" style="width:100%;margin-top:16px">Se connecter</button>
+    <div class="err" id="login-err"></div>
+  </form>
+</div>
+<div id="noaccess-view" class="overlay hidden">
+  <div class="authcard"><h1>Accès non autorisé</h1>
+    <div class="sub" id="noaccess-msg">Ton compte n'a pas accès au pointage. Contacte l'administrateur.</div>
+    <button class="btn ghost" style="width:100%" onclick="location.href='./index.html'">← Retour au portail</button>
+  </div>
+</div>
+
+<div id="app-view" class="hidden">
+  <header>
+    <h1>⏱️ TimeGuard Pro <span class="hint" id="role-badge"></span></h1>
+    <span class="spacer"></span>
+    <span class="who" id="who"></span>
+    <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
+    <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
+    <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
+  </header>
+  <nav>
+    <button data-tab="dash" class="active" onclick="showTab('dash')">📊 Tableau de bord</button>
+    <button data-tab="employes" onclick="showTab('employes')">👥 Employés</button>
+    <button data-tab="pointages" onclick="showTab('pointages')">⏱️ Pointages</button>
+    <button data-tab="documents" onclick="showTab('documents')">📄 Documents</button>
+    <button data-tab="bulletins" onclick="showTab('bulletins')">🧾 Bulletins</button>
+    <button data-tab="zones" onclick="showTab('zones')">📍 Zones GPS</button>
+    <button data-tab="params" onclick="showTab('params')">⚙️ Paramètres</button>
+  </nav>
+  <main>
+    <div id="tab-dash"><section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
+      <section class="panel"><h2>Pointages du jour</h2><div class="table-wrap"><table id="dash-today"></table></div></section></div>
+
+    <div id="tab-employes" class="hidden"><section class="panel">
+      <div class="row" style="margin-bottom:12px"><input class="search" id="emp-search" placeholder="🔎 Rechercher…" oninput="renderEmployes()">
+      <span class="hint" id="emp-count"></span></div>
+      <div class="table-wrap"><table id="emp-table"></table></div></section></div>
+
+    <div id="tab-pointages" class="hidden"><section class="panel">
+      <div class="row" style="margin-bottom:12px">
+        <div class="field"><label>Date</label><input type="date" id="pt-date" onchange="renderPointages()"></div>
+        <div class="field"><label>Employé</label><select id="pt-emp" onchange="renderPointages()"><option value="">Tous</option></select></div>
+        <div class="field"><label>Mois entier ?</label><select id="pt-mode" onchange="renderPointages()"><option value="day">Ce jour</option><option value="month">Tout le mois</option></select></div>
+      </div>
+      <div class="table-wrap"><table id="pt-table"></table></div>
+      <div class="hint" id="pt-count" style="margin-top:8px"></div></section></div>
+
+    <div id="tab-documents" class="hidden"><section class="panel">
+      <div class="row" style="margin-bottom:12px"><input class="search" id="doc-search" placeholder="🔎 Rechercher…" oninput="renderDocuments()"><span class="hint" id="doc-count"></span></div>
+      <div class="table-wrap"><table id="doc-table"></table></div></section></div>
+
+    <div id="tab-bulletins" class="hidden"><section class="panel">
+      <div class="row" style="margin-bottom:12px"><input class="search" id="bul-search" placeholder="🔎 Rechercher…" oninput="renderBulletins()"><span class="hint" id="bul-count"></span></div>
+      <div class="table-wrap"><table id="bul-table"></table></div></section></div>
+
+    <div id="tab-zones" class="hidden"><section class="panel"><h2>Zones GPS</h2>
+      <div class="table-wrap"><table id="zones-table"></table></div></section></div>
+
+    <div id="tab-params" class="hidden"><section class="panel"><h2>Paramètres société</h2>
+      <div id="params-body"></div></section>
+      <section class="panel"><h2>Équipes / Sociétés</h2><div class="table-wrap"><table id="equipes-table"></table></div></section></div>
+  </main>
+</div>
+
+<!-- FICHE EMPLOYÉ -->
+<div id="detail-view" class="hidden">
+  <div class="dhead"><button class="btn ghost small" onclick="closeDetail()">← Retour</button>
+    <h1 id="d-name" style="font-size:18px;margin:0"></h1></div>
+  <main><div id="detail-body"></div></main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
+const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const db=sb.schema('pointage');   // toutes les tables sont dans le schéma "pointage"
+
+let SESSION=null, MYROLE=null;
+let PROFILES=[], EMPLOYES=[], EQUIPES=[], POINTAGES=[], DOCUMENTS=[], BULLETINS=[], ZONES=[], COMPANY=null;
+let profByUser={}, empById={};
+
+function toggleTheme(){const l=document.documentElement.getAttribute('data-theme')!=='light';if(l)document.documentElement.setAttribute('data-theme','light');else document.documentElement.removeAttribute('data-theme');try{localStorage.setItem('pfp-theme',l?'light':'dark');}catch(e){}updateThemeBtn();}
+function updateThemeBtn(){const b=document.getElementById('theme-btn');if(b)b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙';}
+updateThemeBtn();
+
+function esc(s){return(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR');}
+function fmtTime(d){if(!d)return'—';return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}
+function eur(n){if(n==null||n===''||isNaN(Number(n)))return'—';return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €';}
+function mins(n){if(n==null||isNaN(Number(n)))return'—';n=Math.round(Number(n));return Math.floor(n/60)+'h'+String(n%60).padStart(2,'0');}
+let _tt;function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2600);}
+
+function empName(e){const p=profByUser[e.user_id];if(p)return((p.first_name||'')+' '+(p.last_name||'')).trim()||p.email||'(sans nom)';return '(employé '+String(e.id).slice(0,6)+')';}
+function empEmail(e){const p=profByUser[e.user_id];return p?p.email:'';}
+function equipeName(id){const q=EQUIPES.find(x=>x.id===id);return q?(q.nom||q.nom_societe||''):'';}
+
+/* AUTH */
+async function doLogin(e){e.preventDefault();
+  const email=document.getElementById('login-email').value.trim(),password=document.getElementById('login-pass').value;
+  document.getElementById('login-err').textContent='Connexion…';
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error){document.getElementById('login-err').textContent='Email ou mot de passe incorrect.';return;}
+  document.getElementById('login-err').textContent='';await afterAuth(data.session);}
+async function doLogout(){await sb.auth.signOut();location.reload();}
+async function afterAuth(session){
+  SESSION=session;
+  const {data:roles}=await db.from('user_roles').select('role').eq('user_id',session.user.id);
+  const rset=(roles||[]).map(r=>r.role);
+  MYROLE=rset.includes('admin')?'admin':rset.includes('manager')?'manager':rset.includes('comptable')?'comptable':rset.includes('employee')?'employee':null;
+  document.getElementById('login-view').classList.add('hidden');
+  if(!MYROLE){document.getElementById('noaccess-view').classList.remove('hidden');return;}
+  if(MYROLE==='employee'){document.getElementById('noaccess-msg').textContent="L'écran employé (pointer) arrive bientôt. Pour l'instant, seul l'espace admin est disponible.";document.getElementById('noaccess-view').classList.remove('hidden');return;}
+  document.getElementById('noaccess-view').classList.add('hidden');
+  document.getElementById('app-view').classList.remove('hidden');
+  document.getElementById('who').textContent=session.user.email||'';
+  document.getElementById('role-badge').textContent='· '+MYROLE;
+  await loadAll();showTab('dash');
+}
+async function loadAll(){
+  const [p,e,q,pt,dc,bl,z,co]=await Promise.all([
+    db.from('profiles').select('*'),
+    db.from('employees').select('*'),
+    db.from('equipes').select('*'),
+    db.from('pointages').select('*').order('date',{ascending:false}),
+    db.from('employee_documents').select('*').order('created_at',{ascending:false}),
+    db.from('employee_payslips').select('*').order('month',{ascending:false}),
+    db.from('zones_gps').select('*'),
+    db.from('company_settings').select('*').limit(1),
+  ]);
+  PROFILES=p.data||[];EMPLOYES=e.data||[];EQUIPES=q.data||[];POINTAGES=pt.data||[];DOCUMENTS=dc.data||[];BULLETINS=bl.data||[];ZONES=z.data||[];COMPANY=(co.data||[])[0]||null;
+  profByUser={};PROFILES.forEach(x=>profByUser[x.user_id]=x);
+  empById={};EMPLOYES.forEach(x=>empById[x.id]=x);
+  const sel=document.getElementById('pt-emp');
+  sel.innerHTML='<option value="">Tous</option>'+EMPLOYES.slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
+  document.getElementById('pt-date').value=new Date().toISOString().slice(0,10);
+}
+function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  ['dash','employes','pointages','documents','bulletins','zones','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  ({dash:renderDash,employes:renderEmployes,pointages:renderPointages,documents:renderDocuments,bulletins:renderBulletins,zones:renderZones,params:renderParams}[t])();}
+
+/* DASHBOARD */
+function renderDash(){
+  const today=new Date().toISOString().slice(0,10);
+  const ptToday=POINTAGES.filter(p=>p.date===today);
+  const actifs=EMPLOYES.filter(e=>e.status==='active').length;
+  const enCours=ptToday.filter(p=>p.status==='in_progress').length;
+  const kpi=[{v:EMPLOYES.length,l:'Employés'},{v:actifs,l:'Actifs'},{v:ptToday.length,l:'Pointages aujourd\'hui'},
+    {v:enCours,l:'En cours maintenant'},{v:POINTAGES.length,l:'Pointages (total)'},{v:BULLETINS.length,l:'Bulletins'},
+    {v:DOCUMENTS.length,l:'Documents'},{v:ZONES.length,l:'Zones GPS'}];
+  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+  const t=document.getElementById('dash-today');
+  if(!ptToday.length){t.innerHTML='<tr><td class="empty">Aucun pointage aujourd\'hui.</td></tr>';return;}
+  t.innerHTML='<tr><th>Employé</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th></tr>'+
+    ptToday.map(p=>{const e=empById[p.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${fmtTime(p.heure_debut)}</td><td>${fmtTime(p.heure_fin)}</td><td>${statutPill(p.status)}</td><td class="num">${mins(p.temps_net)}</td></tr>`;}).join('');
+}
+function statutPill(s){const m={in_progress:['En cours','var(--accent)'],completed:['Terminé','var(--good)'],paused:['En pause','var(--warn)']};const x=m[s]||[s||'—','var(--muted)'];return `<span class="pill" style="background:${x[1]}22;color:${x[1]}">${x[0]}</span>`;}
+
+/* EMPLOYÉS */
+function renderEmployes(){
+  const q=(document.getElementById('emp-search').value||'').toLowerCase().trim();
+  const rows=EMPLOYES.filter(e=>!q||[empName(e),empEmail(e),equipeName(e.equipe_id)].some(v=>(v||'').toLowerCase().includes(q)))
+    .sort((a,b)=>empName(a).localeCompare(empName(b)));
+  document.getElementById('emp-count').textContent=rows.length+' employé(s)';
+  const t=document.getElementById('emp-table');
+  t.innerHTML='<tr><th>Nom</th><th>Email</th><th>Équipe</th><th>Horaires</th><th>Type</th><th>Statut</th><th class="num">Taux</th></tr>'+
+    rows.map(e=>`<tr class="clickable" onclick="openEmp('${e.id}')">
+      <td><b>${esc(empName(e))}</b></td><td>${esc(empEmail(e))}</td><td>${esc(equipeName(e.equipe_id))}</td>
+      <td>${e.horaires_debut?e.horaires_debut.slice(0,5)+'–'+(e.horaires_fin||'').slice(0,5):'—'}</td>
+      <td>${esc(e.type_horaire||'')}</td><td>${e.status==='active'?'<span class="pill" style="background:var(--good)22;color:var(--good)">Actif</span>':esc(e.status||'')}</td>
+      <td class="num">${e.taux_horaire!=null?eur(e.taux_horaire):(e.salaire_global!=null?eur(e.salaire_global):'—')}</td></tr>`).join('');
+}
+async function openEmp(id){
+  const e=empById[id];if(!e)return;
+  document.getElementById('d-name').textContent='👤 '+empName(e);
+  const p=profByUser[e.user_id]||{};
+  const pts=POINTAGES.filter(x=>x.employee_id===id);
+  const docs=DOCUMENTS.filter(x=>x.employee_id===id);
+  const buls=BULLETINS.filter(x=>x.employee_id===id);
+  const zs=ZONES.filter(x=>x.employee_id===id);
+  const kv=(k,v)=>`<div class="kv"><span class="k">${k} :</span> ${esc(v==null||v===''?'—':v)}</div>`;
+  document.getElementById('detail-body').innerHTML=`
+    <div class="card"><h3>Informations</h3><div class="grid2">
+      ${kv('Prénom',p.first_name)}${kv('Nom',p.last_name)}${kv('Email',p.email)}${kv('Téléphone',p.phone)}
+      ${kv('Poste',p.position)}${kv('Équipe',equipeName(e.equipe_id))}${kv('Horaires',(e.horaires_debut||'').slice(0,5)+'–'+(e.horaires_fin||'').slice(0,5))}
+      ${kv('Type horaire',e.type_horaire)}${kv('Statut',e.status)}${kv('Taux horaire',e.taux_horaire!=null?eur(e.taux_horaire):'—')}
+      ${kv('Salaire global',e.salaire_global!=null?eur(e.salaire_global):'—')}${kv('Type salaire',e.salaire_type)}${kv('Frais transport',e.frais_transport!=null?eur(e.frais_transport):'—')}
+      ${kv('Pause prévue (min)',e.duree_pause_prevue)}${kv('Heures sup autorisées',e.heures_supplementaires_autorisees?'oui':'non')}</div></div>
+    <div class="card"><h3>Pointages (${pts.length})</h3><div class="table-wrap"><table>
+      <tr><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>GPS</th></tr>
+      ${pts.slice(0,200).map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${fmtTime(x.heure_debut)}</td><td>${fmtTime(x.heure_fin)}</td><td>${statutPill(x.status)}</td><td class="num">${mins(x.temps_net)}</td><td class="hint">${x.location_lat?Number(x.location_lat).toFixed(4)+','+Number(x.location_lng).toFixed(4):'—'}</td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
+    </table></div>${pts.length>200?'<div class="hint">200 premiers affichés</div>':''}</div>
+    <div class="card"><h3>Bulletins de paie (${buls.length})</h3><div class="table-wrap"><table>
+      <tr><th>Mois</th><th>Fichier</th><th></th></tr>
+      ${buls.map(x=>`<tr><td>${esc(x.month)}</td><td>${esc(x.file_name||'')}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
+    </table></div></div>
+    <div class="card"><h3>Documents (${docs.length})</h3><div class="table-wrap"><table>
+      <tr><th>Nom</th><th>Catégorie</th><th>Date</th><th></th></tr>
+      ${docs.map(x=>`<tr><td>${esc(x.file_name||'')}</td><td>${esc(x.category||'')}</td><td>${fmtDate(x.created_at)}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
+    </table></div></div>
+    <div class="card"><h3>Zones GPS (${zs.length})</h3><div class="table-wrap"><table>
+      <tr><th>Zone</th><th>Adresse</th><th class="num">Rayon</th><th>Active</th></tr>
+      ${zs.map(x=>`<tr><td>${esc(x.nom_zone)}</td><td>${esc(x.adresse||'')}</td><td class="num">${x.rayon_m} m</td><td>${x.active?'✅':'—'}</td></tr>`).join('')||'<tr><td class="empty">Aucune</td></tr>'}
+    </table></div></div>`;
+  document.getElementById('detail-view').classList.remove('hidden');window.scrollTo(0,0);
+}
+function closeDetail(){document.getElementById('detail-view').classList.add('hidden');}
+
+/* POINTAGES */
+function renderPointages(){
+  const mode=document.getElementById('pt-mode').value,date=document.getElementById('pt-date').value,emp=document.getElementById('pt-emp').value;
+  let rows=POINTAGES.slice();
+  if(emp)rows=rows.filter(p=>p.employee_id===emp);
+  if(mode==='day'&&date)rows=rows.filter(p=>p.date===date);
+  else if(mode==='month'&&date)rows=rows.filter(p=>(p.date||'').slice(0,7)===date.slice(0,7));
+  document.getElementById('pt-count').textContent=rows.length+' pointage(s)';
+  const t=document.getElementById('pt-table');
+  if(!rows.length){t.innerHTML='<tr><td class="empty">Aucun pointage.</td></tr>';return;}
+  t.innerHTML='<tr><th>Employé</th><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>Saisi</th><th>GPS</th></tr>'+
+    rows.slice(0,500).map(p=>{const e=empById[p.employee_id];return `<tr class="clickable" onclick="openEmp('${p.employee_id}')"><td>${esc(e?empName(e):'—')}</td><td>${fmtDate(p.date)}</td><td>${fmtTime(p.heure_debut)}</td><td>${fmtTime(p.heure_fin)}</td><td>${statutPill(p.status)}</td><td class="num">${mins(p.temps_net)}</td><td>${p.saisi_manuellement?'✍️ manuel':(p.auto_depointage?'⏲️ auto':'')}</td><td class="hint">${p.location_lat?'📍':''}</td></tr>`;}).join('');
+}
+
+/* DOCUMENTS / BULLETINS */
+function renderDocuments(){
+  const q=(document.getElementById('doc-search').value||'').toLowerCase().trim();
+  const rows=DOCUMENTS.filter(x=>{const e=empById[x.employee_id];return !q||[x.file_name,x.category,e?empName(e):''].some(v=>(v||'').toLowerCase().includes(q));});
+  document.getElementById('doc-count').textContent=rows.length+' document(s)';
+  document.getElementById('doc-table').innerHTML='<tr><th>Employé</th><th>Fichier</th><th>Catégorie</th><th>Date</th><th></th></tr>'+
+    (rows.map(x=>{const e=empById[x.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${esc(x.file_name||'')}</td><td>${esc(x.category||'')}</td><td>${fmtDate(x.created_at)}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td class="empty">Aucun</td></tr>');
+}
+function renderBulletins(){
+  const q=(document.getElementById('bul-search').value||'').toLowerCase().trim();
+  const rows=BULLETINS.filter(x=>{const e=empById[x.employee_id];return !q||[x.file_name,x.month,e?empName(e):''].some(v=>(v||'').toLowerCase().includes(q));});
+  document.getElementById('bul-count').textContent=rows.length+' bulletin(s)';
+  document.getElementById('bul-table').innerHTML='<tr><th>Employé</th><th>Mois</th><th>Fichier</th><th></th></tr>'+
+    (rows.map(x=>{const e=empById[x.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${esc(x.month)}</td><td>${esc(x.file_name||'')}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td class="empty">Aucun</td></tr>');
+}
+
+/* ZONES / PARAMS */
+function renderZones(){
+  document.getElementById('zones-table').innerHTML='<tr><th>Employé</th><th>Zone</th><th>Adresse</th><th class="num">Rayon</th><th>Active</th></tr>'+
+    (ZONES.map(z=>{const e=empById[z.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${esc(z.nom_zone)}</td><td>${esc(z.adresse||'')}</td><td class="num">${z.rayon_m} m</td><td>${z.active?'✅':'—'}</td></tr>`;}).join('')||'<tr><td class="empty">Aucune zone</td></tr>');
+}
+function renderParams(){
+  const c=COMPANY||{};const kv=(k,v)=>`<div class="kv"><span class="k">${k} :</span> ${esc(v==null||v===''?'—':v)}</div>`;
+  document.getElementById('params-body').innerHTML=`<div class="grid2">${kv('Société',c.company_name)}${kv('SIRET',c.siret)}${kv('Adresse',c.company_address)}${kv('Email',c.company_email)}${kv('Téléphone',c.company_phone)}${kv('Pays',c.country)}</div>`;
+  document.getElementById('equipes-table').innerHTML='<tr><th>Nom</th><th>Société</th><th>Pays</th><th>Fuseau</th><th>Devise</th></tr>'+
+    (EQUIPES.map(q=>`<tr><td>${esc(q.nom||'')}</td><td>${esc(q.nom_societe||'')}</td><td>${esc(q.country||'')}</td><td>${esc(q.timezone||'')}</td><td>${esc(q.currency||'')}</td></tr>`).join('')||'<tr><td class="empty">Aucune</td></tr>');
+}
+
+/* FICHIERS (URL signée car buckets privés) */
+async function openFile(fileUrl){
+  try{
+    const m=fileUrl.match(/\/object\/(?:public\/)?([^/]+)\/(.+)$/);
+    if(!m){window.open(fileUrl,'_blank');return;}
+    const bucket=m[1],path=decodeURIComponent(m[2]);
+    const {data,error}=await sb.storage.from(bucket).createSignedUrl(path,3600);
+    if(error||!data){toast('Fichier indisponible : '+(error?error.message:''));return;}
+    window.open(data.signedUrl,'_blank');
+  }catch(e){toast('Erreur : '+e.message);}
+}
+
+/* INIT */
+(async()=>{const {data:{session}}=await sb.auth.getSession();
+  if(!session){document.getElementById('login-view').classList.remove('hidden');return;}
+  await afterAuth(session);})();
+</script>
+</body>
+</html>
