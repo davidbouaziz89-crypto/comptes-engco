@@ -114,6 +114,7 @@
         <div class="field"><label>Date</label><input type="date" id="pt-date" onchange="renderPointages()"></div>
         <div class="field"><label>Employé</label><select id="pt-emp" onchange="renderPointages()"><option value="">Tous</option></select></div>
         <div class="field"><label>Mois entier ?</label><select id="pt-mode" onchange="renderPointages()"><option value="day">Ce jour</option><option value="month">Tout le mois</option></select></div>
+        <button class="btn small" onclick="openAddPointage(document.getElementById('pt-emp').value)">➕ Ajouter un pointage</button>
         <button class="btn ghost small" onclick="exportPointages()">⬇️ Export Excel</button>
         <button class="btn ghost small" onclick="exportPdf()">⬇️ PDF (mois)</button>
         <button class="btn ghost small" onclick="closeForgottenDays()">🧹 Clôturer les journées oubliées</button>
@@ -219,6 +220,17 @@
   </div>
 </div>
 
+<!-- MODAL AJOUT / MODIF POINTAGE -->
+<div id="ptedit-modal" class="overlay hidden" style="background:rgba(0,0,0,.6)">
+  <div class="authcard"><h1 id="pe-title" style="font-size:19px">Pointage</h1>
+    <div id="pe-emp-wrap"><label>Employé</label><select id="pe-emp"></select></div>
+    <label>Date</label><input type="date" id="pe-date">
+    <div class="row"><div class="field" style="flex:1"><label>Début</label><input type="time" id="pe-start"></div><div class="field" style="flex:1"><label>Fin</label><input type="time" id="pe-end"></div><div class="field"><label>Pause (min)</label><input type="number" id="pe-pause" value="0"></div></div>
+    <div class="err" id="pe-msg"></div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn ghost" onclick="closePtEdit()">Annuler</button><button class="btn" id="pe-go" onclick="savePointageManual()">Enregistrer</button></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -244,6 +256,7 @@ function mins(n){if(n==null||isNaN(Number(n)))return'—';n=Math.round(Number(n)
 function gv(id){const el=document.getElementById(id);return el?String(el.value).trim():'';}
 function gnum(id){const s=gv(id);return s===''?null:(isNaN(Number(s))?null:Number(s));}
 function safePdf(s){return String(s||'').replace(/[^a-z0-9]+/gi,'_')||'export';}
+function tzTimeLocal(iso){const d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 let _tt;function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2600);}
 
 function empName(e){const p=profByUser[e.user_id];if(p)return((p.first_name||'')+' '+(p.last_name||'')).trim()||p.email||'(sans nom)';return '(employé '+String(e.id).slice(0,6)+')';}
@@ -269,7 +282,6 @@ async function forgotPassword(){
 }
 async function afterAuth(session){
   SESSION=session;
-  // Le rôle vient de profiles.role (comme l'appli d'origine ; policy self-read OK pour tous les rôles)
   const {data:prof}=await db.from('profiles').select('role').eq('user_id',session.user.id).maybeSingle();
   MYROLE=prof?prof.role:null;
   document.getElementById('login-view').classList.add('hidden');
@@ -313,6 +325,7 @@ async function reloadCore(){
   empById={};EMPLOYES.forEach(x=>empById[x.id]=x);
   profByUser={};PROFILES.forEach(x=>profByUser[x.user_id]=x);
 }
+async function reloadPointages(){const {data}=await db.from('pointages').select('*').order('date',{ascending:false});POINTAGES=data||[];}
 function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   ['dash','employes','pointages','demandes','documents','bulletins','zones','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
   ({dash:renderDash,employes:renderEmployes,pointages:renderPointages,demandes:renderDemandes,documents:renderDocuments,bulletins:renderBulletins,zones:renderZones,params:renderParams}[t])();}
@@ -375,17 +388,19 @@ async function openEmp(id){
   const zs=ZONES.filter(x=>x.employee_id===id);
   document.getElementById('detail-body').innerHTML='<div class="hint">Chargement…</div>';
   document.getElementById('detail-view').classList.remove('hidden');window.scrollTo(0,0);
-  const [boR,adjR,sdR,saR]=await Promise.all([
+  const [boR,adjR,sdR,saR,pcR]=await Promise.all([
     db.from('employee_bonus').select('*').eq('employee_id',id).order('month',{ascending:false}),
     db.from('employee_monthly_adjustments').select('*').eq('employee_id',id).order('month',{ascending:false}),
     db.from('employee_school_days').select('*').eq('employee_id',id).order('date',{ascending:false}),
-    db.from('employee_school_absences').select('*').eq('employee_id',id).order('absence_date',{ascending:false})
+    db.from('employee_school_absences').select('*').eq('employee_id',id).order('absence_date',{ascending:false}),
+    db.from('pointage_comments').select('*, absence_categories(name)').eq('employee_id',id).order('pointage_date',{ascending:false})
   ]);
-  const bonuses=boR.data||[], adjustments=adjR.data||[], schoolDays=sdR.data||[], schoolAbs=saR.data||[];
+  const bonuses=boR.data||[], adjustments=adjR.data||[], schoolDays=sdR.data||[], schoolAbs=saR.data||[], pcomments=pcR.data||[];
   const equipeOpts='<option value="">— Aucune —</option>'+EQUIPES.map(q=>`<option value="${q.id}"${q.id===e.equipe_id?' selected':''}>${esc(q.nom||q.nom_societe||'')}</option>`).join('');
   const statusVals=[...new Set(['active','inactive',...distinctVals('status')])];
   const hh=(e.horaires_hebdomadaires&&typeof e.horaires_hebdomadaires==='object')?e.horaires_hebdomadaires:{};
   const DAYS=[['lundi','Lundi'],['mardi','Mardi'],['mercredi','Mercredi'],['jeudi','Jeudi'],['vendredi','Vendredi'],['samedi','Samedi'],['dimanche','Dimanche']];
+  const absOpts='<option value="">— Aucune —</option>'+ABSCATS.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
   document.getElementById('detail-body').innerHTML=`
     <div class="card"><h3>✏️ Informations de l'employé</h3>
       <div class="hint" style="margin:-6px 0 12px">Email de connexion : <b>${esc(p.email||'—')}</b> <span style="opacity:.7">(non modifiable ici)</span></div>
@@ -432,6 +447,21 @@ async function openEmp(id){
       <div style="margin-top:8px"><button class="btn small" onclick="savePlanning('${id}')">💾 Enregistrer le planning</button></div>
     </div>
 
+    <div class="card"><h3>🌴 Statuts / absences par jour (${pcomments.length})</h3>
+      <div class="hint" style="margin:-6px 0 10px">Marque un jour en congé / absence / statut particulier. Alimente le suivi de présence et les calculs.</div>
+      <div class="table-wrap"><table>
+        <tr><th>Date</th><th>Catégorie</th><th>½ journée</th><th>Commentaire</th><th></th></tr>
+        ${pcomments.slice(0,150).map(pc=>`<tr><td>${fmtDate(pc.pointage_date)}</td><td>${esc(pc.absence_categories?pc.absence_categories.name:'—')}</td><td>${pc.half_day_period?esc(pc.half_day_period):'—'}</td><td style="white-space:normal">${esc(pc.comment||'')}</td><td><button class="btn ghost small" onclick="delPointageComment('${pc.id}','${id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
+      </table></div>
+      <div class="row" style="margin-top:10px">
+        <div class="field"><label>Date</label><input type="date" id="pc-date"></div>
+        <div class="field"><label>Catégorie</label><select id="pc-cat">${absOpts}</select></div>
+        <div class="field"><label>Demi-journée</label><select id="pc-half"><option value="">Non</option><option value="matin">Matin</option><option value="apres_midi">Après-midi</option></select></div>
+        <div class="field" style="flex:1"><label>Commentaire</label><input id="pc-comment"></div>
+        <button class="btn small" onclick="savePointageComment('${id}')">➕ Ajouter</button>
+      </div>
+    </div>
+
     <div class="card"><h3>💶 Primes (${bonuses.length})</h3>
       <div class="table-wrap"><table>
         <tr><th>Mois</th><th>Libellé</th><th class="num">Montant</th><th></th></tr>
@@ -474,9 +504,10 @@ async function openEmp(id){
     </div>
 
     <div class="card"><h3>Pointages (${pts.length})</h3><div class="table-wrap"><table>
-      <tr><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>GPS</th></tr>
-      ${pts.slice(0,200).map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${fmtTime(x.heure_debut)}</td><td>${fmtTime(x.heure_fin)}</td><td>${statutPill(x.status)}</td><td class="num">${mins(x.temps_net)}</td><td class="hint">${x.location_lat?Number(x.location_lat).toFixed(4)+','+Number(x.location_lng).toFixed(4):'—'}</td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
-    </table></div>${pts.length>200?'<div class="hint">200 premiers affichés</div>':''}</div>
+      <tr><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>GPS</th><th></th></tr>
+      ${pts.slice(0,200).map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${fmtTime(x.heure_debut)}</td><td>${fmtTime(x.heure_fin)}</td><td>${statutPill(x.status)}</td><td class="num">${mins(x.temps_net)}</td><td class="hint">${x.location_lat?Number(x.location_lat).toFixed(4)+','+Number(x.location_lng).toFixed(4):'—'}</td><td><button class="btn ghost small" onclick="openEditPointage('${x.id}')">✏️</button> <button class="btn ghost small" onclick="delPointage('${x.id}','${id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
+    </table></div>${pts.length>200?'<div class="hint">200 premiers affichés</div>':''}
+    <div style="margin-top:10px"><button class="btn small" onclick="openAddPointage('${id}')">➕ Ajouter un pointage</button></div></div>
     <div class="card"><h3>Bulletins de paie (${buls.length})</h3><div class="table-wrap"><table>
       <tr><th>Mois</th><th>Fichier</th><th></th></tr>
       ${buls.map(x=>`<tr><td>${esc(x.month)}</td><td>${esc(x.file_name||'')}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
@@ -515,6 +546,16 @@ async function savePlanning(id){
   if(error){toast('Erreur : '+error.message);return;}
   await reloadCore(); toast('Planning enregistré ✓');
 }
+async function savePointageComment(id){
+  const date=gv('pc-date');if(!date){toast('Date requise.');return;}
+  const cat=gv('pc-cat')||null;const half=gv('pc-half')||null;const comment=gv('pc-comment')||null;
+  if(!cat&&!comment){toast('Choisis une catégorie ou écris un commentaire.');return;}
+  const row={employee_id:id,pointage_date:date,absence_category_id:cat,half_day_period:half,comment,created_by_user_id:SESSION.user.id};
+  const {error}=await db.from('pointage_comments').upsert(row,{onConflict:'employee_id,pointage_date'});
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Statut enregistré ✓');openEmp(id);
+}
+async function delPointageComment(cid,id){if(!confirm('Supprimer ce statut ?'))return;const {error}=await db.from('pointage_comments').delete().eq('id',cid);if(error){toast('Erreur : '+error.message);return;}toast('Supprimé');openEmp(id);}
 async function fillMyPosition(){try{const l=await empGetLocation();document.getElementById('zf-lat').value=l.lat.toFixed(6);document.getElementById('zf-lng').value=l.lng.toFixed(6);toast('Position récupérée ✓');}catch(e){toast(e.message);}}
 function editZone(zid){
   const z=ZONES.find(x=>x.id===zid);if(!z)return;window._zEdit=zid;
@@ -589,6 +630,59 @@ async function addSchoolAbsence(id){
 async function delSchoolAbsence(sid,id){if(!confirm('Supprimer ?'))return;const {error}=await db.from('employee_school_absences').delete().eq('id',sid);if(error){toast('Erreur : '+error.message);return;}toast('Supprimé');openEmp(id);}
 function closeDetail(){document.getElementById('detail-view').classList.add('hidden');}
 
+/* AJOUT / MODIFICATION MANUELLE DE POINTAGE */
+function openAddPointage(prefillEmp){
+  window._peEdit=null; window._peEmp=null;
+  document.getElementById('pe-title').textContent='➕ Ajouter un pointage';
+  document.getElementById('pe-emp-wrap').style.display='';
+  const opts='<option value="">— Choisir —</option>'+EMPLOYES.slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
+  document.getElementById('pe-emp').innerHTML=opts;
+  document.getElementById('pe-emp').value=prefillEmp||'';
+  const ptd=document.getElementById('pt-date');
+  document.getElementById('pe-date').value=(ptd&&ptd.value)||new Date().toISOString().slice(0,10);
+  document.getElementById('pe-start').value='';document.getElementById('pe-end').value='';document.getElementById('pe-pause').value='0';
+  document.getElementById('pe-msg').textContent='';
+  document.getElementById('ptedit-modal').classList.remove('hidden');
+}
+function openEditPointage(pid){
+  const p=POINTAGES.find(x=>x.id===pid);if(!p){toast('Pointage introuvable');return;}
+  window._peEdit=pid; window._peEmp=p.employee_id;
+  document.getElementById('pe-title').textContent='✏️ Modifier le pointage';
+  document.getElementById('pe-emp-wrap').style.display='none';
+  document.getElementById('pe-date').value=p.date||'';
+  document.getElementById('pe-start').value=p.heure_debut?tzTimeLocal(p.heure_debut):'';
+  document.getElementById('pe-end').value=p.heure_fin?tzTimeLocal(p.heure_fin):'';
+  document.getElementById('pe-pause').value=p.pause_manuelle!=null?p.pause_manuelle:((p.temps_total!=null&&p.temps_net!=null)?(p.temps_total-p.temps_net):0);
+  document.getElementById('pe-msg').textContent='';
+  document.getElementById('ptedit-modal').classList.remove('hidden');
+}
+function closePtEdit(){document.getElementById('ptedit-modal').classList.add('hidden');}
+async function savePointageManual(){
+  const editing=window._peEdit;
+  const empId=editing?window._peEmp:document.getElementById('pe-emp').value;
+  const date=gv('pe-date'),st=gv('pe-start'),en=gv('pe-end'),pause=gnum('pe-pause')||0;
+  const msg=document.getElementById('pe-msg');
+  if(!empId||!date||!st||!en){msg.textContent='Employé, date, début et fin requis.';return;}
+  let start=new Date(date+'T'+st+':00'); let end=new Date(date+'T'+en+':00');
+  if(end<=start) end=new Date(end.getTime()+24*3600000);
+  const total=Math.round((end-start)/60000); const net=Math.max(0,total-pause);
+  const row={employee_id:empId,date,heure_debut:start.toISOString(),heure_fin:end.toISOString(),status:'completed',temps_total:total,temps_net:net,pause_manuelle:pause||null,saisi_manuellement:true,modifie_par_admin_id:SESSION.user.id};
+  const btn=document.getElementById('pe-go');btn.disabled=true;msg.textContent='Enregistrement…';
+  let r; if(editing) r=await db.from('pointages').update(row).eq('id',editing); else r=await db.from('pointages').insert(row);
+  btn.disabled=false;
+  if(r.error){msg.textContent='Erreur : '+r.error.message;return;}
+  closePtEdit();toast('Pointage enregistré ✓');
+  await reloadPointages(); renderPointages(); renderDash();
+  const dv=document.getElementById('detail-view'); if(dv&&!dv.classList.contains('hidden')) openEmp(empId);
+}
+async function delPointage(pid,empId){
+  if(!confirm('Supprimer ce pointage ?'))return;
+  const {error}=await db.from('pointages').delete().eq('id',pid);
+  if(error){toast('Suppression refusée : '+error.message);return;}
+  await reloadPointages(); toast('Pointage supprimé'); renderPointages(); renderDash();
+  const dv=document.getElementById('detail-view'); if(dv&&!dv.classList.contains('hidden')) openEmp(empId);
+}
+
 /* POINTAGES */
 function renderPointages(){
   const mode=document.getElementById('pt-mode').value,date=document.getElementById('pt-date').value,emp=document.getElementById('pt-emp').value;
@@ -599,8 +693,8 @@ function renderPointages(){
   document.getElementById('pt-count').textContent=rows.length+' pointage(s)';
   const t=document.getElementById('pt-table');
   if(!rows.length){t.innerHTML='<tr><td class="empty">Aucun pointage.</td></tr>';return;}
-  t.innerHTML='<tr><th>Employé</th><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>Saisi</th><th>GPS</th></tr>'+
-    rows.slice(0,500).map(p=>{const e=empById[p.employee_id];return `<tr class="clickable" onclick="openEmp('${p.employee_id}')"><td>${esc(e?empName(e):'—')}</td><td>${fmtDate(p.date)}</td><td>${fmtTime(p.heure_debut)}</td><td>${fmtTime(p.heure_fin)}</td><td>${statutPill(p.status)}</td><td class="num">${mins(p.temps_net)}</td><td>${p.saisi_manuellement?'✍️ manuel':(p.auto_depointage?'⏲️ auto':'')}</td><td class="hint">${p.location_lat?'📍':''}</td></tr>`;}).join('');
+  t.innerHTML='<tr><th>Employé</th><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>Saisi</th><th>GPS</th><th></th></tr>'+
+    rows.slice(0,500).map(p=>{const e=empById[p.employee_id];return `<tr><td class="clickable" onclick="openEmp('${p.employee_id}')" style="cursor:pointer">${esc(e?empName(e):'—')}</td><td>${fmtDate(p.date)}</td><td>${fmtTime(p.heure_debut)}</td><td>${fmtTime(p.heure_fin)}</td><td>${statutPill(p.status)}</td><td class="num">${mins(p.temps_net)}</td><td>${p.saisi_manuellement?'✍️ manuel':(p.auto_depointage?'⏲️ auto':'')}</td><td class="hint">${p.location_lat?'📍':''}</td><td><button class="btn ghost small" onclick="openEditPointage('${p.id}')">✏️</button></td></tr>`;}).join('');
 }
 async function closeForgottenDays(){
   const today=new Date().toISOString().slice(0,10);
@@ -616,7 +710,7 @@ async function closeForgottenDays(){
     const {error}=await db.from('pointages').update({heure_fin:fin.toISOString(),status:'completed',auto_depointage:true}).eq('id',p.id);
     if(!error)ok++;
   }
-  const {data}=await db.from('pointages').select('*').order('date',{ascending:false});POINTAGES=data||[];
+  await reloadPointages();
   toast(ok+' journée(s) clôturée(s)');renderPointages();renderDash();
 }
 
@@ -644,6 +738,7 @@ async function openRequest(id){
     </div>
     <div class="card"><h3>Décision</h3>
       <label>Réponse admin (optionnel)</label><input id="req-reply" value="${esc(r.admin_reply||'')}">
+      <div class="hint" style="margin-top:8px">Approuver un congé daté remplira automatiquement le calendrier de présence de l'employé.</div>
       <div class="row" style="margin-top:12px">
         <button class="btn" style="background:linear-gradient(135deg,var(--good),#0f9d58)" onclick="decideRequest('${r.id}','approved')">✅ Approuver</button>
         <button class="btn" style="background:linear-gradient(135deg,var(--bad),#c0392b)" onclick="decideRequest('${r.id}','rejected')">❌ Refuser</button>
@@ -663,6 +758,21 @@ async function decideRequest(id,status){
   const {error}=await db.from('employee_requests').update(patch).eq('id',id);
   if(error){toast('Erreur : '+error.message);return;}
   const r=REQUESTS.find(x=>x.id===id);if(r)Object.assign(r,patch);
+  // Congé approuvé daté → remplit pointage_comments par jour
+  if(status==='approved' && r && r.start_date){
+    const catName=(r.category||'').toLowerCase();
+    if(/cong|absence|rtt/.test(catName)){
+      let absId=null;
+      const match=ABSCATS.find(a=>catName.includes((a.name||'').toLowerCase())||(a.code&&catName.includes(a.code.toLowerCase())));
+      if(match)absId=match.id; else {const cp=ABSCATS.find(a=>/cong/i.test(a.name||''));if(cp)absId=cp.id;}
+      const start=new Date(r.start_date),end=new Date(r.end_date||r.start_date);
+      const rows=[];const label='Congé approuvé (demande du '+fmtDate(r.created_at)+')';
+      for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+        rows.push({employee_id:r.employee_id,pointage_date:d.toISOString().slice(0,10),comment:label,absence_category_id:absId,created_by_user_id:SESSION.user.id,half_day_period:r.half_day?r.half_day_period:null});
+      }
+      if(rows.length){ const {error:pcErr}=await db.from('pointage_comments').upsert(rows,{onConflict:'employee_id,pointage_date',ignoreDuplicates:true}); if(pcErr)toast('Statut congé non enregistré : '+pcErr.message); }
+    }
+  }
   toast('Demande '+({approved:'approuvée',rejected:'refusée',pending:'remise en attente'}[status]));
   renderDemandes();
 }
@@ -764,7 +874,6 @@ async function addCat(kind){
   const {error}=await db.from(CAT_MAP[kind]).insert(row);
   if(error){toast('Erreur : '+error.message);return;}
   await reloadCats(); toast('Catégorie ajoutée ✓'); renderCatsParam();
-  if(kind==='req')document.getElementById('myreq-cat');
 }
 async function delCat(kind,id){
   if(!confirm('Supprimer cette catégorie ?'))return;
