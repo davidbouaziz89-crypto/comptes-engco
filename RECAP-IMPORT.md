@@ -14,7 +14,8 @@ Dernière mise à jour : 2026-07-14.
   - `documents.html` = 📄 Générateur de documents (brique `docucrm`)
   - `crm.html` = 🎓 CRM Formation (brique `crmformation`)
   - `pointage.html` = ⏱️ TimeGuard Pro / Pointage (brique `pointage`)
-  - **Thème clair/sombre** (🌙/☀️) sur les 3 pages, préférence partagée (localStorage `pfp-theme`).
+  - `photovoltaique.html` = ☀️ CRM Photovoltaïque (brique `crmpv`) — voir section 3 plus bas.
+  - **Thème clair/sombre** (🌙/☀️) sur les pages, préférence partagée (localStorage `pfp-theme`).
 
 ## Comment publier (sur n'importe quel PC)
 Pas de serveur MCP ; on utilise **`gh` CLI** + git :
@@ -62,3 +63,15 @@ Pas de serveur MCP ; on utilise **`gh` CLI** + git :
 ### Notes techniques utiles
 - Données source ré-exportables si besoin via le SQL editor de Lovable Cloud (Cloud → SQL editor → Export CSV) : `select json_build_object('table', (select json_agg(t) from table t), …)::text`.
 - Logique pointage (dans `usePointage.tsx`) : clock-in insert `pointages` (status `in_progress`, heure_debut, GPS, ip) ; clock-out update heure_fin+`completed` (triggers calculent `temps_total`/`temps_net`) ; pauses insert/update `pause_fin` (trigger calcule `duree`). GPS : zones actives de l'employé, Haversine, OK si distance ≤ rayon_m + 50.
+
+---
+
+# 3) CRM PHOTOVOLTAÏQUE — 🟢 BASE POSÉE (2026-07-14)
+- Page `photovoltaique.html`, brique `crmpv`, icône ☀️. Construit from scratch (pas de source Lovable). Live : https://gestion.proformationplus.fr/photovoltaique.html . Vente de panneaux aux **particuliers**.
+- **Rôles (cascade)** : télépro (appel à froid) → confirmateur (confirme + montant) → commercial (signe) → secrétaire (installation/paiement) + admin. `telepro` et `confirmateur` ajoutés à `app_roles` ; `commercial`/`secretaire` existaient déjà.
+- **Base** : tables **`pv_*`** dans le schéma public de unified-backend. `pv_leads` (numero = ID client auto), `pv_comments` (signés, suppr admin), `pv_documents` (bucket privé `pv-documents`), `pv_statuts` (statuts PAR rôle via `role_key`), `pv_sources`, `pv_client_types`, `pv_settings` (key='crm' → commission), `pv_profiles` (annuaire équipe). Fonctions `is_super_admin()`, `has_pv_access()`, `pv_my_role()`. RLS : CRUD = has_pv_access, DELETE = admin, écriture des paramètres = admin.
+- **Commission télépro** = montant fixe par dossier, **versée seulement si signé ET installé** (réglable dans Paramètres, défaut 50 €). **Rentabilité = à définir plus tard avec David** (aperçu provisoire CA installé − commissions).
+- **Donner l'accès à un employé** : écran **Utilisateurs** du portail (admin) → créer/éditer l'utilisateur, cocher « ☀️ CRM Photovoltaïque » et choisir le rôle (télépro/confirmateur/commercial/secrétaire). `VALID_KEYS` des edge functions `admin-create-user`/`admin-manage-user` inclut désormais `crmpv` (+ `crmformation`, `pointage`).
+- **Verrouillage rôle** = UI seulement pour l'instant (chaque rôle édite son étape, les autres en lecture seule). RLS ne cloisonne pas encore les leads par télépro → **à durcir** (isolation par `owner_telepro`).
+- **UI faite** : dashboard, liste clients (import Excel + modèle), pipeline kanban, fiche client (infos + suivi par étapes + documents + commentaires signés), commissions, paramètres (commission/statuts par rôle/sources/types client). Testé Playwright OK, tables vides (prêtes).
+- **Reste** : vrai calcul de rentabilité, RLS par propriétaire, éventuelles commissions confirmateur/commercial, champs qualif PV en plus. Améliorations au fil de l'eau.
