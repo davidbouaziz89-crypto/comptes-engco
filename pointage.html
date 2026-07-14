@@ -147,6 +147,7 @@
       <div class="table-wrap"><table id="bul-table"></table></div></section></div>
 
     <div id="tab-zones" class="hidden"><section class="panel"><h2>Zones GPS</h2>
+      <div class="hint" style="margin-bottom:10px">Pour ajouter ou modifier une zone, ouvre la fiche de l'employé concerné (onglet 👥 Employés).</div>
       <div class="table-wrap"><table id="zones-table"></table></div></section></div>
 
     <div id="tab-params" class="hidden"><section class="panel"><h2>Paramètres société</h2>
@@ -219,11 +220,15 @@ function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-
 function fmtTime(d){if(!d)return'—';return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}
 function eur(n){if(n==null||n===''||isNaN(Number(n)))return'—';return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €';}
 function mins(n){if(n==null||isNaN(Number(n)))return'—';n=Math.round(Number(n));return Math.floor(n/60)+'h'+String(n%60).padStart(2,'0');}
+function gv(id){const el=document.getElementById(id);return el?String(el.value).trim():'';}
+function gnum(id){const s=gv(id);return s===''?null:(isNaN(Number(s))?null:Number(s));}
 let _tt;function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2600);}
 
 function empName(e){const p=profByUser[e.user_id];if(p)return((p.first_name||'')+' '+(p.last_name||'')).trim()||p.email||'(sans nom)';return '(employé '+String(e.id).slice(0,6)+')';}
 function empEmail(e){const p=profByUser[e.user_id];return p?p.email:'';}
 function equipeName(id){const q=EQUIPES.find(x=>x.id===id);return q?(q.nom||q.nom_societe||''):'';}
+function distinctVals(field){const s=new Set();EMPLOYES.forEach(e=>{if(e[field]!=null&&e[field]!=='')s.add(e[field]);});return[...s];}
+function selOpts(vals,cur,allowBlank){let out=allowBlank?'<option value="">—</option>':'';const set=new Set(vals);if(cur!=null&&cur!==''&&!set.has(cur))out+=`<option value="${esc(cur)}" selected>${esc(cur)}</option>`;vals.forEach(v=>{out+=`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`;});return out;}
 
 /* AUTH */
 async function doLogin(e){e.preventDefault();
@@ -270,8 +275,14 @@ async function loadAll(){
   document.getElementById('upbul-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
   document.getElementById('pt-date').value=new Date().toISOString().slice(0,10);
 }
+async function reloadCore(){
+  const [e,p,z]=await Promise.all([db.from('employees').select('*'),db.from('profiles').select('*'),db.from('zones_gps').select('*')]);
+  EMPLOYES=e.data||[];PROFILES=p.data||[];ZONES=z.data||[];
+  empById={};EMPLOYES.forEach(x=>empById[x.id]=x);
+  profByUser={};PROFILES.forEach(x=>profByUser[x.user_id]=x);
+}
 function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dash','employes','pointages','documents','bulletins','zones','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  ['dash','employes','pointages','demandes','documents','bulletins','zones','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
   ({dash:renderDash,employes:renderEmployes,pointages:renderPointages,demandes:renderDemandes,documents:renderDocuments,bulletins:renderBulletins,zones:renderZones,params:renderParams}[t])();}
 
 /* DASHBOARD */
@@ -307,20 +318,89 @@ function renderEmployes(){
 }
 async function openEmp(id){
   const e=empById[id];if(!e)return;
+  window._zEdit=null;
   document.getElementById('d-name').textContent='👤 '+empName(e);
   const p=profByUser[e.user_id]||{};
   const pts=POINTAGES.filter(x=>x.employee_id===id);
   const docs=DOCUMENTS.filter(x=>x.employee_id===id);
   const buls=BULLETINS.filter(x=>x.employee_id===id);
   const zs=ZONES.filter(x=>x.employee_id===id);
-  const kv=(k,v)=>`<div class="kv"><span class="k">${k} :</span> ${esc(v==null||v===''?'—':v)}</div>`;
+  document.getElementById('detail-body').innerHTML='<div class="hint">Chargement…</div>';
+  document.getElementById('detail-view').classList.remove('hidden');window.scrollTo(0,0);
+  const [boR,adjR]=await Promise.all([
+    db.from('employee_bonus').select('*').eq('employee_id',id).order('month',{ascending:false}),
+    db.from('employee_monthly_adjustments').select('*').eq('employee_id',id).order('month',{ascending:false})
+  ]);
+  const bonuses=boR.data||[], adjustments=adjR.data||[];
+  const equipeOpts='<option value="">— Aucune —</option>'+EQUIPES.map(q=>`<option value="${q.id}"${q.id===e.equipe_id?' selected':''}>${esc(q.nom||q.nom_societe||'')}</option>`).join('');
+  const statusVals=[...new Set(['active','inactive',...distinctVals('status')])];
   document.getElementById('detail-body').innerHTML=`
-    <div class="card"><h3>Informations</h3><div class="grid2">
-      ${kv('Prénom',p.first_name)}${kv('Nom',p.last_name)}${kv('Email',p.email)}${kv('Téléphone',p.phone)}
-      ${kv('Poste',p.position)}${kv('Équipe',equipeName(e.equipe_id))}${kv('Horaires',(e.horaires_debut||'').slice(0,5)+'–'+(e.horaires_fin||'').slice(0,5))}
-      ${kv('Type horaire',e.type_horaire)}${kv('Statut',e.status)}${kv('Taux horaire',e.taux_horaire!=null?eur(e.taux_horaire):'—')}
-      ${kv('Salaire global',e.salaire_global!=null?eur(e.salaire_global):'—')}${kv('Type salaire',e.salaire_type)}${kv('Frais transport',e.frais_transport!=null?eur(e.frais_transport):'—')}
-      ${kv('Pause prévue (min)',e.duree_pause_prevue)}${kv('Heures sup autorisées',e.heures_supplementaires_autorisees?'oui':'non')}</div></div>
+    <div class="card"><h3>✏️ Informations de l'employé</h3>
+      <div class="hint" style="margin:-6px 0 12px">Email de connexion : <b>${esc(p.email||'—')}</b> <span style="opacity:.7">(non modifiable ici)</span></div>
+      <div class="grid2">
+        <div class="field"><label>Prénom</label><input id="ef-first" value="${esc(p.first_name||'')}"></div>
+        <div class="field"><label>Nom</label><input id="ef-last" value="${esc(p.last_name||'')}"></div>
+        <div class="field"><label>Téléphone</label><input id="ef-phone" value="${esc(p.phone||'')}"></div>
+        <div class="field"><label>Poste</label><input id="ef-position" value="${esc(p.position||'')}"></div>
+        <div class="field"><label>Équipe</label><select id="ef-equipe">${equipeOpts}</select></div>
+        <div class="field"><label>Statut</label><select id="ef-status">${selOpts(statusVals,e.status,false)}</select></div>
+        <div class="field"><label>Type d'horaire</label><select id="ef-type">${selOpts(distinctVals('type_horaire'),e.type_horaire,true)}</select></div>
+        <div class="field"><label>Type de salaire</label><select id="ef-salType">${selOpts(distinctVals('salaire_type'),e.salaire_type,true)}</select></div>
+        <div class="field"><label>Horaire début</label><input type="time" id="ef-debut" value="${(e.horaires_debut||'').slice(0,5)}"></div>
+        <div class="field"><label>Horaire fin</label><input type="time" id="ef-fin" value="${(e.horaires_fin||'').slice(0,5)}"></div>
+        <div class="field"><label>Taux horaire (€)</label><input type="number" step="0.01" id="ef-taux" value="${e.taux_horaire!=null?e.taux_horaire:''}"></div>
+        <div class="field"><label>Salaire global (€)</label><input type="number" step="0.01" id="ef-salglobal" value="${e.salaire_global!=null?e.salaire_global:''}"></div>
+        <div class="field"><label>Frais transport (€)</label><input type="number" step="0.01" id="ef-frais" value="${e.frais_transport!=null?e.frais_transport:''}"></div>
+        <div class="field"><label>Pause prévue (min)</label><input type="number" id="ef-pausePrev" value="${e.duree_pause_prevue!=null?e.duree_pause_prevue:''}"></div>
+        <div class="field"><label>Pause auto (min)</label><input type="number" id="ef-pauseAuto" value="${e.pause_automatique_minutes!=null?e.pause_automatique_minutes:''}"></div>
+        <div class="field"><label>Heures sup autorisées</label><select id="ef-hs"><option value="non"${!e.heures_supplementaires_autorisees?' selected':''}>Non</option><option value="oui"${e.heures_supplementaires_autorisees?' selected':''}>Oui</option></select></div>
+      </div>
+      <div style="margin-top:12px"><button class="btn" onclick="saveEmpInfo('${id}')">💾 Enregistrer les informations</button></div>
+    </div>
+
+    <div class="card"><h3>📍 Zones GPS (${zs.length})</h3>
+      <div class="table-wrap"><table>
+        <tr><th>Zone</th><th>Adresse</th><th class="num">Lat</th><th class="num">Lng</th><th class="num">Rayon</th><th>Active</th><th></th></tr>
+        ${zs.map(z=>`<tr><td>${esc(z.nom_zone)}</td><td>${esc(z.adresse||'')}</td><td class="num">${z.latitude!=null?Number(z.latitude).toFixed(5):'—'}</td><td class="num">${z.longitude!=null?Number(z.longitude).toFixed(5):'—'}</td><td class="num">${z.rayon_m} m</td><td>${z.active?'✅':'—'}</td><td><button class="btn ghost small" onclick="editZone('${z.id}')">✏️</button> <button class="btn ghost small" onclick="delZone('${z.id}','${id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucune zone</td></tr>'}
+      </table></div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="field"><label>Nom de la zone</label><input id="zf-nom" placeholder="ex : Chantier Nord"></div>
+        <div class="field"><label>Adresse</label><input id="zf-adr"></div>
+        <div class="field"><label>Latitude</label><input id="zf-lat"></div>
+        <div class="field"><label>Longitude</label><input id="zf-lng"></div>
+        <div class="field"><label>Rayon (m)</label><input type="number" id="zf-rayon" value="100"></div>
+        <div class="field"><label>Active ?</label><select id="zf-active"><option value="oui" selected>Oui</option><option value="non">Non</option></select></div>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn ghost small" onclick="fillMyPosition()">📍 Utiliser ma position actuelle</button><button class="btn small" onclick="saveZone('${id}')">➕ Enregistrer la zone</button></div>
+    </div>
+
+    <div class="card"><h3>💶 Primes (${bonuses.length})</h3>
+      <div class="table-wrap"><table>
+        <tr><th>Mois</th><th>Libellé</th><th class="num">Montant</th><th></th></tr>
+        ${bonuses.map(b=>`<tr><td>${esc((b.month||'').slice(0,7))}</td><td>${esc(b.bonus_name||'')}</td><td class="num">${eur(b.amount)}</td><td><button class="btn ghost small" onclick="delBonus('${b.id}','${id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucune prime</td></tr>'}
+      </table></div>
+      <div class="row" style="margin-top:10px">
+        <div class="field"><label>Mois</label><input type="month" id="bf-month"></div>
+        <div class="field" style="flex:1"><label>Libellé</label><input id="bf-name" placeholder="ex : Prime de rendement"></div>
+        <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="bf-amount"></div>
+        <button class="btn small" onclick="saveBonus('${id}')">➕ Ajouter</button>
+      </div>
+    </div>
+
+    <div class="card"><h3>🔧 Ajustements mensuels (${adjustments.length})</h3>
+      <div class="hint" style="margin:-6px 0 10px">Heures d'absence du mois précédent à reporter, avec commentaire.</div>
+      <div class="table-wrap"><table>
+        <tr><th>Mois</th><th class="num">Heures absence (mois -1)</th><th>Commentaire</th><th></th></tr>
+        ${adjustments.map(a=>`<tr><td>${esc((a.month||'').slice(0,7))}</td><td class="num">${a.hours_absence_previous_month!=null?a.hours_absence_previous_month:'—'}</td><td style="white-space:normal">${esc(a.comment||'')}</td><td><button class="btn ghost small" onclick="delAdjustment('${a.id}','${id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucun ajustement</td></tr>'}
+      </table></div>
+      <div class="row" style="margin-top:10px">
+        <div class="field"><label>Mois</label><input type="month" id="af-month"></div>
+        <div class="field"><label>Heures absence</label><input type="number" id="af-hours"></div>
+        <div class="field" style="flex:1"><label>Commentaire</label><input id="af-comment"></div>
+        <button class="btn small" onclick="saveAdjustment('${id}')">➕ Ajouter</button>
+      </div>
+    </div>
+
     <div class="card"><h3>Pointages (${pts.length})</h3><div class="table-wrap"><table>
       <tr><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>GPS</th></tr>
       ${pts.slice(0,200).map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${fmtTime(x.heure_debut)}</td><td>${fmtTime(x.heure_fin)}</td><td>${statutPill(x.status)}</td><td class="num">${mins(x.temps_net)}</td><td class="hint">${x.location_lat?Number(x.location_lat).toFixed(4)+','+Number(x.location_lng).toFixed(4):'—'}</td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
@@ -332,12 +412,77 @@ async function openEmp(id){
     <div class="card"><h3>Documents (${docs.length})</h3><div class="table-wrap"><table>
       <tr><th>Nom</th><th>Catégorie</th><th>Date</th><th></th></tr>
       ${docs.map(x=>`<tr><td>${esc(x.file_name||'')}</td><td>${esc(x.category||'')}</td><td>${fmtDate(x.created_at)}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
-    </table></div></div>
-    <div class="card"><h3>Zones GPS (${zs.length})</h3><div class="table-wrap"><table>
-      <tr><th>Zone</th><th>Adresse</th><th class="num">Rayon</th><th>Active</th></tr>
-      ${zs.map(x=>`<tr><td>${esc(x.nom_zone)}</td><td>${esc(x.adresse||'')}</td><td class="num">${x.rayon_m} m</td><td>${x.active?'✅':'—'}</td></tr>`).join('')||'<tr><td class="empty">Aucune</td></tr>'}
     </table></div></div>`;
-  document.getElementById('detail-view').classList.remove('hidden');window.scrollTo(0,0);
+}
+async function saveEmpInfo(id){
+  const e=empById[id];if(!e)return;
+  const empPatch={equipe_id:gv('ef-equipe')||null,status:gv('ef-status')||null,type_horaire:gv('ef-type')||null,salaire_type:gv('ef-salType')||null,
+    horaires_debut:gv('ef-debut')||null,horaires_fin:gv('ef-fin')||null,
+    taux_horaire:gnum('ef-taux'),salaire_global:gnum('ef-salglobal'),frais_transport:gnum('ef-frais'),
+    duree_pause_prevue:gnum('ef-pausePrev'),pause_automatique_minutes:gnum('ef-pauseAuto'),
+    heures_supplementaires_autorisees:document.getElementById('ef-hs').value==='oui'};
+  const r1=await db.from('employees').update(empPatch).eq('id',id);
+  let r2={error:null};
+  if(e.user_id){ r2=await db.from('profiles').update({first_name:gv('ef-first')||null,last_name:gv('ef-last')||null,phone:gv('ef-phone')||null,position:gv('ef-position')||null}).eq('user_id',e.user_id); }
+  if(r1.error||r2.error){toast('Erreur : '+((r1.error&&r1.error.message)||(r2.error&&r2.error.message)));return;}
+  toast('Informations enregistrées ✓');
+  await reloadCore(); renderEmployes(); openEmp(id);
+}
+async function fillMyPosition(){try{const l=await empGetLocation();document.getElementById('zf-lat').value=l.lat.toFixed(6);document.getElementById('zf-lng').value=l.lng.toFixed(6);toast('Position récupérée ✓');}catch(e){toast(e.message);}}
+function editZone(zid){
+  const z=ZONES.find(x=>x.id===zid);if(!z)return;window._zEdit=zid;
+  document.getElementById('zf-nom').value=z.nom_zone||'';
+  document.getElementById('zf-adr').value=z.adresse||'';
+  document.getElementById('zf-lat').value=z.latitude!=null?z.latitude:'';
+  document.getElementById('zf-lng').value=z.longitude!=null?z.longitude:'';
+  document.getElementById('zf-rayon').value=z.rayon_m!=null?z.rayon_m:100;
+  document.getElementById('zf-active').value=z.active?'oui':'non';
+  toast('Modifie puis « Enregistrer la zone »');
+}
+async function saveZone(empId){
+  const row={employee_id:empId,nom_zone:gv('zf-nom'),adresse:gv('zf-adr')||null,latitude:gnum('zf-lat'),longitude:gnum('zf-lng'),rayon_m:gnum('zf-rayon')||100,active:document.getElementById('zf-active').value==='oui'};
+  if(!row.nom_zone){toast('Nom de zone requis.');return;}
+  if(row.latitude==null||row.longitude==null){toast('Latitude/Longitude requises (bouton « ma position »).');return;}
+  let r;
+  if(window._zEdit) r=await db.from('zones_gps').update(row).eq('id',window._zEdit);
+  else r=await db.from('zones_gps').insert(row);
+  if(r.error){toast('Erreur : '+r.error.message);return;}
+  window._zEdit=null; toast('Zone enregistrée ✓');
+  const {data}=await db.from('zones_gps').select('*'); ZONES=data||[];
+  openEmp(empId);
+}
+async function delZone(zid,empId){
+  if(!confirm('Supprimer cette zone GPS ?'))return;
+  const {error}=await db.from('zones_gps').delete().eq('id',zid);
+  if(error){toast('Erreur : '+error.message);return;}
+  const {data}=await db.from('zones_gps').select('*'); ZONES=data||[];
+  toast('Zone supprimée'); openEmp(empId);
+}
+async function saveBonus(empId){
+  const name=gv('bf-name'),amount=gnum('bf-amount'),month=gv('bf-month');
+  if(!name||amount==null||!month){toast('Mois, libellé et montant requis.');return;}
+  const {error}=await db.from('employee_bonus').insert({employee_id:empId,bonus_name:name,amount:amount,month:month+'-01'});
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Prime ajoutée ✓'); openEmp(empId);
+}
+async function delBonus(bid,empId){
+  if(!confirm('Supprimer cette prime ?'))return;
+  const {error}=await db.from('employee_bonus').delete().eq('id',bid);
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Prime supprimée'); openEmp(empId);
+}
+async function saveAdjustment(empId){
+  const month=gv('af-month'),hours=gnum('af-hours'),comment=gv('af-comment')||null;
+  if(!month){toast('Mois requis.');return;}
+  const {error}=await db.from('employee_monthly_adjustments').insert({employee_id:empId,month:month+'-01',hours_absence_previous_month:hours!=null?Math.round(hours):null,comment});
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Ajustement ajouté ✓'); openEmp(empId);
+}
+async function delAdjustment(aid,empId){
+  if(!confirm('Supprimer cet ajustement ?'))return;
+  const {error}=await db.from('employee_monthly_adjustments').delete().eq('id',aid);
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Ajustement supprimé'); openEmp(empId);
 }
 function closeDetail(){document.getElementById('detail-view').classList.add('hidden');}
 
@@ -433,7 +578,7 @@ function renderBulletins(){
 /* ZONES / PARAMS */
 function renderZones(){
   document.getElementById('zones-table').innerHTML='<tr><th>Employé</th><th>Zone</th><th>Adresse</th><th class="num">Rayon</th><th>Active</th></tr>'+
-    (ZONES.map(z=>{const e=empById[z.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${esc(z.nom_zone)}</td><td>${esc(z.adresse||'')}</td><td class="num">${z.rayon_m} m</td><td>${z.active?'✅':'—'}</td></tr>`;}).join('')||'<tr><td class="empty">Aucune zone</td></tr>');
+    (ZONES.map(z=>{const e=empById[z.employee_id];return `<tr class="clickable" onclick="openEmp('${z.employee_id}')"><td>${esc(e?empName(e):'—')}</td><td>${esc(z.nom_zone)}</td><td>${esc(z.adresse||'')}</td><td class="num">${z.rayon_m} m</td><td>${z.active?'✅':'—'}</td></tr>`;}).join('')||'<tr><td class="empty">Aucune zone</td></tr>');
 }
 function renderParams(){
   const c=COMPANY||{};const kv=(k,v)=>`<div class="kv"><span class="k">${k} :</span> ${esc(v==null||v===''?'—':v)}</div>`;
