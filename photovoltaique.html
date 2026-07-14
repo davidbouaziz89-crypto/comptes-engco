@@ -340,14 +340,12 @@ const ROLES=[
   {key:'telepro',label:'Télépro',icon:'📞'},
   {key:'confirmateur',label:'Confirmateur',icon:'✅'},
   {key:'commercial',label:'Commercial',icon:'🤝'},
-  {key:'secretaire',label:'Secrétaire',icon:'🗂️'},
 ];
 const roleLabel=k=>{ const r=ROLES.find(x=>x.key===k); return r?r.label:k; };
 const STAGES=[
   {key:'telepro',label:'Télépro',color:'#3b82f6'},
   {key:'confirmateur',label:'Confirmateur',color:'#8a5cff'},
   {key:'commercial',label:'Commercial',color:'#f59e0b'},
-  {key:'secretaire',label:'Secrétaire',color:'#0ea5e9'},
   {key:'termine',label:'Terminé',color:'#16a34a'},
   {key:'perdu',label:'Perdu',color:'#dc2626'},
 ];
@@ -437,7 +435,7 @@ function showTab(t){
 
 /* ---------- LISTE CLIENTS ---------- */
 function statutPill(id){ const s=statutOf(id); if(!s) return '<span class="hint">—</span>'; const c=s.couleur||'#f5a623'; return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(s.nom)}</span>`; }
-function curStatutId(l){ return l['statut_'+(l.stage==='confirmateur'?'confirmateur':l.stage==='commercial'?'commercial':l.stage==='secretaire'?'secretaire':'telepro')]; }
+function curStatutId(l){ return l['statut_'+(l.stage==='confirmateur'?'confirmateur':l.stage==='commercial'?'commercial':'telepro')]; }
 function filteredLeads(){
   const q=(document.getElementById('lead-search').value||'').toLowerCase().trim();
   const fs=document.getElementById('lead-fstage').value, fo=document.getElementById('lead-fowner').value;
@@ -582,15 +580,10 @@ function renderRolePanel(){
     h+=dateField('rdv_date','Date de RDV confirmée','confirmateur');
   } else if(role==='commercial'){
     h+=ownerSelect('owner_commercial','commercial');
-    h+=checkField('signe','Dossier signé','commercial');
-    h+=dateField('date_signature','Date de signature','commercial');
     h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
-  } else if(role==='secretaire'){
-    h+=ownerSelect('owner_secretaire','secretaire');
-    h+=checkField('installe','Installation réalisée','secretaire');
-    h+=dateField('date_installation','Date d\'installation','secretaire');
-    h+=checkField('paye','Dossier payé','secretaire');
-    h+=dateField('date_paiement','Date de paiement','secretaire');
+    h+=`<div class="grid2"><div>${checkField('signe','Dossier signé','commercial')}</div><div>${dateField('date_signature','Date de signature','commercial')}</div></div>`;
+    h+=`<div class="grid2"><div>${checkField('installe','Installation réalisée','commercial')}</div><div>${dateField('date_installation','Date d\'installation','commercial')}</div></div>`;
+    h+=`<div class="grid2"><div>${checkField('paye','Dossier payé','commercial')}</div><div>${dateField('date_paiement','Date de paiement','commercial')}</div></div>`;
   }
   box.innerHTML=h;
 }
@@ -605,7 +598,7 @@ function renderNext(){
     h+=`<button class="btn danger small" onclick="setStage('perdu')">Marquer perdu ✕</button>`;
   } else {
     h+=`<span class="pill" style="background:#16a34a22;color:#16a34a">Dossier terminé</span>`;
-    h+=`<button class="btn ghost small" onclick="setStage('secretaire')">Ré-ouvrir</button>`;
+    h+=`<button class="btn ghost small" onclick="setStage('commercial')">Ré-ouvrir</button>`;
   }
   zone.innerHTML=h;
 }
