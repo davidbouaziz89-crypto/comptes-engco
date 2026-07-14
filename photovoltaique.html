@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM Photovoltaïque</title>
+<script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
+    --accent:#f5a623;--accent2:#ff7a45;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;
+    --accent:#e08e00;--accent2:#f4630a;--good:#16a34a;--bad:#dc2626;--warn:#d97706;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  .hidden{display:none!important}
+  a{color:var(--accent)}
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(1200px 600px at 50% -10%,rgba(245,166,35,.15),transparent),var(--bg)}
+  .authcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:30px 28px;width:100%;max-width:400px}
+  .authcard h1{margin:0 0 4px;font-size:22px}
+  .authcard .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 5px}
+  input,select,textarea{width:100%;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--txt);font-size:14px;font-family:inherit}
+  textarea{resize:vertical;min-height:70px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  input:disabled,select:disabled,textarea:disabled{opacity:.6;cursor:not-allowed}
+  .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
+  header{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
+  header .spacer{margin-left:auto}
+  .who{color:var(--muted);font-size:14px}
+  .rolebadge{display:inline-block;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:700;background:var(--accent);color:#241500}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;border-radius:9px;color:#241500;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
+  .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
+  .btn.danger{background:transparent;border:1px solid var(--line);color:var(--bad);font-weight:600}
+  .btn.small{padding:5px 10px;font-size:13px}
+  .btn:disabled{opacity:.5;cursor:default}
+  nav{display:flex;gap:6px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
+  nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  nav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
+  main{max-width:1200px;margin:0 auto;padding:22px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+  .panel h2{margin:0 0 14px;font-size:18px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;min-width:160px;flex:1}
+  .field.full{flex-basis:100%}
+  .field.sm{min-width:110px;flex:0 0 auto}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);font-size:14px;white-space:nowrap}
+  th{color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right}
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover td{background:var(--panel2)}
+  .empty{color:var(--muted);text-align:center;padding:24px}
+  .search{max-width:280px}
+  .hint{color:var(--muted);font-size:13px}
+  .pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+  .tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--muted)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .kpi .k-val{font-size:24px;font-weight:800}
+  .kpi .k-lab{color:var(--muted);font-size:13px;margin-top:4px}
+  .kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+  .kcol{flex:0 0 230px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:120px}
+  .kcol.drag-over{border-color:var(--accent);box-shadow:0 0 0 2px rgba(245,166,35,.35)}
+  .kcol h3{margin:0 0 10px;font-size:13px;display:flex;justify-content:space-between;align-items:center;text-transform:uppercase;letter-spacing:.03em}
+  .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:9px;cursor:grab}
+  .kcard .kc-name{font-weight:700;font-size:14px}
+  .kcard .kc-meta{color:var(--muted);font-size:12px;margin-top:3px}
+  .kcard .kc-amt{color:var(--good);font-size:13px;font-weight:700;margin-top:4px}
+  /* ===== FICHE CLIENT ===== */
+  #lead-view{position:fixed;inset:0;background:var(--bg);overflow:auto;z-index:50}
+  .lead-head{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
+  .lead-wrap{max-width:1200px;margin:0 auto;padding:20px}
+  .bcards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+  @media(max-width:820px){.bcards{grid-template-columns:1fr 1fr}}
+  .bcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .bcard .b-lab{color:var(--muted);font-size:12px}
+  .bcard .b-val{font-size:20px;font-weight:800;margin-top:4px}
+  .lead-body{display:grid;grid-template-columns:1fr 1.6fr;gap:18px}
+  @media(max-width:880px){.lead-body{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .card h3{margin:0 0 6px;font-size:15px}
+  .ltabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+  .ltabs button{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;cursor:pointer;font-weight:600;font-size:14px}
+  .ltabs button.active{color:var(--txt);border-color:var(--accent)}
+  .stepper{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .step{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer;background:transparent;text-align:left;color:var(--txt);flex:1;min-width:130px}
+  .step:hover{background:var(--panel2)}
+  .step.active{border-color:var(--accent);background:rgba(245,166,35,.10)}
+  .step.done{border-color:rgba(55,211,155,.4);background:rgba(55,211,155,.06)}
+  .step .dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;background:var(--panel2);border:1px solid var(--line);color:var(--muted);flex-shrink:0}
+  .step.active .dot{background:var(--accent);border-color:var(--accent);color:#241500}
+  .step.done .dot{background:var(--good);border-color:var(--good);color:#052a1c}
+  .step .s-lab{flex:1;font-size:13px}
+  .step.active .s-lab{font-weight:700}
+  .detail-box{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px;background:var(--panel2)}
+  .subcard{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--panel)}
+  .act{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
+  .act .a-head{color:var(--muted);font-size:12px;margin-bottom:3px}
+  .docitem{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
+  .docitem .d-name{flex:1;font-size:14px;word-break:break-word}
+  .chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--txt);margin:10px 0}
+  .chk input{width:auto}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s;z-index:200;max-width:90vw}
+  #toast.show{opacity:1}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:600px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="login-view" class="overlay hidden">
+  <form class="authcard" onsubmit="doLogin(event)">
+    <h1>☀️ CRM Photovoltaïque</h1><div class="sub">Connecte-toi pour accéder au CRM.</div>
+    <label>Email</label><input type="email" id="login-email" autocomplete="username" required>
+    <label>Mot de passe</label><input type="password" id="login-pass" autocomplete="current-password" required>
+    <button class="btn" type="submit" style="width:100%;margin-top:16px">Se connecter</button>
+    <div class="err" id="login-err"></div>
+  </form>
+</div>
+<div id="noaccess-view" class="overlay hidden">
+  <div class="authcard"><h1>Accès non autorisé</h1>
+    <div class="sub">Ton compte n'a pas accès au CRM Photovoltaïque. Contacte l'administrateur.</div>
+    <button class="btn ghost" style="width:100%" onclick="location.href='./index.html'">← Retour au portail</button>
+  </div>
+</div>
+
+<div id="app-view" class="hidden">
+  <header>
+    <h1>☀️ CRM Photovoltaïque</h1><span class="spacer"></span>
+    <span class="rolebadge" id="rolebadge"></span>
+    <span class="who" id="who"></span>
+    <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
+    <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
+    <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
+  </header>
+  <nav>
+    <button data-tab="dash" class="active" onclick="showTab('dash')">📊 Tableau de bord</button>
+    <button data-tab="leads" onclick="showTab('leads')">👥 Clients</button>
+    <button data-tab="pipeline" onclick="showTab('pipeline')">🎯 Pipeline</button>
+    <button data-tab="commissions" onclick="showTab('commissions')">💶 Commissions</button>
+    <button data-tab="params" id="nav-params" onclick="showTab('params')">⚙️ Paramètres</button>
+  </nav>
+  <main>
+    <div id="tab-dash">
+      <section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
+      <section class="panel"><h2>Répartition par étape</h2><div class="table-wrap"><table id="dash-stages"></table></div></section>
+    </div>
+    <div id="tab-leads" class="hidden">
+      <section class="panel">
+        <div class="row" style="margin-bottom:14px">
+          <input class="search" id="lead-search" placeholder="🔎 Rechercher un client…" oninput="renderLeads()">
+          <select id="lead-fstage" class="field sm" onchange="renderLeads()"><option value="">Toutes étapes</option></select>
+          <select id="lead-fowner" class="field sm" onchange="renderLeads()"><option value="">Tous télépros</option></select>
+          <span class="spacer" style="flex:1"></span>
+          <button class="btn small" onclick="newLead()">＋ Nouveau client</button>
+          <button class="btn ghost small" onclick="downloadLeadsTemplate()">⬇️ Modèle</button>
+          <label class="btn ghost small" style="margin:0;cursor:pointer">⬆️ Importer<input type="file" id="lead-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importLeadsFile(event)"></label>
+        </div>
+        <div class="table-wrap"><table id="leads-table"></table></div>
+        <div class="hint" id="leads-count" style="margin-top:8px"></div>
+      </section>
+    </div>
+    <div id="tab-pipeline" class="hidden">
+      <section class="panel"><h2>Pipeline</h2>
+        <div class="hint" style="margin-bottom:12px">Glissez une carte pour changer l'étape. Cliquez-la pour ouvrir la fiche.</div>
+        <div class="kanban" id="kanban"></div>
+      </section>
+    </div>
+    <div id="tab-commissions" class="hidden">
+      <section class="panel"><h2>💶 Commissions télépro</h2>
+        <div class="hint" id="comm-rule" style="margin-bottom:12px"></div>
+        <div class="table-wrap"><table id="comm-table"></table></div>
+      </section>
+      <section class="panel"><h2>📈 Rentabilité (aperçu)</h2>
+        <div class="kpis" id="renta-grid"></div>
+        <div class="hint" style="margin-top:10px">⚠️ Calcul provisoire (CA des dossiers installés − commissions télépro). On affinera avec les autres coûts.</div>
+      </section>
+    </div>
+    <div id="tab-params" class="hidden">
+      <section class="panel"><h2>💶 Commission du télépro</h2>
+        <div class="row">
+          <div class="field sm"><label>Montant fixe (€) par dossier</label><input id="set-comm" type="number" step="0.01"></div>
+          <div class="field"><label>Condition de versement</label>
+            <select id="set-cond">
+              <option value="signe_installe">Uniquement si signé ET installé</option>
+              <option value="signe">Si signé</option>
+              <option value="toujours">Toujours (dès le confirmé)</option>
+            </select></div>
+          <button class="btn small" onclick="saveSettings()">💾 Enregistrer</button>
+        </div>
+      </section>
+      <section class="panel"><h2>🎨 Statuts par rôle</h2>
+        <form class="row" onsubmit="addStatut(event)" style="margin-bottom:12px">
+          <div class="field sm"><label>Rôle</label><select id="st-role"></select></div>
+          <div class="field"><label>Nom du statut</label><input id="st-nom" placeholder="ex : RDV pris" required></div>
+          <div class="field sm"><label>Couleur</label><input id="st-couleur" type="color" value="#f5a623" style="height:42px;padding:4px"></div>
+          <div class="field sm"><label>Ordre</label><input id="st-ordre" type="number" value="0"></div>
+          <button class="btn small" type="submit">Ajouter</button>
+        </form>
+        <div id="st-tables"></div>
+      </section>
+      <div class="grid2">
+        <section class="panel"><h2>📥 Sources de leads</h2>
+          <form class="row" onsubmit="addRef(event,'pv_sources','src-nom')" style="margin-bottom:12px">
+            <div class="field"><input id="src-nom" placeholder="ex : Achat de leads" required></div><button class="btn small" type="submit">Ajouter</button>
+          </form><div class="table-wrap"><table id="src-table"></table></div>
+        </section>
+        <section class="panel"><h2>🏠 Types de client</h2>
+          <form class="row" onsubmit="addRef(event,'pv_client_types','ct-nom')" style="margin-bottom:12px">
+            <div class="field"><input id="ct-nom" placeholder="ex : Propriétaire" required></div><button class="btn small" type="submit">Ajouter</button>
+          </form><div class="table-wrap"><table id="ct-table"></table></div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== FICHE CLIENT ===== -->
+<div id="lead-view" class="hidden">
+  <div class="lead-head">
+    <button class="btn ghost small" onclick="closeLead()">← Retour</button>
+    <span class="spacer"></span>
+    <button class="btn danger small" id="lv-del" onclick="deleteLead()">🗑️ Supprimer</button>
+  </div>
+  <div class="lead-wrap">
+    <div class="bcards">
+      <div class="bcard"><div class="b-lab">Étape en cours</div><div class="b-val" id="bc-stage">—</div></div>
+      <div class="bcard"><div class="b-lab">Montant vente</div><div class="b-val" id="bc-montant">—</div></div>
+      <div class="bcard"><div class="b-lab">Statut dossier</div><div class="b-val" id="bc-etat" style="font-size:15px">—</div></div>
+      <div class="bcard"><div class="b-lab">Commission télépro</div><div class="b-val" id="bc-comm">—</div></div>
+    </div>
+    <div class="lead-body">
+      <!-- GAUCHE : infos client -->
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="pill" style="background:var(--accent);color:#241500" id="lv-num">Client</span>
+          <span style="font-weight:600">Informations client</span>
+        </div>
+        <h3 id="lv-name" style="margin:0 0 12px">—</h3>
+        <div class="grid2">
+          <div><label>Civilité</label><select id="lv-civilite"><option value="">—</option><option>M.</option><option>Mme</option></select></div>
+          <div><label>Type de client</label><select id="lv-type"></select></div>
+        </div>
+        <div class="grid2">
+          <div><label>Prénom</label><input id="lv-prenom"></div>
+          <div><label>Nom</label><input id="lv-nom"></div>
+        </div>
+        <label>Email</label><input id="lv-email" type="email">
+        <div class="grid2">
+          <div><label>Téléphone</label><input id="lv-telephone"></div>
+          <div><label>Téléphone 2</label><input id="lv-telephone2"></div>
+        </div>
+        <label>Adresse</label><input id="lv-adresse">
+        <div class="grid2">
+          <div><label>Code postal</label><input id="lv-cp"></div>
+          <div><label>Ville</label><input id="lv-ville"></div>
+        </div>
+        <label>Source</label><select id="lv-source"></select>
+        <label>Notes</label><textarea id="lv-notes" rows="3"></textarea>
+        <div class="quick" id="lv-quick" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px">
+          <button class="btn" id="lv-save" onclick="saveLeadInfo()">💾 Enregistrer</button>
+        </div>
+      </div>
+      <!-- DROITE : suivi / documents / commentaires -->
+      <div class="card">
+        <div class="ltabs">
+          <button id="ltab-suivi" class="active" onclick="showLeadTab('suivi')">Suivi (étapes)</button>
+          <button id="ltab-docs" onclick="showLeadTab('docs')">📎 Documents</button>
+          <button id="ltab-comments" onclick="showLeadTab('comments')">💬 Commentaires</button>
+        </div>
+        <div id="lead-suivi">
+          <div class="stepper" id="lv-stepper"></div>
+          <div class="detail-box" id="lv-detail"></div>
+          <div id="lv-next" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-top:16px"></div>
+        </div>
+        <div id="lead-docs" class="hidden">
+          <label class="btn ghost small" id="doc-upbtn" style="cursor:pointer;display:inline-flex">⬆️ Ajouter un document<input type="file" id="doc-file" class="hidden" onchange="uploadDoc(event)"></label>
+          <div id="doc-list" style="margin-top:14px"></div>
+        </div>
+        <div id="lead-comments" class="hidden">
+          <label>Ajouter un commentaire</label>
+          <div class="row">
+            <div class="field sm"><select id="act-type"><option value="note">📝 Note</option><option value="appel">📞 Appel</option><option value="email">✉️ Email</option><option value="rdv">📅 RDV</option></select></div>
+            <div class="field"><input id="act-content" placeholder="Votre commentaire…" onkeydown="if(event.key==='Enter')addActivity()"></div>
+            <button class="btn small" type="button" onclick="addActivity()">Ajouter</button>
+          </div>
+          <div id="act-list" style="margin-top:14px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
+const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let SESSION=null, IS_ADMIN=false, MY_ROLE=null;
+let LEADS=[], STATUTS=[], SOURCES=[], CTYPES=[], PROFILES=[], SETTINGS={};
+let curLead=null, curDocs=[], selRole='telepro';
+
+const ROLES=[
+  {key:'telepro',label:'Télépro',icon:'📞'},
+  {key:'confirmateur',label:'Confirmateur',icon:'✅'},
+  {key:'commercial',label:'Commercial',icon:'🤝'},
+  {key:'secretaire',label:'Secrétaire',icon:'🗂️'},
+];
+const roleLabel=k=>{ const r=ROLES.find(x=>x.key===k); return r?r.label:k; };
+const STAGES=[
+  {key:'telepro',label:'Télépro',color:'#3b82f6'},
+  {key:'confirmateur',label:'Confirmateur',color:'#8a5cff'},
+  {key:'commercial',label:'Commercial',color:'#f59e0b'},
+  {key:'secretaire',label:'Secrétaire',color:'#0ea5e9'},
+  {key:'termine',label:'Terminé',color:'#16a34a'},
+  {key:'perdu',label:'Perdu',color:'#dc2626'},
+];
+const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
+
+function eur(n){ if(n==null||n===''||isNaN(Number(n))) return '—'; return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €'; }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('fr-FR'); }
+function leadName(l){ return ((l.prenom||'')+' '+(l.nom||'')).trim()||l.email||l.telephone||'(sans nom)'; }
+function statutOf(id){ return STATUTS.find(s=>s.id===id); }
+function statutsFor(role){ return STATUTS.filter(s=>s.role_key===role).sort((a,b)=>(a.ordre||0)-(b.ordre||0)); }
+function profileName(id){ const p=PROFILES.find(x=>x.id===id); return p?(p.nom||p.email||'—'):null; }
+function canEdit(role){ return IS_ADMIN || MY_ROLE===role; }
+let _tt; function toast(m){ const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2600); }
+
+/* ---------- THÈME ---------- */
+function toggleTheme(){
+  const light=document.documentElement.getAttribute('data-theme')!=='light';
+  if(light) document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme');
+  try{ localStorage.setItem('pfp-theme',light?'light':'dark'); }catch(e){}
+  updateThemeBtn();
+}
+function updateThemeBtn(){ const b=document.getElementById('theme-btn'); if(b) b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙'; }
+updateThemeBtn();
+
+/* ---------- AUTH ---------- */
+async function doLogin(e){
+  e.preventDefault();
+  const email=document.getElementById('login-email').value.trim(), password=document.getElementById('login-pass').value;
+  document.getElementById('login-err').textContent='Connexion…';
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error){ document.getElementById('login-err').textContent='Email ou mot de passe incorrect.'; return; }
+  document.getElementById('login-err').textContent=''; await afterAuth(data.session);
+}
+async function doLogout(){ await db.auth.signOut(); location.reload(); }
+async function afterAuth(session){
+  SESSION=session;
+  const {data:mems}=await db.from('app_memberships').select('project_key,role').eq('user_id',session.user.id);
+  IS_ADMIN=(mems||[]).some(m=>m.role==='admin');
+  const pvMem=(mems||[]).find(m=>m.project_key==='crmpv');
+  MY_ROLE=IS_ADMIN?'admin':(pvMem?pvMem.role:null);
+  const hasAccess=IS_ADMIN||!!pvMem;
+  document.getElementById('login-view').classList.add('hidden');
+  if(!hasAccess){ document.getElementById('noaccess-view').classList.remove('hidden'); return; }
+  document.getElementById('noaccess-view').classList.add('hidden');
+  document.getElementById('app-view').classList.remove('hidden');
+  document.getElementById('who').textContent=session.user.email||'';
+  const rb=document.getElementById('rolebadge'); rb.textContent=IS_ADMIN?'Admin':roleLabel(MY_ROLE);
+  if(!IS_ADMIN) document.getElementById('nav-params').classList.add('hidden'); // params = admin
+  // enregistre / met à jour son profil (annuaire équipe)
+  await db.from('pv_profiles').upsert({id:session.user.id,email:session.user.email,role:MY_ROLE,actif:true},{onConflict:'id'});
+  await loadAll(); showTab('dash');
+}
+async function loadAll(){
+  const [st,sr,ct,pr,se,l]=await Promise.all([
+    db.from('pv_statuts').select('*').order('role_key').order('ordre'),
+    db.from('pv_sources').select('*').order('ordre'),
+    db.from('pv_client_types').select('*').order('ordre'),
+    db.from('pv_profiles').select('*').eq('actif',true),
+    db.from('pv_settings').select('*').eq('key','crm').maybeSingle(),
+    db.from('pv_leads').select('*').order('created_at',{ascending:false}),
+  ]);
+  STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; PROFILES=pr.data||[];
+  SETTINGS=(se.data&&se.data.value)||{}; LEADS=l.data||[];
+  fillSelects(); renderLeads();
+}
+function fillSelects(){
+  const set=(id,html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
+  set('lead-fstage','<option value="">Toutes étapes</option>'+STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join(''));
+  const telepros=PROFILES.filter(p=>p.role==='telepro'||p.role==='admin');
+  set('lead-fowner','<option value="">Tous télépros</option>'+telepros.map(p=>`<option value="${p.id}">${esc(p.nom||p.email)}</option>`).join(''));
+  set('lv-source','<option value="">— Aucune —</option>'+SOURCES.map(s=>`<option value="${esc(s.nom)}">${esc(s.nom)}</option>`).join(''));
+  set('lv-type','<option value="">— Non précisé —</option>'+CTYPES.map(c=>`<option value="${esc(c.nom)}">${esc(c.nom)}</option>`).join(''));
+  set('st-role',ROLES.map(r=>`<option value="${r.key}">${r.icon} ${r.label}</option>`).join(''));
+}
+function showTab(t){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  ['dash','leads','pipeline','commissions','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  if(t==='dash') renderDashboard();
+  if(t==='pipeline') renderPipeline();
+  if(t==='commissions') renderCommissions();
+  if(t==='params') renderParams();
+}
+
+/* ---------- LISTE CLIENTS ---------- */
+function statutPill(id){ const s=statutOf(id); if(!s) return '<span class="hint">—</span>'; const c=s.couleur||'#f5a623'; return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(s.nom)}</span>`; }
+function curStatutId(l){ return l['statut_'+(l.stage==='confirmateur'?'confirmateur':l.stage==='commercial'?'commercial':l.stage==='secretaire'?'secretaire':'telepro')]; }
+function filteredLeads(){
+  const q=(document.getElementById('lead-search').value||'').toLowerCase().trim();
+  const fs=document.getElementById('lead-fstage').value, fo=document.getElementById('lead-fowner').value;
+  return LEADS.filter(l=>{
+    if(fs&&l.stage!==fs) return false; if(fo&&l.owner_telepro!==fo) return false;
+    if(!q) return true; return [leadName(l),l.email,l.telephone,l.ville,l.code_postal,l.source].some(v=>(v||'').toLowerCase().includes(q));
+  });
+}
+function renderLeads(){
+  const rows=filteredLeads(), t=document.getElementById('leads-table');
+  document.getElementById('leads-count').textContent=rows.length+' client(s) · '+LEADS.length+' au total';
+  if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucun client. Cliquez « ＋ Nouveau client » ou importez un fichier.</td></tr>'; return; }
+  t.innerHTML='<tr><th>ID</th><th>Nom</th><th>Ville</th><th>Étape</th><th>Statut</th><th>Télépro</th><th class="num">Montant</th></tr>'+
+    rows.slice(0,400).map(l=>{ const st=stageOf(l.stage); return `<tr class="clickable" onclick="openLead('${l.id}')">
+      <td class="hint">${l.numero||''}</td>
+      <td><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</td>
+      <td>${esc(l.ville||'')}</td>
+      <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
+      <td>${statutPill(curStatutId(l))}</td>
+      <td class="hint">${esc(profileName(l.owner_telepro)||'—')}</td>
+      <td class="num">${eur(l.montant)}</td></tr>`; }).join('');
+  if(rows.length>400) document.getElementById('leads-count').textContent+=' (400 affichés)';
+}
+async function newLead(){
+  const patch={nom:'Nouveau client',stage:'telepro',created_by:SESSION.user.id};
+  if(MY_ROLE==='telepro') patch.owner_telepro=SESSION.user.id;
+  const {data,error}=await db.from('pv_leads').insert(patch).select().single();
+  if(error){ toast('Erreur : '+error.message); return; }
+  LEADS.unshift(data); renderLeads(); openLead(data.id);
+}
+
+/* ---------- FICHE CLIENT ---------- */
+async function openLead(id){
+  const l=LEADS.find(x=>x.id===id); if(!l) return;
+  curLead={...l}; selRole=(l.stage&&ROLES.some(r=>r.key===l.stage))?l.stage:'telepro';
+  const g=i=>document.getElementById(i);
+  g('lv-num').textContent='Client N° '+(l.numero||'—');
+  g('lv-name').textContent=leadName(l);
+  g('lv-civilite').value=l.civilite||''; g('lv-type').value=l.type_client||'';
+  g('lv-prenom').value=l.prenom||''; g('lv-nom').value=l.nom||''; g('lv-email').value=l.email||'';
+  g('lv-telephone').value=l.telephone||''; g('lv-telephone2').value=l.telephone2||'';
+  g('lv-adresse').value=l.adresse||''; g('lv-cp').value=l.code_postal||''; g('lv-ville').value=l.ville||'';
+  g('lv-source').value=l.source||''; g('lv-notes').value=l.notes||'';
+  g('lv-del').classList.toggle('hidden',!IS_ADMIN);
+  g('doc-upbtn').classList.toggle('hidden',false);
+  renderQuick(); renderBudgetCards();
+  showLeadTab('suivi');
+  document.getElementById('lead-view').classList.remove('hidden'); window.scrollTo(0,0);
+}
+function closeLead(){ document.getElementById('lead-view').classList.add('hidden'); curLead=null; loadAll(); }
+function renderQuick(){
+  const l=curLead, q=[];
+  if(l.telephone) q.push(`<a class="btn ghost small" href="tel:${esc(l.telephone)}">📞 Appeler</a>`);
+  if(l.telephone) q.push(`<a class="btn ghost small" href="sms:${esc(l.telephone)}">💬 SMS</a>`);
+  if(l.email) q.push(`<a class="btn ghost small" href="mailto:${esc(l.email)}">✉️ Email</a>`);
+  document.getElementById('lv-quick').innerHTML=q.join('');
+}
+function renderBudgetCards(){
+  const l=curLead, st=stageOf(l.stage);
+  document.getElementById('bc-stage').innerHTML=`<span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span>`;
+  document.getElementById('bc-montant').textContent=eur(l.montant);
+  const etat=[]; etat.push(l.signe?'✅ Signé':'⬜ Non signé'); etat.push(l.installe?'✅ Installé':'⬜ Non installé'); etat.push(l.paye?'✅ Payé':'⬜ Non payé');
+  document.getElementById('bc-etat').innerHTML=etat.join('<br>');
+  document.getElementById('bc-comm').textContent=commissionEarned(l)?eur(commissionValue()):'—';
+}
+async function saveLeadInfo(){
+  if(!curLead) return;
+  const g=i=>document.getElementById(i).value;
+  const patch={ civilite:g('lv-civilite')||null, type_client:g('lv-type')||null,
+    prenom:g('lv-prenom')||null, nom:g('lv-nom')||null, email:g('lv-email')||null,
+    telephone:g('lv-telephone')||null, telephone2:g('lv-telephone2')||null,
+    adresse:g('lv-adresse')||null, code_postal:g('lv-cp')||null, ville:g('lv-ville')||null,
+    source:g('lv-source')||null, notes:g('lv-notes')||null };
+  const btn=document.getElementById('lv-save'); btn.disabled=true; btn.textContent='Enregistrement…';
+  const ok=await updLead(patch); btn.disabled=false; btn.textContent='💾 Enregistrer';
+  if(ok){ document.getElementById('lv-name').textContent=leadName(curLead); renderQuick(); toast('Enregistré ✓'); }
+}
+async function updLead(patch,msg){
+  if(!curLead) return true;
+  patch.updated_at=new Date().toISOString();
+  const {error}=await db.from('pv_leads').update(patch).eq('id',curLead.id);
+  if(error){ toast('Erreur : '+error.message); return false; }
+  Object.assign(curLead,patch); const L=LEADS.find(x=>x.id===curLead.id); if(L) Object.assign(L,patch);
+  renderBudgetCards(); if(msg) toast(msg); return true;
+}
+function showLeadTab(t){
+  document.getElementById('ltab-suivi').classList.toggle('active',t==='suivi');
+  document.getElementById('ltab-docs').classList.toggle('active',t==='docs');
+  document.getElementById('ltab-comments').classList.toggle('active',t==='comments');
+  document.getElementById('lead-suivi').classList.toggle('hidden',t!=='suivi');
+  document.getElementById('lead-docs').classList.toggle('hidden',t!=='docs');
+  document.getElementById('lead-comments').classList.toggle('hidden',t!=='comments');
+  if(t==='suivi') renderSuivi();
+  if(t==='docs') loadDocs();
+  if(t==='comments') loadActivities();
+}
+
+/* ---------- SUIVI PAR ÉTAPE ---------- */
+function stageIndex(k){ const i=ROLES.findIndex(r=>r.key===k); return i<0?0:i; }
+function renderSuivi(){
+  const cur=(curLead.stage==='termine')?ROLES.length:(curLead.stage==='perdu'?-1:stageIndex(curLead.stage));
+  document.getElementById('lv-stepper').innerHTML=ROLES.map((r,i)=>{
+    const cls=(i<cur?'done':(r.key===selRole?'active':''));
+    return `<button class="step ${cls}" onclick="selectRole('${r.key}')"><span class="dot">${i<cur?'✓':i+1}</span><span class="s-lab">${r.icon} ${r.label}</span></button>`;
+  }).join('');
+  renderRolePanel(); renderNext();
+}
+function selectRole(k){ selRole=k; renderSuivi(); }
+function ownerSelect(field,role){
+  const ed=canEdit(role);
+  const opts='<option value="">— Non attribué —</option>'+PROFILES.map(p=>`<option value="${p.id}" ${curLead[field]===p.id?'selected':''}>${esc(p.nom||p.email)}${p.role?' ('+roleLabel(p.role)+')':''}</option>`).join('');
+  return `<label>Attribué à (${roleLabel(role)})</label><select ${ed?'':'disabled'} onchange="updLead({${field}:this.value||null},'Attribution enregistrée')">${opts}</select>`;
+}
+function statutSelect(role){
+  const ed=canEdit(role); const field='statut_'+role; const list=statutsFor(role);
+  const opts='<option value="">— Aucun —</option>'+list.map(s=>`<option value="${s.id}" ${curLead[field]===s.id?'selected':''}>${esc(s.nom)}</option>`).join('');
+  return `<label>Statut ${roleLabel(role)}</label><select ${ed?'':'disabled'} onchange="updLead({${field}:this.value||null},'Statut enregistré').then(()=>renderSuivi())">${opts}</select>`;
+}
+function dateField(field,label,role){
+  const ed=canEdit(role);
+  return `<label>${label}</label><input type="date" ${ed?'':'disabled'} value="${(curLead[field]||'').slice(0,10)}" onchange="updLead({${field}:this.value||null},'Date enregistrée')">`;
+}
+function checkField(field,label,role){
+  const ed=canEdit(role);
+  return `<label class="chk"><input type="checkbox" ${curLead[field]?'checked':''} ${ed?'':'disabled'} onchange="updLead({${field}:this.checked},'Mis à jour').then(()=>renderSuivi())"> ${label}</label>`;
+}
+function renderRolePanel(){
+  const role=selRole, ed=canEdit(role), box=document.getElementById('lv-detail');
+  let h=`<div style="font-weight:700;margin-bottom:12px">${ROLES.find(r=>r.key===role).icon} Étape ${roleLabel(role)}</div>`;
+  if(!ed) h+=`<div class="hint" style="margin-bottom:10px">🔒 Lecture seule (réservé au rôle ${roleLabel(role)} ou à l'admin).</div>`;
+  h+=statutSelect(role);
+  if(role==='telepro'){
+    h+=ownerSelect('owner_telepro','telepro');
+    h+=`<div class="grid2"><div>${dateField('rdv_date','Date de RDV (optionnel)','telepro')}</div>
+      <div><label>Montant facture élec. (€/mois)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant_facture!=null?curLead.montant_facture:''}" onchange="updLead({montant_facture:this.value===''?null:Number(this.value)})"></div></div>`;
+    h+=`<div class="grid2"><div><label>Type de logement</label><input ${ed?'':'disabled'} value="${esc(curLead.type_logement||'')}" placeholder="Maison / Appartement" onchange="updLead({type_logement:this.value||null})"></div>
+      <div><label>Mode de chauffage</label><input ${ed?'':'disabled'} value="${esc(curLead.mode_chauffage||'')}" placeholder="Élec / Gaz / Pompe à chaleur…" onchange="updLead({mode_chauffage:this.value||null})"></div></div>`;
+    h+=`<div class="hint" style="margin-top:6px">Le type de client (propriétaire/locataire) se règle dans la fiche à gauche.</div>`;
+  } else if(role==='confirmateur'){
+    h+=ownerSelect('owner_confirmateur','confirmateur');
+    h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
+    h+=dateField('rdv_date','Date de RDV confirmée','confirmateur');
+  } else if(role==='commercial'){
+    h+=ownerSelect('owner_commercial','commercial');
+    h+=checkField('signe','Dossier signé','commercial');
+    h+=dateField('date_signature','Date de signature','commercial');
+    h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
+  } else if(role==='secretaire'){
+    h+=ownerSelect('owner_secretaire','secretaire');
+    h+=checkField('installe','Installation réalisée','secretaire');
+    h+=dateField('date_installation','Date d\'installation','secretaire');
+    h+=checkField('paye','Dossier payé','secretaire');
+    h+=dateField('date_paiement','Date de paiement','secretaire');
+  }
+  box.innerHTML=h;
+}
+function renderNext(){
+  const zone=document.getElementById('lv-next');
+  if(curLead.stage==='perdu'){ zone.innerHTML=`<button class="btn ghost" onclick="setStage('telepro')">↩︎ Ré-ouvrir le dossier</button>`; return; }
+  const cur=stageIndex(curLead.stage), next=ROLES[cur+1];
+  let h='';
+  if(curLead.stage!=='termine'){
+    if(next) h+=`<button class="btn" onclick="setStage('${next.key}')">Passer à l'étape « ${next.label} » →</button>`;
+    else h+=`<button class="btn" onclick="setStage('termine')">✅ Marquer comme terminé</button>`;
+    h+=`<button class="btn danger small" onclick="setStage('perdu')">Marquer perdu ✕</button>`;
+  } else {
+    h+=`<span class="pill" style="background:#16a34a22;color:#16a34a">Dossier terminé</span>`;
+    h+=`<button class="btn ghost small" onclick="setStage('secretaire')">Ré-ouvrir</button>`;
+  }
+  zone.innerHTML=h;
+}
+async function setStage(k){ if(await updLead({stage:k},'Étape : '+stageOf(k).label)){ selRole=ROLES.some(r=>r.key===k)?k:selRole; renderSuivi(); } }
+
+/* ---------- DOCUMENTS ---------- */
+async function loadDocs(){
+  if(!curLead) return;
+  const {data,error}=await db.from('pv_documents').select('*').eq('lead_id',curLead.id).order('created_at',{ascending:false});
+  const box=document.getElementById('doc-list');
+  if(error){ box.innerHTML='<div class="hint">Erreur : '+esc(error.message)+'</div>'; return; }
+  curDocs=data||[];
+  if(!curDocs.length){ box.innerHTML='<div class="hint">Aucun document. Cliquez « ⬆️ Ajouter un document ».</div>'; return; }
+  box.innerHTML=curDocs.map(d=>{
+    const del=IS_ADMIN?`<button class="btn danger small" onclick="delDoc('${d.id}')" title="Supprimer (admin)">✕</button>`:'';
+    const ko=d.taille?Math.round(d.taille/1024):0;
+    return `<div class="docitem"><span>📄</span><div class="d-name">${esc(d.nom||'document')}<br><span class="hint">${ko} Ko · ${new Date(d.created_at).toLocaleString('fr-FR')}${d.uploaded_email?' · '+esc(d.uploaded_email):''}</span></div>
+      <button class="btn ghost small" onclick="openDoc('${d.id}')">⬇️ Ouvrir</button>${del}</div>`;
+  }).join('');
+}
+function safeName(s){ return String(s||'fichier').replace(/[^\w.\-]+/g,'_').slice(-80); }
+async function uploadDoc(e){
+  const file=e.target.files[0]; if(!file||!curLead) return;
+  toast('Envoi du document…');
+  const path=curLead.id+'/'+Date.now()+'-'+safeName(file.name);
+  const {error:upErr}=await db.storage.from('pv-documents').upload(path,file,{upsert:false});
+  if(upErr){ toast('Erreur envoi : '+upErr.message); e.target.value=''; return; }
+  const {error}=await db.from('pv_documents').insert({lead_id:curLead.id,nom:file.name,path,mime:file.type,taille:file.size,uploaded_by:SESSION.user.id,uploaded_email:SESSION.user.email});
+  e.target.value='';
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('Document ajouté ✓'); loadDocs();
+}
+async function openDoc(id){
+  const d=curDocs.find(x=>x.id===id); if(!d) return;
+  const {data,error}=await db.storage.from('pv-documents').createSignedUrl(d.path,3600);
+  if(error){ toast('Erreur : '+error.message); return; }
+  window.open(data.signedUrl,'_blank','noopener');
+}
+async function delDoc(id){
+  const d=curDocs.find(x=>x.id===id); if(!d) return;
+  if(!confirm('Supprimer le document « '+(d.nom||'')+' » ? (Admin uniquement.)')) return;
+  await db.storage.from('pv-documents').remove([d.path]);
+  const {error}=await db.from('pv_documents').delete().eq('id',id);
+  if(error){ toast('Suppression refusée : '+error.message); return; }
+  toast('Document supprimé'); loadDocs();
+}
+
+/* ---------- COMMENTAIRES ---------- */
+async function loadActivities(){
+  if(!curLead) return;
+  const {data,error}=await db.from('pv_comments').select('*').eq('lead_id',curLead.id).order('created_at',{ascending:false});
+  const box=document.getElementById('act-list');
+  if(error){ box.innerHTML='<div class="hint">Erreur : '+esc(error.message)+'</div>'; return; }
+  if(!data||!data.length){ box.innerHTML='<div class="hint">Aucun commentaire.</div>'; return; }
+  const ic={note:'📝',appel:'📞',email:'✉️',rdv:'📅'};
+  box.innerHTML=data.map(a=>{
+    const del=IS_ADMIN?`<button class="btn danger small" style="float:right;padding:2px 8px" onclick="delActivity('${a.id}')" title="Supprimer (admin)">✕</button>`:'';
+    return `<div class="act">${del}<div class="a-head">${ic[a.type]||''} <b style="color:var(--txt)">${esc(a.user_email||'?')}</b>${a.role?' · '+esc(roleLabel(a.role)):''} · ${new Date(a.created_at).toLocaleString('fr-FR')}</div><div style="white-space:pre-wrap">${esc(a.contenu||'')}</div></div>`;
+  }).join('');
+}
+async function addActivity(){
+  if(!curLead) return;
+  const contenu=document.getElementById('act-content').value.trim(); if(!contenu){ toast('Écris un commentaire.'); return; }
+  const type=document.getElementById('act-type').value;
+  const {error}=await db.from('pv_comments').insert({lead_id:curLead.id,type,contenu,user_id:SESSION.user.id,user_email:SESSION.user.email,role:MY_ROLE});
+  if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('act-content').value=''; loadActivities();
+}
+async function delActivity(id){
+  if(!confirm('Supprimer ce commentaire ? (Réservé à l\'admin.)')) return;
+  const {error}=await db.from('pv_comments').delete().eq('id',id);
+  if(error){ toast('Suppression refusée : '+error.message); return; }
+  loadActivities(); toast('Commentaire supprimé');
+}
+async function deleteLead(){
+  if(!curLead) return;
+  if(!confirm('Supprimer définitivement le client « '+leadName(curLead)+' » ? (Admin uniquement.)')) return;
+  const {error}=await db.from('pv_leads').delete().eq('id',curLead.id);
+  if(error){ toast('Suppression refusée : '+error.message); return; }
+  LEADS=LEADS.filter(x=>x.id!==curLead.id); toast('Client supprimé'); closeLead();
+}
+
+/* ---------- PIPELINE ---------- */
+function renderPipeline(){
+  document.getElementById('kanban').innerHTML=STAGES.map(s=>{
+    const cards=LEADS.filter(l=>l.stage===s.key);
+    return `<div class="kcol" data-stage="${s.key}" ondragover="kOver(event)" ondragleave="kLeave(event)" ondrop="kDrop(event)">
+      <h3><span style="color:${s.color}">${s.label}</span><span>${cards.length}</span></h3>
+      ${cards.slice(0,60).map(l=>`<div class="kcard" draggable="true" ondragstart="kStart(event,'${l.id}')" onclick="openLead('${l.id}')">
+        <div class="kc-name">${esc(leadName(l))}</div><div class="kc-meta">${esc(l.ville||'')} ${l.owner_telepro?'· '+esc(profileName(l.owner_telepro)||''):''}</div>
+        ${l.montant?`<div class="kc-amt">${eur(l.montant)}</div>`:''}</div>`).join('')}</div>`;
+  }).join('');
+}
+let _drag=null;
+function kStart(e,id){ _drag=id; e.dataTransfer.effectAllowed='move'; }
+function kOver(e){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function kLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+async function kDrop(e){
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  const stage=e.currentTarget.dataset.stage, id=_drag; _drag=null;
+  const l=LEADS.find(x=>x.id===id); if(!l||l.stage===stage) return;
+  const {error}=await db.from('pv_leads').update({stage,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  l.stage=stage; renderPipeline(); toast('Étape : '+stageOf(stage).label);
+}
+
+/* ---------- COMMISSIONS ---------- */
+function commissionValue(){ return Number(SETTINGS.commission_telepro||0)||0; }
+function commissionEarned(l){
+  const cond=SETTINGS.commission_condition||'signe_installe';
+  if(cond==='toujours') return l.stage!=='perdu';
+  if(cond==='signe') return !!l.signe;
+  return !!l.signe && !!l.installe; // signe_installe
+}
+function renderCommissions(){
+  const val=commissionValue(), cond=SETTINGS.commission_condition||'signe_installe';
+  const condTxt={signe_installe:'si signé ET installé',signe:'si signé',toujours:'dès le confirmé'}[cond];
+  document.getElementById('comm-rule').textContent='Règle : '+eur(val)+' par dossier '+condTxt+'.';
+  const map={};
+  LEADS.forEach(l=>{ if(!commissionEarned(l)) return; const k=l.owner_telepro||'_none'; (map[k]=map[k]||[]).push(l); });
+  const t=document.getElementById('comm-table');
+  const keys=Object.keys(map);
+  if(!keys.length){ t.innerHTML='<tr><td class="empty">Aucune commission pour l\'instant.</td></tr>'; }
+  else{
+    t.innerHTML='<tr><th>Télépro</th><th class="num">Dossiers éligibles</th><th class="num">Commission unitaire</th><th class="num">Total</th></tr>'+
+      keys.map(k=>{ const arr=map[k], name=k==='_none'?'(non attribué)':(profileName(k)||'(inconnu)');
+        return `<tr><td>${esc(name)}</td><td class="num">${arr.length}</td><td class="num">${eur(val)}</td><td class="num"><b>${eur(arr.length*val)}</b></td></tr>`; }).join('')+
+      `<tr><td><b>Total</b></td><td class="num"><b>${keys.reduce((s,k)=>s+map[k].length,0)}</b></td><td></td><td class="num"><b>${eur(keys.reduce((s,k)=>s+map[k].length,0)*val)}</b></td></tr>`;
+  }
+  const installes=LEADS.filter(l=>l.installe), ca=installes.reduce((s,l)=>s+(Number(l.montant)||0),0);
+  const commTot=LEADS.filter(commissionEarned).length*val;
+  const renta=[{v:installes.length,l:'Dossiers installés'},{v:eur(ca),l:'CA installé'},{v:eur(commTot),l:'Commissions télépro'},{v:eur(ca-commTot),l:'Marge (provisoire)'}];
+  document.getElementById('renta-grid').innerHTML=renta.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+}
+
+/* ---------- DASHBOARD ---------- */
+function renderDashboard(){
+  const total=LEADS.length, signe=LEADS.filter(l=>l.signe).length, installe=LEADS.filter(l=>l.installe).length, paye=LEADS.filter(l=>l.paye).length;
+  const perdu=LEADS.filter(l=>l.stage==='perdu').length;
+  const caSigne=LEADS.filter(l=>l.signe).reduce((s,l)=>s+(Number(l.montant)||0),0);
+  const commDue=LEADS.filter(commissionEarned).length*commissionValue();
+  const kpi=[{v:total,l:'Clients au total'},{v:signe,l:'Signés'},{v:installe,l:'Installés'},{v:paye,l:'Payés'},
+    {v:perdu,l:'Perdus'},{v:(total?Math.round(signe/total*100):0)+' %',l:'Taux de signature'},
+    {v:eur(caSigne),l:'CA signé'},{v:eur(commDue),l:'Commissions télépro dues'}];
+  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+  document.getElementById('dash-stages').innerHTML='<tr><th>Étape</th><th class="num">Nombre</th><th class="num">Montant cumulé</th></tr>'+
+    STAGES.map(s=>{ const r=LEADS.filter(l=>l.stage===s.key), amt=r.reduce((a,l)=>a+(Number(l.montant)||0),0);
+      return `<tr><td><span class="pill" style="background:${s.color}22;color:${s.color}">${s.label}</span></td><td class="num">${r.length}</td><td class="num">${eur(amt)}</td></tr>`; }).join('');
+}
+
+/* ---------- PARAMÈTRES ---------- */
+function renderParams(){
+  document.getElementById('set-comm').value=SETTINGS.commission_telepro!=null?SETTINGS.commission_telepro:'';
+  document.getElementById('set-cond').value=SETTINGS.commission_condition||'signe_installe';
+  renderStatutTables(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_client_types','ct-table',CTYPES);
+}
+async function saveSettings(){
+  const val={ commission_telepro:Number(document.getElementById('set-comm').value)||0, commission_condition:document.getElementById('set-cond').value };
+  const {error}=await db.from('pv_settings').upsert({key:'crm',value:val,updated_at:new Date().toISOString()},{onConflict:'key'});
+  if(error){ toast('Erreur : '+error.message); return; }
+  SETTINGS=val; toast('Réglages enregistrés ✓');
+}
+function renderStatutTables(){
+  document.getElementById('st-tables').innerHTML=ROLES.map(r=>{
+    const list=statutsFor(r.key);
+    const rows=list.length?list.map(s=>`<tr><td>${statutPill(s.id)}</td><td><span class="tag" style="background:${s.couleur};color:#fff">${esc(s.couleur||'')}</span></td><td class="num">${s.ordre}</td><td class="num"><button class="btn danger small" onclick="delRef('pv_statuts','${s.id}')">Suppr.</button></td></tr>`).join(''):'<tr><td class="empty">Aucun statut</td></tr>';
+    return `<div style="margin-bottom:14px"><div style="font-weight:700;margin-bottom:6px">${r.icon} ${r.label}</div><div class="table-wrap"><table><tr><th>Statut</th><th>Couleur</th><th class="num">Ordre</th><th></th></tr>${rows}</table></div></div>`;
+  }).join('');
+}
+async function addStatut(e){
+  e.preventDefault();
+  const role_key=document.getElementById('st-role').value, nom=document.getElementById('st-nom').value.trim();
+  if(!nom) return;
+  const couleur=document.getElementById('st-couleur').value, ordre=Number(document.getElementById('st-ordre').value)||0;
+  const {error}=await db.from('pv_statuts').insert({role_key,nom,couleur,ordre});
+  if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('st-nom').value=''; await reloadRefs(); toast('Statut ajouté');
+}
+function renderRef(table,tid,arr){
+  const t=document.getElementById(tid);
+  t.innerHTML=arr.length?arr.map(r=>`<tr><td>${esc(r.nom)}</td><td class="num"><button class="btn danger small" onclick="delRef('${table}','${r.id}')">Suppr.</button></td></tr>`).join(''):'<tr><td class="empty">Vide</td></tr>';
+}
+async function addRef(e,table,inputId){
+  e.preventDefault(); const nom=document.getElementById(inputId).value.trim(); if(!nom) return;
+  const ordre=table==='pv_sources'?SOURCES.length:CTYPES.length;
+  const {error}=await db.from(table).insert({nom,ordre}); if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById(inputId).value=''; await reloadRefs(); toast('Ajouté');
+}
+async function delRef(table,id){
+  if(!confirm('Supprimer cet élément ?')) return;
+  const {error}=await db.from(table).delete().eq('id',id); if(error){ toast('Suppression refusée : '+error.message); return; }
+  await reloadRefs();
+}
+async function reloadRefs(){
+  const [st,sr,ct]=await Promise.all([
+    db.from('pv_statuts').select('*').order('role_key').order('ordre'),
+    db.from('pv_sources').select('*').order('ordre'),
+    db.from('pv_client_types').select('*').order('ordre')]);
+  STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; fillSelects(); renderParams();
+}
+
+/* ---------- IMPORT ---------- */
+function downloadLeadsTemplate(){
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['civilite','prenom','nom','email','telephone','telephone2','adresse','code_postal','ville','type_client','source','montant'],
+    ['M.','Jean','Dupont','jean@exemple.fr','0600000000','','12 rue du Soleil','75001','Paris','Propriétaire','Achat de leads','']
+  ]);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Leads'); XLSX.writeFile(wb,'modele-leads-photovoltaique.xlsx');
+}
+async function importLeadsFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+    const get=(r,keys)=>{ for(const k of Object.keys(r)){ if(keys.includes(k.toLowerCase().trim())) return r[k]; } return ''; };
+    const mine=(MY_ROLE==='telepro')?SESSION.user.id:null;
+    const payload=rows.map(r=>{ const m=String(get(r,['montant','budget','prix'])).replace(/[^\d.,-]/g,'').replace(',','.');
+      return { civilite:String(get(r,['civilite','civilité'])).trim()||null,
+        prenom:String(get(r,['prenom','prénom'])).trim()||null, nom:String(get(r,['nom','name'])).trim()||null,
+        email:String(get(r,['email','mail'])).trim()||null, telephone:String(get(r,['telephone','téléphone','tel','phone','portable'])).trim()||null,
+        telephone2:String(get(r,['telephone2','tel2','téléphone2','fixe'])).trim()||null,
+        adresse:String(get(r,['adresse','address'])).trim()||null, code_postal:String(get(r,['code_postal','cp','code postal','zip'])).trim()||null,
+        ville:String(get(r,['ville','city'])).trim()||null, type_client:String(get(r,['type_client','type','type de client'])).trim()||null,
+        source:String(get(r,['source','origine'])).trim()||null, montant:m?Number(m):null,
+        stage:'telepro', owner_telepro:mine, created_by:SESSION.user.id }; }).filter(p=>p.nom||p.prenom||p.email||p.telephone);
+    if(!payload.length){ toast('Aucune ligne exploitable.'); e.target.value=''; return; }
+    if(!confirm('Importer '+payload.length+' client(s) ?')){ e.target.value=''; return; }
+    const {error}=await db.from('pv_leads').insert(payload); if(error){ toast('Erreur import : '+error.message); e.target.value=''; return; }
+    toast(payload.length+' client(s) importé(s)'); e.target.value='';
+    const {data}=await db.from('pv_leads').select('*').order('created_at',{ascending:false}); LEADS=data||[]; renderLeads(); showTab('leads');
+  }catch(err){ toast('Erreur fichier : '+err.message); e.target.value=''; }
+}
+
+/* ---------- INIT ---------- */
+(async()=>{
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){ document.getElementById('login-view').classList.remove('hidden'); return; }
+  await afterAuth(session);
+})();
+</script>
+</body>
+</html>
