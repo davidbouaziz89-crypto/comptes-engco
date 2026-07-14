@@ -235,9 +235,9 @@ async function doLogin(e){e.preventDefault();
 async function doLogout(){await sb.auth.signOut();location.reload();}
 async function afterAuth(session){
   SESSION=session;
-  const {data:roles}=await db.from('user_roles').select('role').eq('user_id',session.user.id);
-  const rset=(roles||[]).map(r=>r.role);
-  MYROLE=rset.includes('admin')?'admin':rset.includes('manager')?'manager':rset.includes('comptable')?'comptable':rset.includes('employee')?'employee':null;
+  // Le rôle vient de profiles.role (comme l'appli d'origine ; policy self-read OK pour tous les rôles)
+  const {data:prof}=await db.from('profiles').select('role').eq('user_id',session.user.id).maybeSingle();
+  MYROLE=prof?prof.role:null;
   document.getElementById('login-view').classList.add('hidden');
   if(!MYROLE){document.getElementById('noaccess-view').classList.remove('hidden');return;}
   if(MYROLE==='employee'){ await initEmployee(session); return; }
