@@ -51,6 +51,7 @@
   .pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
   .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .kpi.clk{cursor:pointer}.kpi.clk:hover{border-color:var(--accent)}.kpi.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(79,124,255,.35)}
   .kpi .k-val{font-size:24px;font-weight:800}.kpi .k-lab{color:var(--muted);font-size:13px;margin-top:4px}
   .search{max-width:280px}
   #detail-view{position:fixed;inset:0;background:var(--bg);overflow:auto;z-index:50}
@@ -96,6 +97,7 @@
   </header>
   <nav>
     <button data-tab="dash" class="active" onclick="showTab('dash')">📊 Tableau de bord</button>
+    <button data-tab="presence" onclick="showTab('presence')">🟢 Présences</button>
     <button data-tab="employes" onclick="showTab('employes')">👥 Employés</button>
     <button data-tab="pointages" onclick="showTab('pointages')">⏱️ Pointages</button>
     <button data-tab="demandes" onclick="showTab('demandes')">📨 Demandes</button>
@@ -107,6 +109,12 @@
   <main>
     <div id="tab-dash"><section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
       <section class="panel"><h2>Pointages du jour</h2><div class="table-wrap"><table id="dash-today"></table></div></section></div>
+
+    <div id="tab-presence" class="hidden"><section class="panel">
+      <div class="row" style="margin-bottom:12px"><div class="field"><label>Date</label><input type="date" id="pr-date" onchange="renderPresence()"></div><span class="hint" id="pr-count"></span></div>
+      <div class="kpis" id="pr-kpi" style="margin-bottom:14px"></div>
+      <div class="table-wrap"><table id="pr-table"></table></div>
+    </section></div>
 
     <div id="tab-employes" class="hidden"><section class="panel">
       <div class="row" style="margin-bottom:12px"><input class="search" id="emp-search" placeholder="🔎 Rechercher…" oninput="renderEmployes()">
@@ -121,6 +129,7 @@
         <button class="btn small" onclick="openAddPointage(document.getElementById('pt-emp').value)">➕ Ajouter un pointage</button>
         <button class="btn ghost small" onclick="exportPointages()">⬇️ Export Excel (brut)</button>
         <button class="btn ghost small" onclick="exportTeamExcel()">📊 Récap équipe (Excel)</button>
+        <button class="btn ghost small" onclick="exportTeamPdf()">📄 Récap équipe (PDF)</button>
         <button class="btn ghost small" onclick="closeForgottenDays()">🧹 Clôturer les journées oubliées</button>
       </div>
       <div class="hint" style="margin-bottom:8px">Pour le <b>récapitulatif de paie détaillé</b> d'un employé (heures prévues/faites/manquées/sup + total à rémunérer) et son <b>PDF</b>, ouvre sa fiche (onglet 👥 Employés).</div>
@@ -249,6 +258,7 @@ let PROFILES=[], EMPLOYES=[], EQUIPES=[], POINTAGES=[], DOCUMENTS=[], BULLETINS=
 let REQUESTS=[], REQCATS=[], ABSCATS=[], DOCCATS=[], HOLIDAYS=[];
 let profByUser={}, empById={};
 let RECAP_CACHE={};
+let _prFilter='';
 
 function toggleTheme(){const l=document.documentElement.getAttribute('data-theme')!=='light';if(l)document.documentElement.setAttribute('data-theme','light');else document.documentElement.removeAttribute('data-theme');try{localStorage.setItem('pfp-theme',l?'light':'dark');}catch(e){}updateThemeBtn();}
 function updateThemeBtn(){const b=document.getElementById('theme-btn');if(b)b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙';}
@@ -280,6 +290,7 @@ function hmsToMin(v){if(v==null)return 0;if(typeof v==='number')return v;const p
 function timeToMin(t){if(!t)return null;const p=String(t).split(':').map(Number);return (p[0]*60)+(p[1]||0);}
 function schedPause(s,emp){if(s&&s.pause)return hmsToMin(s.pause);if(emp.duree_pause_prevue!=null)return Number(emp.duree_pause_prevue)||0;if(emp.pause_automatique_minutes!=null)return Number(emp.pause_automatique_minutes)||0;return 0;}
 function expectedMinutesForDay(s,emp){if(!schedActif(s))return 0;const d=timeToMin(s.debut),f=timeToMin(s.fin);if(d==null||f==null)return 0;let span=f-d;if(span<0)span+=1440;return Math.max(0,span-schedPause(s,emp));}
+function isHolidayFor(dateStr,country){return HOLIDAYS.some(h=>h.date===dateStr&&(!h.country||h.country===country));}
 async function computeMonthly(empId,ym){
   const emp=empById[empId];if(!emp)return null;
   const eq=EQUIPES.find(q=>q.id===emp.equipe_id)||{};
@@ -292,7 +303,6 @@ async function computeMonthly(empId,ym){
   ]);
   const commentByDate={};(pcR.data||[]).forEach(c=>commentByDate[c.pointage_date]=c);
   const schoolSet=new Set((sdR.data||[]).filter(s=>s.is_school_day).map(s=>s.date));
-  const holidayByDate={};HOLIDAYS.filter(h=>!h.country||h.country===country).forEach(h=>holidayByDate[h.date]=h.name);
   const ptByDate={};POINTAGES.filter(p=>p.employee_id===empId&&(p.date||'').slice(0,7)===ym).forEach(p=>{(ptByDate[p.date]=ptByDate[p.date]||[]).push(p);});
   const type=(emp.type_horaire||'').toLowerCase();
   const isVariable=/variable|taux|flex/.test(type);
@@ -311,7 +321,7 @@ async function computeMonthly(empId,ym){
     pauseTot+=pauseDay;worked+=actual;if(actual>0){presentDays++;}
     const wk=Math.min(5,Math.floor((day-1)/7));
     const cmt=commentByDate[ds];
-    const isHoliday=!!holidayByDate[ds];
+    const isHoliday=isHolidayFor(ds,country);
     const isSchool=schoolSet.has(ds)||(sched&&sched.ecole===true);
     const absent=cmt&&cmt.absence_categories&&cmt.absence_categories.counts_as_present===false;
     let exp=0,statut='';
@@ -335,7 +345,6 @@ async function computeMonthly(empId,ym){
   const prevAbsenceMin=(adjR&&adjR.data&&adjR.data.hours_absence_previous_month)?Number(adjR.data.hours_absence_previous_month)*60:0;
   const totalNetMin=Math.max(0,worked+paidLeaveMin+schoolMin+holidayPaidMin-prevAbsenceMin);
   const bonuses=boR.data||[];const bonusTotal=bonuses.reduce((s,b)=>s+(Number(b.amount)||0),0);
-  // rémunération
   let tauxAffiche=null,tauxCalcule=null;
   if(emp.taux_horaire!=null)tauxAffiche=Number(emp.taux_horaire);
   if(emp.salaire_global!=null&&expected>0)tauxCalcule=Number(emp.salaire_global)/(expected/60);
@@ -347,7 +356,7 @@ async function getRecap(empId){
 }
 async function renderMonthlyRecap(empId){
   const out=document.getElementById('rc-out');if(out)out.innerHTML='<div class="hint">Calcul…</div>';
-  const r=await getRecap(empId);if(!r){if(out)out.innerHTML='<div class="val-bad">Erreur de calcul.</div>';return;}
+  const r=await getRecap(empId);if(!r){if(out)out.innerHTML='<div style="color:var(--bad)">Erreur de calcul.</div>';return;}
   const box=(l,v,c)=>`<div class="rc-box"><div class="v"${c?` style="color:${c}"`:''}>${v}</div><div class="l">${l}</div></div>`;
   let absRows=Object.entries(r.absByCat).map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num">${v.days}</td><td class="num">${hh(v.minutes)}</td></tr>`).join('');
   const remun=r.isVariable?(r.tauxAffiche!=null?`Taux horaire : <b>${eur(r.tauxAffiche)}</b>`:'Payé à l\'heure (taux non renseigné)')
@@ -373,7 +382,7 @@ async function renderMonthlyRecap(empId){
 async function exportEmployeePdf(empId){
   const r=RECAP_CACHE[empId]||await getRecap(empId);if(!r){toast('Calcule d\'abord le mois.');return;}
   if(!window.jspdf){toast('Module PDF non chargé.');return;}
-  const {jsPDF}=window.jspdf;const doc=new jsPDF();const p=profByUser[r.emp.user_id]||{};
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
   doc.setFontSize(16);doc.text('Pointage '+empName(r.emp),14,18);
   doc.setFontSize(11);doc.text('Société : '+String((r.eq.nom_societe||r.eq.nom||(COMPANY&&COMPANY.company_name)||'')),14,26);
   doc.text('Période : '+r.ym,14,32);
@@ -420,6 +429,67 @@ async function exportTeamExcel(){
   XLSX.writeFile(wb,'Recap_equipe_'+ym+'.xlsx');
   toast('Récapitulatif équipe généré ✓');
 }
+async function exportTeamPdf(){
+  const ym=(document.getElementById('pt-date').value||new Date().toISOString().slice(0,10)).slice(0,7);
+  if(!window.jspdf){toast('Module PDF non chargé.');return;}
+  toast('Génération du PDF équipe…');
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  const list=EMPLOYES.filter(e=>e.status==='active').sort((a,b)=>empName(a).localeCompare(empName(b)));
+  let first=true;
+  for(const e of list){const r=await computeMonthly(e.id,ym);if(!r)continue;if(!first)doc.addPage();first=false;
+    let y=16;doc.setFontSize(14);doc.text(empName(e)+' — '+ym,14,y);y+=6;doc.setFontSize(10);doc.text('Société : '+String(r.eq.nom_societe||r.eq.nom||''),14,y);
+    const body=r.days.map(d=>[fmtDate(d.date),d.statut,d.debut||'-',d.fin||'-',hh(d.net),d.missing?hh(d.missing):'-',d.overtime?hh(d.overtime):'-']);
+    doc.autoTable({startY:y+4,head:[['Date','Statut','Début','Fin','T. net','Manq.','Supp.']],body,styles:{fontSize:7},headStyles:{fillColor:[66,66,66]}});
+    doc.autoTable({startY:doc.lastAutoTable.finalY+4,head:[['Indicateur','Valeur']],body:[['Heures prévues',hh(r.expected)],['Heures effectuées',hh(r.worked)],['Manquées',hh(r.missing)],['Supplémentaires',hh(r.overtime)],['Jours présents',r.presentDays+''],[{content:'Total à rémunérer',styles:{fontStyle:'bold'}},{content:hh(r.totalNetMin),styles:{fontStyle:'bold'}}]],styles:{fontSize:8},headStyles:{fillColor:[66,66,66]},columnStyles:{1:{halign:'right'}}});
+  }
+  if(first){toast('Aucun employé actif.');return;}
+  doc.save('Recap_equipe_'+ym+'.pdf');toast('PDF équipe généré ✓');
+}
+
+/* ===== PRÉSENCES DU JOUR ===== */
+function computeDayStatus(e,date,ctx){
+  const eq=EQUIPES.find(q=>q.id===e.equipe_id)||{};
+  const country=eq.country||(COMPANY&&COMPANY.country)||'FR';
+  const sched=dayScheduleFor(e,date);
+  const cmt=ctx.cmt;
+  if(cmt&&cmt.absence_categories&&cmt.absence_categories.counts_as_present===false) return {k:'conge',label:cmt.absence_categories.name||'Absence',color:'var(--warn)'};
+  if(ctx.school||(sched&&sched.ecole===true)) return {k:'ecole',label:'École',color:'var(--accent)'};
+  const pts=(ctx.pts||[]).slice().sort((a,b)=>String(a.heure_debut||'').localeCompare(String(b.heure_debut||'')));
+  if(pts.length){
+    const allDone=pts.every(p=>p.heure_fin);
+    const arrivee=pts[0].heure_debut?fmtTime(pts[0].heure_debut):'';
+    let retard=false;
+    if(schedActif(sched)&&pts[0].heure_debut){const dm=timeToMin(sched.debut);const d0=new Date(pts[0].heure_debut);const actualMin=d0.getHours()*60+d0.getMinutes();if(dm!=null&&(actualMin-dm)>5)retard=true;}
+    if(allDone) return {k:'termine',label:'Terminé',color:'var(--good)',arrivee,depart:fmtTime(pts[pts.length-1].heure_fin),retard};
+    return {k:'present',label:'Présent',color:'var(--good)',arrivee,retard};
+  }
+  if(isHolidayFor(date,country)&&schedActif(sched)) return {k:'ferie',label:'Jour férié',color:'var(--muted)'};
+  if(!schedActif(sched)) return {k:'nontrav',label:'Non travaillé',color:'var(--muted)'};
+  return {k:'nonpointe',label:'Non pointé',color:'var(--bad)'};
+}
+async function renderPresence(){
+  let date=gv('pr-date');if(!date){date=new Date().toISOString().slice(0,10);const el=document.getElementById('pr-date');if(el)el.value=date;}
+  const [pcR,sdR]=await Promise.all([
+    db.from('pointage_comments').select('*, absence_categories(name,counts_as_present)').eq('pointage_date',date),
+    db.from('employee_school_days').select('employee_id,is_school_day').eq('date',date)
+  ]);
+  const cmtBy={};(pcR.data||[]).forEach(c=>cmtBy[c.employee_id]=c);
+  const schoolSet=new Set((sdR.data||[]).filter(s=>s.is_school_day).map(s=>s.employee_id));
+  const ptBy={};POINTAGES.filter(p=>p.date===date).forEach(p=>{(ptBy[p.employee_id]=ptBy[p.employee_id]||[]).push(p);});
+  const active=EMPLOYES.filter(e=>e.status==='active');
+  const list=active.map(e=>({e,s:computeDayStatus(e,date,{cmt:cmtBy[e.id],school:schoolSet.has(e.id),pts:ptBy[e.id]||[]})})).sort((a,b)=>empName(a.e).localeCompare(empName(b.e)));
+  const cnt={present:0,termine:0,ecole:0,conge:0,nonpointe:0,retard:0};
+  list.forEach(x=>{const k=x.s.k;if(k==='present')cnt.present++;else if(k==='termine')cnt.termine++;else if(k==='ecole')cnt.ecole++;else if(k==='conge')cnt.conge++;else if(k==='nonpointe')cnt.nonpointe++;if(x.s.retard)cnt.retard++;});
+  const kpiDefs=[['Présents',cnt.present,'present','var(--good)'],['Terminé',cnt.termine,'termine','var(--good)'],['École',cnt.ecole,'ecole','var(--accent)'],['Congé/Absence',cnt.conge,'conge','var(--warn)'],['Non pointé',cnt.nonpointe,'nonpointe','var(--bad)'],['En retard',cnt.retard,'retard','var(--warn)']];
+  document.getElementById('pr-kpi').innerHTML=kpiDefs.map(([l,v,k,c])=>`<div class="kpi clk${_prFilter===k?' on':''}" onclick="setPrFilter('${k}')"><div class="k-val" style="color:${c}">${v}</div><div class="k-lab">${l}</div></div>`).join('');
+  let shown=list;
+  if(_prFilter==='retard')shown=list.filter(x=>x.s.retard); else if(_prFilter)shown=list.filter(x=>x.s.k===_prFilter);
+  document.getElementById('pr-count').textContent=shown.length+' / '+list.length+' employé(s)';
+  const t=document.getElementById('pr-table');
+  t.innerHTML='<tr><th>Employé</th><th>Équipe</th><th>Statut</th><th>Arrivée</th><th>Départ</th><th>Retard</th></tr>'+
+    (shown.map(({e,s})=>`<tr class="clickable" onclick="openEmp('${e.id}')"><td><b>${esc(empName(e))}</b></td><td>${esc(equipeName(e.equipe_id))}</td><td><span class="pill" style="background:${s.color}22;color:${s.color}">${esc(s.label)}</span></td><td>${esc(s.arrivee||'—')}</td><td>${esc(s.depart||'—')}</td><td>${s.retard?'<span style="color:var(--warn)">⚠️ en retard</span>':'—'}</td></tr>`).join('')||'<tr><td class="empty">Aucun employé</td></tr>');
+}
+function setPrFilter(k){_prFilter=(_prFilter===k?'':k);renderPresence();}
 
 /* AUTH */
 async function doLogin(e){e.preventDefault();
@@ -473,7 +543,9 @@ async function loadAll(){
   document.getElementById('pt-emp').innerHTML='<option value="">Tous</option>'+empOpts;
   document.getElementById('updoc-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
   document.getElementById('upbul-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
-  document.getElementById('pt-date').value=new Date().toISOString().slice(0,10);
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('pt-date').value=today;
+  const prd=document.getElementById('pr-date');if(prd)prd.value=today;
 }
 async function reloadCore(){
   const [e,p,z]=await Promise.all([db.from('employees').select('*'),db.from('profiles').select('*'),db.from('zones_gps').select('*')]);
@@ -483,8 +555,8 @@ async function reloadCore(){
 }
 async function reloadPointages(){const {data}=await db.from('pointages').select('*').order('date',{ascending:false});POINTAGES=data||[];}
 function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dash','employes','pointages','demandes','documents','bulletins','zones','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
-  ({dash:renderDash,employes:renderEmployes,pointages:renderPointages,demandes:renderDemandes,documents:renderDocuments,bulletins:renderBulletins,zones:renderZones,params:renderParams}[t])();}
+  ['dash','presence','employes','pointages','demandes','documents','bulletins','zones','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  ({dash:renderDash,presence:renderPresence,employes:renderEmployes,pointages:renderPointages,demandes:renderDemandes,documents:renderDocuments,bulletins:renderBulletins,zones:renderZones,params:renderParams}[t])();}
 
 /* DASHBOARD */
 function renderDash(){
