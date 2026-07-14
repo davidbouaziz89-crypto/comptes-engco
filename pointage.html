@@ -7,6 +7,7 @@
 <script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
   :root{--bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;--accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;}
   :root[data-theme="light"]{--bg:#f4f6fb;--panel:#fff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;--accent:#4f7cff;--accent2:#8a5cff;--good:#16a34a;--bad:#dc2626;--warn:#d97706;}
@@ -29,6 +30,7 @@
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
   .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
   .btn.small{padding:5px 10px;font-size:13px}
+  .btn:disabled{opacity:.55;cursor:default}
   nav{display:flex;gap:6px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
   nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
   nav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
@@ -69,6 +71,7 @@
     <label>Mot de passe</label><input type="password" id="login-pass" autocomplete="current-password" required>
     <button class="btn" type="submit" style="width:100%;margin-top:16px">Se connecter</button>
     <div class="err" id="login-err"></div>
+    <div style="text-align:center;margin-top:8px"><a href="#" class="hint" onclick="forgotPassword();return false">Mot de passe oublié ?</a></div>
   </form>
 </div>
 <div id="noaccess-view" class="overlay hidden">
@@ -103,7 +106,7 @@
 
     <div id="tab-employes" class="hidden"><section class="panel">
       <div class="row" style="margin-bottom:12px"><input class="search" id="emp-search" placeholder="🔎 Rechercher…" oninput="renderEmployes()">
-      <span class="hint" id="emp-count"></span></div>
+      <span class="hint" id="emp-count"></span><span class="spacer" style="margin-left:auto"></span><button class="btn small" onclick="openNewEmp()">➕ Nouvel employé</button></div>
       <div class="table-wrap"><table id="emp-table"></table></div></section></div>
 
     <div id="tab-pointages" class="hidden"><section class="panel">
@@ -112,6 +115,8 @@
         <div class="field"><label>Employé</label><select id="pt-emp" onchange="renderPointages()"><option value="">Tous</option></select></div>
         <div class="field"><label>Mois entier ?</label><select id="pt-mode" onchange="renderPointages()"><option value="day">Ce jour</option><option value="month">Tout le mois</option></select></div>
         <button class="btn ghost small" onclick="exportPointages()">⬇️ Export Excel</button>
+        <button class="btn ghost small" onclick="exportPdf()">⬇️ PDF (mois)</button>
+        <button class="btn ghost small" onclick="closeForgottenDays()">🧹 Clôturer les journées oubliées</button>
       </div>
       <div class="table-wrap"><table id="pt-table"></table></div>
       <div class="hint" id="pt-count" style="margin-top:8px"></div></section></div>
@@ -150,9 +155,12 @@
       <div class="hint" style="margin-bottom:10px">Pour ajouter ou modifier une zone, ouvre la fiche de l'employé concerné (onglet 👥 Employés).</div>
       <div class="table-wrap"><table id="zones-table"></table></div></section></div>
 
-    <div id="tab-params" class="hidden"><section class="panel"><h2>Paramètres société</h2>
-      <div id="params-body"></div></section>
-      <section class="panel"><h2>Équipes / Sociétés</h2><div class="table-wrap"><table id="equipes-table"></table></div></section></div>
+    <div id="tab-params" class="hidden">
+      <section class="panel"><h2>Paramètres société</h2><div id="params-company"></div></section>
+      <section class="panel"><h2>Équipes / Sociétés</h2><div id="params-equipes"></div></section>
+      <section class="panel"><h2>Catégories</h2><div id="params-cats"></div></section>
+      <section class="panel"><h2>Jours fériés</h2><div id="params-holidays"></div></section>
+    </div>
   </main>
 </div>
 
@@ -198,6 +206,19 @@
   <main><div id="detail-body"></div></main>
 </div>
 
+<!-- MODAL NOUVEL EMPLOYÉ -->
+<div id="newemp-modal" class="overlay hidden" style="background:rgba(0,0,0,.6)">
+  <div class="authcard"><h1 style="font-size:19px">➕ Nouvel employé</h1>
+    <div class="sub">Un compte de connexion sera créé pour l'employé.</div>
+    <label>Email *</label><input type="email" id="ne-email">
+    <div class="row"><div class="field" style="flex:1"><label>Prénom</label><input id="ne-first"></div><div class="field" style="flex:1"><label>Nom</label><input id="ne-last"></div></div>
+    <label>Équipe</label><select id="ne-equipe"></select>
+    <label>Mot de passe temporaire</label><input id="ne-pass" value="TimeGuard2026!">
+    <div class="err" id="ne-msg"></div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn ghost" onclick="closeNewEmp()">Annuler</button><button class="btn" id="ne-go" onclick="createEmployee()">Créer l'employé</button></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -208,7 +229,7 @@ const db=sb.schema('pointage');   // toutes les tables sont dans le schéma "poi
 
 let SESSION=null, MYROLE=null;
 let PROFILES=[], EMPLOYES=[], EQUIPES=[], POINTAGES=[], DOCUMENTS=[], BULLETINS=[], ZONES=[], COMPANY=null;
-let REQUESTS=[], REQCATS=[];
+let REQUESTS=[], REQCATS=[], ABSCATS=[], DOCCATS=[], HOLIDAYS=[];
 let profByUser={}, empById={};
 
 function toggleTheme(){const l=document.documentElement.getAttribute('data-theme')!=='light';if(l)document.documentElement.setAttribute('data-theme','light');else document.documentElement.removeAttribute('data-theme');try{localStorage.setItem('pfp-theme',l?'light':'dark');}catch(e){}updateThemeBtn();}
@@ -222,6 +243,7 @@ function eur(n){if(n==null||n===''||isNaN(Number(n)))return'—';return Number(n
 function mins(n){if(n==null||isNaN(Number(n)))return'—';n=Math.round(Number(n));return Math.floor(n/60)+'h'+String(n%60).padStart(2,'0');}
 function gv(id){const el=document.getElementById(id);return el?String(el.value).trim():'';}
 function gnum(id){const s=gv(id);return s===''?null:(isNaN(Number(s))?null:Number(s));}
+function safePdf(s){return String(s||'').replace(/[^a-z0-9]+/gi,'_')||'export';}
 let _tt;function toast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2600);}
 
 function empName(e){const p=profByUser[e.user_id];if(p)return((p.first_name||'')+' '+(p.last_name||'')).trim()||p.email||'(sans nom)';return '(employé '+String(e.id).slice(0,6)+')';}
@@ -238,6 +260,13 @@ async function doLogin(e){e.preventDefault();
   if(error){document.getElementById('login-err').textContent='Email ou mot de passe incorrect.';return;}
   document.getElementById('login-err').textContent='';await afterAuth(data.session);}
 async function doLogout(){await sb.auth.signOut();location.reload();}
+async function forgotPassword(){
+  const email=prompt('Entrez votre email pour recevoir un lien de réinitialisation :',document.getElementById('login-email').value||'');
+  if(!email)return;
+  const {error}=await sb.auth.resetPasswordForEmail(email.trim(),{redirectTo:location.origin+location.pathname});
+  if(error){document.getElementById('login-err').textContent='Erreur : '+error.message;return;}
+  document.getElementById('login-err').textContent='Email de réinitialisation envoyé (vérifiez votre boîte).';
+}
 async function afterAuth(session){
   SESSION=session;
   // Le rôle vient de profiles.role (comme l'appli d'origine ; policy self-read OK pour tous les rôles)
@@ -253,7 +282,7 @@ async function afterAuth(session){
   await loadAll();showTab('dash');
 }
 async function loadAll(){
-  const [p,e,q,pt,dc,bl,z,co,rq,rc]=await Promise.all([
+  const [p,e,q,pt,dc,bl,z,co,rq,rc,ac,dcat,hol]=await Promise.all([
     db.from('profiles').select('*'),
     db.from('employees').select('*'),
     db.from('equipes').select('*'),
@@ -264,9 +293,12 @@ async function loadAll(){
     db.from('company_settings').select('*').limit(1),
     db.from('employee_requests').select('*').order('created_at',{ascending:false}),
     db.from('request_categories').select('*').order('name'),
+    db.from('absence_categories').select('*').order('name'),
+    db.from('document_categories').select('*').order('name'),
+    db.from('public_holidays').select('*').order('date'),
   ]);
   PROFILES=p.data||[];EMPLOYES=e.data||[];EQUIPES=q.data||[];POINTAGES=pt.data||[];DOCUMENTS=dc.data||[];BULLETINS=bl.data||[];ZONES=z.data||[];COMPANY=(co.data||[])[0]||null;
-  REQUESTS=rq.data||[];REQCATS=rc.data||[];
+  REQUESTS=rq.data||[];REQCATS=rc.data||[];ABSCATS=ac.data||[];DOCCATS=dcat.data||[];HOLIDAYS=hol.data||[];
   profByUser={};PROFILES.forEach(x=>profByUser[x.user_id]=x);
   empById={};EMPLOYES.forEach(x=>empById[x.id]=x);
   const empOpts=EMPLOYES.slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
@@ -316,6 +348,22 @@ function renderEmployes(){
       <td>${esc(e.type_horaire||'')}</td><td>${e.status==='active'?'<span class="pill" style="background:var(--good)22;color:var(--good)">Actif</span>':esc(e.status||'')}</td>
       <td class="num">${e.taux_horaire!=null?eur(e.taux_horaire):(e.salaire_global!=null?eur(e.salaire_global):'—')}</td></tr>`).join('');
 }
+function openNewEmp(){
+  document.getElementById('ne-email').value='';document.getElementById('ne-first').value='';document.getElementById('ne-last').value='';document.getElementById('ne-pass').value='TimeGuard2026!';document.getElementById('ne-msg').textContent='';
+  document.getElementById('ne-equipe').innerHTML='<option value="">— Aucune —</option>'+EQUIPES.map(q=>`<option value="${q.id}">${esc(q.nom||q.nom_societe||'')}</option>`).join('');
+  document.getElementById('newemp-modal').classList.remove('hidden');
+}
+function closeNewEmp(){document.getElementById('newemp-modal').classList.add('hidden');}
+async function createEmployee(){
+  const email=gv('ne-email').toLowerCase();const msg=document.getElementById('ne-msg');
+  if(!email){msg.textContent='Email requis.';return;}
+  const btn=document.getElementById('ne-go');btn.disabled=true;msg.textContent='Création en cours…';
+  const {data,error}=await sb.functions.invoke('pointage-create-employee',{body:{email,first_name:gv('ne-first'),last_name:gv('ne-last'),equipe_id:gv('ne-equipe')||null,password:gv('ne-pass')||'TimeGuard2026!'}});
+  btn.disabled=false;
+  if(error||(data&&data.error)){msg.textContent='Erreur : '+((data&&data.error)||error.message);return;}
+  closeNewEmp();toast('Employé créé ✓ (mot de passe : '+(data.temp_password||'')+')');
+  await loadAll();renderEmployes();
+}
 async function openEmp(id){
   const e=empById[id];if(!e)return;
   window._zEdit=null;
@@ -327,13 +375,17 @@ async function openEmp(id){
   const zs=ZONES.filter(x=>x.employee_id===id);
   document.getElementById('detail-body').innerHTML='<div class="hint">Chargement…</div>';
   document.getElementById('detail-view').classList.remove('hidden');window.scrollTo(0,0);
-  const [boR,adjR]=await Promise.all([
+  const [boR,adjR,sdR,saR]=await Promise.all([
     db.from('employee_bonus').select('*').eq('employee_id',id).order('month',{ascending:false}),
-    db.from('employee_monthly_adjustments').select('*').eq('employee_id',id).order('month',{ascending:false})
+    db.from('employee_monthly_adjustments').select('*').eq('employee_id',id).order('month',{ascending:false}),
+    db.from('employee_school_days').select('*').eq('employee_id',id).order('date',{ascending:false}),
+    db.from('employee_school_absences').select('*').eq('employee_id',id).order('absence_date',{ascending:false})
   ]);
-  const bonuses=boR.data||[], adjustments=adjR.data||[];
+  const bonuses=boR.data||[], adjustments=adjR.data||[], schoolDays=sdR.data||[], schoolAbs=saR.data||[];
   const equipeOpts='<option value="">— Aucune —</option>'+EQUIPES.map(q=>`<option value="${q.id}"${q.id===e.equipe_id?' selected':''}>${esc(q.nom||q.nom_societe||'')}</option>`).join('');
   const statusVals=[...new Set(['active','inactive',...distinctVals('status')])];
+  const hh=(e.horaires_hebdomadaires&&typeof e.horaires_hebdomadaires==='object')?e.horaires_hebdomadaires:{};
+  const DAYS=[['lundi','Lundi'],['mardi','Mardi'],['mercredi','Mercredi'],['jeudi','Jeudi'],['vendredi','Vendredi'],['samedi','Samedi'],['dimanche','Dimanche']];
   document.getElementById('detail-body').innerHTML=`
     <div class="card"><h3>✏️ Informations de l'employé</h3>
       <div class="hint" style="margin:-6px 0 12px">Email de connexion : <b>${esc(p.email||'—')}</b> <span style="opacity:.7">(non modifiable ici)</span></div>
@@ -355,7 +407,7 @@ async function openEmp(id){
         <div class="field"><label>Pause auto (min)</label><input type="number" id="ef-pauseAuto" value="${e.pause_automatique_minutes!=null?e.pause_automatique_minutes:''}"></div>
         <div class="field"><label>Heures sup autorisées</label><select id="ef-hs"><option value="non"${!e.heures_supplementaires_autorisees?' selected':''}>Non</option><option value="oui"${e.heures_supplementaires_autorisees?' selected':''}>Oui</option></select></div>
       </div>
-      <div style="margin-top:12px"><button class="btn" onclick="saveEmpInfo('${id}')">💾 Enregistrer les informations</button></div>
+      <div class="row" style="margin-top:12px"><button class="btn" onclick="saveEmpInfo('${id}')">💾 Enregistrer les informations</button><button class="btn ghost" onclick="resetEmpPassword('${esc(p.email||'')}')">🔑 Réinitialiser le mot de passe</button></div>
     </div>
 
     <div class="card"><h3>📍 Zones GPS (${zs.length})</h3>
@@ -372,6 +424,12 @@ async function openEmp(id){
         <div class="field"><label>Active ?</label><select id="zf-active"><option value="oui" selected>Oui</option><option value="non">Non</option></select></div>
       </div>
       <div class="row" style="margin-top:10px"><button class="btn ghost small" onclick="fillMyPosition()">📍 Utiliser ma position actuelle</button><button class="btn small" onclick="saveZone('${id}')">➕ Enregistrer la zone</button></div>
+    </div>
+
+    <div class="card"><h3>🗓️ Planning hebdomadaire</h3>
+      <div class="hint" style="margin:-6px 0 10px">Laisse vide un jour non travaillé.</div>
+      ${DAYS.map(([k,lab])=>{const d=hh[k]||{};return `<div class="row" style="margin-bottom:6px"><div class="field" style="min-width:110px;justify-content:center"><b>${lab}</b></div><div class="field"><label>Début</label><input type="time" id="pl-${k}-d" value="${esc((d.debut||'').slice(0,5))}"></div><div class="field"><label>Fin</label><input type="time" id="pl-${k}-f" value="${esc((d.fin||'').slice(0,5))}"></div></div>`;}).join('')}
+      <div style="margin-top:8px"><button class="btn small" onclick="savePlanning('${id}')">💾 Enregistrer le planning</button></div>
     </div>
 
     <div class="card"><h3>💶 Primes (${bonuses.length})</h3>
@@ -401,6 +459,20 @@ async function openEmp(id){
       </div>
     </div>
 
+    <div class="card"><h3>🎓 Jours d'école (${schoolDays.length})</h3>
+      <div class="table-wrap"><table><tr><th>Date</th><th>Jour d'école ?</th><th></th></tr>
+        ${schoolDays.slice(0,120).map(s=>`<tr><td>${fmtDate(s.date)}</td><td>${s.is_school_day?'✅':'—'}</td><td><button class="btn ghost small" onclick="delSchoolDay('${s.id}','${id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
+      </table></div>
+      <div class="row" style="margin-top:10px"><div class="field"><label>Date</label><input type="date" id="sd-date"></div><div class="field"><label>Jour d'école ?</label><select id="sd-is"><option value="oui" selected>Oui</option><option value="non">Non</option></select></div><button class="btn small" onclick="addSchoolDay('${id}')">➕ Ajouter</button></div>
+    </div>
+
+    <div class="card"><h3>📕 Absences d'école (${schoolAbs.length})</h3>
+      <div class="table-wrap"><table><tr><th>Date</th><th>Début</th><th>Fin</th><th class="num">Durée (min)</th><th>Commentaire</th><th></th></tr>
+        ${schoolAbs.slice(0,120).map(s=>`<tr><td>${fmtDate(s.absence_date)}</td><td>${(s.start_time||'').slice(0,5)||'—'}</td><td>${(s.end_time||'').slice(0,5)||'—'}</td><td class="num">${s.duration_minutes!=null?s.duration_minutes:'—'}</td><td style="white-space:normal">${esc(s.comment||'')}</td><td><button class="btn ghost small" onclick="delSchoolAbsence('${s.id}','${id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucune</td></tr>'}
+      </table></div>
+      <div class="row" style="margin-top:10px"><div class="field"><label>Date</label><input type="date" id="sa-date"></div><div class="field"><label>Début</label><input type="time" id="sa-start"></div><div class="field"><label>Fin</label><input type="time" id="sa-end"></div><div class="field" style="flex:1"><label>Commentaire</label><input id="sa-comment"></div><button class="btn small" onclick="addSchoolAbsence('${id}')">➕ Ajouter</button></div>
+    </div>
+
     <div class="card"><h3>Pointages (${pts.length})</h3><div class="table-wrap"><table>
       <tr><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>GPS</th></tr>
       ${pts.slice(0,200).map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${fmtTime(x.heure_debut)}</td><td>${fmtTime(x.heure_fin)}</td><td>${statutPill(x.status)}</td><td class="num">${mins(x.temps_net)}</td><td class="hint">${x.location_lat?Number(x.location_lat).toFixed(4)+','+Number(x.location_lng).toFixed(4):'—'}</td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
@@ -427,6 +499,21 @@ async function saveEmpInfo(id){
   if(r1.error||r2.error){toast('Erreur : '+((r1.error&&r1.error.message)||(r2.error&&r2.error.message)));return;}
   toast('Informations enregistrées ✓');
   await reloadCore(); renderEmployes(); openEmp(id);
+}
+async function resetEmpPassword(email){
+  if(!email){toast('Pas d\'email pour cet employé.');return;}
+  if(!confirm('Envoyer un email de réinitialisation du mot de passe à '+email+' ?'))return;
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Email de réinitialisation envoyé ✓');
+}
+async function savePlanning(id){
+  const DAYS=['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+  const hh={};
+  DAYS.forEach(k=>{const d=gv('pl-'+k+'-d'),f=gv('pl-'+k+'-f');if(d||f)hh[k]={debut:d||null,fin:f||null};});
+  const {error}=await db.from('employees').update({horaires_hebdomadaires:hh}).eq('id',id);
+  if(error){toast('Erreur : '+error.message);return;}
+  await reloadCore(); toast('Planning enregistré ✓');
 }
 async function fillMyPosition(){try{const l=await empGetLocation();document.getElementById('zf-lat').value=l.lat.toFixed(6);document.getElementById('zf-lng').value=l.lng.toFixed(6);toast('Position récupérée ✓');}catch(e){toast(e.message);}}
 function editZone(zid){
@@ -484,6 +571,22 @@ async function delAdjustment(aid,empId){
   if(error){toast('Erreur : '+error.message);return;}
   toast('Ajustement supprimé'); openEmp(empId);
 }
+async function addSchoolDay(id){
+  const date=gv('sd-date');if(!date){toast('Date requise.');return;}
+  const {error}=await db.from('employee_school_days').insert({employee_id:id,date,is_school_day:document.getElementById('sd-is').value==='oui'});
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Ajouté ✓');openEmp(id);
+}
+async function delSchoolDay(sid,id){if(!confirm('Supprimer ?'))return;const {error}=await db.from('employee_school_days').delete().eq('id',sid);if(error){toast('Erreur : '+error.message);return;}toast('Supprimé');openEmp(id);}
+async function addSchoolAbsence(id){
+  const date=gv('sa-date');if(!date){toast('Date requise.');return;}
+  const st=gv('sa-start'),en=gv('sa-end');let dur=null;
+  if(st&&en){const a=st.split(':').map(Number),b=en.split(':').map(Number);dur=(b[0]*60+b[1])-(a[0]*60+a[1]);if(dur<0)dur=null;}
+  const {error}=await db.from('employee_school_absences').insert({employee_id:id,absence_date:date,month:date.slice(0,7),start_time:st||null,end_time:en||null,duration_minutes:dur,comment:gv('sa-comment')||null});
+  if(error){toast('Erreur : '+error.message);return;}
+  toast('Absence ajoutée ✓');openEmp(id);
+}
+async function delSchoolAbsence(sid,id){if(!confirm('Supprimer ?'))return;const {error}=await db.from('employee_school_absences').delete().eq('id',sid);if(error){toast('Erreur : '+error.message);return;}toast('Supprimé');openEmp(id);}
 function closeDetail(){document.getElementById('detail-view').classList.add('hidden');}
 
 /* POINTAGES */
@@ -498,6 +601,23 @@ function renderPointages(){
   if(!rows.length){t.innerHTML='<tr><td class="empty">Aucun pointage.</td></tr>';return;}
   t.innerHTML='<tr><th>Employé</th><th>Date</th><th>Début</th><th>Fin</th><th>Statut</th><th class="num">Temps net</th><th>Saisi</th><th>GPS</th></tr>'+
     rows.slice(0,500).map(p=>{const e=empById[p.employee_id];return `<tr class="clickable" onclick="openEmp('${p.employee_id}')"><td>${esc(e?empName(e):'—')}</td><td>${fmtDate(p.date)}</td><td>${fmtTime(p.heure_debut)}</td><td>${fmtTime(p.heure_fin)}</td><td>${statutPill(p.status)}</td><td class="num">${mins(p.temps_net)}</td><td>${p.saisi_manuellement?'✍️ manuel':(p.auto_depointage?'⏲️ auto':'')}</td><td class="hint">${p.location_lat?'📍':''}</td></tr>`;}).join('');
+}
+async function closeForgottenDays(){
+  const today=new Date().toISOString().slice(0,10);
+  const open=POINTAGES.filter(p=>p.status==='in_progress'&&(p.date||'')<today);
+  if(!open.length){toast('Aucune journée oubliée à clôturer.');return;}
+  if(!confirm(open.length+' journée(s) restée(s) ouverte(s) les jours précédents vont être clôturées. Continuer ?'))return;
+  let ok=0;
+  for(const p of open){
+    const e=empById[p.employee_id];
+    let fin;
+    if(e&&e.horaires_fin){ fin=new Date(p.date+'T'+e.horaires_fin); }
+    else { fin=new Date(new Date(p.heure_debut).getTime()); }
+    const {error}=await db.from('pointages').update({heure_fin:fin.toISOString(),status:'completed',auto_depointage:true}).eq('id',p.id);
+    if(!error)ok++;
+  }
+  const {data}=await db.from('pointages').select('*').order('date',{ascending:false});POINTAGES=data||[];
+  toast(ok+' journée(s) clôturée(s)');renderPointages();renderDash();
 }
 
 /* DEMANDES (admin) */
@@ -581,11 +701,103 @@ function renderZones(){
     (ZONES.map(z=>{const e=empById[z.employee_id];return `<tr class="clickable" onclick="openEmp('${z.employee_id}')"><td>${esc(e?empName(e):'—')}</td><td>${esc(z.nom_zone)}</td><td>${esc(z.adresse||'')}</td><td class="num">${z.rayon_m} m</td><td>${z.active?'✅':'—'}</td></tr>`;}).join('')||'<tr><td class="empty">Aucune zone</td></tr>');
 }
 function renderParams(){
-  const c=COMPANY||{};const kv=(k,v)=>`<div class="kv"><span class="k">${k} :</span> ${esc(v==null||v===''?'—':v)}</div>`;
-  document.getElementById('params-body').innerHTML=`<div class="grid2">${kv('Société',c.company_name)}${kv('SIRET',c.siret)}${kv('Adresse',c.company_address)}${kv('Email',c.company_email)}${kv('Téléphone',c.company_phone)}${kv('Pays',c.country)}</div>`;
-  document.getElementById('equipes-table').innerHTML='<tr><th>Nom</th><th>Société</th><th>Pays</th><th>Fuseau</th><th>Devise</th></tr>'+
-    (EQUIPES.map(q=>`<tr><td>${esc(q.nom||'')}</td><td>${esc(q.nom_societe||'')}</td><td>${esc(q.country||'')}</td><td>${esc(q.timezone||'')}</td><td>${esc(q.currency||'')}</td></tr>`).join('')||'<tr><td class="empty">Aucune</td></tr>');
+  const c=COMPANY||{};
+  document.getElementById('params-company').innerHTML=`
+    <div class="grid2">
+      <div class="field"><label>Société</label><input id="cs-name" value="${esc(c.company_name||'')}"></div>
+      <div class="field"><label>SIRET</label><input id="cs-siret" value="${esc(c.siret||'')}"></div>
+      <div class="field"><label>Adresse</label><input id="cs-addr" value="${esc(c.company_address||'')}"></div>
+      <div class="field"><label>Email</label><input id="cs-email" value="${esc(c.company_email||'')}"></div>
+      <div class="field"><label>Téléphone</label><input id="cs-phone" value="${esc(c.company_phone||'')}"></div>
+      <div class="field"><label>Pays</label><input id="cs-country" value="${esc(c.country||'')}"></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn small" onclick="saveCompany()">💾 Enregistrer</button></div>`;
+  renderEquipesParam();renderCatsParam();renderHolidaysParam();
 }
+async function saveCompany(){
+  const patch={company_name:gv('cs-name')||null,siret:gv('cs-siret')||null,company_address:gv('cs-addr')||null,company_email:gv('cs-email')||null,company_phone:gv('cs-phone')||null,country:gv('cs-country')||null};
+  let r;
+  if(COMPANY&&COMPANY.id) r=await db.from('company_settings').update(patch).eq('id',COMPANY.id);
+  else r=await db.from('company_settings').insert(patch).select().single();
+  if(r.error){toast('Erreur : '+r.error.message);return;}
+  const {data}=await db.from('company_settings').select('*').limit(1);COMPANY=(data||[])[0]||null;
+  toast('Paramètres enregistrés ✓');
+}
+function renderEquipesParam(){
+  document.getElementById('params-equipes').innerHTML=`
+   <div class="table-wrap"><table>
+    <tr><th>Nom</th><th>Société</th><th>Pays</th><th>Fuseau</th><th>Devise</th><th></th></tr>
+    ${EQUIPES.map(q=>`<tr><td>${esc(q.nom||'')}</td><td>${esc(q.nom_societe||'')}</td><td>${esc(q.country||'')}</td><td>${esc(q.timezone||'')}</td><td>${esc(q.currency||'')}</td><td><button class="btn ghost small" onclick="editEquipe('${q.id}')">✏️</button> <button class="btn ghost small" onclick="delEquipe('${q.id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucune</td></tr>'}
+   </table></div>
+   <div class="row" style="margin-top:10px">
+    <div class="field"><label>Nom</label><input id="eq-nom"></div>
+    <div class="field"><label>Société</label><input id="eq-soc"></div>
+    <div class="field"><label>Pays</label><input id="eq-country"></div>
+    <div class="field"><label>Fuseau</label><input id="eq-tz" placeholder="Europe/Paris"></div>
+    <div class="field"><label>Devise</label><input id="eq-cur" placeholder="EUR"></div>
+    <button class="btn small" onclick="saveEquipe()">➕ Enregistrer</button>
+   </div>`;
+}
+function editEquipe(id){const q=EQUIPES.find(x=>x.id===id);if(!q)return;window._eqEdit=id;document.getElementById('eq-nom').value=q.nom||'';document.getElementById('eq-soc').value=q.nom_societe||'';document.getElementById('eq-country').value=q.country||'';document.getElementById('eq-tz').value=q.timezone||'';document.getElementById('eq-cur').value=q.currency||'';toast('Modifie puis Enregistrer');}
+async function saveEquipe(){
+  const row={nom:gv('eq-nom')||null,nom_societe:gv('eq-soc')||null,country:gv('eq-country')||null,timezone:gv('eq-tz')||null,currency:gv('eq-cur')||null};
+  if(!row.nom&&!row.nom_societe){toast('Nom requis.');return;}
+  let r; if(window._eqEdit) r=await db.from('equipes').update(row).eq('id',window._eqEdit); else r=await db.from('equipes').insert(row);
+  if(r.error){toast('Erreur : '+r.error.message);return;}
+  window._eqEdit=null;const {data}=await db.from('equipes').select('*');EQUIPES=data||[];toast('Équipe enregistrée ✓');renderEquipesParam();
+}
+async function delEquipe(id){if(!confirm('Supprimer cette équipe ?'))return;const {error}=await db.from('equipes').delete().eq('id',id);if(error){toast('Erreur : '+error.message);return;}const {data}=await db.from('equipes').select('*');EQUIPES=data||[];toast('Équipe supprimée');renderEquipesParam();}
+const CAT_MAP={req:'request_categories',abs:'absence_categories',doc:'document_categories'};
+function renderCatsParam(){
+  const block=(title,kind,rows,extra)=>`<div class="card" style="margin-bottom:0"><h3>${title}</h3>
+     ${rows.map(c=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="flex:1">${esc(c.name)}${c.code?` <span class="hint">(${esc(c.code)})</span>`:''}</span><button class="btn ghost small" onclick="delCat('${kind}','${c.id}')">🗑️</button></div>`).join('')||'<div class="hint">Aucune</div>'}
+     <div class="row" style="margin-top:8px">${extra}<div class="field" style="flex:1"><input id="cat-${kind}-name" placeholder="Nouvelle catégorie"></div><button class="btn small" onclick="addCat('${kind}')">➕</button></div></div>`;
+  document.getElementById('params-cats').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+     ${block('📨 Demandes','req',REQCATS,'')}
+     ${block('🌴 Absences','abs',ABSCATS,'<div class="field" style="max-width:90px"><input id="cat-abs-code" placeholder="Code"></div>')}
+     ${block('📄 Documents','doc',DOCCATS,'')}
+   </div>`;
+}
+async function addCat(kind){
+  const name=gv('cat-'+kind+'-name'); if(!name){toast('Nom requis.');return;}
+  const row={name}; if(kind==='abs'){row.code=gv('cat-abs-code')||name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g,'_');row.counts_as_present=false;}
+  const {error}=await db.from(CAT_MAP[kind]).insert(row);
+  if(error){toast('Erreur : '+error.message);return;}
+  await reloadCats(); toast('Catégorie ajoutée ✓'); renderCatsParam();
+  if(kind==='req')document.getElementById('myreq-cat');
+}
+async function delCat(kind,id){
+  if(!confirm('Supprimer cette catégorie ?'))return;
+  const {error}=await db.from(CAT_MAP[kind]).delete().eq('id',id);
+  if(error){toast('Erreur : '+error.message);return;}
+  await reloadCats(); toast('Catégorie supprimée'); renderCatsParam();
+}
+async function reloadCats(){
+  const [a,b,c]=await Promise.all([db.from('request_categories').select('*').order('name'),db.from('absence_categories').select('*').order('name'),db.from('document_categories').select('*').order('name')]);
+  REQCATS=a.data||[];ABSCATS=b.data||[];DOCCATS=c.data||[];
+}
+function renderHolidaysParam(){
+  document.getElementById('params-holidays').innerHTML=`
+   <div class="table-wrap"><table>
+    <tr><th>Date</th><th>Nom</th><th>Pays</th><th></th></tr>
+    ${HOLIDAYS.map(h=>`<tr><td>${fmtDate(h.date)}</td><td>${esc(h.name||'')}</td><td>${esc(h.country||'')}</td><td><button class="btn ghost small" onclick="delHoliday('${h.id}')">🗑️</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
+   </table></div>
+   <div class="row" style="margin-top:10px">
+     <div class="field"><label>Date</label><input type="date" id="h-date"></div>
+     <div class="field" style="flex:1"><label>Nom</label><input id="h-name" placeholder="ex : Pont de mai"></div>
+     <div class="field"><label>Pays</label><input id="h-country" value="${esc((COMPANY&&COMPANY.country)||'FR')}"></div>
+     <button class="btn small" onclick="addHoliday()">➕ Ajouter</button>
+   </div>`;
+}
+async function addHoliday(){
+  const date=gv('h-date'),name=gv('h-name'),country=gv('h-country')||'FR';
+  if(!date||!name){toast('Date et nom requis.');return;}
+  const {error}=await db.from('public_holidays').insert({date,name,country,is_custom:true});
+  if(error){toast('Erreur : '+error.message);return;}
+  const {data}=await db.from('public_holidays').select('*').order('date');HOLIDAYS=data||[];
+  toast('Jour férié ajouté ✓');renderHolidaysParam();
+}
+async function delHoliday(id){if(!confirm('Supprimer ce jour férié ?'))return;const {error}=await db.from('public_holidays').delete().eq('id',id);if(error){toast('Erreur : '+error.message);return;}const {data}=await db.from('public_holidays').select('*').order('date');HOLIDAYS=data||[];toast('Supprimé');renderHolidaysParam();}
 
 /* EXPORT EXCEL des pointages */
 function exportPointages(){
@@ -598,6 +810,29 @@ function exportPointages(){
   rows.forEach(p=>{const e=empById[p.employee_id];aoa.push([e?empName(e):'',p.date,fmtTime(p.heure_debut),fmtTime(p.heure_fin),p.status,p.temps_net!=null?mins(p.temps_net):'',p.saisi_manuellement?'oui':'',p.auto_depointage?'oui':'',p.location_lat||'',p.location_lng||'']);});
   const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Pointages');
   XLSX.writeFile(wb,'pointages-'+(date||'export')+'.xlsx');
+}
+/* EXPORT PDF mensuel (un employé) */
+function exportPdf(){
+  const emp=document.getElementById('pt-emp').value,date=document.getElementById('pt-date').value;
+  if(!emp){toast('Choisis un employé pour l\'export PDF.');return;}
+  if(!date){toast('Choisis une date (son mois sera utilisé).');return;}
+  if(!window.jspdf){toast('Module PDF non chargé.');return;}
+  const ym=date.slice(0,7),e=empById[emp];
+  const rows=POINTAGES.filter(p=>p.employee_id===emp&&(p.date||'').slice(0,7)===ym).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  let y=16;
+  doc.setFontSize(15);doc.text(String((COMPANY&&COMPANY.company_name)||'TimeGuard Pro'),14,y);y+=7;
+  doc.setFontSize(11);doc.text('Relevé mensuel — '+empName(e),14,y);y+=6;
+  doc.text('Mois : '+ym,14,y);y+=9;
+  doc.setFontSize(10);
+  doc.text('Date',14,y);doc.text('Début',56,y);doc.text('Fin',86,y);doc.text('Temps net',196,y,{align:'right'});y+=2;doc.line(14,y,196,y);y+=5;
+  let tot=0;
+  rows.forEach(p=>{ if(y>282){doc.addPage();y=16;} tot+=Number(p.temps_net)||0;
+    doc.text(fmtDate(p.date),14,y);doc.text(fmtTime(p.heure_debut),56,y);doc.text(fmtTime(p.heure_fin),86,y);doc.text(mins(p.temps_net),196,y,{align:'right'});y+=6;});
+  if(!rows.length){doc.text('Aucun pointage ce mois-ci.',14,y);y+=6;}
+  y+=2;doc.line(14,y,196,y);y+=7;doc.setFontSize(12);doc.text('Total du mois : '+mins(tot),196,y,{align:'right'});
+  doc.setFontSize(9);doc.text('Généré le '+new Date().toLocaleString('fr-FR'),14,290);
+  doc.save('releve-'+safePdf(empName(e))+'-'+ym+'.pdf');
 }
 /* UPLOAD document / bulletin (admin) */
 async function uploadDocument(){
