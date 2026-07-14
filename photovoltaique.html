@@ -285,6 +285,7 @@
           <div><label>Ville</label><input id="lv-ville"></div>
         </div>
         <label>Source</label><select id="lv-source"></select>
+        <label>Télépro attribué <span class="hint" id="lv-owner-hint"></span></label><select id="lv-owner-telepro"></select>
         <label>Notes</label><textarea id="lv-notes" rows="3"></textarea>
         <div class="quick" id="lv-quick" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
         <div style="display:flex;justify-content:flex-end;margin-top:12px">
@@ -322,6 +323,20 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ===== PLANNING / DISTANCES ===== -->
+<div id="planning-view" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px">
+  <div class="card" style="max-width:780px;width:100%;max-height:92vh;overflow:auto">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <h3 style="margin:0;flex:1" id="plan-title">📅 Planning du commercial</h3>
+      <button class="btn ghost small" onclick="closePlanning()">✕ Fermer</button>
+    </div>
+    <div id="plan-nav" class="row" style="margin-bottom:12px;align-items:center"></div>
+    <div id="plan-body"></div>
+    <div id="plan-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"></div>
+    <div class="hint" style="margin-top:8px">Distances estimées (adresses géocodées via l'annuaire officiel). L'estimation route/voiture est indicative.</div>
   </div>
 </div>
 
@@ -418,6 +433,9 @@ function fillSelects(){
   set('lead-fstage','<option value="">Toutes étapes</option>'+STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join(''));
   const telepros=PROFILES.filter(p=>p.role==='telepro'||p.role==='admin');
   set('lead-fowner','<option value="">Tous télépros</option>'+telepros.map(p=>`<option value="${p.id}">${esc(p.nom||p.email)}</option>`).join(''));
+  set('lv-owner-telepro','<option value="">— Non attribué —</option>'+telepros.map(p=>`<option value="${p.id}">${esc(p.nom||p.email)}</option>`).join(''));
+  const ot=document.getElementById('lv-owner-telepro'); if(ot) ot.disabled=!IS_ADMIN;
+  const oh=document.getElementById('lv-owner-hint'); if(oh) oh.textContent=IS_ADMIN?'(vous attribuez le lead)':'(attribué par l\'admin)';
   set('lv-source','<option value="">— Aucune —</option>'+SOURCES.map(s=>`<option value="${esc(s.nom)}">${esc(s.nom)}</option>`).join(''));
   set('lv-type','<option value="">— Non précisé —</option>'+CTYPES.map(c=>`<option value="${esc(c.nom)}">${esc(c.nom)}</option>`).join(''));
   set('doc-type','<option value="">— Type de document —</option>'+DOCTYPES.map(d=>`<option value="${esc(d.nom)}">${esc(d.nom)}</option>`).join(''));
@@ -478,7 +496,7 @@ async function openLead(id){
   g('lv-prenom').value=l.prenom||''; g('lv-nom').value=l.nom||''; g('lv-email').value=l.email||'';
   g('lv-telephone').value=l.telephone||''; g('lv-telephone2').value=l.telephone2||'';
   g('lv-adresse').value=l.adresse||''; g('lv-cp').value=l.code_postal||''; g('lv-ville').value=l.ville||'';
-  g('lv-source').value=l.source||''; g('lv-notes').value=l.notes||'';
+  g('lv-source').value=l.source||''; g('lv-owner-telepro').value=l.owner_telepro||''; g('lv-notes').value=l.notes||'';
   g('lv-del').classList.toggle('hidden',!IS_ADMIN);
   g('doc-upbtn').classList.toggle('hidden',false);
   renderQuick(); renderBudgetCards();
@@ -509,6 +527,7 @@ async function saveLeadInfo(){
     telephone:g('lv-telephone')||null, telephone2:g('lv-telephone2')||null,
     adresse:g('lv-adresse')||null, code_postal:g('lv-cp')||null, ville:g('lv-ville')||null,
     source:g('lv-source')||null, notes:g('lv-notes')||null };
+  if(IS_ADMIN) patch.owner_telepro=g('lv-owner-telepro')||null;
   const btn=document.getElementById('lv-save'); btn.disabled=true; btn.textContent='Enregistrement…';
   const ok=await updLead(patch); btn.disabled=false; btn.textContent='💾 Enregistrer';
   if(ok){ document.getElementById('lv-name').textContent=leadName(curLead); renderQuick(); toast('Enregistré ✓'); }
@@ -549,6 +568,11 @@ function ownerSelect(field,role){
   const opts='<option value="">— Non attribué —</option>'+PROFILES.map(p=>`<option value="${p.id}" ${curLead[field]===p.id?'selected':''}>${esc(p.nom||p.email)}${p.role?' ('+roleLabel(p.role)+')':''}</option>`).join('');
   return `<label>Attribué à (${roleLabel(role)})</label><select ${ed?'':'disabled'} onchange="updLead({${field}:this.value||null},'Attribution enregistrée')">${opts}</select>`;
 }
+function commercialSelect(ed){
+  const coms=PROFILES.filter(p=>p.role==='commercial'||p.role==='admin');
+  const opts='<option value="">— Aucun commercial —</option>'+coms.map(p=>`<option value="${p.id}" ${curLead.owner_commercial===p.id?'selected':''}>${esc(p.nom||p.email)}</option>`).join('');
+  return `<label>Commercial assigné (pour le RDV)</label><select ${ed?'':'disabled'} onchange="updLead({owner_commercial:this.value||null},'Commercial assigné')">${opts}</select>`;
+}
 function statutSelect(role){
   const ed=canEdit(role); const field='statut_'+role; const list=statutsFor(role);
   const opts='<option value="">— Aucun —</option>'+list.map(s=>`<option value="${s.id}" ${curLead[field]===s.id?'selected':''}>${esc(s.nom)}</option>`).join('');
@@ -568,16 +592,17 @@ function renderRolePanel(){
   if(!ed) h+=`<div class="hint" style="margin-bottom:10px">🔒 Lecture seule (réservé au rôle ${roleLabel(role)} ou à l'admin).</div>`;
   h+=statutSelect(role);
   if(role==='telepro'){
-    h+=ownerSelect('owner_telepro','telepro');
-    h+=`<div class="grid2"><div>${dateField('rdv_date','Date de RDV (optionnel)','telepro')}</div>
-      <div><label>Montant facture élec. (€/mois)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant_facture!=null?curLead.montant_facture:''}" onchange="updLead({montant_facture:this.value===''?null:Number(this.value)})"></div></div>`;
-    h+=`<div class="grid2"><div><label>Type de logement</label><input ${ed?'':'disabled'} value="${esc(curLead.type_logement||'')}" placeholder="Maison / Appartement" onchange="updLead({type_logement:this.value||null})"></div>
-      <div><label>Mode de chauffage</label><input ${ed?'':'disabled'} value="${esc(curLead.mode_chauffage||'')}" placeholder="Élec / Gaz / Pompe à chaleur…" onchange="updLead({mode_chauffage:this.value||null})"></div></div>`;
-    h+=`<div class="hint" style="margin-top:6px">Le type de client (propriétaire/locataire) se règle dans la fiche à gauche.</div>`;
+    h+=`<div class="grid2"><div><label>Montant facture élec. (€/mois)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant_facture!=null?curLead.montant_facture:''}" onchange="updLead({montant_facture:this.value===''?null:Number(this.value)})"></div>
+      <div><label>Type de logement</label><input ${ed?'':'disabled'} value="${esc(curLead.type_logement||'')}" placeholder="Maison / Appartement" onchange="updLead({type_logement:this.value||null})"></div></div>`;
+    h+=`<div><label>Mode de chauffage</label><input ${ed?'':'disabled'} value="${esc(curLead.mode_chauffage||'')}" placeholder="Élec / Gaz / Pompe à chaleur…" onchange="updLead({mode_chauffage:this.value||null})"></div>`;
+    h+=`<div class="hint" style="margin-top:6px">L'attribution du télépro et le type de client se règlent dans la fiche à gauche.</div>`;
   } else if(role==='confirmateur'){
     h+=ownerSelect('owner_confirmateur','confirmateur');
     h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
-    h+=dateField('rdv_date','Date de RDV confirmée','confirmateur');
+    h+=`<div class="grid2"><div>${dateField('rdv_date','Date du RDV','confirmateur')}</div>
+      <div><label>Heure du RDV</label><input type="time" ${ed?'':'disabled'} value="${curLead.rdv_heure||''}" onchange="updLead({rdv_heure:this.value||null})"></div></div>`;
+    h+=commercialSelect(ed);
+    h+=`<button class="btn" type="button" style="margin-top:12px" ${ed?'':'disabled'} onclick="openPlanning()">📅 Placer le rendez-vous (voir le planning du commercial)</button>`;
   } else if(role==='commercial'){
     h+=ownerSelect('owner_commercial','commercial');
     h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
@@ -647,6 +672,84 @@ async function delDoc(id){
   if(error){ toast('Suppression refusée : '+error.message); return; }
   toast('Document supprimé'); loadDocs();
 }
+
+/* ---------- PLANNING & DISTANCES ---------- */
+let planWeekStart=null, planCommercial=null;
+function toMin(hhmm){ if(!hhmm) return null; const p=hhmm.split(':'); return (+p[0])*60+(+(p[1]||0)); }
+function mondayOf(iso){ const d=new Date(iso+'T00:00:00'); const off=(d.getDay()+6)%7; d.setDate(d.getDate()-off); d.setHours(0,0,0,0); return d; }
+function toISODate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function haversineKm(a,b){ if(!a||!b||a.lat==null||b.lat==null||a.lng==null||b.lng==null) return null;
+  const R=6371,toR=x=>x*Math.PI/180, dLat=toR(b.lat-a.lat), dLng=toR(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s)); }
+async function geocodeLead(l){
+  if(l.lat!=null&&l.lng!=null) return l;
+  const q=[l.adresse,l.code_postal,l.ville].filter(Boolean).join(' ');
+  if(!q) return l;
+  try{
+    const r=await fetch('https://api-adresse.data.gouv.fr/search/?limit=1&q='+encodeURIComponent(q));
+    const j=await r.json(); const f=j.features&&j.features[0];
+    if(f&&f.geometry){ l.lng=f.geometry.coordinates[0]; l.lat=f.geometry.coordinates[1];
+      await db.from('pv_leads').update({lat:l.lat,lng:l.lng}).eq('id',l.id);
+      const L=LEADS.find(x=>x.id===l.id); if(L){ L.lat=l.lat; L.lng=l.lng; } }
+  }catch(e){}
+  return l;
+}
+async function openPlanning(){
+  if(!curLead.owner_commercial){ toast('Choisissez d\'abord un commercial.'); return; }
+  const date=curLead.rdv_date?curLead.rdv_date.slice(0,10):'';
+  if(!date){ toast('Renseignez d\'abord la date du RDV.'); return; }
+  planCommercial=curLead.owner_commercial; planWeekStart=mondayOf(date);
+  document.getElementById('planning-view').classList.remove('hidden');
+  document.getElementById('plan-body').innerHTML='<div class="hint">Chargement du planning…</div>';
+  await geocodeLead(curLead);
+  renderPlanning();
+}
+function closePlanning(){ document.getElementById('planning-view').classList.add('hidden'); }
+function shiftWeek(n){ planWeekStart=new Date(planWeekStart); planWeekStart.setDate(planWeekStart.getDate()+n*7); renderPlanning(); }
+async function renderPlanning(){
+  const com=PROFILES.find(p=>p.id===planCommercial);
+  document.getElementById('plan-title').textContent='📅 Planning — '+(com?(com.nom||com.email):'commercial');
+  const start=planWeekStart, end=new Date(start); end.setDate(end.getDate()+6);
+  const startISO=toISODate(start), endISO=toISODate(end);
+  document.getElementById('plan-nav').innerHTML=`<button class="btn ghost small" onclick="shiftWeek(-1)">← Semaine préc.</button>
+    <div style="flex:1;text-align:center;font-weight:700">Semaine du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')}</div>
+    <button class="btn ghost small" onclick="shiftWeek(1)">Semaine suiv. →</button>`;
+  const inWeek=d=>{ const dd=d.slice(0,10); return dd>=startISO&&dd<=endISO; };
+  let rdvs=LEADS.filter(l=>l.owner_commercial===planCommercial && l.rdv_date && inWeek(l.rdv_date) && l.id!==curLead.id)
+    .map(l=>({id:l.id,date:l.rdv_date.slice(0,10),heure:l.rdv_heure||'',nom:leadName(l),ville:l.ville||'',lat:l.lat,lng:l.lng}));
+  rdvs.push({id:curLead.id,date:curLead.rdv_date.slice(0,10),heure:curLead.rdv_heure||'',nom:leadName(curLead)+' (ce dossier)',ville:curLead.ville||'',lat:curLead.lat,lng:curLead.lng,proposed:true});
+  // géocoder les RDV sans coordonnées
+  for(const r of rdvs){ if(r.lat==null){ const L=LEADS.find(x=>x.id===r.id); if(L){ await geocodeLead(L); r.lat=L.lat; r.lng=L.lng; } } }
+  const days=[]; for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(d.getDate()+i); days.push(toISODate(d)); }
+  let html='';
+  days.forEach(diso=>{
+    const list=rdvs.filter(r=>r.date===diso).sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));
+    const dObj=new Date(diso+'T00:00:00'); const dName=dObj.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
+    html+=`<div class="subcard"><div style="font-weight:700;text-transform:capitalize;margin-bottom:6px">${dName}${list.length?` <span class="hint">(${list.length} RDV)</span>`:' <span class="hint">— libre</span>'}</div>`;
+    list.forEach((r,i)=>{
+      html+=`<div style="display:flex;gap:8px;align-items:center;${r.proposed?'background:rgba(245,166,35,.14);border-radius:8px;padding:5px 7px':'padding:3px 0'}">
+        <b style="width:52px">${r.heure||'--:--'}</b><span style="flex:1">${esc(r.nom)}${r.ville?' · '+esc(r.ville):''}</span>${r.proposed?'<span class="pill" style="background:var(--accent);color:#241500">proposé</span>':''}</div>`;
+      const next=list[i+1];
+      if(next){
+        const km=haversineKm(r,next);
+        if(km==null){ html+='<div class="hint" style="margin:2px 0 4px 60px">↕ distance inconnue (adresse manquante)</div>'; }
+        else{
+          const road=km*1.3, mins=Math.round(road/50*60);
+          let gapTxt='', warn=false;
+          const g1=toMin(r.heure), g2=toMin(next.heure);
+          if(g1!=null&&g2!=null){ const gap=g2-g1; gapTxt=` · ${(Math.round(gap/6)/10)} h entre les 2`; if(gap>0 && mins>gap-15) warn=true; }
+          html+=`<div class="hint" style="margin:2px 0 4px 60px;${warn?'color:var(--bad);font-weight:600':''}">↕ ${Math.round(km)} km à vol d'oiseau (~${Math.round(road)} km route, ~${mins} min voiture)${gapTxt}${warn?' — ⚠️ trajet trop long pour l\'écart de temps':''}</div>`;
+        }
+      }
+    });
+    html+='</div>';
+  });
+  document.getElementById('plan-body').innerHTML=html;
+  const ed=canEdit('confirmateur');
+  document.getElementById('plan-actions').innerHTML=ed?`<button class="btn ghost small" onclick="closePlanning()">Modifier la date/heure</button><button class="btn" onclick="confirmRdv()">✅ Confirmer ce créneau</button>`:'';
+}
+async function confirmRdv(){ toast('Rendez-vous placé ✓ (enregistré)'); closePlanning(); }
 
 /* ---------- DOCUMENTS (vue globale) ---------- */
 async function loadDocsAll(){
