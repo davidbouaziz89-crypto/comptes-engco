@@ -118,7 +118,8 @@
 
     <div id="tab-employes" class="hidden"><section class="panel">
       <div class="row" style="margin-bottom:12px"><input class="search" id="emp-search" placeholder="🔎 Rechercher…" oninput="renderEmployes()">
-      <span class="hint" id="emp-count"></span><span class="spacer" style="margin-left:auto"></span><button class="btn small" onclick="openNewEmp()">➕ Nouvel employé</button></div>
+      <select id="emp-fstatus" class="field" style="max-width:150px" onchange="renderEmployes()"><option value="active">Actifs</option><option value="archived">Archivés</option><option value="all">Tous</option></select>
+      <span class="hint" id="emp-count"></span><span class="spacer" style="margin-left:auto"></span><button class="btn small" id="btn-newemp" onclick="openNewEmp()">➕ Nouvel employé</button></div>
       <div class="table-wrap"><table id="emp-table"></table></div></section></div>
 
     <div id="tab-pointages" class="hidden"><section class="panel">
@@ -172,6 +173,7 @@
 
     <div id="tab-params" class="hidden">
       <section class="panel"><h2>Paramètres société</h2><div id="params-company"></div></section>
+      <section class="panel" id="sec-access"><h2>Accès managers &amp; comptables</h2><div id="params-access"></div></section>
       <section class="panel"><h2>Équipes / Sociétés</h2><div id="params-equipes"></div></section>
       <section class="panel"><h2>Catégories</h2><div id="params-cats"></div></section>
       <section class="panel"><h2>Jours fériés</h2><div id="params-holidays"></div></section>
@@ -253,9 +255,10 @@ const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const db=sb.schema('pointage');
 
-let SESSION=null, MYROLE=null;
+let SESSION=null, MYROLE=null, ISADMIN=true, CANEDIT=true;
 let PROFILES=[], EMPLOYES=[], EQUIPES=[], POINTAGES=[], DOCUMENTS=[], BULLETINS=[], ZONES=[], COMPANY=null;
-let REQUESTS=[], REQCATS=[], ABSCATS=[], DOCCATS=[], HOLIDAYS=[];
+let REQUESTS=[], REQCATS=[], ABSCATS=[], DOCCATS=[], HOLIDAYS=[], MGR_TEAMS=[], CMP_ACCESS=[];
+let MANAGED_TEAMS=[], ACCESS_TEAMS=[];
 let profByUser={}, empById={};
 let RECAP_CACHE={};
 let _prFilter='';
@@ -281,6 +284,15 @@ function empEmail(e){const p=profByUser[e.user_id];return p?p.email:'';}
 function equipeName(id){const q=EQUIPES.find(x=>x.id===id);return q?(q.nom||q.nom_societe||''):'';}
 function distinctVals(field){const s=new Set();EMPLOYES.forEach(e=>{if(e[field]!=null&&e[field]!=='')s.add(e[field]);});return[...s];}
 function selOpts(vals,cur,allowBlank){let out=allowBlank?'<option value="">—</option>':'';const set=new Set(vals);if(cur!=null&&cur!==''&&!set.has(cur))out+=`<option value="${esc(cur)}" selected>${esc(cur)}</option>`;vals.forEach(v=>{out+=`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`;});return out;}
+function visibleEmployes(){if(MYROLE==='manager')return EMPLOYES.filter(e=>MANAGED_TEAMS.includes(e.equipe_id));if(MYROLE==='comptable')return EMPLOYES.filter(e=>ACCESS_TEAMS.includes(e.equipe_id));return EMPLOYES;}
+function applyRoleUI(){
+  const allowed=({admin:['dash','presence','employes','pointages','demandes','documents','bulletins','zones','params'],
+    manager:['dash','presence','employes','pointages','demandes','documents','bulletins'],
+    comptable:['dash','presence','pointages']}[MYROLE])||['dash','presence','employes','pointages','demandes','documents','bulletins','zones','params'];
+  document.querySelectorAll('nav button').forEach(b=>{b.style.display=allowed.includes(b.dataset.tab)?'':'none';});
+  const sa=document.getElementById('sec-access');if(sa)sa.style.display=ISADMIN?'':'none';
+  const bn=document.getElementById('btn-newemp');if(bn)bn.style.display=(ISADMIN||MYROLE==='manager')?'':'none';
+}
 
 /* ===== MOTEUR DE CALCUL MENSUEL (fidèle à l'ancien logiciel) ===== */
 const JOURS_FR=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -423,7 +435,7 @@ async function exportTeamExcel(){
   const ym=(document.getElementById('pt-date').value||new Date().toISOString().slice(0,10)).slice(0,7);
   toast('Calcul du récapitulatif équipe…');
   const aoa=[['Récapitulatif équipe — mois '+ym],[],['Employé','Équipe','H. prévues','H. faites','H. manquées','H. supp.','Jours présents','Total à rémunérer']];
-  const list=EMPLOYES.filter(e=>e.status==='active').sort((a,b)=>empName(a).localeCompare(empName(b)));
+  const list=visibleEmployes().filter(e=>e.status!=='archived').sort((a,b)=>empName(a).localeCompare(empName(b)));
   for(const e of list){const r=await computeMonthly(e.id,ym);if(!r)continue;aoa.push([empName(e),equipeName(e.equipe_id),hh(r.expected),hh(r.worked),hh(r.missing),hh(r.overtime),r.presentDays,hh(r.totalNetMin)]);}
   const ws=XLSX.utils.aoa_to_sheet(aoa);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Récap équipe');
   XLSX.writeFile(wb,'Recap_equipe_'+ym+'.xlsx');
@@ -434,7 +446,7 @@ async function exportTeamPdf(){
   if(!window.jspdf){toast('Module PDF non chargé.');return;}
   toast('Génération du PDF équipe…');
   const {jsPDF}=window.jspdf;const doc=new jsPDF();
-  const list=EMPLOYES.filter(e=>e.status==='active').sort((a,b)=>empName(a).localeCompare(empName(b)));
+  const list=visibleEmployes().filter(e=>e.status!=='archived').sort((a,b)=>empName(a).localeCompare(empName(b)));
   let first=true;
   for(const e of list){const r=await computeMonthly(e.id,ym);if(!r)continue;if(!first)doc.addPage();first=false;
     let y=16;doc.setFontSize(14);doc.text(empName(e)+' — '+ym,14,y);y+=6;doc.setFontSize(10);doc.text('Société : '+String(r.eq.nom_societe||r.eq.nom||''),14,y);
@@ -476,7 +488,7 @@ async function renderPresence(){
   const cmtBy={};(pcR.data||[]).forEach(c=>cmtBy[c.employee_id]=c);
   const schoolSet=new Set((sdR.data||[]).filter(s=>s.is_school_day).map(s=>s.employee_id));
   const ptBy={};POINTAGES.filter(p=>p.date===date).forEach(p=>{(ptBy[p.employee_id]=ptBy[p.employee_id]||[]).push(p);});
-  const active=EMPLOYES.filter(e=>e.status==='active');
+  const active=visibleEmployes().filter(e=>e.status!=='archived');
   const list=active.map(e=>({e,s:computeDayStatus(e,date,{cmt:cmtBy[e.id],school:schoolSet.has(e.id),pts:ptBy[e.id]||[]})})).sort((a,b)=>empName(a.e).localeCompare(empName(b.e)));
   const cnt={present:0,termine:0,ecole:0,conge:0,nonpointe:0,retard:0};
   list.forEach(x=>{const k=x.s.k;if(k==='present')cnt.present++;else if(k==='termine')cnt.termine++;else if(k==='ecole')cnt.ecole++;else if(k==='conge')cnt.conge++;else if(k==='nonpointe')cnt.nonpointe++;if(x.s.retard)cnt.retard++;});
@@ -517,10 +529,14 @@ async function afterAuth(session){
   document.getElementById('app-view').classList.remove('hidden');
   document.getElementById('who').textContent=session.user.email||'';
   document.getElementById('role-badge').textContent='· '+MYROLE;
-  await loadAll();showTab('dash');
+  ISADMIN=MYROLE==='admin'; CANEDIT=MYROLE!=='comptable';
+  MANAGED_TEAMS=[];ACCESS_TEAMS=[];
+  if(MYROLE==='manager'){const {data}=await db.from('manager_teams').select('team_id').eq('user_id',session.user.id);MANAGED_TEAMS=(data||[]).map(x=>x.team_id);}
+  if(MYROLE==='comptable'){const {data}=await db.from('comptable_access').select('team_id').eq('user_id',session.user.id);ACCESS_TEAMS=(data||[]).map(x=>x.team_id);}
+  await loadAll();applyRoleUI();showTab('dash');
 }
 async function loadAll(){
-  const [p,e,q,pt,dc,bl,z,co,rq,rc,ac,dcat,hol]=await Promise.all([
+  const [p,e,q,pt,dc,bl,z,co,rq,rc,ac,dcat,hol,mt,ca]=await Promise.all([
     db.from('profiles').select('*'),
     db.from('employees').select('*'),
     db.from('equipes').select('*'),
@@ -534,12 +550,14 @@ async function loadAll(){
     db.from('absence_categories').select('*').order('name'),
     db.from('document_categories').select('*').order('name'),
     db.from('public_holidays').select('*').order('date'),
+    db.from('manager_teams').select('*'),
+    db.from('comptable_access').select('*'),
   ]);
   PROFILES=p.data||[];EMPLOYES=e.data||[];EQUIPES=q.data||[];POINTAGES=pt.data||[];DOCUMENTS=dc.data||[];BULLETINS=bl.data||[];ZONES=z.data||[];COMPANY=(co.data||[])[0]||null;
-  REQUESTS=rq.data||[];REQCATS=rc.data||[];ABSCATS=ac.data||[];DOCCATS=dcat.data||[];HOLIDAYS=hol.data||[];
+  REQUESTS=rq.data||[];REQCATS=rc.data||[];ABSCATS=ac.data||[];DOCCATS=dcat.data||[];HOLIDAYS=hol.data||[];MGR_TEAMS=mt.data||[];CMP_ACCESS=ca.data||[];
   profByUser={};PROFILES.forEach(x=>profByUser[x.user_id]=x);
   empById={};EMPLOYES.forEach(x=>empById[x.id]=x);
-  const empOpts=EMPLOYES.slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
+  const empOpts=visibleEmployes().slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
   document.getElementById('pt-emp').innerHTML='<option value="">Tous</option>'+empOpts;
   document.getElementById('updoc-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
   document.getElementById('upbul-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
@@ -561,12 +579,13 @@ function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classLi
 /* DASHBOARD */
 function renderDash(){
   const today=new Date().toISOString().slice(0,10);
-  const ptToday=POINTAGES.filter(p=>p.date===today);
-  const actifs=EMPLOYES.filter(e=>e.status==='active').length;
+  const vis=visibleEmployes();const visIds=new Set(vis.map(e=>e.id));
+  const ptToday=POINTAGES.filter(p=>p.date===today&&visIds.has(p.employee_id));
+  const actifs=vis.filter(e=>e.status==='active').length;
   const enCours=ptToday.filter(p=>p.status==='in_progress').length;
-  const kpi=[{v:EMPLOYES.length,l:'Employés'},{v:actifs,l:'Actifs'},{v:ptToday.length,l:'Pointages aujourd\'hui'},
-    {v:enCours,l:'En cours maintenant'},{v:POINTAGES.length,l:'Pointages (total)'},{v:BULLETINS.length,l:'Bulletins'},
-    {v:DOCUMENTS.length,l:'Documents'},{v:ZONES.length,l:'Zones GPS'}];
+  const kpi=[{v:vis.length,l:'Employés'},{v:actifs,l:'Actifs'},{v:ptToday.length,l:'Pointages aujourd\'hui'},
+    {v:enCours,l:'En cours maintenant'},{v:BULLETINS.length,l:'Bulletins'},{v:DOCUMENTS.length,l:'Documents'},
+    {v:ZONES.length,l:'Zones GPS'},{v:REQUESTS.filter(r=>r.status==='pending').length,l:'Demandes en attente'}];
   document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
   const t=document.getElementById('dash-today');
   if(!ptToday.length){t.innerHTML='<tr><td class="empty">Aucun pointage aujourd\'hui.</td></tr>';return;}
@@ -578,20 +597,24 @@ function statutPill(s){const m={in_progress:['En cours','var(--accent)'],complet
 /* EMPLOYÉS */
 function renderEmployes(){
   const q=(document.getElementById('emp-search').value||'').toLowerCase().trim();
-  const rows=EMPLOYES.filter(e=>!q||[empName(e),empEmail(e),equipeName(e.equipe_id)].some(v=>(v||'').toLowerCase().includes(q)))
+  const fs=(document.getElementById('emp-fstatus')||{value:'active'}).value;
+  let base=visibleEmployes();
+  if(fs==='active')base=base.filter(e=>e.status!=='archived');else if(fs==='archived')base=base.filter(e=>e.status==='archived');
+  const rows=base.filter(e=>!q||[empName(e),empEmail(e),equipeName(e.equipe_id)].some(v=>(v||'').toLowerCase().includes(q)))
     .sort((a,b)=>empName(a).localeCompare(empName(b)));
   document.getElementById('emp-count').textContent=rows.length+' employé(s)';
   const t=document.getElementById('emp-table');
   t.innerHTML='<tr><th>Nom</th><th>Email</th><th>Équipe</th><th>Horaires</th><th>Type</th><th>Statut</th><th class="num">Taux</th></tr>'+
-    rows.map(e=>`<tr class="clickable" onclick="openEmp('${e.id}')">
+    (rows.map(e=>`<tr class="clickable" onclick="openEmp('${e.id}')">
       <td><b>${esc(empName(e))}</b></td><td>${esc(empEmail(e))}</td><td>${esc(equipeName(e.equipe_id))}</td>
       <td>${e.horaires_debut?e.horaires_debut.slice(0,5)+'–'+(e.horaires_fin||'').slice(0,5):'—'}</td>
-      <td>${esc(e.type_horaire||'')}</td><td>${e.status==='active'?'<span class="pill" style="background:var(--good)22;color:var(--good)">Actif</span>':esc(e.status||'')}</td>
-      <td class="num">${e.taux_horaire!=null?eur(e.taux_horaire):(e.salaire_global!=null?eur(e.salaire_global):'—')}</td></tr>`).join('');
+      <td>${esc(e.type_horaire||'')}</td><td>${e.status==='active'?'<span class="pill" style="background:var(--good)22;color:var(--good)">Actif</span>':(e.status==='archived'?'<span class="pill" style="background:var(--muted)22;color:var(--muted)">Archivé</span>':esc(e.status||''))}</td>
+      <td class="num">${e.taux_horaire!=null?eur(e.taux_horaire):(e.salaire_global!=null?eur(e.salaire_global):'—')}</td></tr>`).join('')||'<tr><td class="empty" colspan="7">Aucun employé</td></tr>');
 }
 function openNewEmp(){
   document.getElementById('ne-email').value='';document.getElementById('ne-first').value='';document.getElementById('ne-last').value='';document.getElementById('ne-pass').value='TimeGuard2026!';document.getElementById('ne-msg').textContent='';
-  document.getElementById('ne-equipe').innerHTML='<option value="">— Aucune —</option>'+EQUIPES.map(q=>`<option value="${q.id}">${esc(q.nom||q.nom_societe||'')}</option>`).join('');
+  const teams=(MYROLE==='manager')?EQUIPES.filter(q=>MANAGED_TEAMS.includes(q.id)):EQUIPES;
+  document.getElementById('ne-equipe').innerHTML='<option value="">— Aucune —</option>'+teams.map(q=>`<option value="${q.id}">${esc(q.nom||q.nom_societe||'')}</option>`).join('');
   document.getElementById('newemp-modal').classList.remove('hidden');
 }
 function closeNewEmp(){document.getElementById('newemp-modal').classList.add('hidden');}
@@ -599,11 +622,17 @@ async function createEmployee(){
   const email=gv('ne-email').toLowerCase();const msg=document.getElementById('ne-msg');
   if(!email){msg.textContent='Email requis.';return;}
   const btn=document.getElementById('ne-go');btn.disabled=true;msg.textContent='Création en cours…';
-  const {data,error}=await sb.functions.invoke('pointage-create-employee',{body:{email,first_name:gv('ne-first'),last_name:gv('ne-last'),equipe_id:gv('ne-equipe')||null,password:gv('ne-pass')||'TimeGuard2026!'}});
+  const {data,error}=await sb.functions.invoke('pointage-create-employee',{body:{email,first_name:gv('ne-first'),last_name:gv('ne-last'),equipe_id:gv('ne-equipe')||null,password:gv('ne-pass')||'TimeGuard2026!',role:'employee'}});
   btn.disabled=false;
   if(error||(data&&data.error)){msg.textContent='Erreur : '+((data&&data.error)||error.message);return;}
   closeNewEmp();toast('Employé créé ✓ (mot de passe : '+(data.temp_password||'')+')');
   await loadAll();renderEmployes();
+}
+async function toggleArchive(id,ns){
+  if(!confirm(ns==='archived'?'Archiver cet employé ? Il n\'apparaîtra plus dans les listes actives.':'Réactiver cet employé ?'))return;
+  const {error}=await db.from('employees').update({status:ns}).eq('id',id);
+  if(error){toast('Erreur : '+error.message);return;}
+  await reloadCore();toast(ns==='archived'?'Employé archivé':'Employé réactivé');renderEmployes();openEmp(id);
 }
 async function openEmp(id){
   const e=empById[id];if(!e)return;
@@ -625,13 +654,13 @@ async function openEmp(id){
   ]);
   const bonuses=boR.data||[], adjustments=adjR.data||[], schoolDays=sdR.data||[], schoolAbs=saR.data||[], pcomments=pcR.data||[];
   const equipeOpts='<option value="">— Aucune —</option>'+EQUIPES.map(q=>`<option value="${q.id}"${q.id===e.equipe_id?' selected':''}>${esc(q.nom||q.nom_societe||'')}</option>`).join('');
-  const statusVals=[...new Set(['active','inactive',...distinctVals('status')])];
+  const statusVals=[...new Set(['active','inactive','archived',...distinctVals('status')])];
   const hhw=(e.horaires_hebdomadaires&&typeof e.horaires_hebdomadaires==='object')?e.horaires_hebdomadaires:{};
   const DAYS=[['lundi','Lundi'],['mardi','Mardi'],['mercredi','Mercredi'],['jeudi','Jeudi'],['vendredi','Vendredi'],['samedi','Samedi'],['dimanche','Dimanche']];
   const absOpts='<option value="">— Aucune —</option>'+ABSCATS.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
   document.getElementById('detail-body').innerHTML=`
     <div class="card"><h3>✏️ Informations de l'employé</h3>
-      <div class="hint" style="margin:-6px 0 12px">Email de connexion : <b>${esc(p.email||'—')}</b> <span style="opacity:.7">(non modifiable ici)</span></div>
+      <div class="hint" style="margin:-6px 0 12px">Email de connexion : <b>${esc(p.email||'—')}</b> <span style="opacity:.7">(non modifiable ici)</span>${e.status==='archived'?' · <span style="color:var(--warn)">ARCHIVÉ</span>':''}</div>
       <div class="grid2">
         <div class="field"><label>Prénom</label><input id="ef-first" value="${esc(p.first_name||'')}"></div>
         <div class="field"><label>Nom</label><input id="ef-last" value="${esc(p.last_name||'')}"></div>
@@ -650,7 +679,7 @@ async function openEmp(id){
         <div class="field"><label>Pause auto (min)</label><input type="number" id="ef-pauseAuto" value="${e.pause_automatique_minutes!=null?e.pause_automatique_minutes:''}"></div>
         <div class="field"><label>Heures sup autorisées</label><select id="ef-hs"><option value="non"${!e.heures_supplementaires_autorisees?' selected':''}>Non</option><option value="oui"${e.heures_supplementaires_autorisees?' selected':''}>Oui</option></select></div>
       </div>
-      <div class="row" style="margin-top:12px"><button class="btn" onclick="saveEmpInfo('${id}')">💾 Enregistrer les informations</button><button class="btn ghost" onclick="resetEmpPassword('${esc(p.email||'')}')">🔑 Réinitialiser le mot de passe</button></div>
+      <div class="row" style="margin-top:12px"><button class="btn" onclick="saveEmpInfo('${id}')">💾 Enregistrer les informations</button><button class="btn ghost" onclick="resetEmpPassword('${esc(p.email||'')}')">🔑 Réinitialiser le mot de passe</button><button class="btn ghost" onclick="toggleArchive('${id}','${e.status==='archived'?'active':'archived'}')">${e.status==='archived'?'♻️ Réactiver':'📦 Archiver'}</button></div>
     </div>
 
     <div class="card"><h3>📊 Récapitulatif mensuel & paie</h3>
@@ -874,7 +903,7 @@ function openAddPointage(prefillEmp){
   window._peEdit=null; window._peEmp=null;
   document.getElementById('pe-title').textContent='➕ Ajouter un pointage';
   document.getElementById('pe-emp-wrap').style.display='';
-  const opts='<option value="">— Choisir —</option>'+EMPLOYES.slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
+  const opts='<option value="">— Choisir —</option>'+visibleEmployes().slice().sort((a,b)=>empName(a).localeCompare(empName(b))).map(e=>`<option value="${e.id}">${esc(empName(e))}</option>`).join('');
   document.getElementById('pe-emp').innerHTML=opts;
   document.getElementById('pe-emp').value=prefillEmp||'';
   const ptd=document.getElementById('pt-date');
@@ -925,7 +954,8 @@ async function delPointage(pid,empId){
 /* POINTAGES */
 function renderPointages(){
   const mode=document.getElementById('pt-mode').value,date=document.getElementById('pt-date').value,emp=document.getElementById('pt-emp').value;
-  let rows=POINTAGES.slice();
+  const visIds=new Set(visibleEmployes().map(e=>e.id));
+  let rows=POINTAGES.filter(p=>visIds.has(p.employee_id));
   if(emp)rows=rows.filter(p=>p.employee_id===emp);
   if(mode==='day'&&date)rows=rows.filter(p=>p.date===date);
   else if(mode==='month'&&date)rows=rows.filter(p=>(p.date||'').slice(0,7)===date.slice(0,7));
@@ -958,7 +988,8 @@ function reqPill(s){const m={pending:['En attente','var(--warn)'],approved:['App
 function reqPeriode(r){if(!r.start_date&&!r.end_date)return'—';let s=fmtDate(r.start_date);if(r.end_date&&r.end_date!==r.start_date)s+=' → '+fmtDate(r.end_date);if(r.half_day)s+=' (½ j'+(r.half_day_period?' '+r.half_day_period:'')+')';return s;}
 function renderDemandes(){
   const q=(document.getElementById('req-search').value||'').toLowerCase().trim(),fs=document.getElementById('req-fstatus').value;
-  const rows=REQUESTS.filter(r=>{if(fs&&r.status!==fs)return false;const e=empById[r.employee_id];return !q||[e?empName(e):'',r.category,r.message].some(v=>(v||'').toLowerCase().includes(q));});
+  const visIds=new Set(visibleEmployes().map(e=>e.id));
+  const rows=REQUESTS.filter(r=>{if(!visIds.has(r.employee_id))return false;if(fs&&r.status!==fs)return false;const e=empById[r.employee_id];return !q||[e?empName(e):'',r.category,r.message].some(v=>(v||'').toLowerCase().includes(q));});
   document.getElementById('req-count').textContent=rows.length+' demande(s)';
   const t=document.getElementById('req-table');
   if(!rows.length){t.innerHTML='<tr><td class="empty">Aucune demande.</td></tr>';return;}
@@ -1030,14 +1061,16 @@ async function sendReqMsg(id){
 /* DOCUMENTS / BULLETINS */
 function renderDocuments(){
   const q=(document.getElementById('doc-search').value||'').toLowerCase().trim();
-  const rows=DOCUMENTS.filter(x=>{const e=empById[x.employee_id];return !q||[x.file_name,x.category,e?empName(e):''].some(v=>(v||'').toLowerCase().includes(q));});
+  const visIds=new Set(visibleEmployes().map(e=>e.id));
+  const rows=DOCUMENTS.filter(x=>{if(!visIds.has(x.employee_id))return false;const e=empById[x.employee_id];return !q||[x.file_name,x.category,e?empName(e):''].some(v=>(v||'').toLowerCase().includes(q));});
   document.getElementById('doc-count').textContent=rows.length+' document(s)';
   document.getElementById('doc-table').innerHTML='<tr><th>Employé</th><th>Fichier</th><th>Catégorie</th><th>Date</th><th></th></tr>'+
     (rows.map(x=>{const e=empById[x.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${esc(x.file_name||'')}</td><td>${esc(x.category||'')}</td><td>${fmtDate(x.created_at)}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td class="empty">Aucun</td></tr>');
 }
 function renderBulletins(){
   const q=(document.getElementById('bul-search').value||'').toLowerCase().trim();
-  const rows=BULLETINS.filter(x=>{const e=empById[x.employee_id];return !q||[x.file_name,x.month,e?empName(e):''].some(v=>(v||'').toLowerCase().includes(q));});
+  const visIds=new Set(visibleEmployes().map(e=>e.id));
+  const rows=BULLETINS.filter(x=>{if(!visIds.has(x.employee_id))return false;const e=empById[x.employee_id];return !q||[x.file_name,x.month,e?empName(e):''].some(v=>(v||'').toLowerCase().includes(q));});
   document.getElementById('bul-count').textContent=rows.length+' bulletin(s)';
   document.getElementById('bul-table').innerHTML='<tr><th>Employé</th><th>Mois</th><th>Fichier</th><th></th></tr>'+
     (rows.map(x=>{const e=empById[x.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${esc(x.month)}</td><td>${esc(x.file_name||'')}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td class="empty">Aucun</td></tr>');
@@ -1060,7 +1093,7 @@ function renderParams(){
       <div class="field"><label>Pays</label><input id="cs-country" value="${esc(c.country||'')}"></div>
     </div>
     <div style="margin-top:12px"><button class="btn small" onclick="saveCompany()">💾 Enregistrer</button></div>`;
-  renderEquipesParam();renderCatsParam();renderHolidaysParam();
+  renderAccessParam();renderEquipesParam();renderCatsParam();renderHolidaysParam();
 }
 async function saveCompany(){
   const patch={company_name:gv('cs-name')||null,siret:gv('cs-siret')||null,company_address:gv('cs-addr')||null,company_email:gv('cs-email')||null,company_phone:gv('cs-phone')||null,country:gv('cs-country')||null};
@@ -1070,6 +1103,51 @@ async function saveCompany(){
   if(r.error){toast('Erreur : '+r.error.message);return;}
   const {data}=await db.from('company_settings').select('*').limit(1);COMPANY=(data||[])[0]||null;
   toast('Paramètres enregistrés ✓');
+}
+function renderAccessParam(){
+  const box=document.getElementById('params-access');if(!box)return;
+  if(!ISADMIN){box.innerHTML='<div class="hint">Réservé à l\'administrateur.</div>';return;}
+  const mgrs=PROFILES.filter(p=>p.role==='manager');const cpts=PROFILES.filter(p=>p.role==='comptable');
+  const teamsOf=(uid,arr)=>arr.filter(x=>x.user_id===uid).map(x=>{const q=EQUIPES.find(e=>e.id===x.team_id);return q?(q.nom||q.nom_societe||'?'):'?';}).join(', ')||'—';
+  const eqChecks=EQUIPES.map(q=>`<label style="display:inline-flex;align-items:center;gap:6px;margin:2px 10px 2px 0;color:var(--txt);font-size:14px"><input type="checkbox" class="ra-team" value="${q.id}" style="width:auto"> ${esc(q.nom||q.nom_societe||'')}</label>`).join('');
+  box.innerHTML=`
+   <div class="hint" style="margin-bottom:8px">Un <b>manager</b> gère ses équipes (voit/édite leurs pointages). Un <b>comptable</b> consulte les pointages de ses équipes (lecture seule).</div>
+   <div class="row">
+     <div class="field"><label>Rôle</label><select id="ra-role"><option value="manager">Manager</option><option value="comptable">Comptable</option></select></div>
+     <div class="field"><label>Prénom</label><input id="ra-first"></div>
+     <div class="field"><label>Nom</label><input id="ra-last"></div>
+     <div class="field"><label>Email</label><input id="ra-email"></div>
+     <div class="field"><label>Mot de passe</label><input id="ra-pass" value="TimeGuard2026!"></div>
+   </div>
+   <div style="margin:8px 0"><div class="hint" style="margin-bottom:4px">Équipes accessibles :</div>${eqChecks||'<span class="hint">Crée d\'abord une équipe.</span>'}</div>
+   <div class="err" id="ra-msg"></div>
+   <button class="btn small" onclick="createRoleUser()">➕ Créer l'accès</button>
+   <div class="table-wrap" style="margin-top:14px"><table>
+     <tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Équipes</th><th></th></tr>
+     ${mgrs.map(m=>`<tr><td>${esc(((m.first_name||'')+' '+(m.last_name||'')).trim()||'—')}</td><td>${esc(m.email||'')}</td><td>Manager</td><td>${esc(teamsOf(m.user_id,MGR_TEAMS))}</td><td><button class="btn ghost small" onclick="delRoleUser('${m.user_id}','manager')">🗑️</button></td></tr>`).join('')}
+     ${cpts.map(m=>`<tr><td>${esc(((m.first_name||'')+' '+(m.last_name||'')).trim()||'—')}</td><td>${esc(m.email||'')}</td><td>Comptable</td><td>${esc(teamsOf(m.user_id,CMP_ACCESS))}</td><td><button class="btn ghost small" onclick="delRoleUser('${m.user_id}','comptable')">🗑️</button></td></tr>`).join('')}
+     ${(!mgrs.length&&!cpts.length)?'<tr><td class="empty" colspan="5">Aucun manager ni comptable</td></tr>':''}
+   </table></div>`;
+}
+async function createRoleUser(){
+  const role=gv('ra-role'),email=gv('ra-email').toLowerCase(),first=gv('ra-first'),last=gv('ra-last'),pass=gv('ra-pass')||'TimeGuard2026!';
+  const teams=[...document.querySelectorAll('.ra-team:checked')].map(x=>x.value);
+  const msg=document.getElementById('ra-msg');
+  if(!email){msg.textContent='Email requis.';return;}
+  if(!teams.length){msg.textContent='Choisis au moins une équipe.';return;}
+  msg.textContent='Création…';
+  const {data,error}=await sb.functions.invoke('pointage-create-employee',{body:{email,first_name:first,last_name:last,password:pass,role,team_ids:teams}});
+  if(error||(data&&data.error)){msg.textContent='Erreur : '+((data&&data.error)||error.message);return;}
+  msg.textContent='';toast('Accès créé ✓ (mot de passe : '+(data.temp_password||pass)+')');
+  await loadAll();renderParams();
+}
+async function delRoleUser(uid,role){
+  if(!confirm('Retirer cet accès ? Le compte de connexion restera mais perdra ses droits.'))return;
+  if(role==='manager')await db.from('manager_teams').delete().eq('user_id',uid);
+  else await db.from('comptable_access').delete().eq('user_id',uid);
+  await db.from('user_roles').delete().eq('user_id',uid);
+  await db.from('profiles').update({role:'employee'}).eq('user_id',uid);
+  await loadAll();toast('Accès retiré');renderParams();
 }
 function renderEquipesParam(){
   document.getElementById('params-equipes').innerHTML=`
@@ -1149,7 +1227,8 @@ async function delHoliday(id){if(!confirm('Supprimer ce jour férié ?'))return;
 /* EXPORT EXCEL brut des pointages */
 function exportPointages(){
   const mode=document.getElementById('pt-mode').value,date=document.getElementById('pt-date').value,emp=document.getElementById('pt-emp').value;
-  let rows=POINTAGES.slice();
+  const visIds=new Set(visibleEmployes().map(e=>e.id));
+  let rows=POINTAGES.filter(p=>visIds.has(p.employee_id));
   if(emp)rows=rows.filter(p=>p.employee_id===emp);
   if(mode==='day'&&date)rows=rows.filter(p=>p.date===date);else if(mode==='month'&&date)rows=rows.filter(p=>(p.date||'').slice(0,7)===date.slice(0,7));
   if(!rows.length){toast('Aucun pointage à exporter.');return;}
