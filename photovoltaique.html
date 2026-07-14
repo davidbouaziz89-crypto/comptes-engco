@@ -738,7 +738,7 @@ async function renderPlanning(){
           const road=km*1.3, mins=Math.round(road/50*60);
           let gapTxt='', warn=false;
           const g1=toMin(r.heure), g2=toMin(next.heure);
-          if(g1!=null&&g2!=null){ const gap=g2-g1; gapTxt=` · ${(Math.round(gap/6)/10)} h entre les 2`; if(gap>0 && mins>gap-15) warn=true; }
+          if(g1!=null&&g2!=null){ const gap=g2-g1; gapTxt=` · ${(Math.round(gap/6)/10)} h entre les 2`; if(gap>0 && mins>gap-60) warn=true; } // réserve ~1h pour le RDV
           html+=`<div class="hint" style="margin:2px 0 4px 60px;${warn?'color:var(--bad);font-weight:600':''}">↕ ${Math.round(km)} km à vol d'oiseau (~${Math.round(road)} km route, ~${mins} min voiture)${gapTxt}${warn?' — ⚠️ trajet trop long pour l\'écart de temps':''}</div>`;
         }
       }
