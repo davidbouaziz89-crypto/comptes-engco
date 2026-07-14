@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root{--bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;--accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;}
   :root[data-theme="light"]{--bg:#f4f6fb;--panel:#fff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;--accent:#4f7cff;--accent2:#8a5cff;--good:#16a34a;--bad:#dc2626;--warn:#d97706;}
@@ -58,6 +59,9 @@
   .card h3{margin:0 0 12px;font-size:15px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .kv{font-size:13px}.kv .k{color:var(--muted)}
+  .rc-tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+  .rc-box{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .rc-box .v{font-size:20px;font-weight:800}.rc-box .l{color:var(--muted);font-size:12px}
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--txt);padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s;z-index:200}
   #toast.show{opacity:1}
 </style>
@@ -115,10 +119,11 @@
         <div class="field"><label>Employé</label><select id="pt-emp" onchange="renderPointages()"><option value="">Tous</option></select></div>
         <div class="field"><label>Mois entier ?</label><select id="pt-mode" onchange="renderPointages()"><option value="day">Ce jour</option><option value="month">Tout le mois</option></select></div>
         <button class="btn small" onclick="openAddPointage(document.getElementById('pt-emp').value)">➕ Ajouter un pointage</button>
-        <button class="btn ghost small" onclick="exportPointages()">⬇️ Export Excel</button>
-        <button class="btn ghost small" onclick="exportPdf()">⬇️ PDF (mois)</button>
+        <button class="btn ghost small" onclick="exportPointages()">⬇️ Export Excel (brut)</button>
+        <button class="btn ghost small" onclick="exportTeamExcel()">📊 Récap équipe (Excel)</button>
         <button class="btn ghost small" onclick="closeForgottenDays()">🧹 Clôturer les journées oubliées</button>
       </div>
+      <div class="hint" style="margin-bottom:8px">Pour le <b>récapitulatif de paie détaillé</b> d'un employé (heures prévues/faites/manquées/sup + total à rémunérer) et son <b>PDF</b>, ouvre sa fiche (onglet 👥 Employés).</div>
       <div class="table-wrap"><table id="pt-table"></table></div>
       <div class="hint" id="pt-count" style="margin-top:8px"></div></section></div>
 
@@ -237,12 +242,13 @@
 const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const db=sb.schema('pointage');   // toutes les tables sont dans le schéma "pointage"
+const db=sb.schema('pointage');
 
 let SESSION=null, MYROLE=null;
 let PROFILES=[], EMPLOYES=[], EQUIPES=[], POINTAGES=[], DOCUMENTS=[], BULLETINS=[], ZONES=[], COMPANY=null;
 let REQUESTS=[], REQCATS=[], ABSCATS=[], DOCCATS=[], HOLIDAYS=[];
 let profByUser={}, empById={};
+let RECAP_CACHE={};
 
 function toggleTheme(){const l=document.documentElement.getAttribute('data-theme')!=='light';if(l)document.documentElement.setAttribute('data-theme','light');else document.documentElement.removeAttribute('data-theme');try{localStorage.setItem('pfp-theme',l?'light':'dark');}catch(e){}updateThemeBtn();}
 function updateThemeBtn(){const b=document.getElementById('theme-btn');if(b)b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙';}
@@ -253,6 +259,7 @@ function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-
 function fmtTime(d){if(!d)return'—';return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}
 function eur(n){if(n==null||n===''||isNaN(Number(n)))return'—';return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €';}
 function mins(n){if(n==null||isNaN(Number(n)))return'—';n=Math.round(Number(n));return Math.floor(n/60)+'h'+String(n%60).padStart(2,'0');}
+function hh(n){n=Math.round(Number(n)||0);return Math.floor(n/60)+'h'+String(n%60).padStart(2,'0');}
 function gv(id){const el=document.getElementById(id);return el?String(el.value).trim():'';}
 function gnum(id){const s=gv(id);return s===''?null:(isNaN(Number(s))?null:Number(s));}
 function safePdf(s){return String(s||'').replace(/[^a-z0-9]+/gi,'_')||'export';}
@@ -264,6 +271,155 @@ function empEmail(e){const p=profByUser[e.user_id];return p?p.email:'';}
 function equipeName(id){const q=EQUIPES.find(x=>x.id===id);return q?(q.nom||q.nom_societe||''):'';}
 function distinctVals(field){const s=new Set();EMPLOYES.forEach(e=>{if(e[field]!=null&&e[field]!=='')s.add(e[field]);});return[...s];}
 function selOpts(vals,cur,allowBlank){let out=allowBlank?'<option value="">—</option>':'';const set=new Set(vals);if(cur!=null&&cur!==''&&!set.has(cur))out+=`<option value="${esc(cur)}" selected>${esc(cur)}</option>`;vals.forEach(v=>{out+=`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`;});return out;}
+
+/* ===== MOTEUR DE CALCUL MENSUEL (fidèle à l'ancien logiciel) ===== */
+const JOURS_FR=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+function dayScheduleFor(emp,dateStr){const hhh=(emp.horaires_hebdomadaires&&typeof emp.horaires_hebdomadaires==='object')?emp.horaires_hebdomadaires:{};const jour=JOURS_FR[new Date(dateStr+'T00:00:00').getDay()];return hhh[jour]||null;}
+function schedActif(s){if(!s)return false;if(s.actif===false)return false;return !!(s.debut&&s.fin);}
+function hmsToMin(v){if(v==null)return 0;if(typeof v==='number')return v;const p=String(v).split(':').map(Number);if(p.length>=2)return (p[0]*60)+(p[1]||0);return Number(v)||0;}
+function timeToMin(t){if(!t)return null;const p=String(t).split(':').map(Number);return (p[0]*60)+(p[1]||0);}
+function schedPause(s,emp){if(s&&s.pause)return hmsToMin(s.pause);if(emp.duree_pause_prevue!=null)return Number(emp.duree_pause_prevue)||0;if(emp.pause_automatique_minutes!=null)return Number(emp.pause_automatique_minutes)||0;return 0;}
+function expectedMinutesForDay(s,emp){if(!schedActif(s))return 0;const d=timeToMin(s.debut),f=timeToMin(s.fin);if(d==null||f==null)return 0;let span=f-d;if(span<0)span+=1440;return Math.max(0,span-schedPause(s,emp));}
+async function computeMonthly(empId,ym){
+  const emp=empById[empId];if(!emp)return null;
+  const eq=EQUIPES.find(q=>q.id===emp.equipe_id)||{};
+  const country=eq.country||(COMPANY&&COMPANY.country)||'FR';
+  const [pcR,sdR,boR,adjR]=await Promise.all([
+    db.from('pointage_comments').select('*, absence_categories(name,counts_as_present)').eq('employee_id',empId).gte('pointage_date',ym+'-01').lte('pointage_date',ym+'-31'),
+    db.from('employee_school_days').select('*').eq('employee_id',empId).gte('date',ym+'-01').lte('date',ym+'-31'),
+    db.from('employee_bonus').select('*').eq('employee_id',empId).eq('month',ym+'-01'),
+    db.from('employee_monthly_adjustments').select('*').eq('employee_id',empId).eq('month',ym+'-01').maybeSingle()
+  ]);
+  const commentByDate={};(pcR.data||[]).forEach(c=>commentByDate[c.pointage_date]=c);
+  const schoolSet=new Set((sdR.data||[]).filter(s=>s.is_school_day).map(s=>s.date));
+  const holidayByDate={};HOLIDAYS.filter(h=>!h.country||h.country===country).forEach(h=>holidayByDate[h.date]=h.name);
+  const ptByDate={};POINTAGES.filter(p=>p.employee_id===empId&&(p.date||'').slice(0,7)===ym).forEach(p=>{(ptByDate[p.date]=ptByDate[p.date]||[]).push(p);});
+  const type=(emp.type_horaire||'').toLowerCase();
+  const isVariable=/variable|taux|flex/.test(type);
+  const supOK=!!emp.heures_supplementaires_autorisees;
+  const today=new Date().toISOString().slice(0,10);
+  const [Y,M]=ym.split('-').map(Number);const lastDay=new Date(Y,M,0).getDate();
+  let expected=0,worked=0,pauseTot=0,missing=0,overtime=0,presentDays=0,workedDays=0,holidayDays=0,holidayPaidMin=0;
+  const absByCat={};const holidayList=[];const days=[];const weekTot=[{e:0,w:0,m:0,o:0},{e:0,w:0,m:0,o:0},{e:0,w:0,m:0,o:0},{e:0,w:0,m:0,o:0},{e:0,w:0,m:0,o:0},{e:0,w:0,m:0,o:0}];
+  for(let day=1;day<=lastDay;day++){
+    const ds=ym+'-'+String(day).padStart(2,'0');
+    if(ds>today)continue;
+    const sched=dayScheduleFor(emp,ds);
+    const dayPts=(ptByDate[ds]||[]).slice().sort((a,b)=>String(a.heure_debut||'').localeCompare(String(b.heure_debut||'')));
+    const actual=dayPts.reduce((s,p)=>s+(Number(p.temps_net)||0),0);
+    const pauseDay=dayPts.reduce((s,p)=>s+Math.max(0,(Number(p.temps_total)||0)-(Number(p.temps_net)||0)),0);
+    pauseTot+=pauseDay;worked+=actual;if(actual>0){presentDays++;}
+    const wk=Math.min(5,Math.floor((day-1)/7));
+    const cmt=commentByDate[ds];
+    const isHoliday=!!holidayByDate[ds];
+    const isSchool=schoolSet.has(ds)||(sched&&sched.ecole===true);
+    const absent=cmt&&cmt.absence_categories&&cmt.absence_categories.counts_as_present===false;
+    let exp=0,statut='';
+    if(isVariable){ exp=0; overtime+=actual; weekTot[wk].w+=actual;weekTot[wk].o+=actual; statut=actual>0?'Présent':'—'; }
+    else if(isHoliday){ holidayDays++;holidayList.push(ds); const e=expectedMinutesForDay(sched,emp); if(e>0)holidayPaidMin+=e; if(actual>0){overtime+=actual;statut='Férié (travaillé)';}else statut='Jour férié'; weekTot[wk].w+=actual;weekTot[wk].o+=(actual>0?actual:0); }
+    else if(isSchool){ const e=expectedMinutesForDay(sched,emp); absByCat['École']=absByCat['École']||{days:0,minutes:0};absByCat['École'].days++;absByCat['École'].minutes+=e; statut='École'; }
+    else if(absent){ const e=expectedMinutesForDay(sched,emp);const half=cmt.half_day_period?0.5:1;const catName=cmt.absence_categories.name||'Absence';
+      absByCat[catName]=absByCat[catName]||{days:0,minutes:0};absByCat[catName].days+=half;absByCat[catName].minutes+=e*half;
+      if(cmt.half_day_period){exp=e*0.5;} statut=catName+(cmt.half_day_period?' (½)':''); }
+    else { exp=expectedMinutesForDay(sched,emp); if(schedActif(sched))workedDays++;
+      if(dayPts.some(p=>p.status==='in_progress'))statut='En cours'; else if(actual>0)statut='Présent'; else if(!schedActif(sched))statut='Non travaillé'; else statut='Absent'; }
+    expected+=exp;weekTot[wk].e+=exp;if(!isVariable&&!isHoliday)weekTot[wk].w+=actual;
+    const dmiss=Math.max(0,exp-actual);const dover=supOK?Math.max(0,actual-exp):0;
+    missing+=dmiss;overtime+=(isVariable||isHoliday?0:dover);weekTot[wk].m+=dmiss;weekTot[wk].o+=(isVariable||isHoliday?0:dover);
+    if(dayPts.length||exp>0||isHoliday||isSchool||absent){
+      days.push({date:ds,statut,debut:dayPts[0]&&dayPts[0].heure_debut?tzTimeLocal(dayPts[0].heure_debut):'',fin:dayPts.length&&dayPts[dayPts.length-1].heure_fin?tzTimeLocal(dayPts[dayPts.length-1].heure_fin):'',total:dayPts.reduce((s,p)=>s+(Number(p.temps_total)||0),0),net:actual,missing:dmiss,overtime:dover,comment:cmt?(cmt.comment||''):'',manual:dayPts.some(p=>p.saisi_manuellement)});
+    }
+  }
+  let paidLeaveMin=0,schoolMin=0,otherJustifiedMin=0;
+  Object.entries(absByCat).forEach(([name,v])=>{const n=name.toLowerCase();if(/école|ecole|alternant/.test(n))schoolMin+=v.minutes;else if(/cong.*pay|pay[ée]|\bcp\b/.test(n))paidLeaveMin+=v.minutes;else otherJustifiedMin+=v.minutes;});
+  const prevAbsenceMin=(adjR&&adjR.data&&adjR.data.hours_absence_previous_month)?Number(adjR.data.hours_absence_previous_month)*60:0;
+  const totalNetMin=Math.max(0,worked+paidLeaveMin+schoolMin+holidayPaidMin-prevAbsenceMin);
+  const bonuses=boR.data||[];const bonusTotal=bonuses.reduce((s,b)=>s+(Number(b.amount)||0),0);
+  // rémunération
+  let tauxAffiche=null,tauxCalcule=null;
+  if(emp.taux_horaire!=null)tauxAffiche=Number(emp.taux_horaire);
+  if(emp.salaire_global!=null&&expected>0)tauxCalcule=Number(emp.salaire_global)/(expected/60);
+  return {ym,emp,eq,expected,worked,pauseTot,missing,overtime,presentDays,workedDays,holidayDays,holidayPaidMin,holidayList,absByCat,paidLeaveMin,schoolMin,otherJustifiedMin,prevAbsenceMin,totalNetMin,bonuses,bonusTotal,days,weekTot,tauxAffiche,tauxCalcule,adj:(adjR&&adjR.data)||null,isVariable};
+}
+async function getRecap(empId){
+  const ym=gv('rc-month')||new Date().toISOString().slice(0,7);
+  const r=await computeMonthly(empId,ym);RECAP_CACHE[empId]=r;return r;
+}
+async function renderMonthlyRecap(empId){
+  const out=document.getElementById('rc-out');if(out)out.innerHTML='<div class="hint">Calcul…</div>';
+  const r=await getRecap(empId);if(!r){if(out)out.innerHTML='<div class="val-bad">Erreur de calcul.</div>';return;}
+  const box=(l,v,c)=>`<div class="rc-box"><div class="v"${c?` style="color:${c}"`:''}>${v}</div><div class="l">${l}</div></div>`;
+  let absRows=Object.entries(r.absByCat).map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num">${v.days}</td><td class="num">${hh(v.minutes)}</td></tr>`).join('');
+  const remun=r.isVariable?(r.tauxAffiche!=null?`Taux horaire : <b>${eur(r.tauxAffiche)}</b>`:'Payé à l\'heure (taux non renseigné)')
+    :(r.emp.salaire_global!=null?`Salaire global : <b>${eur(r.emp.salaire_global)}</b> (${esc(r.emp.salaire_type||'—')})${r.tauxCalcule!=null?` · taux calculé ≈ <b>${eur(r.tauxCalcule)}</b>/h`:''}`:(r.tauxAffiche!=null?`Taux horaire : <b>${eur(r.tauxAffiche)}</b>`:'Rémunération non renseignée'));
+  out.innerHTML=`
+    <div class="rc-tot">
+      ${box('Heures prévues',hh(r.expected))}
+      ${box('Heures effectuées',hh(r.worked),'var(--good)')}
+      ${box('Heures manquées',hh(r.missing),'var(--bad)')}
+      ${box('Heures supplémentaires',hh(r.overtime),'var(--accent)')}
+      ${box('Total pauses',hh(r.pauseTot))}
+      ${box('Jours présents',r.presentDays)}
+    </div>
+    <div style="background:var(--panel2);border:1px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:13px;color:var(--muted)">Total net d'heures à rémunérer</div>
+      <div style="font-size:24px;font-weight:800;color:var(--accent)">${hh(r.totalNetMin)}</div>
+      <div class="hint" style="margin-top:4px">= effectuées ${hh(r.worked)} + congés payés ${hh(r.paidLeaveMin)} + école ${hh(r.schoolMin)} + fériés ${hh(r.holidayPaidMin)}${r.prevAbsenceMin?` − absences mois précédent ${hh(r.prevAbsenceMin)}`:''}</div>
+    </div>
+    <div class="kv" style="margin-bottom:12px">💶 ${remun}${r.emp.frais_transport!=null?` · Frais transport : <b>${eur(r.emp.frais_transport)}</b>`:''}${r.bonuses.length?` · Primes : <b>${eur(r.bonusTotal)}</b>`:''}</div>
+    ${absRows?`<div class="table-wrap"><table><tr><th>Absence / statut</th><th class="num">Jours</th><th class="num">Heures prévues</th></tr>${absRows}</table></div>`:'<div class="hint">Aucune absence enregistrée ce mois-ci.</div>'}
+    ${r.holidayDays?`<div class="hint" style="margin-top:8px">Jours fériés du mois : ${r.holidayDays} (${r.holidayList.map(d=>fmtDate(d)).join(', ')})</div>`:''}`;
+}
+async function exportEmployeePdf(empId){
+  const r=RECAP_CACHE[empId]||await getRecap(empId);if(!r){toast('Calcule d\'abord le mois.');return;}
+  if(!window.jspdf){toast('Module PDF non chargé.');return;}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();const p=profByUser[r.emp.user_id]||{};
+  doc.setFontSize(16);doc.text('Pointage '+empName(r.emp),14,18);
+  doc.setFontSize(11);doc.text('Société : '+String((r.eq.nom_societe||r.eq.nom||(COMPANY&&COMPANY.company_name)||'')),14,26);
+  doc.text('Période : '+r.ym,14,32);
+  const body=r.days.map(d=>[fmtDate(d.date),d.statut,d.debut||'-',d.fin||'-',hh(d.total),hh(d.net),d.missing?hh(d.missing):'-',d.overtime?hh(d.overtime):'-',(d.comment||'').slice(0,40),d.manual?'Oui':'Non']);
+  body.push([{content:'TOTAL',styles:{fontStyle:'bold'}},'','','',{content:hh(r.days.reduce((s,d)=>s+d.total,0)),styles:{fontStyle:'bold'}},{content:hh(r.worked),styles:{fontStyle:'bold'}},{content:hh(r.missing),styles:{fontStyle:'bold'}},{content:hh(r.overtime),styles:{fontStyle:'bold'}},'','']);
+  doc.autoTable({startY:38,head:[['Date','Statut','Début','Fin','T. total','T. net','H. manq.','H. supp.','Commentaire','Manuel']],body,styles:{fontSize:7},headStyles:{fillColor:[66,66,66]}});
+  doc.addPage();doc.setFontSize(14);doc.text('Récapitulatif du mois — '+r.ym,14,18);
+  doc.autoTable({startY:24,head:[['Indicateur','Valeur']],body:[
+    ['Heures prévues du mois',hh(r.expected)],['Heures effectivement travaillées',hh(r.worked)],['Jours présents',r.presentDays+' jour(s)'],['Total pauses',hh(r.pauseTot)],['Total heures manquées',hh(r.missing)],['Total heures supplémentaires',hh(r.overtime)],
+    ...(r.holidayDays?[['Jours fériés du mois',r.holidayDays+' jour(s)']]:[])
+  ],styles:{fontSize:9},headStyles:{fillColor:[66,66,66]},columnStyles:{0:{cellWidth:110,fontStyle:'bold'},1:{halign:'right'}}});
+  doc.setFontSize(13);doc.text('Éléments de rémunération',14,doc.lastAutoTable.finalY+10);
+  doc.autoTable({startY:doc.lastAutoTable.finalY+14,head:[['Élément','Valeur']],body:[
+    ['Jours / heures d\'école (alternant)',hh(r.schoolMin)],['Congés payés',hh(r.paidLeaveMin)],['Jours fériés payés',hh(r.holidayPaidMin)],['Autres absences justifiées',hh(r.otherJustifiedMin)],
+    ...(r.prevAbsenceMin?[['Absences du mois précédent','-'+hh(r.prevAbsenceMin)]]:[]),
+    [{content:'Total net d\'heures à rémunérer',styles:{fontStyle:'bold'}},{content:hh(r.totalNetMin),styles:{fontStyle:'bold'}}]
+  ],styles:{fontSize:9},headStyles:{fillColor:[66,66,66]},columnStyles:{0:{cellWidth:110},1:{halign:'right'}}});
+  if(r.bonuses.length){doc.setFontSize(13);doc.text('Bonus du mois',14,doc.lastAutoTable.finalY+10);
+    doc.autoTable({startY:doc.lastAutoTable.finalY+14,head:[['Nom du bonus','Montant']],body:[...r.bonuses.map(b=>[b.bonus_name||'',eur(b.amount)]),[{content:'Total bonus',styles:{fontStyle:'bold'}},{content:eur(r.bonusTotal),styles:{fontStyle:'bold'}}]],styles:{fontSize:9},headStyles:{fillColor:[66,66,66]},columnStyles:{1:{halign:'right'}}});}
+  doc.save('Pointages_'+safePdf(empName(r.emp))+'_'+r.ym+'.pdf');
+}
+async function exportEmployeeExcel(empId){
+  const r=RECAP_CACHE[empId]||await getRecap(empId);if(!r){toast('Calcule d\'abord le mois.');return;}
+  const aoa=[['Société :',String(r.eq.nom_societe||r.eq.nom||'')],['Pointages -',empName(r.emp)],['Période :',r.ym],[],
+    ['Date','Statut','Début','Fin','Temps total','Temps net','Heures manquées','Heures supp.','Commentaire','Manuel']];
+  r.days.forEach(d=>aoa.push([fmtDate(d.date),d.statut,d.debut||'',d.fin||'',hh(d.total),hh(d.net),d.missing?hh(d.missing):'',d.overtime?hh(d.overtime):'',d.comment||'',d.manual?'Oui':'Non']));
+  aoa.push(['TOTAL','','','',hh(r.days.reduce((s,d)=>s+d.total,0)),hh(r.worked),hh(r.missing),hh(r.overtime),'','']);
+  aoa.push([]);aoa.push(['TOTAUX DU MOIS']);
+  aoa.push(['Heures prévues',hh(r.expected)]);aoa.push(['Heures effectuées',hh(r.worked)]);aoa.push(['Jours présents',r.presentDays]);aoa.push(['Total pauses',hh(r.pauseTot)]);aoa.push(['Heures manquées',hh(r.missing)]);aoa.push(['Heures supplémentaires',hh(r.overtime)]);
+  aoa.push([]);aoa.push(['Congés payés',hh(r.paidLeaveMin)]);aoa.push(['École',hh(r.schoolMin)]);aoa.push(['Fériés payés',hh(r.holidayPaidMin)]);aoa.push(['Autres absences',hh(r.otherJustifiedMin)]);
+  if(r.prevAbsenceMin)aoa.push(['Absences mois précédent','-'+hh(r.prevAbsenceMin)]);
+  aoa.push(['TOTAL NET D\'HEURES À RÉMUNÉRER',hh(r.totalNetMin)]);
+  if(r.bonuses.length){aoa.push([]);aoa.push(['BONUS DU MOIS']);r.bonuses.forEach(b=>aoa.push([b.bonus_name||'',eur(b.amount)]));aoa.push(['Total bonus',eur(r.bonusTotal)]);}
+  const ws=XLSX.utils.aoa_to_sheet(aoa);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Récapitulatif');
+  XLSX.writeFile(wb,'Pointages_'+safePdf(empName(r.emp))+'_'+r.ym+'.xlsx');
+}
+async function exportTeamExcel(){
+  const ym=(document.getElementById('pt-date').value||new Date().toISOString().slice(0,10)).slice(0,7);
+  toast('Calcul du récapitulatif équipe…');
+  const aoa=[['Récapitulatif équipe — mois '+ym],[],['Employé','Équipe','H. prévues','H. faites','H. manquées','H. supp.','Jours présents','Total à rémunérer']];
+  const list=EMPLOYES.filter(e=>e.status==='active').sort((a,b)=>empName(a).localeCompare(empName(b)));
+  for(const e of list){const r=await computeMonthly(e.id,ym);if(!r)continue;aoa.push([empName(e),equipeName(e.equipe_id),hh(r.expected),hh(r.worked),hh(r.missing),hh(r.overtime),r.presentDays,hh(r.totalNetMin)]);}
+  const ws=XLSX.utils.aoa_to_sheet(aoa);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Récap équipe');
+  XLSX.writeFile(wb,'Recap_equipe_'+ym+'.xlsx');
+  toast('Récapitulatif équipe généré ✓');
+}
 
 /* AUTH */
 async function doLogin(e){e.preventDefault();
@@ -398,7 +554,7 @@ async function openEmp(id){
   const bonuses=boR.data||[], adjustments=adjR.data||[], schoolDays=sdR.data||[], schoolAbs=saR.data||[], pcomments=pcR.data||[];
   const equipeOpts='<option value="">— Aucune —</option>'+EQUIPES.map(q=>`<option value="${q.id}"${q.id===e.equipe_id?' selected':''}>${esc(q.nom||q.nom_societe||'')}</option>`).join('');
   const statusVals=[...new Set(['active','inactive',...distinctVals('status')])];
-  const hh=(e.horaires_hebdomadaires&&typeof e.horaires_hebdomadaires==='object')?e.horaires_hebdomadaires:{};
+  const hhw=(e.horaires_hebdomadaires&&typeof e.horaires_hebdomadaires==='object')?e.horaires_hebdomadaires:{};
   const DAYS=[['lundi','Lundi'],['mardi','Mardi'],['mercredi','Mercredi'],['jeudi','Jeudi'],['vendredi','Vendredi'],['samedi','Samedi'],['dimanche','Dimanche']];
   const absOpts='<option value="">— Aucune —</option>'+ABSCATS.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
   document.getElementById('detail-body').innerHTML=`
@@ -425,6 +581,16 @@ async function openEmp(id){
       <div class="row" style="margin-top:12px"><button class="btn" onclick="saveEmpInfo('${id}')">💾 Enregistrer les informations</button><button class="btn ghost" onclick="resetEmpPassword('${esc(p.email||'')}')">🔑 Réinitialiser le mot de passe</button></div>
     </div>
 
+    <div class="card"><h3>📊 Récapitulatif mensuel & paie</h3>
+      <div class="row" style="align-items:flex-end">
+        <div class="field"><label>Mois</label><input type="month" id="rc-month" value="${new Date().toISOString().slice(0,7)}"></div>
+        <button class="btn small" onclick="renderMonthlyRecap('${id}')">Calculer</button>
+        <button class="btn ghost small" onclick="exportEmployeePdf('${id}')">⬇️ PDF détaillé</button>
+        <button class="btn ghost small" onclick="exportEmployeeExcel('${id}')">⬇️ Excel détaillé</button>
+      </div>
+      <div id="rc-out" style="margin-top:12px"><div class="hint">Choisis un mois puis « Calculer ».</div></div>
+    </div>
+
     <div class="card"><h3>📍 Zones GPS (${zs.length})</h3>
       <div class="table-wrap"><table>
         <tr><th>Zone</th><th>Adresse</th><th class="num">Lat</th><th class="num">Lng</th><th class="num">Rayon</th><th>Active</th><th></th></tr>
@@ -443,7 +609,7 @@ async function openEmp(id){
 
     <div class="card"><h3>🗓️ Planning hebdomadaire</h3>
       <div class="hint" style="margin:-6px 0 10px">Laisse vide un jour non travaillé.</div>
-      ${DAYS.map(([k,lab])=>{const d=hh[k]||{};return `<div class="row" style="margin-bottom:6px"><div class="field" style="min-width:110px;justify-content:center"><b>${lab}</b></div><div class="field"><label>Début</label><input type="time" id="pl-${k}-d" value="${esc((d.debut||'').slice(0,5))}"></div><div class="field"><label>Fin</label><input type="time" id="pl-${k}-f" value="${esc((d.fin||'').slice(0,5))}"></div></div>`;}).join('')}
+      ${DAYS.map(([k,lab])=>{const d=hhw[k]||{};return `<div class="row" style="margin-bottom:6px"><div class="field" style="min-width:110px;justify-content:center"><b>${lab}</b></div><div class="field"><label>Début</label><input type="time" id="pl-${k}-d" value="${esc((d.debut||'').slice(0,5))}"></div><div class="field"><label>Fin</label><input type="time" id="pl-${k}-f" value="${esc((d.fin||'').slice(0,5))}"></div></div>`;}).join('')}
       <div style="margin-top:8px"><button class="btn small" onclick="savePlanning('${id}')">💾 Enregistrer le planning</button></div>
     </div>
 
@@ -540,9 +706,10 @@ async function resetEmpPassword(email){
 }
 async function savePlanning(id){
   const DAYS=['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
-  const hh={};
-  DAYS.forEach(k=>{const d=gv('pl-'+k+'-d'),f=gv('pl-'+k+'-f');if(d||f)hh[k]={debut:d||null,fin:f||null};});
-  const {error}=await db.from('employees').update({horaires_hebdomadaires:hh}).eq('id',id);
+  const emp=empById[id];const prev=(emp&&emp.horaires_hebdomadaires&&typeof emp.horaires_hebdomadaires==='object')?emp.horaires_hebdomadaires:{};
+  const hhw={};
+  DAYS.forEach(k=>{const d=gv('pl-'+k+'-d'),f=gv('pl-'+k+'-f');const base=prev[k]&&typeof prev[k]==='object'?Object.assign({},prev[k]):{};if(d||f){base.debut=d||null;base.fin=f||null;base.actif=true;hhw[k]=base;}else{base.debut=null;base.fin=null;base.actif=false;hhw[k]=base;}});
+  const {error}=await db.from('employees').update({horaires_hebdomadaires:hhw}).eq('id',id);
   if(error){toast('Erreur : '+error.message);return;}
   await reloadCore(); toast('Planning enregistré ✓');
 }
@@ -758,7 +925,6 @@ async function decideRequest(id,status){
   const {error}=await db.from('employee_requests').update(patch).eq('id',id);
   if(error){toast('Erreur : '+error.message);return;}
   const r=REQUESTS.find(x=>x.id===id);if(r)Object.assign(r,patch);
-  // Congé approuvé daté → remplit pointage_comments par jour
   if(status==='approved' && r && r.start_date){
     const catName=(r.category||'').toLowerCase();
     if(/cong|absence|rtt/.test(catName)){
@@ -908,7 +1074,7 @@ async function addHoliday(){
 }
 async function delHoliday(id){if(!confirm('Supprimer ce jour férié ?'))return;const {error}=await db.from('public_holidays').delete().eq('id',id);if(error){toast('Erreur : '+error.message);return;}const {data}=await db.from('public_holidays').select('*').order('date');HOLIDAYS=data||[];toast('Supprimé');renderHolidaysParam();}
 
-/* EXPORT EXCEL des pointages */
+/* EXPORT EXCEL brut des pointages */
 function exportPointages(){
   const mode=document.getElementById('pt-mode').value,date=document.getElementById('pt-date').value,emp=document.getElementById('pt-emp').value;
   let rows=POINTAGES.slice();
@@ -919,29 +1085,6 @@ function exportPointages(){
   rows.forEach(p=>{const e=empById[p.employee_id];aoa.push([e?empName(e):'',p.date,fmtTime(p.heure_debut),fmtTime(p.heure_fin),p.status,p.temps_net!=null?mins(p.temps_net):'',p.saisi_manuellement?'oui':'',p.auto_depointage?'oui':'',p.location_lat||'',p.location_lng||'']);});
   const ws=XLSX.utils.aoa_to_sheet(aoa),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Pointages');
   XLSX.writeFile(wb,'pointages-'+(date||'export')+'.xlsx');
-}
-/* EXPORT PDF mensuel (un employé) */
-function exportPdf(){
-  const emp=document.getElementById('pt-emp').value,date=document.getElementById('pt-date').value;
-  if(!emp){toast('Choisis un employé pour l\'export PDF.');return;}
-  if(!date){toast('Choisis une date (son mois sera utilisé).');return;}
-  if(!window.jspdf){toast('Module PDF non chargé.');return;}
-  const ym=date.slice(0,7),e=empById[emp];
-  const rows=POINTAGES.filter(p=>p.employee_id===emp&&(p.date||'').slice(0,7)===ym).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  const {jsPDF}=window.jspdf;const doc=new jsPDF();
-  let y=16;
-  doc.setFontSize(15);doc.text(String((COMPANY&&COMPANY.company_name)||'TimeGuard Pro'),14,y);y+=7;
-  doc.setFontSize(11);doc.text('Relevé mensuel — '+empName(e),14,y);y+=6;
-  doc.text('Mois : '+ym,14,y);y+=9;
-  doc.setFontSize(10);
-  doc.text('Date',14,y);doc.text('Début',56,y);doc.text('Fin',86,y);doc.text('Temps net',196,y,{align:'right'});y+=2;doc.line(14,y,196,y);y+=5;
-  let tot=0;
-  rows.forEach(p=>{ if(y>282){doc.addPage();y=16;} tot+=Number(p.temps_net)||0;
-    doc.text(fmtDate(p.date),14,y);doc.text(fmtTime(p.heure_debut),56,y);doc.text(fmtTime(p.heure_fin),86,y);doc.text(mins(p.temps_net),196,y,{align:'right'});y+=6;});
-  if(!rows.length){doc.text('Aucun pointage ce mois-ci.',14,y);y+=6;}
-  y+=2;doc.line(14,y,196,y);y+=7;doc.setFontSize(12);doc.text('Total du mois : '+mins(tot),196,y,{align:'right'});
-  doc.setFontSize(9);doc.text('Généré le '+new Date().toLocaleString('fr-FR'),14,290);
-  doc.save('releve-'+safePdf(empName(e))+'-'+ym+'.pdf');
 }
 /* UPLOAD document / bulletin (admin) */
 async function uploadDocument(){
