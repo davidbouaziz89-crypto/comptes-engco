@@ -157,14 +157,24 @@
       <div class="table-wrap"><table id="doc-table"></table></div></section></div>
 
     <div id="tab-bulletins" class="hidden">
-      <section class="panel"><h2>Ajouter un bulletin</h2>
-        <div class="row"><div class="field"><label>Employé</label><select id="upbul-emp"></select></div>
-          <div class="field" style="max-width:150px"><label>Mois</label><input type="month" id="upbul-month"></div>
+      <section class="panel"><h2>Ajouter un bulletin de paie</h2>
+        <div class="row">
+          <div class="field"><label>Employé</label><select id="upbul-emp" onchange="onBulEmpChange()"></select></div>
+          <div class="field"><label>Société</label><select id="upbul-team"></select></div>
+          <div class="field" style="max-width:160px"><label>Mois</label><input type="month" id="upbul-month"></div>
           <div class="field"><label>Fichier PDF</label><input type="file" id="upbul-file" accept=".pdf"></div>
-          <button class="btn small" onclick="uploadBulletin()">⬆️ Ajouter</button></div>
+          <button class="btn small" onclick="uploadBulletin()">⬆️ Ajouter</button>
+        </div>
+        <div class="hint" style="margin-top:8px">La société est pré-remplie avec l'équipe de l'employé, mais tu peux la <b>changer</b> (utile si le salarié a changé de société). Si un bulletin existe déjà pour cet employé et ce mois, il sera <b>remplacé</b>.</div>
       </section>
       <section class="panel">
-      <div class="row" style="margin-bottom:12px"><input class="search" id="bul-search" placeholder="🔎 Rechercher…" oninput="renderBulletins()"><span class="hint" id="bul-count"></span></div>
+      <div class="row" style="margin-bottom:12px">
+        <input class="search" id="bul-search" placeholder="🔎 Rechercher (nom, fichier…)" oninput="renderBulletins()">
+        <div class="field"><label>Société</label><select id="bul-fteam" onchange="renderBulletins()"><option value="">Toutes</option></select></div>
+        <div class="field" style="max-width:160px"><label>Mois / année</label><input type="month" id="bul-fmonth" onchange="renderBulletins()"></div>
+        <button class="btn ghost small" onclick="resetBulFilters()">↺ Réinitialiser</button>
+        <span class="hint" id="bul-count"></span>
+      </div>
       <div class="table-wrap"><table id="bul-table"></table></div></section></div>
 
     <div id="tab-zones" class="hidden"><section class="panel"><h2>Zones GPS</h2>
@@ -270,6 +280,7 @@ updateThemeBtn();
 function esc(s){return(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR');}
 function fmtTime(d){if(!d)return'—';return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}
+function fmtMonth(m){if(!m)return'—';const p=String(m).slice(0,7).split('-');if(p.length<2)return String(m);const d=new Date(Number(p[0]),Number(p[1])-1,1);const s=d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});return s.charAt(0).toUpperCase()+s.slice(1);}
 function eur(n){if(n==null||n===''||isNaN(Number(n)))return'—';return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €';}
 function mins(n){if(n==null||isNaN(Number(n)))return'—';n=Math.round(Number(n));return Math.floor(n/60)+'h'+String(n%60).padStart(2,'0');}
 function hh(n){n=Math.round(Number(n)||0);return Math.floor(n/60)+'h'+String(n%60).padStart(2,'0');}
@@ -282,13 +293,14 @@ let _tt;function toast(m){const el=document.getElementById('toast');el.textConte
 function empName(e){const p=profByUser[e.user_id];if(p)return((p.first_name||'')+' '+(p.last_name||'')).trim()||p.email||'(sans nom)';return '(employé '+String(e.id).slice(0,6)+')';}
 function empEmail(e){const p=profByUser[e.user_id];return p?p.email:'';}
 function equipeName(id){const q=EQUIPES.find(x=>x.id===id);return q?(q.nom||q.nom_societe||''):'';}
+function societeName(id){const q=EQUIPES.find(x=>x.id===id);return q?(q.nom_societe||q.nom||''):'';}
 function distinctVals(field){const s=new Set();EMPLOYES.forEach(e=>{if(e[field]!=null&&e[field]!=='')s.add(e[field]);});return[...s];}
 function selOpts(vals,cur,allowBlank){let out=allowBlank?'<option value="">—</option>':'';const set=new Set(vals);if(cur!=null&&cur!==''&&!set.has(cur))out+=`<option value="${esc(cur)}" selected>${esc(cur)}</option>`;vals.forEach(v=>{out+=`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(v)}</option>`;});return out;}
 function visibleEmployes(){if(MYROLE==='manager')return EMPLOYES.filter(e=>MANAGED_TEAMS.includes(e.equipe_id));if(MYROLE==='comptable')return EMPLOYES.filter(e=>ACCESS_TEAMS.includes(e.equipe_id));return EMPLOYES;}
 function applyRoleUI(){
   const allowed=({admin:['dash','presence','employes','pointages','demandes','documents','bulletins','zones','params'],
     manager:['dash','presence','employes','pointages','demandes','documents','bulletins'],
-    comptable:['dash','presence','pointages']}[MYROLE])||['dash','presence','employes','pointages','demandes','documents','bulletins','zones','params'];
+    comptable:['dash','presence','pointages','bulletins']}[MYROLE])||['dash','presence','employes','pointages','demandes','documents','bulletins','zones','params'];
   document.querySelectorAll('nav button').forEach(b=>{b.style.display=allowed.includes(b.dataset.tab)?'':'none';});
   const sa=document.getElementById('sec-access');if(sa)sa.style.display=ISADMIN?'':'none';
   const bn=document.getElementById('btn-newemp');if(bn)bn.style.display=(ISADMIN||MYROLE==='manager')?'':'none';
@@ -561,6 +573,9 @@ async function loadAll(){
   document.getElementById('pt-emp').innerHTML='<option value="">Tous</option>'+empOpts;
   document.getElementById('updoc-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
   document.getElementById('upbul-emp').innerHTML='<option value="">— Choisir —</option>'+empOpts;
+  const teamOpts=EQUIPES.slice().sort((a,b)=>societeName(a.id).localeCompare(societeName(b.id))).map(q=>`<option value="${q.id}">${esc(societeName(q.id))}</option>`).join('');
+  const ubt=document.getElementById('upbul-team');if(ubt)ubt.innerHTML='<option value="">— Aucune —</option>'+teamOpts;
+  const bft=document.getElementById('bul-fteam');if(bft)bft.innerHTML='<option value="">Toutes les sociétés</option>'+teamOpts;
   const today=new Date().toISOString().slice(0,10);
   document.getElementById('pt-date').value=today;
   const prd=document.getElementById('pr-date');if(prd)prd.value=today;
@@ -572,6 +587,7 @@ async function reloadCore(){
   profByUser={};PROFILES.forEach(x=>profByUser[x.user_id]=x);
 }
 async function reloadPointages(){const {data}=await db.from('pointages').select('*').order('date',{ascending:false});POINTAGES=data||[];}
+async function reloadBulletins(){const {data}=await db.from('employee_payslips').select('*').order('month',{ascending:false});BULLETINS=data||[];}
 function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   ['dash','presence','employes','pointages','demandes','documents','bulletins','zones','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
   ({dash:renderDash,presence:renderPresence,employes:renderEmployes,pointages:renderPointages,demandes:renderDemandes,documents:renderDocuments,bulletins:renderBulletins,zones:renderZones,params:renderParams}[t])();}
@@ -776,8 +792,8 @@ async function openEmp(id){
     </table></div>${pts.length>200?'<div class="hint">200 premiers affichés</div>':''}
     <div style="margin-top:10px"><button class="btn small" onclick="openAddPointage('${id}')">➕ Ajouter un pointage</button></div></div>
     <div class="card"><h3>Bulletins de paie (${buls.length})</h3><div class="table-wrap"><table>
-      <tr><th>Mois</th><th>Fichier</th><th></th></tr>
-      ${buls.map(x=>`<tr><td>${esc(x.month)}</td><td>${esc(x.file_name||'')}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
+      <tr><th>Mois</th><th>Société</th><th>Fichier</th><th></th></tr>
+      ${buls.map(x=>`<tr><td>${esc(fmtMonth(x.month))}</td><td>${esc(societeName(x.team_id)||'—')}</td><td>${esc(x.file_name||'')}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`).join('')||'<tr><td class="empty">Aucun</td></tr>'}
     </table></div></div>
     <div class="card"><h3>Documents (${docs.length})</h3><div class="table-wrap"><table>
       <tr><th>Nom</th><th>Catégorie</th><th>Date</th><th></th></tr>
@@ -1067,13 +1083,36 @@ function renderDocuments(){
   document.getElementById('doc-table').innerHTML='<tr><th>Employé</th><th>Fichier</th><th>Catégorie</th><th>Date</th><th></th></tr>'+
     (rows.map(x=>{const e=empById[x.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${esc(x.file_name||'')}</td><td>${esc(x.category||'')}</td><td>${fmtDate(x.created_at)}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td class="empty">Aucun</td></tr>');
 }
+function onBulEmpChange(){
+  const id=gv('upbul-emp');const e=empById[id];const t=document.getElementById('upbul-team');
+  if(t)t.value=(e&&e.equipe_id)?e.equipe_id:'';
+}
+function resetBulFilters(){
+  const s=document.getElementById('bul-search');if(s)s.value='';
+  const t=document.getElementById('bul-fteam');if(t)t.value='';
+  const m=document.getElementById('bul-fmonth');if(m)m.value='';
+  renderBulletins();
+}
 function renderBulletins(){
-  const q=(document.getElementById('bul-search').value||'').toLowerCase().trim();
+  const q=(gv('bul-search')||'').toLowerCase().trim();
+  const ft=gv('bul-fteam');const fm=gv('bul-fmonth');
   const visIds=new Set(visibleEmployes().map(e=>e.id));
-  const rows=BULLETINS.filter(x=>{if(!visIds.has(x.employee_id))return false;const e=empById[x.employee_id];return !q||[x.file_name,x.month,e?empName(e):''].some(v=>(v||'').toLowerCase().includes(q));});
+  const rows=BULLETINS.filter(x=>{
+    if(!visIds.has(x.employee_id))return false;
+    if(ft&&x.team_id!==ft)return false;
+    if(fm&&String(x.month||'').slice(0,7)!==fm)return false;
+    const e=empById[x.employee_id];
+    return !q||[x.file_name,x.month,e?empName(e):'',societeName(x.team_id)].some(v=>(v||'').toLowerCase().includes(q));
+  });
   document.getElementById('bul-count').textContent=rows.length+' bulletin(s)';
-  document.getElementById('bul-table').innerHTML='<tr><th>Employé</th><th>Mois</th><th>Fichier</th><th></th></tr>'+
-    (rows.map(x=>{const e=empById[x.employee_id];return `<tr><td>${esc(e?empName(e):'—')}</td><td>${esc(x.month)}</td><td>${esc(x.file_name||'')}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button></td></tr>`;}).join('')||'<tr><td class="empty">Aucun</td></tr>');
+  document.getElementById('bul-table').innerHTML='<tr><th>Employé</th><th>Société</th><th>Mois</th><th>Fichier</th><th>Ajouté le</th><th></th></tr>'+
+    (rows.map(x=>{const e=empById[x.employee_id];return `<tr><td><b>${esc(e?empName(e):'—')}</b></td><td>${esc(societeName(x.team_id)||'—')}</td><td>${esc(fmtMonth(x.month))}</td><td>${esc(x.file_name||'')}</td><td>${x.uploaded_at?fmtDate(x.uploaded_at):'—'}</td><td><button class="btn ghost small" onclick="openFile('${esc(x.file_url)}')">Ouvrir</button> <button class="btn ghost small" onclick="delBulletin('${x.id}')">🗑️</button></td></tr>`;}).join('')||'<tr><td class="empty" colspan="6">Aucun bulletin</td></tr>');
+}
+async function delBulletin(id){
+  if(!confirm('Supprimer ce bulletin ?'))return;
+  const {error}=await db.from('employee_payslips').delete().eq('id',id);
+  if(error){toast('Suppression refusée : '+error.message);return;}
+  await reloadBulletins();toast('Bulletin supprimé');renderBulletins();
 }
 
 /* ZONES / PARAMS */
@@ -1108,10 +1147,10 @@ function renderAccessParam(){
   const box=document.getElementById('params-access');if(!box)return;
   if(!ISADMIN){box.innerHTML='<div class="hint">Réservé à l\'administrateur.</div>';return;}
   const mgrs=PROFILES.filter(p=>p.role==='manager');const cpts=PROFILES.filter(p=>p.role==='comptable');
-  const teamsOf=(uid,arr)=>arr.filter(x=>x.user_id===uid).map(x=>{const q=EQUIPES.find(e=>e.id===x.team_id);return q?(q.nom||q.nom_societe||'?'):'?';}).join(', ')||'—';
-  const eqChecks=EQUIPES.map(q=>`<label style="display:inline-flex;align-items:center;gap:6px;margin:2px 10px 2px 0;color:var(--txt);font-size:14px"><input type="checkbox" class="ra-team" value="${q.id}" style="width:auto"> ${esc(q.nom||q.nom_societe||'')}</label>`).join('');
+  const teamsOf=(uid,arr)=>arr.filter(x=>x.user_id===uid).map(x=>societeName(x.team_id)||'?').join(', ')||'—';
+  const eqChecks=EQUIPES.map(q=>`<label style="display:inline-flex;align-items:center;gap:6px;margin:2px 10px 2px 0;color:var(--txt);font-size:14px"><input type="checkbox" class="ra-team" value="${q.id}" style="width:auto"> ${esc(societeName(q.id))}</label>`).join('');
   box.innerHTML=`
-   <div class="hint" style="margin-bottom:8px">Un <b>manager</b> gère ses équipes (voit/édite leurs pointages). Un <b>comptable</b> consulte les pointages de ses équipes (lecture seule).</div>
+   <div class="hint" style="margin-bottom:8px">Un <b>manager</b> gère ses équipes (voit/édite leurs pointages). Un <b>comptable</b> consulte les pointages et bulletins de ses équipes (lecture seule).</div>
    <div class="row">
      <div class="field"><label>Rôle</label><select id="ra-role"><option value="manager">Manager</option><option value="comptable">Comptable</option></select></div>
      <div class="field"><label>Prénom</label><input id="ra-first"></div>
@@ -1251,17 +1290,21 @@ async function uploadDocument(){
   const {data}=await db.from('employee_documents').select('*').order('created_at',{ascending:false});DOCUMENTS=data||[];renderDocuments();
 }
 async function uploadBulletin(){
-  const empId=document.getElementById('upbul-emp').value,file=document.getElementById('upbul-file').files[0],month=document.getElementById('upbul-month').value;
+  const empId=gv('upbul-emp'),file=document.getElementById('upbul-file').files[0],month=gv('upbul-month'),teamId=gv('upbul-team')||null;
   if(!empId||!file||!month){toast('Choisis employé, mois et fichier.');return;}
   const path=`${empId}/${month}.pdf`;
   const {error:upErr}=await sb.storage.from('payslips').upload(path,file,{contentType:'application/pdf',upsert:true});
   if(upErr){toast('Erreur upload : '+upErr.message);return;}
   const url=`${SUPABASE_URL}/storage/v1/object/public/payslips/${path}`;
-  const emp=empById[empId];
-  const {error}=await db.from('employee_payslips').insert({employee_id:empId,month,file_name:file.name,file_url:url,uploaded_by:SESSION.user.id,team_id:emp?emp.equipe_id:null});
-  if(error){toast('Erreur : '+error.message);return;}
-  toast('Bulletin ajouté ✓');document.getElementById('upbul-file').value='';
-  const {data}=await db.from('employee_payslips').select('*').order('month',{ascending:false});BULLETINS=data||[];renderBulletins();
+  const existing=BULLETINS.find(b=>b.employee_id===empId&&String(b.month).slice(0,7)===month);
+  const row={employee_id:empId,month,file_name:file.name,file_url:url,uploaded_by:SESSION.user.id,team_id:teamId,uploaded_at:new Date().toISOString()};
+  let r;
+  if(existing) r=await db.from('employee_payslips').update(row).eq('id',existing.id);
+  else r=await db.from('employee_payslips').insert(row);
+  if(r.error){toast('Erreur : '+r.error.message);return;}
+  toast(existing?'Bulletin remplacé ✓':'Bulletin ajouté ✓');
+  document.getElementById('upbul-file').value='';
+  await reloadBulletins();renderBulletins();
 }
 
 /* FICHIERS (URL signée car buckets privés) */
