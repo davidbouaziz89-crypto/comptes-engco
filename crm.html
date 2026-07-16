@@ -680,8 +680,6 @@ function renderBudgetCards(){
 /* Étapes / parcours */
 /* Rendu koneckt : étapes en cartes progressives décroissantes */
 const STEP_ICONS={infos_lead:'📋',organisme:'🎓',lien_edof:'🔗',test_positionnement:'🗓️',entree_formation:'✅',a_facturer:'🧾'};
-let envoiMail={};
-function stepHasMail(code){ return code==='lien_edof'||code==='test_positionnement'; }
 function stepBlock(code){
   if(code==='organisme'&&curLeadFormations.length===0) return 'Ajoutez au moins une formation';
   if(code==='test_positionnement'&&!curLead.date_test_positionnement) return 'Renseignez la date du rendez-vous';
@@ -725,14 +723,12 @@ function renderEtapes(){
     const p=PARCOURS[i], active=i===cur, done=i<cur;
     const icon=STEP_ICONS[p.code]||'•';
     const block=active?stepBlock(p.code):null;
-    const hasMail=stepHasMail(p.code), mailOn=(p.code in envoiMail)?envoiMail[p.code]:hasMail;
     const cancel=i>0?`<button class="s-cancel" onclick="setEtape('${PARCOURS[i-1].code}')">↺ Annuler l'étape</button>`:'';
     const badge=active?'<span class="s-badge active">En cours</span>':(done?'<span class="s-badge done">Validée</span>':'');
-    const mailTgl=hasMail?`<label class="s-mail"><span>Envoi Mail</span><input type="checkbox" ${mailOn?'checked':''} onchange="envoiMail['${p.code}']=this.checked"></label>`:'';
     let validBtn='';
     if(active&&next) validBtn=`<button class="btn small" ${block?'disabled':''} onclick="setEtape('${next.code}')">✓ Valider l'étape</button>`;
     else if(active&&!next) validBtn=`<span class="s-badge done">Dossier finalisé</span>`;
-    const foot=`<div class="s-foot">${block?`<span class="s-block">${block}</span>`:''}${mailTgl}<button class="btn ghost small" onclick="saveLeadInfo()">Enregistrer modifications</button>${validBtn}</div>`;
+    const foot=`<div class="s-foot">${block?`<span class="s-block">${block}</span>`:''}<button class="btn ghost small" onclick="saveLeadInfo()">Enregistrer modifications</button>${validBtn}</div>`;
     cards+=`<div class="scard ${active?'active':''} ${done?'done':''}">
       <div class="s-rail"><div class="s-num">Étape ${i+1}</div><div class="s-dot ${active?'active':done?'done':''}">${done?'✓':icon}</div>${cancel}</div>
       <div class="s-body"><div class="s-head">${p.label}${badge}</div><div class="s-content">${stepContentHTML(p.code)}</div><div class="s-sep"></div>${foot}</div>
