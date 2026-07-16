@@ -101,6 +101,28 @@
   .step.done .dot{background:var(--good);border-color:var(--good);color:#052a1c}
   .step .s-lab{flex:1;font-size:14px}
   .step.active .s-lab{font-weight:700}
+  /* Étapes en cartes progressives (style koneckt) */
+  .steps{display:flex;flex-direction:column;gap:14px}
+  .s-title{margin:0 0 4px;font-size:16px}
+  .scard{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+  .scard.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(79,124,255,.18)}
+  .scard.done{border-color:rgba(55,211,155,.35)}
+  .s-rail{width:118px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-right:1px solid var(--line);background:var(--panel2);text-align:center}
+  .s-num{font-size:12px;color:var(--muted);font-weight:600}
+  .s-dot{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+  .s-dot.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .s-dot.done{background:var(--good);border-color:var(--good);color:#052a1c}
+  .s-cancel{margin-top:2px;background:none;border:none;color:var(--bad);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;padding:0}
+  .s-cancel:hover{text-decoration:underline}
+  .s-body{flex:1;padding:14px 16px;min-width:0}
+  .s-head{display:flex;align-items:center;gap:8px;font-weight:700;text-transform:uppercase;font-size:13px;letter-spacing:.03em;color:var(--muted);margin-bottom:12px}
+  .s-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .s-badge.active{background:var(--accent);color:#fff}
+  .s-badge.done{background:rgba(55,211,155,.15);color:var(--good);border:1px solid rgba(55,211,155,.4)}
+  .s-sep{height:1px;background:var(--line);margin:14px 0}
+  .s-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px}
+  .s-block{margin-right:auto;color:var(--bad);font-size:13px}
+  .s-mail{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer}
   .detail-box{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px;background:var(--panel2)}
   .frow{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--panel)}
   .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin:10px 0;font-size:12px}
@@ -279,9 +301,7 @@
           <button id="ltab-comments" onclick="showLeadTab('comments')">Commentaires</button>
         </div>
         <div id="lead-etapes">
-          <div class="stepper" id="lv-stepper"></div>
-          <div class="detail-box" id="lv-detail"></div>
-          <div id="lv-next" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-top:16px"></div>
+          <div id="lv-steps" class="steps"></div>
         </div>
         <div id="lead-comments" class="hidden">
           <label>Ajouter un commentaire</label>
@@ -492,36 +512,47 @@ function renderBudgetCards(){
 }
 
 /* Étapes / parcours */
+/* Rendu koneckt : étapes en cartes progressives décroissantes */
+const STEP_ICONS={organisme:'🎓',lien_edof:'🔗',test_positionnement:'🗓️',entree_formation:'✅',a_facturer:'🧾'};
+let envoiMail={};
+function stepHasMail(code){ return code==='lien_edof'||code==='test_positionnement'; }
+function stepBlock(code){
+  if(code==='organisme'&&curLeadFormations.length===0) return 'Ajoutez au moins une formation';
+  if(code==='test_positionnement'&&!curLead.date_test_positionnement) return 'Renseignez la date du rendez-vous';
+  if(code==='entree_formation'&&!curLead.date_entree_formation) return 'Renseignez la date du rendez-vous';
+  return null;
+}
+function stepContentHTML(code){
+  if(code==='organisme') return formationsManagerHTML();
+  if(code==='lien_edof') return linksHTML('edof');
+  if(code==='test_positionnement') return `<div class="field"><label>Date du test de positionnement</label><input type="date" value="${(curLead.date_test_positionnement||'').slice(0,10)}" onchange="updLead({date_test_positionnement:this.value||null},'Date enregistrée').then(renderEtapes)"></div>`+linksHTML('calendly');
+  if(code==='entree_formation') return `<div class="field"><label>Date d'entrée en formation</label><input type="date" value="${(curLead.date_entree_formation||'').slice(0,10)}" onchange="updLead({date_entree_formation:this.value||null},'Date enregistrée').then(renderEtapes)"></div>`;
+  if(code==='a_facturer') return `<div class="hint">Ce lead est à l'étape finale, prêt à être facturé.</div>`;
+  return '';
+}
 function renderEtapes(){
-  const cur=parcoursIndex(curLead.etape);
-  document.getElementById('lv-stepper').innerHTML=PARCOURS.map((p,i)=>{
-    const cls=i<cur?'done':(i===cur?'active':'');
-    return `<button class="step ${cls}" onclick="setEtape('${p.code}')"><span class="dot">${i<cur?'✓':i+1}</span><span class="s-lab">${p.label}</span>${i===cur?'<span class="pill" style="background:var(--accent);color:#fff">En cours</span>':''}</button>`;
-  }).join('');
-  renderEtapeDetail(); renderNext();
+  const cur=parcoursIndex(curLead.etape), next=PARCOURS[cur+1];
+  let cards='';
+  for(let i=cur;i>=0;i--){
+    const p=PARCOURS[i], active=i===cur, done=i<cur;
+    const icon=STEP_ICONS[p.code]||'•';
+    const block=active?stepBlock(p.code):null;
+    const hasMail=stepHasMail(p.code), mailOn=(p.code in envoiMail)?envoiMail[p.code]:hasMail;
+    const cancel=i>0?`<button class="s-cancel" onclick="setEtape('${PARCOURS[i-1].code}')">↺ Annuler l'étape</button>`:'';
+    const badge=active?'<span class="s-badge active">En cours</span>':(done?'<span class="s-badge done">Validée</span>':'');
+    const mailTgl=hasMail?`<label class="s-mail"><span>Envoi Mail</span><input type="checkbox" ${mailOn?'checked':''} onchange="envoiMail['${p.code}']=this.checked"></label>`:'';
+    let validBtn='';
+    if(active&&next) validBtn=`<button class="btn small" ${block?'disabled':''} onclick="setEtape('${next.code}')">✓ Valider l'étape</button>`;
+    else if(active&&!next) validBtn=`<span class="s-badge done">Dossier finalisé</span>`;
+    const foot=`<div class="s-foot">${block?`<span class="s-block">${block}</span>`:''}${mailTgl}<button class="btn ghost small" onclick="saveLeadInfo()">Enregistrer modifications</button>${validBtn}</div>`;
+    cards+=`<div class="scard ${active?'active':''} ${done?'done':''}">
+      <div class="s-rail"><div class="s-num">Étape ${i+1}</div><div class="s-dot ${active?'active':done?'done':''}">${done?'✓':icon}</div>${cancel}</div>
+      <div class="s-body"><div class="s-head">${p.label}${badge}</div><div class="s-content">${stepContentHTML(p.code)}</div><div class="s-sep"></div>${foot}</div>
+    </div>`;
+  }
+  document.getElementById('lv-steps').innerHTML=`<h3 class="s-title">Étapes</h3>`+cards;
 }
 async function setEtape(code){ if(await updLead({etape:code},'Étape mise à jour')) renderEtapes(); }
-function renderEtapeDetail(){
-  const code=curLead.etape||'organisme', box=document.getElementById('lv-detail');
-  const label=PARCOURS[parcoursIndex(code)].label;
-  let inner='';
-  if(code==='organisme') inner=formationsManagerHTML();
-  else if(code==='lien_edof') inner=linksHTML('edof');
-  else if(code==='test_positionnement') inner=`<div><label>Date du test de positionnement</label><input type="date" value="${(curLead.date_test_positionnement||'').slice(0,10)}" onchange="updLead({date_test_positionnement:this.value||null},'Date enregistrée').then(renderNext)"></div>`+linksHTML('calendly');
-  else if(code==='entree_formation') inner=`<div><label>Date d'entrée en formation</label><input type="date" value="${(curLead.date_entree_formation||'').slice(0,10)}" onchange="updLead({date_entree_formation:this.value||null},'Date enregistrée').then(renderNext)"></div>`;
-  else if(code==='a_facturer') inner=`<div class="hint">Ce lead est à l'étape finale, prêt à être facturé.</div>`;
-  box.innerHTML=`<div style="font-weight:700;margin-bottom:12px">${label}</div>`+inner;
-}
-function renderNext(){
-  const cur=parcoursIndex(curLead.etape), next=PARCOURS[cur+1], zone=document.getElementById('lv-next');
-  if(!next){ zone.innerHTML=''; return; }
-  let block=null;
-  if(curLead.etape==='organisme'&&curLeadFormations.length===0) block='Ajoutez au moins une formation';
-  else if(curLead.etape==='test_positionnement'&&!curLead.date_test_positionnement) block='Renseignez la date du rendez-vous';
-  else if(curLead.etape==='entree_formation'&&!curLead.date_entree_formation) block='Renseignez la date du rendez-vous';
-  zone.innerHTML=(block?`<div style="color:var(--bad);font-size:13px">${block}</div>`:'')+
-    `<button class="btn" ${block?'disabled':''} onclick="setEtape('${next.code}')">Valider et passer à l'étape suivante →</button>`;
-}
 
 /* Formations du lead (budget + choix) */
 function affordableFormations(){
@@ -543,7 +574,7 @@ function formationsManagerHTML(){
   h+=`</div>`;
   if(!budgetSet) return h+`<div class="hint">Renseignez d'abord le budget du client.</div>`;
   const cats=CATEGORIES.filter(c=>c.actif!==false);
-  h+=`<div class="subcard"><label>Filtrer par catégorie</label><select id="lf-catfilter" onchange="leadCatFilter=this.value;renderEtapeDetail()">
+  h+=`<div class="subcard"><label>Filtrer par catégorie</label><select id="lf-catfilter" onchange="leadCatFilter=this.value;renderEtapes()">
     <option value="">Toutes les catégories</option>${cats.map(c=>`<option value="${esc(c.nom)}" ${leadCatFilter===c.nom?'selected':''}>${esc(c.nom)}</option>`).join('')}</select></div>`;
   const aff=affordableFormations();
   if(!curLeadFormations.length) h+=`<div class="hint">Aucune formation ajoutée à ce dossier.</div>`;
@@ -577,7 +608,7 @@ function formationRowHTML(lf,aff){
 async function saveBudget(){
   const v=document.getElementById('lf-budget').value; const n=Number(v);
   if(!v||isNaN(n)||n<=0){ toast('Budget invalide'); return; }
-  if(await updLead({montant:n},'Budget enregistré')){ renderBudgetCards(); renderEtapeDetail(); }
+  if(await updLead({montant:n},'Budget enregistré')){ renderBudgetCards(); renderEtapes(); }
 }
 async function addLeadFormation(){
   const aff=affordableFormations();
