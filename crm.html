@@ -286,7 +286,6 @@
         <label>Téléphone</label><input id="lv-telephone">
         <label>Source</label><input id="lv-source">
         <label>Statut</label><select id="lv-statut"></select>
-        <label>Disponibilité</label><input id="lv-disponibilite">
         <label>Commercial</label><select id="lv-owner"></select>
         <label>Notes</label><textarea id="lv-notes" rows="4"></textarea>
         <div class="quick" id="lv-quick" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
@@ -335,6 +334,7 @@ const STAGES=[
 ];
 const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
 const PARCOURS=[
+  {code:'infos_lead',label:'Infos lead'},
   {code:'organisme',label:'Formations'},
   {code:'lien_edof',label:'Lien EDOF'},
   {code:'test_positionnement',label:'RDV test de positionnement'},
@@ -439,7 +439,7 @@ function renderLeads(){
       <td class="num">${eur(l.montant)}</td><td>${fmtDate(l.created_at)}</td></tr>`; }).join('');
 }
 async function newLead(){
-  const {data,error}=await db.from('crm_leads').insert({nom:'Nouveau lead',stage:'nouveau',etape:'organisme'}).select().single();
+  const {data,error}=await db.from('crm_leads').insert({nom:'Nouveau lead',stage:'nouveau',etape:'infos_lead'}).select().single();
   if(error){ toast('Erreur : '+error.message); return; }
   LEADS.unshift(data); renderLeads(); openLead(data.id);
 }
@@ -453,7 +453,7 @@ async function openLead(id){
   g('lv-name').textContent=leadName(l);
   g('lv-prenom').value=l.prenom||''; g('lv-nom').value=l.nom||''; g('lv-email').value=l.email||'';
   g('lv-telephone').value=l.telephone||''; g('lv-source').value=l.source||'';
-  g('lv-statut').value=l.statut_id||''; g('lv-disponibilite').value=l.disponibilite||'';
+  g('lv-statut').value=l.statut_id||'';
   g('lv-owner').value=l.owner_id||''; g('lv-notes').value=l.notes||'';
   renderQuick();
   showLeadTab('etapes');
@@ -473,7 +473,7 @@ async function saveLeadInfo(){
   const g=i=>document.getElementById(i).value;
   const patch={ prenom:g('lv-prenom')||null, nom:g('lv-nom')||null, email:g('lv-email')||null,
     telephone:g('lv-telephone')||null, source:g('lv-source')||null,
-    statut_id:g('lv-statut')||null, disponibilite:g('lv-disponibilite')||null,
+    statut_id:g('lv-statut')||null,
     owner_id:g('lv-owner')||null, notes:g('lv-notes')||null, updated_at:new Date().toISOString() };
   const btn=document.getElementById('lv-save'); btn.disabled=true; btn.textContent='Enregistrement…';
   const {error}=await db.from('crm_leads').update(patch).eq('id',curLead.id);
@@ -513,7 +513,7 @@ function renderBudgetCards(){
 
 /* Étapes / parcours */
 /* Rendu koneckt : étapes en cartes progressives décroissantes */
-const STEP_ICONS={organisme:'🎓',lien_edof:'🔗',test_positionnement:'🗓️',entree_formation:'✅',a_facturer:'🧾'};
+const STEP_ICONS={infos_lead:'📋',organisme:'🎓',lien_edof:'🔗',test_positionnement:'🗓️',entree_formation:'✅',a_facturer:'🧾'};
 let envoiMail={};
 function stepHasMail(code){ return code==='lien_edof'||code==='test_positionnement'; }
 function stepBlock(code){
@@ -522,7 +522,29 @@ function stepBlock(code){
   if(code==='entree_formation'&&!curLead.date_entree_formation) return 'Renseignez la date du rendez-vous';
   return null;
 }
+function infosLeadHTML(){
+  const v=k=>esc(curLead[k]!=null?curLead[k]:''), act=(curLead.en_activite||'');
+  return `<div class="frow">
+    <label>Êtes-vous en activité ?</label>
+    <select onchange="updLead({en_activite:this.value||null},'Enregistré')">
+      <option value="" ${act===''?'selected':''}>—</option>
+      <option value="oui" ${act==='oui'?'selected':''}>Oui</option>
+      <option value="non" ${act==='non'?'selected':''}>Non</option>
+    </select>
+    <label>Situation actuelle</label>
+    <input value="${v('situation_actuelle')}" onchange="updLead({situation_actuelle:this.value||null},'Enregistré')">
+    <label>Type de formation</label>
+    <input value="${v('type_formation')}" onchange="updLead({type_formation:this.value||null},'Enregistré')">
+    <label>Formation choisie</label>
+    <input value="${v('formation')}" onchange="updLead({formation:this.value||null},'Enregistré')">
+    <label>Disponibilité</label>
+    <input value="${v('disponibilite')}" onchange="updLead({disponibilite:this.value||null},'Enregistré')">
+    <label>Identité numérique</label>
+    <input value="${v('identite_numerique')}" onchange="updLead({identite_numerique:this.value||null},'Enregistré')">
+  </div>`;
+}
 function stepContentHTML(code){
+  if(code==='infos_lead') return infosLeadHTML();
   if(code==='organisme') return formationsManagerHTML();
   if(code==='lien_edof') return linksHTML('edof');
   if(code==='test_positionnement') return `<div class="field"><label>Date du test de positionnement</label><input type="date" value="${(curLead.date_test_positionnement||'').slice(0,10)}" onchange="updLead({date_test_positionnement:this.value||null},'Date enregistrée').then(renderEtapes)"></div>`+linksHTML('calendly');
@@ -829,7 +851,7 @@ async function reloadRefs(){
 
 /* ---------- IMPORT ---------- */
 function downloadLeadsTemplate(){
-  const ws=XLSX.utils.aoa_to_sheet([['prenom','nom','email','telephone','entreprise','source','montant'],['Jean','Dupont','jean@acme.fr','0600000000','ACME','CALL IA','4000']]);
+  const ws=XLSX.utils.aoa_to_sheet([['prenom','nom','email','telephone','entreprise','source','montant','en_activite','situation_actuelle','type_formation','formation','disponibilite','identite_numerique'],['Jean','Dupont','jean@acme.fr','0600000000','ACME','CALL IA','4000','oui','Salarié','Bureautique','Excel avancé','Lun-Ven 9h-12h','FranceConnect']]);
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Leads'); XLSX.writeFile(wb,'modele-leads-crm.xlsx');
 }
 async function importLeadsFile(e){
@@ -838,11 +860,20 @@ async function importLeadsFile(e){
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
     const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
     const get=(r,keys)=>{ for(const k of Object.keys(r)){ if(keys.includes(k.toLowerCase().trim())) return r[k]; } return ''; };
+    const ouiNon=v=>{ const s=String(v).trim().toLowerCase(); if(!s) return null; if(['oui','o','yes','y','1','true','vrai'].includes(s)) return 'oui'; if(['non','n','no','0','false','faux'].includes(s)) return 'non'; return s; };
+    const txt=v=>{ const s=String(v).trim(); return s||null; };
     const payload=rows.map(r=>{ const m=String(get(r,['montant','budget','prix'])).replace(/[^\d.,-]/g,'').replace(',','.');
       return { prenom:String(get(r,['prenom','prénom'])).trim()||null, nom:String(get(r,['nom','name'])).trim()||null,
         email:String(get(r,['email','mail'])).trim()||null, telephone:String(get(r,['telephone','téléphone','tel','phone'])).trim()||null,
         entreprise:String(get(r,['entreprise','societe','société','company'])).trim()||null, source:String(get(r,['source','origine'])).trim()||null,
-        montant:m?Number(m):null, stage:'nouveau', etape:'organisme' }; }).filter(p=>p.nom||p.prenom||p.email);
+        montant:m?Number(m):null,
+        en_activite:ouiNon(get(r,['en_activite','en activite','en activité','activite','activité','etes vous en activite','êtes-vous en activité ?','êtes-vous en activité'])),
+        situation_actuelle:txt(get(r,['situation_actuelle','situation actuelle','situation'])),
+        type_formation:txt(get(r,['type_formation','type de formation','type formation','type'])),
+        formation:txt(get(r,['formation','formation choisie','formation choisit','formation_choisie'])),
+        disponibilite:txt(get(r,['disponibilite','disponibilité','dispo'])),
+        identite_numerique:txt(get(r,['identite_numerique','identité numérique','identite numerique','identite','identité','identity'])),
+        stage:'nouveau', etape:'infos_lead' }; }).filter(p=>p.nom||p.prenom||p.email);
     if(!payload.length){ toast('Aucune ligne exploitable.'); e.target.value=''; return; }
     if(!confirm('Importer '+payload.length+' lead(s) ?')){ e.target.value=''; return; }
     const {error}=await db.from('crm_leads').insert(payload); if(error){ toast('Erreur import : '+error.message); e.target.value=''; return; }
