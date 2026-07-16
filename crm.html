@@ -207,6 +207,42 @@
       radial-gradient(1200px 700px at -12% -6%,rgba(79,124,255,.11),transparent 58%),
       var(--bg)}
   .lead-head{box-shadow:var(--shadow-sm)}
+
+  /* ===== AGENDA / CALENDRIER ===== */
+  .nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:var(--bad);color:#fff;font-size:11px;font-weight:800;vertical-align:top}
+  #notif-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:16px;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:14px;
+    background:linear-gradient(135deg,rgba(255,107,107,.16),rgba(255,180,84,.12));border:1px solid rgba(255,107,107,.4);box-shadow:var(--shadow-sm);color:var(--txt)}
+  #notif-bar:hover{filter:brightness(1.06)}
+  #notif-bar .nb-ic{font-size:18px}
+  #notif-bar .nb-go{margin-left:auto;color:var(--accent);font-weight:700;white-space:nowrap}
+  .cal-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .cal-nav{display:flex;align-items:center;gap:8px}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .cal-dow{text-align:center;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;padding-bottom:4px}
+  .cal-cell{min-height:88px;border:1px solid var(--line);border-radius:12px;padding:7px 8px;background:var(--panel2);cursor:pointer;transition:transform .12s,box-shadow .12s,border-color .12s;display:flex;flex-direction:column;gap:4px;overflow:hidden}
+  .cal-cell:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm);border-color:var(--accent)}
+  .cal-cell.empty{background:transparent;border:0;cursor:default}
+  .cal-cell.empty:hover{transform:none;box-shadow:none}
+  .cal-cell.today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .cal-cell.selected{border-color:var(--accent);box-shadow:var(--ring)}
+  .cal-cell.past{opacity:.62}
+  .cc-day{font-size:13px;font-weight:700}
+  .cal-cell.today .cc-day{color:var(--accent)}
+  .cc-ev{font-size:11px;font-weight:600;line-height:1.25;padding:2px 6px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(79,124,255,.16);color:var(--txt);border-left:3px solid var(--accent)}
+  .cc-ev.done{opacity:.55;text-decoration:line-through;border-left-color:var(--good)}
+  .cc-ev.late{background:rgba(255,107,107,.16);border-left-color:var(--bad)}
+  .cc-more{font-size:11px;color:var(--muted);font-weight:600}
+  /* Planning du jour */
+  .rdv-item{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--panel2);box-shadow:var(--shadow-sm)}
+  .rdv-item.done{border-left-color:var(--good);opacity:.72}
+  .rdv-item.late{border-left-color:var(--bad)}
+  .rdv-time{font-weight:800;font-size:15px;min-width:58px;color:var(--accent)}
+  .rdv-item.late .rdv-time{color:var(--bad)}
+  .rdv-main{flex:1;min-width:0}
+  .rdv-main .r-tit{font-weight:700}
+  .rdv-main .r-sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .rdv-item .r-acts{display:flex;gap:6px;flex-shrink:0}
+  @media(max-width:600px){.cal-cell{min-height:64px}.cc-ev{display:none}.cal-cell::after{content:attr(data-count);font-size:11px;color:var(--accent);font-weight:700}}
 </style>
 </head>
 <body>
@@ -239,10 +275,12 @@
     <button data-tab="dash" class="active" onclick="showTab('dash')">📊 Tableau de bord</button>
     <button data-tab="leads" onclick="showTab('leads')">👥 Leads</button>
     <button data-tab="pipeline" onclick="showTab('pipeline')">🎯 Pipeline</button>
+    <button data-tab="agenda" onclick="showTab('agenda')">📅 Agenda<span class="nav-badge hidden" id="agenda-badge">0</span></button>
     <button data-tab="formations" onclick="showTab('formations')">🎓 Formations</button>
     <button data-tab="params" onclick="showTab('params')">⚙️ Paramètres</button>
   </nav>
   <main>
+    <div id="notif-bar" class="hidden" onclick="showTab('agenda')"></div>
     <div id="tab-dash">
       <section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
       <section class="panel"><h2>Répartition par étape commerciale</h2><div class="table-wrap"><table id="dash-stages"></table></div></section>
@@ -328,7 +366,50 @@
         </form><div class="table-wrap"><table id="st-table"></table></div>
       </section>
     </div>
+    <div id="tab-agenda" class="hidden">
+      <section class="panel">
+        <div class="cal-top">
+          <div class="cal-nav">
+            <button class="btn ghost small" onclick="calShift(-1)">‹</button>
+            <h2 id="cal-title" style="margin:0;min-width:180px;text-align:center">—</h2>
+            <button class="btn ghost small" onclick="calShift(1)">›</button>
+            <button class="btn ghost small" onclick="calToday()">Aujourd'hui</button>
+          </div>
+          <span class="spacer" style="flex:1"></span>
+          <select id="cal-owner" class="field sm hidden" onchange="renderAgenda()"><option value="">Tous les commerciaux</option></select>
+          <button class="btn small" onclick="openRdv(null)">＋ Nouveau RDV</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </section>
+      <section class="panel">
+        <h2 id="dayplan-title">Planning du jour</h2>
+        <div id="dayplan-list"></div>
+      </section>
+    </div>
   </main>
+</div>
+
+<!-- ===== MODALE RDV ===== -->
+<div id="rdv-view" class="overlay hidden">
+  <div class="authcard" style="max-width:440px">
+    <h1 id="rdv-mtitle" style="font-size:20px">Nouveau RDV</h1>
+    <div class="sub">Rappel / rendez-vous lié à un lead.</div>
+    <label>Lead concerné</label><select id="rdv-lead"></select>
+    <label>Objet</label><input id="rdv-titre" placeholder="ex : Rappeler pour le devis">
+    <div class="row">
+      <div class="field"><label>Date</label><input id="rdv-date" type="date"></div>
+      <div class="field sm"><label>Heure</label><input id="rdv-heure" type="time"></div>
+    </div>
+    <label>Notes</label><textarea id="rdv-notes" rows="3"></textarea>
+    <div id="rdv-owner-line" class="hint hidden" style="margin-top:8px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn danger small hidden" id="rdv-del" onclick="deleteRdv()">🗑️ Supprimer</button>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn ghost" onclick="closeRdv()">Annuler</button>
+      <button class="btn" id="rdv-save" onclick="saveRdv()">💾 Enregistrer</button>
+    </div>
+    <div class="err" id="rdv-err"></div>
+  </div>
 </div>
 
 <!-- ===== FICHE LEAD ===== -->
@@ -361,6 +442,7 @@
         <label>Commercial</label><select id="lv-owner"></select>
         <label>Notes</label><textarea id="lv-notes" rows="4"></textarea>
         <div class="quick" id="lv-quick" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
+        <div id="lv-rdvs"></div>
         <div style="display:flex;justify-content:flex-end;margin-top:12px">
           <button class="btn" id="lv-save" onclick="saveLeadInfo()">💾 Enregistrer</button>
         </div>
@@ -396,8 +478,9 @@ const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let SESSION=null, IS_ADMIN=false;
-let LEADS=[], FORMATIONS=[], ORGANISMES=[], CATEGORIES=[], STATUTS=[], PROFILES=[];
+let LEADS=[], FORMATIONS=[], ORGANISMES=[], CATEGORIES=[], STATUTS=[], PROFILES=[], RDVS=[];
 let curLead=null, curLeadFormations=[], editingFormationId=null, leadCatFilter='';
+let calY=null, calM=null, calSel=null, editingRdvId=null;
 
 const STAGES=[
   {key:'nouveau',color:'#64748b',label:'Nouveau'},{key:'contacte',color:'#3b82f6',label:'Contacté'},
@@ -457,16 +540,21 @@ async function afterAuth(session){
   await loadAll(); showTab('dash');
 }
 async function loadAll(){
-  const [o,c,s,f,l,p]=await Promise.all([
+  const [o,c,s,f,l,p,r]=await Promise.all([
     db.from('crm_organismes').select('*').order('nom'),
     db.from('crm_categories').select('*').order('nom'),
     db.from('crm_statuts').select('*').order('ordre'),
     db.from('crm_formations').select('*').order('categorie').order('nom'),
     db.from('crm_leads').select('*').order('created_at',{ascending:false}),
     db.from('crm_profiles').select('*').eq('actif',true).order('nom'),
+    db.from('crm_rdv').select('*').order('date_rdv').order('heure'),
   ]);
-  ORGANISMES=o.data||[]; CATEGORIES=c.data||[]; STATUTS=s.data||[]; FORMATIONS=f.data||[]; LEADS=l.data||[]; PROFILES=p.data||[];
-  fillAllSelects(); renderLeads();
+  ORGANISMES=o.data||[]; CATEGORIES=c.data||[]; STATUTS=s.data||[]; FORMATIONS=f.data||[]; LEADS=l.data||[]; PROFILES=p.data||[]; RDVS=r.data||[];
+  fillAllSelects(); renderLeads(); renderNotifs();
+}
+async function reloadRdvs(){
+  const {data}=await db.from('crm_rdv').select('*').order('date_rdv').order('heure');
+  RDVS=data||[]; renderNotifs(); if(document.getElementById('tab-agenda') && !document.getElementById('tab-agenda').classList.contains('hidden')) renderAgenda();
 }
 function fillAllSelects(){
   const statutOpts='<option value="">— Aucun —</option>'+STATUTS.map(s=>`<option value="${s.id}">${esc(s.nom)}</option>`).join('');
@@ -483,9 +571,10 @@ function fillAllSelects(){
 }
 function showTab(t){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dash','leads','pipeline','formations','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  ['dash','leads','pipeline','agenda','formations','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
   if(t==='dash') renderDashboard();
   if(t==='pipeline') renderPipeline();
+  if(t==='agenda') renderAgenda();
   if(t==='formations') renderFormations();
   if(t==='params') renderParams();
 }
@@ -534,12 +623,14 @@ async function openLead(id){
   document.getElementById('lead-view').classList.remove('hidden'); window.scrollTo(0,0);
   await loadLeadFormations(id);   // met à jour cartes budget + étape
   loadActivities(id);
+  renderLeadRdvs();
 }
 function closeLead(){ document.getElementById('lead-view').classList.add('hidden'); curLead=null; loadAll(); }
 function renderQuick(){
   const l=curLead, q=[];
   if(l.telephone) q.push(`<a class="btn ghost small" href="tel:${esc(l.telephone)}">📞 Appeler</a>`);
   if(l.email) q.push(`<a class="btn ghost small" href="mailto:${esc(l.email)}">✉️ Email</a>`);
+  q.push(`<button class="btn ghost small" type="button" onclick="openRdv(null)">📅 RDV de rappel</button>`);
   document.getElementById('lv-quick').innerHTML=q.join('');
 }
 async function saveLeadInfo(){
@@ -822,6 +913,140 @@ async function kDrop(e){
   const {error}=await db.from('crm_leads').update({stage,updated_at:new Date().toISOString()}).eq('id',id);
   if(error){ toast('Erreur : '+error.message); return; }
   l.stage=stage; renderPipeline(); toast('Étape : '+stageOf(stage).label);
+}
+
+/* ---------- AGENDA / CALENDRIER ---------- */
+const MONTHS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const DOW=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function isoDate(y,m,d){ return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+function ensureCal(){ if(calY==null){ const d=new Date(); calY=d.getFullYear(); calM=d.getMonth(); } if(!calSel) calSel=todayStr(); }
+function calShift(n){ ensureCal(); calM+=n; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} renderAgenda(); }
+function calToday(){ const d=new Date(); calY=d.getFullYear(); calM=d.getMonth(); calSel=todayStr(); renderAgenda(); }
+function rdvOwnerName(r){ const p=PROFILES.find(x=>(x.email||'').toLowerCase()===(r.owner_email||'').toLowerCase()); return p?(p.nom||p.email):(r.owner_email||'?'); }
+function visibleRdvs(){ let arr=RDVS.slice(); if(IS_ADMIN){ const f=(document.getElementById('cal-owner')||{}).value||''; if(f) arr=arr.filter(r=>r.owner_email===f); } return arr; }
+
+/* Notifications : mes rappels du jour + en retard */
+function myDueRdvs(){ const t=todayStr(); return RDVS.filter(r=>r.owner_id===SESSION.user.id && !r.done && r.date_rdv<=t); }
+function renderNotifs(){
+  const badge=document.getElementById('agenda-badge'), bar=document.getElementById('notif-bar');
+  const due=myDueRdvs(), t=todayStr();
+  const today=due.filter(r=>r.date_rdv===t), late=due.filter(r=>r.date_rdv<t);
+  if(due.length){ badge.textContent=due.length; badge.classList.remove('hidden'); } else badge.classList.add('hidden');
+  if(!due.length){ bar.classList.add('hidden'); return; }
+  let msg=[];
+  if(today.length) msg.push(`<b>${today.length}</b> rappel${today.length>1?'s':''} à faire aujourd'hui`);
+  if(late.length) msg.push(`<b>${late.length}</b> en retard`);
+  bar.innerHTML=`<span class="nb-ic">🔔</span><span>${msg.join(' · ')}</span><span class="nb-go">Voir l'agenda →</span>`;
+  bar.classList.remove('hidden');
+}
+
+function renderAgenda(){
+  ensureCal();
+  const sel=document.getElementById('cal-owner');
+  if(IS_ADMIN){ sel.classList.remove('hidden');
+    const owners=[...new Set(RDVS.map(r=>r.owner_email).filter(Boolean))].sort();
+    const cur=sel.value;
+    sel.innerHTML='<option value="">Tous les commerciaux</option>'+owners.map(o=>`<option value="${esc(o)}">${esc(rdvOwnerName({owner_email:o}))}</option>`).join('');
+    sel.value=cur;
+  } else sel.classList.add('hidden');
+  renderCalendar(); renderDayPlan();
+}
+function renderCalendar(){
+  document.getElementById('cal-title').textContent=MONTHS[calM]+' '+calY;
+  const byDay={}; visibleRdvs().forEach(r=>{ (byDay[r.date_rdv]=byDay[r.date_rdv]||[]).push(r); });
+  const startDow=(new Date(calY,calM,1).getDay()+6)%7;      // lundi = 0
+  const days=new Date(calY,calM+1,0).getDate(), t=todayStr();
+  let cells=DOW.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  for(let i=0;i<startDow;i++) cells+='<div class="cal-cell empty"></div>';
+  for(let d=1;d<=days;d++){
+    const iso=isoDate(calY,calM,d);
+    const evs=(byDay[iso]||[]).slice().sort((a,b)=>(a.heure||'99').localeCompare(b.heure||'99'));
+    const cls=[iso===t?'today':'', iso===calSel?'selected':'', iso<t?'past':''].join(' ');
+    let inner=`<div class="cc-day">${d}</div>`;
+    evs.slice(0,3).forEach(r=>{ const late=!r.done&&iso<t; const hm=r.heure?r.heure.slice(0,5)+' ':''; inner+=`<div class="cc-ev ${r.done?'done':''} ${late?'late':''}">${hm}${esc(r.titre||'RDV')}</div>`; });
+    if(evs.length>3) inner+=`<div class="cc-more">+${evs.length-3} autre(s)</div>`;
+    cells+=`<div class="cal-cell ${cls}" data-count="${evs.length||''}" onclick="selectDay('${iso}')">${inner}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML=cells;
+}
+function selectDay(iso){ calSel=iso; renderCalendar(); renderDayPlan(); }
+function renderDayPlan(){
+  const iso=calSel||todayStr();
+  document.getElementById('dayplan-title').textContent='Planning du '+new Date(iso+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const rdvs=visibleRdvs().filter(r=>r.date_rdv===iso).sort((a,b)=>(a.heure||'99').localeCompare(b.heure||'99'));
+  const box=document.getElementById('dayplan-list'), t=todayStr();
+  if(!rdvs.length){ box.innerHTML=`<div class="empty">Aucun RDV ce jour. <a href="#" onclick="openRdv(null);return false">＋ Ajouter un RDV</a></div>`; return; }
+  box.innerHTML=rdvs.map(r=>{
+    const lead=LEADS.find(l=>l.id===r.lead_id), late=!r.done&&iso<t;
+    const sub=[lead?('👤 '+esc(leadName(lead))):'', IS_ADMIN?('🧑‍💼 '+esc(rdvOwnerName(r))):'', r.notes?esc(r.notes):''].filter(Boolean).join(' · ');
+    return `<div class="rdv-item ${r.done?'done':''} ${late?'late':''}">
+      <div class="rdv-time">${r.heure?r.heure.slice(0,5):'—'}</div>
+      <div class="rdv-main"><div class="r-tit">${esc(r.titre||'RDV')}</div>${sub?`<div class="r-sub">${sub}</div>`:''}</div>
+      <div class="r-acts">
+        <button class="btn ghost small" onclick="toggleRdvDone('${r.id}',${r.done?'false':'true'})">${r.done?'↺ Rouvrir':'✓ Fait'}</button>
+        ${lead?`<button class="btn ghost small" onclick="openLead('${r.lead_id}')">Fiche</button>`:''}
+        <button class="btn ghost small" onclick="openRdv('${r.id}')">✏️</button>
+      </div></div>`;
+  }).join('');
+}
+
+/* Modale RDV */
+function openRdv(id){
+  ensureCal();
+  editingRdvId=id;
+  const g=i=>document.getElementById(i);
+  g('rdv-lead').innerHTML='<option value="">— Aucun (RDV libre) —</option>'+LEADS.map(l=>`<option value="${l.id}">${esc(leadName(l))}${l.telephone?' · '+esc(l.telephone):''}</option>`).join('');
+  g('rdv-err').textContent='';
+  if(id){
+    const r=RDVS.find(x=>x.id===id); if(!r) return;
+    g('rdv-mtitle').textContent='Modifier le RDV';
+    g('rdv-lead').value=r.lead_id||''; g('rdv-titre').value=r.titre||''; g('rdv-date').value=r.date_rdv||''; g('rdv-heure').value=r.heure?r.heure.slice(0,5):''; g('rdv-notes').value=r.notes||'';
+    g('rdv-del').classList.remove('hidden');
+    const own=g('rdv-owner-line'); if(IS_ADMIN&&r.owner_email){ own.textContent='Commercial : '+rdvOwnerName(r); own.classList.remove('hidden'); } else own.classList.add('hidden');
+  } else {
+    g('rdv-mtitle').textContent='Nouveau RDV';
+    g('rdv-titre').value='Rappel'; g('rdv-date').value=calSel||todayStr(); g('rdv-heure').value=''; g('rdv-notes').value='';
+    g('rdv-lead').value=curLead?curLead.id:''; g('rdv-del').classList.add('hidden'); g('rdv-owner-line').classList.add('hidden');
+  }
+  g('rdv-view').classList.remove('hidden');
+}
+function closeRdv(){ document.getElementById('rdv-view').classList.add('hidden'); editingRdvId=null; }
+async function saveRdv(){
+  const g=i=>document.getElementById(i);
+  const date=g('rdv-date').value; if(!date){ g('rdv-err').textContent='Choisis une date.'; return; }
+  const patch={ lead_id:g('rdv-lead').value||null, titre:g('rdv-titre').value.trim()||'Rappel', date_rdv:date, heure:g('rdv-heure').value||null, notes:g('rdv-notes').value.trim()||null };
+  const btn=g('rdv-save'); btn.disabled=true; btn.textContent='Enregistrement…';
+  let error;
+  if(editingRdvId){ ({error}=await db.from('crm_rdv').update({...patch,updated_at:new Date().toISOString()}).eq('id',editingRdvId)); }
+  else { ({error}=await db.from('crm_rdv').insert({...patch,owner_id:SESSION.user.id,owner_email:SESSION.user.email})); }
+  btn.disabled=false; btn.textContent='💾 Enregistrer';
+  if(error){ g('rdv-err').textContent='Erreur : '+error.message; return; }
+  closeRdv(); toast('RDV enregistré'); calSel=date; await reloadRdvs(); if(curLead) renderLeadRdvs();
+}
+async function deleteRdv(){
+  if(!editingRdvId||!confirm('Supprimer ce RDV ?')) return;
+  const {error}=await db.from('crm_rdv').delete().eq('id',editingRdvId);
+  if(error){ toast('Suppression refusée : '+error.message); return; }
+  closeRdv(); toast('RDV supprimé'); await reloadRdvs(); if(curLead) renderLeadRdvs();
+}
+async function toggleRdvDone(id,done){
+  const {error}=await db.from('crm_rdv').update({done,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  await reloadRdvs();
+}
+/* RDV d'un lead (dans la fiche) */
+function renderLeadRdvs(){
+  const box=document.getElementById('lv-rdvs'); if(!box||!curLead) return;
+  const rs=RDVS.filter(r=>r.lead_id===curLead.id).sort((a,b)=>((a.date_rdv||'')+(a.heure||'')).localeCompare((b.date_rdv||'')+(b.heure||'')));
+  if(!rs.length){ box.innerHTML=''; return; }
+  const t=todayStr();
+  box.innerHTML='<label style="margin-top:14px">RDV de rappel</label>'+rs.map(r=>{
+    const late=!r.done&&r.date_rdv<t, col=r.done?'var(--good)':(late?'var(--bad)':'var(--accent)');
+    return `<div class="lnk" style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="openRdv('${r.id}')">
+      <span style="font-weight:800;color:${col}">${r.done?'✓':'📅'}</span>
+      <span style="flex:1;font-size:13px"><b>${esc(r.titre||'RDV')}</b><br><span class="hint">${fmtDate(r.date_rdv)}${r.heure?' · '+r.heure.slice(0,5):''}</span></span></div>`;
+  }).join('');
 }
 
 /* ---------- DASHBOARD ---------- */
