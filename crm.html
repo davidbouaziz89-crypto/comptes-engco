@@ -593,11 +593,11 @@ function renderLeads(){
   const rows=filteredLeads(), t=document.getElementById('leads-table');
   document.getElementById('leads-count').textContent=rows.length+' lead(s) · '+LEADS.length+' au total';
   if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucun lead. Cliquez « ＋ Nouveau lead ».</td></tr>'; return; }
-  t.innerHTML='<tr><th>#</th><th>Nom</th><th>Entreprise</th><th>Statut</th><th>Étape</th><th class="num">Montant</th><th>Créé le</th></tr>'+
+  t.innerHTML='<tr><th>#</th><th>Nom</th><th>Statut</th><th>Étape</th><th class="num">Montant</th><th>Créé le</th></tr>'+
     rows.map(l=>{ const st=stageOf(l.stage); return `<tr class="clickable" onclick="openLead('${l.id}')">
       <td class="hint">${l.numero||''}</td>
       <td><div class="lead-cell"><span class="avatar" style="background:${avatarColor(leadName(l))}">${esc(leadInitials(l))}</span><span><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</span></div></td>
-      <td>${esc(l.entreprise||'')}</td><td>${statutPill(l.statut_id)}</td>
+      <td>${statutPill(l.statut_id)}</td>
       <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
       <td class="num">${eur(l.montant)}</td><td>${fmtDate(l.created_at)}</td></tr>`; }).join('');
 }
@@ -894,7 +894,7 @@ function renderPipeline(){
     return `<div class="kcol" style="--kc:${s.color}" data-stage="${s.key}" ondragover="kOver(event)" ondragleave="kLeave(event)" ondrop="kDrop(event)">
       <h3><span style="color:${s.color}">${s.label}</span><span>${cards.length}</span></h3>
       ${cards.map(l=>`<div class="kcard" style="--kc:${s.color}" draggable="true" ondragstart="kStart(event,'${l.id}')" onclick="openLead('${l.id}')">
-        <div class="kc-name">${esc(leadName(l))}</div><div class="kc-meta">${esc(l.entreprise||'')}</div>
+        <div class="kc-name">${esc(leadName(l))}</div>${l.telephone?`<div class="kc-meta">${esc(l.telephone)}</div>`:''}
         ${l.montant?`<div class="kc-amt">${eur(l.montant)}</div>`:''}</div>`).join('')}</div>`;
   }).join('');
 }
@@ -1153,7 +1153,7 @@ async function reloadRefs(){
 
 /* ---------- IMPORT ---------- */
 function downloadLeadsTemplate(){
-  const ws=XLSX.utils.aoa_to_sheet([['prenom','nom','email','telephone','entreprise','source','montant','en_activite','situation_actuelle','type_formation','formation','disponibilite','identite_numerique'],['Jean','Dupont','jean@acme.fr','0600000000','ACME','CALL IA','4000','oui','Salarié','Bureautique','Excel avancé','Lun-Ven 9h-12h','FranceConnect']]);
+  const ws=XLSX.utils.aoa_to_sheet([['prenom','nom','email','telephone','source','montant','en_activite','situation_actuelle','type_formation','formation','disponibilite','identite_numerique'],['Jean','Dupont','jean@acme.fr','0600000000','CALL IA','4000','oui','Salarié','Bureautique','Excel avancé','Lun-Ven 9h-12h','FranceConnect']]);
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Leads'); XLSX.writeFile(wb,'modele-leads-crm.xlsx');
 }
 async function importLeadsFile(e){
@@ -1167,7 +1167,7 @@ async function importLeadsFile(e){
     const payload=rows.map(r=>{ const m=String(get(r,['montant','budget','prix'])).replace(/[^\d.,-]/g,'').replace(',','.');
       return { prenom:String(get(r,['prenom','prénom'])).trim()||null, nom:String(get(r,['nom','name'])).trim()||null,
         email:String(get(r,['email','mail'])).trim()||null, telephone:String(get(r,['telephone','téléphone','tel','phone'])).trim()||null,
-        entreprise:String(get(r,['entreprise','societe','société','company'])).trim()||null, source:String(get(r,['source','origine'])).trim()||null,
+        source:String(get(r,['source','origine'])).trim()||null,
         montant:m?Number(m):null,
         en_activite:ouiNon(get(r,['en_activite','en activite','en activité','activite','activité','etes vous en activite','êtes-vous en activité ?','êtes-vous en activité'])),
         situation_actuelle:txt(get(r,['situation_actuelle','situation actuelle','situation'])),
