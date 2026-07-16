@@ -11,10 +11,19 @@
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
     --accent:#4f7cff;--accent2:#8a5cff;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;
+    --radius:16px;--radius-sm:11px;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+    --shadow:0 2px 6px rgba(0,0,0,.28),0 12px 32px -16px rgba(0,0,0,.6);
+    --shadow-lg:0 20px 55px -20px rgba(0,0,0,.7);
+    --ring:0 0 0 3px rgba(79,124,255,.3);
   }
   :root[data-theme="light"]{
     --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;
     --accent:#4f7cff;--accent2:#8a5cff;--good:#16a34a;--bad:#dc2626;--warn:#d97706;
+    --shadow-sm:0 1px 2px rgba(16,24,40,.06);
+    --shadow:0 1px 3px rgba(16,24,40,.07),0 14px 30px -18px rgba(16,24,40,.28);
+    --shadow-lg:0 24px 55px -22px rgba(16,24,40,.32);
+    --ring:0 0 0 3px rgba(79,124,255,.18);
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
@@ -135,6 +144,69 @@
   #toast.show{opacity:1}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:600px){.grid2{grid-template-columns:1fr}}
+
+  /* ===================================================================== */
+  /*  FINITION VISUELLE — profondeur, formes rondes, couleur (2026-07)     */
+  /* ===================================================================== */
+  body{
+    background:
+      radial-gradient(1100px 620px at 100% -8%,rgba(138,92,255,.11),transparent 60%),
+      radial-gradient(1200px 700px at -12% -6%,rgba(79,124,255,.11),transparent 58%),
+      var(--bg);
+    background-attachment:fixed;
+  }
+  /* En-tête & barre d'onglets */
+  header{box-shadow:var(--shadow-sm);position:sticky;top:0;z-index:30}
+  nav{gap:6px;padding:9px 22px}
+  nav button{border-radius:999px;border-color:transparent;transition:background .18s,color .18s,box-shadow .18s}
+  nav button:hover{color:var(--txt);background:var(--panel)}
+  nav button.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;box-shadow:0 8px 18px -8px var(--accent)}
+  /* Cartes : profondeur + arrondi */
+  .panel,.card{border-radius:var(--radius);box-shadow:var(--shadow)}
+  .authcard{box-shadow:var(--shadow-lg)}
+  .panel h2,.card h3{letter-spacing:-.01em}
+  /* Boutons : léger relief + rebond au survol */
+  .btn{border-radius:var(--radius-sm);box-shadow:0 8px 18px -10px var(--accent);transition:transform .15s,filter .15s,box-shadow .15s}
+  .btn:hover{transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .btn.ghost,.btn.danger{box-shadow:none}
+  /* Champs : coins doux + halo au focus */
+  input,select,textarea{border-radius:10px;transition:border-color .15s,box-shadow .15s}
+  input:focus,select:focus,textarea:focus{box-shadow:var(--ring)}
+  /* Étiquettes */
+  .tag{border-radius:8px}
+  .pill{box-shadow:var(--shadow-sm)}
+  /* KPI colorés avec pastille-icône */
+  .kpi{position:relative;overflow:hidden;border-radius:var(--radius);padding:16px 16px 16px 20px;background:var(--panel);box-shadow:var(--shadow);transition:transform .18s,box-shadow .18s}
+  .kpi:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--kc,var(--accent))}
+  .kpi .k-ic{position:absolute;top:14px;right:14px;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--kc,var(--accent));box-shadow:0 6px 16px -8px var(--kc,var(--accent))}
+  .kpi .k-val{letter-spacing:-.02em}
+  /* Cartes budget (fiche lead) */
+  .bcard{position:relative;overflow:hidden;padding-left:20px;box-shadow:var(--shadow);transition:transform .18s,box-shadow .18s}
+  .bcard:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .bcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--kc,var(--accent))}
+  /* Avatars ronds sur la liste des leads */
+  .lead-cell{display:flex;align-items:center;gap:11px}
+  .avatar{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0;box-shadow:var(--shadow-sm)}
+  #leads-table td{padding:11px 10px}
+  /* Pipeline coloré */
+  .kcol{border-radius:var(--radius);box-shadow:var(--shadow-sm)}
+  .kcol h3{padding-bottom:9px;border-bottom:2px solid var(--kc,var(--line))}
+  .kcard{border-radius:12px;border-left:3px solid var(--kc,var(--line));box-shadow:var(--shadow-sm);transition:transform .15s,box-shadow .15s}
+  .kcard:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  /* Parcours du lead : timeline verticale + relief */
+  .steps{position:relative}
+  .steps::before{content:"";position:absolute;left:59px;top:64px;bottom:24px;width:2px;background:var(--line);z-index:0}
+  .scard{position:relative;z-index:1;border-radius:var(--radius);box-shadow:var(--shadow-sm);transition:box-shadow .18s}
+  .scard.active{box-shadow:var(--shadow)}
+  .s-dot{box-shadow:var(--shadow-sm)}
+  /* Fiche lead : même halo de fond que l'app */
+  #lead-view{background:
+      radial-gradient(1100px 620px at 100% -8%,rgba(138,92,255,.11),transparent 60%),
+      radial-gradient(1200px 700px at -12% -6%,rgba(79,124,255,.11),transparent 58%),
+      var(--bg)}
+  .lead-head{box-shadow:var(--shadow-sm)}
 </style>
 </head>
 <body>
@@ -268,9 +340,9 @@
   </div>
   <div class="lead-wrap">
     <div class="bcards">
-      <div class="bcard"><div class="b-lab">Montant (budget)</div><div class="b-val" id="bc-montant">—</div></div>
-      <div class="bcard"><div class="b-lab">Formations</div><div class="b-val" id="bc-formations">—</div></div>
-      <div class="bcard"><div class="b-lab">Budget restant</div><div class="b-val" id="bc-restant">—</div></div>
+      <div class="bcard" style="--kc:var(--accent)"><div class="b-lab">Montant (budget)</div><div class="b-val" id="bc-montant">—</div></div>
+      <div class="bcard" style="--kc:var(--accent2)"><div class="b-lab">Formations</div><div class="b-val" id="bc-formations">—</div></div>
+      <div class="bcard" id="bc-restant-card" style="--kc:var(--good)"><div class="b-lab">Budget restant</div><div class="b-val" id="bc-restant">—</div></div>
     </div>
     <div class="lead-body">
       <!-- GAUCHE -->
@@ -347,6 +419,8 @@ function eur(n){ if(n==null||n===''||isNaN(Number(n))) return '—'; return Numb
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('fr-FR'); }
 function leadName(l){ return ((l.prenom||'')+' '+(l.nom||'')).trim()||l.entreprise||l.email||'(sans nom)'; }
+function avatarColor(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return `linear-gradient(135deg,hsl(${h%360} 62% 55%),hsl(${(h*7)%360} 60% 45%))`; }
+function leadInitials(l){ const p=(l.prenom||'').trim(), n=(l.nom||'').trim(); let s=((p[0]||'')+(n[0]||'')).toUpperCase(); if(!s){ const nm=leadName(l); s=(nm[0]||'?').toUpperCase(); } return s; }
 function statutOf(id){ return STATUTS.find(s=>s.id===id); }
 let _tt; function toast(m){ const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2600); }
 
@@ -433,7 +507,7 @@ function renderLeads(){
   t.innerHTML='<tr><th>#</th><th>Nom</th><th>Entreprise</th><th>Statut</th><th>Étape</th><th class="num">Montant</th><th>Créé le</th></tr>'+
     rows.map(l=>{ const st=stageOf(l.stage); return `<tr class="clickable" onclick="openLead('${l.id}')">
       <td class="hint">${l.numero||''}</td>
-      <td><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</td>
+      <td><div class="lead-cell"><span class="avatar" style="background:${avatarColor(leadName(l))}">${esc(leadInitials(l))}</span><span><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</span></div></td>
       <td>${esc(l.entreprise||'')}</td><td>${statutPill(l.statut_id)}</td>
       <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
       <td class="num">${eur(l.montant)}</td><td>${fmtDate(l.created_at)}</td></tr>`; }).join('');
@@ -509,6 +583,7 @@ function renderBudgetCards(){
   document.getElementById('bc-formations').textContent=tot.toLocaleString('fr-FR')+' €';
   const el=document.getElementById('bc-restant'); el.textContent=rest.toLocaleString('fr-FR')+' €';
   el.style.color=rest<0?'var(--bad)':'var(--txt)';
+  const card=document.getElementById('bc-restant-card'); if(card) card.style.setProperty('--kc',rest<0?'var(--bad)':'var(--good)');
 }
 
 /* Étapes / parcours */
@@ -729,9 +804,9 @@ async function deleteLead(){
 function renderPipeline(){
   document.getElementById('kanban').innerHTML=STAGES.map(s=>{
     const cards=LEADS.filter(l=>l.stage===s.key);
-    return `<div class="kcol" data-stage="${s.key}" ondragover="kOver(event)" ondragleave="kLeave(event)" ondrop="kDrop(event)">
+    return `<div class="kcol" style="--kc:${s.color}" data-stage="${s.key}" ondragover="kOver(event)" ondragleave="kLeave(event)" ondrop="kDrop(event)">
       <h3><span style="color:${s.color}">${s.label}</span><span>${cards.length}</span></h3>
-      ${cards.map(l=>`<div class="kcard" draggable="true" ondragstart="kStart(event,'${l.id}')" onclick="openLead('${l.id}')">
+      ${cards.map(l=>`<div class="kcard" style="--kc:${s.color}" draggable="true" ondragstart="kStart(event,'${l.id}')" onclick="openLead('${l.id}')">
         <div class="kc-name">${esc(leadName(l))}</div><div class="kc-meta">${esc(l.entreprise||'')}</div>
         ${l.montant?`<div class="kc-amt">${eur(l.montant)}</div>`:''}</div>`).join('')}</div>`;
   }).join('');
@@ -754,10 +829,16 @@ function renderDashboard(){
   const total=LEADS.length, won=LEADS.filter(l=>l.stage==='gagne'), open=LEADS.filter(l=>l.stage!=='gagne'&&l.stage!=='perdu');
   const wonAmt=won.reduce((s,l)=>s+(Number(l.montant)||0),0), openAmt=open.reduce((s,l)=>s+(Number(l.montant)||0),0);
   const toBill=LEADS.filter(l=>l.etape==='a_facturer').length;
-  const kpi=[{v:total,l:'Leads au total'},{v:open.length,l:'En cours'},{v:won.length,l:'Gagnés'},
-    {v:(total?Math.round(won.length/total*100):0)+' %',l:'Conversion'},{v:eur(wonAmt),l:'CA gagné'},
-    {v:eur(openAmt),l:'Pipeline en cours'},{v:toBill,l:'À facturer'},{v:FORMATIONS.length,l:'Formations'}];
-  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+  const kpi=[
+    {v:total,l:'Leads au total',i:'👥',c:'#4f7cff'},
+    {v:open.length,l:'En cours',i:'⏳',c:'#8a5cff'},
+    {v:won.length,l:'Gagnés',i:'🏆',c:'#16a34a'},
+    {v:(total?Math.round(won.length/total*100):0)+' %',l:'Conversion',i:'📈',c:'#0ea5e9'},
+    {v:eur(wonAmt),l:'CA gagné',i:'💰',c:'#16a34a'},
+    {v:eur(openAmt),l:'Pipeline en cours',i:'🎯',c:'#f59e0b'},
+    {v:toBill,l:'À facturer',i:'🧾',c:'#e11d48'},
+    {v:FORMATIONS.length,l:'Formations',i:'🎓',c:'#8a5cff'}];
+  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi" style="--kc:${x.c}"><div class="k-ic">${x.i}</div><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
   document.getElementById('dash-stages').innerHTML='<tr><th>Étape</th><th class="num">Nombre</th><th class="num">Montant cumulé</th></tr>'+
     STAGES.map(s=>{ const r=LEADS.filter(l=>l.stage===s.key), amt=r.reduce((a,l)=>a+(Number(l.montant)||0),0);
       return `<tr><td><span class="pill" style="background:${s.color}22;color:${s.color}">${s.label}</span></td><td class="num">${r.length}</td><td class="num">${eur(amt)}</td></tr>`; }).join('');
