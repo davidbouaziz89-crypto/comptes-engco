@@ -7,6 +7,7 @@
 <script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
@@ -208,6 +209,13 @@
       var(--bg)}
   .lead-head{box-shadow:var(--shadow-sm)}
 
+  /* ===== GRAPHIQUES (tableau de bord) ===== */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
+  @media(max-width:900px){.grid3{grid-template-columns:1fr}}
+  .chart-box{position:relative;height:300px}
+  .chart-box.sm{height:250px}
+  .chart-box canvas{max-width:100%}
+
   /* ===== AGENDA / CALENDRIER ===== */
   .nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:var(--bad);color:#fff;font-size:11px;font-weight:800;vertical-align:top}
   #notif-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:16px;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:14px;
@@ -283,7 +291,13 @@
     <div id="notif-bar" class="hidden" onclick="showTab('agenda')"></div>
     <div id="tab-dash">
       <section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
-      <section class="panel"><h2>Répartition par étape commerciale</h2><div class="table-wrap"><table id="dash-stages"></table></div></section>
+      <section class="panel"><h2>Chiffre d'affaires gagné par mois</h2><div class="chart-box"><canvas id="ch-ca"></canvas></div></section>
+      <div class="grid3">
+        <section class="panel"><h2>Leads par étape</h2><div class="chart-box sm"><canvas id="ch-etape"></canvas></div></section>
+        <section class="panel"><h2>Leads par statut</h2><div class="chart-box sm"><canvas id="ch-statut"></canvas></div></section>
+        <section class="panel"><h2>Leads par source</h2><div class="chart-box sm"><canvas id="ch-source"></canvas></div></section>
+      </div>
+      <section class="panel"><h2>Nouveaux leads par mois</h2><div class="chart-box"><canvas id="ch-leads"></canvas></div></section>
     </div>
     <div id="tab-leads" class="hidden">
       <section class="panel">
@@ -514,6 +528,7 @@ function toggleTheme(){
   if(light) document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme');
   try{ localStorage.setItem('pfp-theme',light?'light':'dark'); }catch(e){}
   updateThemeBtn();
+  const dash=document.getElementById('tab-dash'); if(dash && !dash.classList.contains('hidden')) renderDashboard();
 }
 function updateThemeBtn(){ const b=document.getElementById('theme-btn'); if(b) b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙'; }
 updateThemeBtn();
@@ -1047,10 +1062,20 @@ function renderLeadRdvs(){
 }
 
 /* ---------- DASHBOARD ---------- */
+let CHARTS={};
+function themeColors(){ const cs=getComputedStyle(document.documentElement); const g=n=>cs.getPropertyValue(n).trim();
+  return {txt:g('--txt'),muted:g('--muted'),line:g('--line'),accent:g('--accent'),panel:g('--panel'),good:g('--good')}; }
+function monthKey(d){ if(!d) return ''; const x=new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'); }
+function lastMonths(n){ const arr=[], now=new Date(); for(let i=n-1;i>=0;i--){ const x=new Date(now.getFullYear(),now.getMonth()-i,1);
+  arr.push({key:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'), label:MONTHS[x.getMonth()].slice(0,4)+'.'+String(x.getFullYear()).slice(2)}); } return arr; }
+const CHART_PALETTE=['#4f7cff','#8a5cff','#16a34a','#f59e0b','#0ea5e9','#e11d48','#14b8a6','#a855f7','#f97316','#64748b','#eab308','#ec4899'];
+function mkChart(id,cfg){ if(typeof Chart==='undefined') return; if(CHARTS[id]) CHARTS[id].destroy(); const el=document.getElementById(id); if(!el) return; CHARTS[id]=new Chart(el,cfg); }
+
 function renderDashboard(){
   const total=LEADS.length, won=LEADS.filter(l=>l.stage==='gagne'), open=LEADS.filter(l=>l.stage!=='gagne'&&l.stage!=='perdu');
   const wonAmt=won.reduce((s,l)=>s+(Number(l.montant)||0),0), openAmt=open.reduce((s,l)=>s+(Number(l.montant)||0),0);
   const toBill=LEADS.filter(l=>l.etape==='a_facturer').length;
+  const nbFormations=FORMATIONS.filter(f=>f.actif!==false).length;
   const kpi=[
     {v:total,l:'Leads au total',i:'👥',c:'#4f7cff'},
     {v:open.length,l:'En cours',i:'⏳',c:'#8a5cff'},
@@ -1059,11 +1084,52 @@ function renderDashboard(){
     {v:eur(wonAmt),l:'CA gagné',i:'💰',c:'#16a34a'},
     {v:eur(openAmt),l:'Pipeline en cours',i:'🎯',c:'#f59e0b'},
     {v:toBill,l:'À facturer',i:'🧾',c:'#e11d48'},
-    {v:FORMATIONS.length,l:'Formations',i:'🎓',c:'#8a5cff'}];
+    {v:nbFormations,l:'Formations actives',i:'🎓',c:'#8a5cff'}];
   document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi" style="--kc:${x.c}"><div class="k-ic">${x.i}</div><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
-  document.getElementById('dash-stages').innerHTML='<tr><th>Étape</th><th class="num">Nombre</th><th class="num">Montant cumulé</th></tr>'+
-    STAGES.map(s=>{ const r=LEADS.filter(l=>l.stage===s.key), amt=r.reduce((a,l)=>a+(Number(l.montant)||0),0);
-      return `<tr><td><span class="pill" style="background:${s.color}22;color:${s.color}">${s.label}</span></td><td class="num">${r.length}</td><td class="num">${eur(amt)}</td></tr>`; }).join('');
+  renderCharts(won);
+}
+function renderCharts(won){
+  if(typeof Chart==='undefined') return;
+  const tc=themeColors();
+  Chart.defaults.color=tc.muted; Chart.defaults.borderColor=tc.line; Chart.defaults.font.family='system-ui,-apple-system,sans-serif';
+  const eur0=v=>Number(v).toLocaleString('fr-FR')+' €';
+  const doughOpts={responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,pointStyle:'circle'}}}};
+  const gridC=tc.line;
+
+  // Chiffre d'affaires gagné par mois (barres)
+  const months=lastMonths(8);
+  const caData=months.map(m=>won.filter(l=>monthKey(l.created_at)===m.key).reduce((s,l)=>s+(Number(l.montant)||0),0));
+  mkChart('ch-ca',{type:'bar',
+    data:{labels:months.map(m=>m.label),datasets:[{label:'CA gagné',data:caData,backgroundColor:tc.accent,borderRadius:7,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>eur0(c.parsed.y)}}},
+      scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:gridC},ticks:{callback:v=>eur0(v)}}}}});
+
+  // Nouveaux leads par mois (courbe)
+  const leadData=months.map(m=>LEADS.filter(l=>monthKey(l.created_at)===m.key).length);
+  mkChart('ch-leads',{type:'line',
+    data:{labels:months.map(m=>m.label),datasets:[{label:'Nouveaux leads',data:leadData,borderColor:'#8a5cff',backgroundColor:'rgba(138,92,255,.15)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#8a5cff',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:gridC},ticks:{precision:0}}}}});
+
+  // Camembert — leads par étape (parcours)
+  const et=PARCOURS.map(p=>({label:p.label,color:p.color,n:LEADS.filter(l=>(l.etape||'infos_lead')===p.code).length})).filter(x=>x.n>0);
+  mkChart('ch-etape',{type:'doughnut',
+    data:{labels:et.map(x=>x.label),datasets:[{data:et.map(x=>x.n),backgroundColor:et.map(x=>x.color),borderColor:tc.panel,borderWidth:2}]},
+    options:doughOpts});
+
+  // Camembert — leads par statut
+  const st=STATUTS.map((s,i)=>({label:s.nom,color:s.couleur||CHART_PALETTE[i%CHART_PALETTE.length],n:LEADS.filter(l=>l.statut_id===s.id).length})).filter(x=>x.n>0);
+  const noStat=LEADS.filter(l=>!l.statut_id).length; if(noStat) st.push({label:'Sans statut',color:'#64748b',n:noStat});
+  mkChart('ch-statut',{type:'doughnut',
+    data:{labels:st.map(x=>x.label),datasets:[{data:st.map(x=>x.n),backgroundColor:st.map(x=>x.color),borderColor:tc.panel,borderWidth:2}]},
+    options:doughOpts});
+
+  // Camembert — leads par source
+  const srcMap={}; LEADS.forEach(l=>{ const s=((l.source||'').trim())||'Sans source'; srcMap[s]=(srcMap[s]||0)+1; });
+  const srcK=Object.keys(srcMap);
+  mkChart('ch-source',{type:'doughnut',
+    data:{labels:srcK,datasets:[{data:srcK.map(k=>srcMap[k]),backgroundColor:srcK.map((k,i)=>CHART_PALETTE[i%CHART_PALETTE.length]),borderColor:tc.panel,borderWidth:2}]},
+    options:doughOpts});
 }
 
 /* ---------- FORMATIONS catalogue ---------- */
