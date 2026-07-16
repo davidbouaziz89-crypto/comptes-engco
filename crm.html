@@ -489,14 +489,15 @@ const STAGES=[
 ];
 const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
 const PARCOURS=[
-  {code:'infos_lead',label:'Infos lead'},
-  {code:'organisme',label:'Formations'},
-  {code:'lien_edof',label:'Lien EDOF'},
-  {code:'test_positionnement',label:'RDV test de positionnement'},
-  {code:'entree_formation',label:'RDV entrée en formation'},
-  {code:'a_facturer',label:'À facturer'},
+  {code:'infos_lead',label:'Infos lead',color:'#64748b'},
+  {code:'organisme',label:'Formations',color:'#3b82f6'},
+  {code:'lien_edof',label:'Lien EDOF',color:'#8b5cf6'},
+  {code:'test_positionnement',label:'RDV test de positionnement',color:'#f59e0b'},
+  {code:'entree_formation',label:'RDV entrée en formation',color:'#0ea5e9'},
+  {code:'a_facturer',label:'À facturer',color:'#16a34a'},
 ];
 const parcoursIndex=k=>{ const i=PARCOURS.findIndex(p=>p.code===k); return i<0?0:i; };
+const parcoursOf=k=>PARCOURS.find(p=>p.code===k)||PARCOURS[0];
 
 function eur(n){ if(n==null||n===''||isNaN(Number(n))) return '—'; return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €'; }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -562,7 +563,7 @@ function fillAllSelects(){
   const orgOpts='<option value="">— Aucun —</option>'+ORGANISMES.filter(o=>o.actif!==false).map(o=>`<option value="${esc(o.nom)}">${esc(o.nom)}</option>`).join('');
   const catOpts='<option value="">— Aucune —</option>'+CATEGORIES.filter(c=>c.actif!==false).map(c=>`<option value="${esc(c.nom)}">${esc(c.nom)}</option>`).join('');
   const set=(id,html)=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; };
-  set('lead-fstage','<option value="">Toutes étapes</option>'+STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join(''));
+  set('lead-fstage','<option value="">Toutes étapes</option>'+PARCOURS.map(p=>`<option value="${p.code}">${esc(p.label)}</option>`).join(''));
   set('lead-fstatut','<option value="">Tous statuts</option>'+STATUTS.map(s=>`<option value="${s.id}">${esc(s.nom)}</option>`).join(''));
   set('lv-statut',statutOpts); set('lv-owner',ownerOpts);
   set('f-categorie',catOpts); set('f-organisme',orgOpts);
@@ -585,7 +586,7 @@ function filteredLeads(){
   const q=(document.getElementById('lead-search').value||'').toLowerCase().trim();
   const fs=document.getElementById('lead-fstage').value, fst=document.getElementById('lead-fstatut').value;
   return LEADS.filter(l=>{
-    if(fs&&l.stage!==fs) return false; if(fst&&l.statut_id!==fst) return false;
+    if(fs&&(l.etape||'infos_lead')!==fs) return false; if(fst&&l.statut_id!==fst) return false;
     if(!q) return true; return [leadName(l),l.email,l.telephone,l.entreprise,l.source].some(v=>(v||'').toLowerCase().includes(q));
   });
 }
@@ -594,11 +595,11 @@ function renderLeads(){
   document.getElementById('leads-count').textContent=rows.length+' lead(s) · '+LEADS.length+' au total';
   if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucun lead. Cliquez « ＋ Nouveau lead ».</td></tr>'; return; }
   t.innerHTML='<tr><th>#</th><th>Nom</th><th>Statut</th><th>Étape</th><th class="num">Montant</th><th>Créé le</th></tr>'+
-    rows.map(l=>{ const st=stageOf(l.stage); return `<tr class="clickable" onclick="openLead('${l.id}')">
+    rows.map(l=>{ const ep=parcoursOf(l.etape||'infos_lead'); return `<tr class="clickable" onclick="openLead('${l.id}')">
       <td class="hint">${l.numero||''}</td>
       <td><div class="lead-cell"><span class="avatar" style="background:${avatarColor(leadName(l))}">${esc(leadInitials(l))}</span><span><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</span></div></td>
       <td>${statutPill(l.statut_id)}</td>
-      <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
+      <td><span class="pill" style="background:${ep.color}22;color:${ep.color}">${esc(ep.label)}</span></td>
       <td class="num">${eur(l.montant)}</td><td>${fmtDate(l.created_at)}</td></tr>`; }).join('');
 }
 async function newLead(){
