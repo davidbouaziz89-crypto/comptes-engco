@@ -263,8 +263,8 @@
         </div>
       </section>
       <section class="panel"><h2>👥 Utilisateurs & rôles</h2>
-        <div class="hint" style="margin-bottom:8px">Cochez les rôles de chaque utilisateur. Une même personne peut cumuler plusieurs rôles (ex : télépro <b>et</b> confirmateur). Le rôle principal (attribué à la connexion) est verrouillé ; ajoutez les rôles supplémentaires.</div>
-        <div class="table-wrap"><table id="users-table"></table></div>
+        <div class="hint" style="margin-bottom:8px">Cochez les rôles de chaque utilisateur. Une même personne peut cumuler plusieurs rôles (ex : télépro <b>et</b> confirmateur). Le rôle principal (attribué à la connexion) est verrouillé ; ajoutez les rôles supplémentaires. Pour un <b>commercial</b>, renseignez l'adresse de son domicile (utilisée pour la distance du 1er RDV du jour).</div>
+        <div id="users-list"></div>
       </section>
       <section class="panel"><h2>🎨 Statuts par rôle</h2>
         <form class="row" onsubmit="addStatut(event)" style="margin-bottom:12px">
@@ -911,6 +911,19 @@ async function geocodeLead(l){
   }catch(e){}
   return l;
 }
+// Géocode le domicile d'un profil (commercial) et mémorise lat/lng dans pv_profiles
+async function geocodeProfile(p){
+  if(!p||(p.lat!=null&&p.lng!=null)) return p;
+  const q=[p.adresse,p.code_postal,p.ville].filter(Boolean).join(' ');
+  if(!q) return p;
+  try{
+    const r=await fetch('https://api-adresse.data.gouv.fr/search/?limit=1&q='+encodeURIComponent(q));
+    const j=await r.json(); const f=j.features&&j.features[0];
+    if(f&&f.geometry){ p.lng=f.geometry.coordinates[0]; p.lat=f.geometry.coordinates[1];
+      await db.from('pv_profiles').update({lat:p.lat,lng:p.lng}).eq('id',p.id); }
+  }catch(e){}
+  return p;
+}
 async function openPlanning(){
   if(!curLead.owner_commercial){ toast('Choisissez d\'abord un commercial.'); return; }
   const date=(curLead.rdv_date?curLead.rdv_date.slice(0,10):'')||toISODate(new Date());
@@ -985,12 +998,25 @@ async function placeComRdv(dateISO,heure){
   }
 }
 // Détail des trajets par jour + repérage des créneaux en dépassement (RDV = 1h15, trajet max 1h30)
-function planningDistanceDetail(days, events){
+// home = domicile du commercial {lat,lng} pour la distance du 1er RDV du jour
+function planningDistanceDetail(days, events, home){
   const RDV_MIN=75, MAX_TRAJET=90; let html=''; const warn=new Set();
+  const homeOk=home&&home.lat!=null&&home.lng!=null;
   days.forEach(d=>{
     const list=events.filter(e=>e.date===d.iso).sort((a,b)=>a.m-b.m);
-    if(list.length<2) return;
+    if(!list.length) return;
     const dObj=new Date(d.iso+'T00:00:00'); let seg='';
+    // Domicile → 1er RDV du jour
+    const first=list[0];
+    if(homeOk){
+      const km=haversineKm(home,first.ref);
+      if(km==null) seg+=`<div class="hint">🏠 Domicile → 1er RDV ${m2hhmm(first.m)} : adresse du RDV manquante</div>`;
+      else{ const road=km*1.3, mins=Math.round(road/50*60);
+        seg+=`<div class="hint">🏠 Domicile → 1er RDV ${m2hhmm(first.m)} : ${Math.round(km)} km (~${mins} min voiture)</div>`; }
+    } else {
+      seg+=`<div class="hint">🏠 Domicile non renseigné (adresse du commercial dans Paramètres → Utilisateurs)</div>`;
+    }
+    if(list.length<2){ html+=`<div class="subcard" style="margin-top:10px"><div style="font-weight:700;text-transform:capitalize;margin-bottom:4px">${dObj.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'})} — 1 RDV</div>${seg}</div>`; return; }
     for(let i=0;i<list.length-1;i++){
       const a=list[i], b=list[i+1], gap=b.m-a.m; let bad=false, txt='';
       if(gap<RDV_MIN){ bad=true; txt='⚠️ créneaux qui se chevauchent (un RDV dure 1h15)'; }
@@ -1017,9 +1043,10 @@ async function renderPlanning(){
   let leadsWeek=LEADS.filter(l=>l.owner_commercial===planCommercial && l.rdv_date && inWeek(l.rdv_date.slice(0,10)) && l.id!==curLead.id);
   for(const l of leadsWeek){ if(l.lat==null) await geocodeLead(l); }
   await geocodeLead(curLead);
+  if(com) await geocodeProfile(com); // domicile du commercial
   let events=leadsWeek.map(l=>({date:l.rdv_date.slice(0,10),m:snapCom(hhmm2m(l.rdv_heure)),label:(l.rdv_heure?l.rdv_heure.slice(0,5)+' ':'')+leadName(l),kind:'other',ref:l}));
   if(curLead.rdv_date && inWeek(curLead.rdv_date.slice(0,10))) events.push({date:curLead.rdv_date.slice(0,10),m:snapCom(hhmm2m(curLead.rdv_heure)),label:(curLead.rdv_heure?curLead.rdv_heure.slice(0,5)+' ':'')+leadName(curLead)+' (ce dossier)',kind:'proposed',ref:curLead});
-  const {html:distHTML,warn}=planningDistanceDetail(days,events);
+  const {html:distHTML,warn}=planningDistanceDetail(days,events,com);
   events.forEach(e=>{ if(warn.has(e)) e.warn=true; });
   const rows=COM_SLOTS.map(m=>({m,label:m2hhmm(m),h:42}));
   document.getElementById('plan-body').innerHTML=calGrid(days,rows,events,ed,'placeComRdv',todayISO)+distHTML;
@@ -1173,18 +1200,29 @@ function renderParams(){
   renderUsers(); renderStatutTables(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_client_types','ct-table',CTYPES); renderRef('pv_doc_types','dt-table',DOCTYPES);
 }
 function renderUsers(){
-  const t=document.getElementById('users-table'); if(!t) return;
-  if(!IS_ADMIN){ t.innerHTML='<tr><td class="empty">Réservé à l\'admin</td></tr>'; return; }
-  const head=`<tr><th>Utilisateur</th>${ROLES.map(r=>`<th class="num">${r.icon} ${r.label}</th>`).join('')}</tr>`;
-  const rows=PROFILES.length?PROFILES.map(p=>{
+  const box=document.getElementById('users-list'); if(!box) return;
+  if(!IS_ADMIN){ box.innerHTML='<div class="hint">Réservé à l\'admin</div>'; return; }
+  if(!PROFILES.length){ box.innerHTML='<div class="hint">Aucun utilisateur (les profils apparaissent après leur première connexion)</div>'; return; }
+  box.innerHTML=PROFILES.map(p=>{
     const extra=Array.isArray(p.roles)?p.roles:[], adm=p.role==='admin';
-    const cells=ROLES.map(r=>{
+    const checks=ROLES.map(r=>{
       const base=p.role===r.key, checked=base||adm||extra.includes(r.key), dis=base||adm;
-      return `<td class="num"><input type="checkbox" ${checked?'checked':''} ${dis?'disabled':''} onchange="toggleRole('${p.id}','${r.key}',this.checked)"></td>`;
+      return `<label class="chk" style="margin:0"><input type="checkbox" ${checked?'checked':''} ${dis?'disabled':''} onchange="toggleRole('${p.id}','${r.key}',this.checked)"> ${r.icon} ${r.label}</label>`;
     }).join('');
-    return `<tr><td>${esc(p.nom||p.email)}${adm?' <span class="tag">admin</span>':''}</td>${cells}</tr>`;
-  }).join(''):'<tr><td class="empty">Aucun utilisateur (les profils apparaissent après leur première connexion)</td></tr>';
-  t.innerHTML=head+rows;
+    const isCom=adm||hasRole(p,'commercial');
+    let addr='';
+    if(isCom){
+      const geo=(p.lat!=null&&p.lng!=null)?'<span class="hint">📍 géolocalisé</span>':'<span class="hint">adresse non géolocalisée (le sera au 1er usage)</span>';
+      addr=`<div class="row" style="margin-top:8px">
+        <div class="field" style="flex:2"><label>Adresse domicile</label><input value="${esc(p.adresse||'')}" placeholder="N° et rue" onchange="updUserProfile('${p.id}','adresse',this.value)"></div>
+        <div class="field sm"><label>Code postal</label><input value="${esc(p.code_postal||'')}" onchange="updUserProfile('${p.id}','code_postal',this.value)"></div>
+        <div class="field"><label>Ville</label><input value="${esc(p.ville||'')}" onchange="updUserProfile('${p.id}','ville',this.value)"></div>
+      </div><div style="margin-top:2px">${geo}</div>`;
+    }
+    return `<div class="subcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <b>${esc(p.nom||p.email)}</b>${adm?' <span class="tag">admin</span>':''}
+      <span style="flex:1"></span>${checks}</div>${addr}</div>`;
+  }).join('');
 }
 async function toggleRole(userId,role,on){
   const p=PROFILES.find(x=>x.id===userId); if(!p) return;
@@ -1194,7 +1232,15 @@ async function toggleRole(userId,role,on){
   if(error){ toast('Erreur : '+error.message); renderUsers(); return; }
   p.roles=roles; toast('Rôles mis à jour ✓');
   if(userId===(SESSION&&SESSION.user.id)) MY_ROLES=IS_ADMIN?MY_ROLES:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),...roles]));
-  fillSelects();
+  fillSelects(); renderUsers();
+}
+async function updUserProfile(id,field,val){
+  const patch={[field]:val||null};
+  if(field==='adresse'||field==='code_postal'||field==='ville'){ patch.lat=null; patch.lng=null; } // forcer un nouveau géocodage
+  const {error}=await db.from('pv_profiles').update(patch).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  const p=PROFILES.find(x=>x.id===id); if(p) Object.assign(p,patch);
+  toast('Enregistré ✓'); renderUsers();
 }
 async function saveSettings(){
   const val={ commission_telepro:Number(document.getElementById('set-comm').value)||0, commission_condition:document.getElementById('set-cond').value };
