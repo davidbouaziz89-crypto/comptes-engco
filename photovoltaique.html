@@ -309,6 +309,10 @@
         </div>
         <label>Source</label><select id="lv-source"></select>
         <label>Télépro attribué <span class="hint" id="lv-owner-hint"></span></label><select id="lv-owner-telepro"></select>
+        <div class="s-sep" style="margin:16px 0 10px"></div>
+        <div style="font-weight:700;margin-bottom:8px">Statuts par étape</div>
+        <div id="lv-statuts"></div>
+        <div class="s-sep" style="margin:16px 0 10px"></div>
         <label>Notes</label><textarea id="lv-notes" rows="3"></textarea>
         <div class="quick" id="lv-quick" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
         <div style="display:flex;justify-content:flex-end;margin-top:12px">
@@ -524,7 +528,7 @@ async function openLead(id){
   g('lv-source').value=l.source||''; g('lv-owner-telepro').value=l.owner_telepro||''; g('lv-notes').value=l.notes||'';
   g('lv-del').classList.toggle('hidden',!IS_ADMIN);
   g('doc-upbtn').classList.toggle('hidden',false);
-  renderQuick(); renderBudgetCards();
+  renderQuick(); renderBudgetCards(); renderStatuts();
   showLeadTab('suivi');
   document.getElementById('lead-view').classList.remove('hidden'); window.scrollTo(0,0);
 }
@@ -639,7 +643,12 @@ function commercialSelect(ed){
 function statutSelect(role){
   const ed=canEdit(role); const field='statut_'+role; const list=statutsFor(role);
   const opts='<option value="">— Aucun —</option>'+list.map(s=>`<option value="${s.id}" ${curLead[field]===s.id?'selected':''}>${esc(s.nom)}</option>`).join('');
-  return `<label>Statut ${roleLabel(role)}</label><select ${ed?'':'disabled'} onchange="updLead({${field}:this.value||null},'Statut enregistré').then(()=>renderSuivi())">${opts}</select>`;
+  return `<label>Statut ${roleLabel(role)}${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="updLead({${field}:this.value||null},'Statut enregistré').then(()=>renderStatuts())">${opts}</select>`;
+}
+// Bloc "Statuts par étape" dans les infos client : un statut par rôle, éditable seulement par le rôle concerné (ou admin)
+function renderStatuts(){
+  const box=document.getElementById('lv-statuts'); if(!box||!curLead) return;
+  box.innerHTML=ROLES.map(r=>statutSelect(r.key)).join('');
 }
 function dateField(field,label,role){
   const ed=canEdit(role);
@@ -699,7 +708,6 @@ function rolePanelHTML(role){
   const ed=canEdit(role);
   let h='';
   if(!ed) h+=`<div class="hint" style="margin-bottom:10px">🔒 Lecture seule (réservé au rôle ${roleLabel(role)} ou à l'admin).</div>`;
-  h+=statutSelect(role);
   if(role==='telepro'){
     // Profil client
     h+=`<div class="grid2"><div>${numField('age','Âge du client',ed)}</div><div>${enumSelect('situation_familiale','Situation familiale',SIT_FAM,ed)}</div></div>`;
