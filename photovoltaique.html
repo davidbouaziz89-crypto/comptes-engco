@@ -418,7 +418,10 @@ const ROLES=[
   {key:'confirmateur',label:'Confirmateur',icon:'✅'},
   {key:'commercial',label:'Commercial',icon:'🤝'},
 ];
-const roleLabel=k=>{ const r=ROLES.find(x=>x.key===k); return r?r.label:k; };
+const ROLE_CQ={key:'cq',label:'CQ',icon:'🔍'};
+// Rôles assignables aux utilisateurs (CQ est un rôle mais pas une étape du pipeline)
+const ASSIGN_ROLES=[...ROLES,ROLE_CQ];
+const roleLabel=k=>{ const r=ASSIGN_ROLES.find(x=>x.key===k); return r?r.label:k; };
 const STAGES=[
   {key:'telepro',label:'Télépro',color:'#3b82f6'},
   {key:'confirmateur',label:'Confirmateur',color:'#8a5cff'},
@@ -730,6 +733,11 @@ function confirmateurSelect(ed){
   const opts='<option value="">— Aucun confirmateur —</option>'+cons.map(p=>`<option value="${p.id}" ${curLead.owner_confirmateur===p.id?'selected':''}>${esc(p.nom||p.email)}</option>`).join('');
   return `<label>Confirmateur assigné (pour le rappel)</label><select ${ed?'':'disabled'} onchange="updLead({owner_confirmateur:this.value||null},'Confirmateur assigné')">${opts}</select>`;
 }
+function cqSelect(ed){
+  const list=PROFILES.filter(p=>hasRole(p,'cq'));
+  const opts='<option value="">— Aucun contrôleur qualité —</option>'+list.map(p=>`<option value="${p.id}" ${curLead.owner_cq===p.id?'selected':''}>${esc(p.nom||p.email)}</option>`).join('');
+  return `<label>Contrôleur qualité assigné</label><select ${ed?'':'disabled'} onchange="updLead({owner_cq:this.value||null},'CQ assigné').then(()=>renderSuivi())">${opts}</select>`;
+}
 /* -- Crédits en cours (liste dynamique) -- */
 function leadCredits(){ return Array.isArray(curLead.credits)?curLead.credits:[]; }
 function creditsTotal(){ return leadCredits().reduce((s,c)=>s+(Number(c.montant)||0),0); }
@@ -920,8 +928,14 @@ function rolePanelHTML(role){
     h+=`<div class="s-sep"></div>`+financementHTML(ed);
     h+=`<div class="s-sep"></div><div class="grid2"><div>${ouiNonSelect('dossier_complet','Dossier complet ?',ed)}</div>
       <div><label>Documents manquants</label><input ${ed?'':'disabled'} placeholder="Ex : fiche contact" value="${esc(curLead.docs_manquants||'')}" onchange="updLead({docs_manquants:this.value||null})"></div></div>`;
-    h+=`<label>Horaire CQ (contrôle qualité)</label><input ${ed?'':'disabled'} placeholder="Ex : Demain 14h" value="${esc(curLead.horaire_cq||'')}" onchange="updLead({horaire_cq:this.value||null})">`;
-    h+=`<label>Commentaires</label><textarea ${ed?'':'disabled'} placeholder="Ex : Client top, RAS, on fonce." onchange="updLead({commentaire_commercial:this.value||null})">${esc(curLead.commentaire_commercial||'')}</textarea>`;
+    h+=`<div class="s-sep"></div><div style="font-weight:700;margin-bottom:8px">🔍 RDV Contrôle Qualité (CQ)</div>`;
+    h+=cqSelect(ed);
+    const _cq=PROFILES.find(p=>p.id===curLead.owner_cq);
+    if(curLead.rdv_cq_date){
+      h+=`<div class="hint" style="margin:8px 0">RDV CQ : <b style="color:var(--txt)">${_cq?esc(_cq.nom||_cq.email)+' · ':''}${new Date(curLead.rdv_cq_date.slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR')}${curLead.rdv_cq_heure?' à '+curLead.rdv_cq_heure:''}</b></div>`;
+    } else { h+=`<div class="hint" style="margin:8px 0">Aucun RDV CQ placé.</div>`; }
+    h+=`<button class="btn" type="button" ${ed?'':'disabled'} onclick="openPlanningCQ()">📅 Placer le RDV CQ</button>`;
+    h+=`<div class="s-sep"></div><label>Commentaires</label><textarea ${ed?'':'disabled'} placeholder="Ex : Client top, RAS, on fonce." onchange="updLead({commentaire_commercial:this.value||null})">${esc(curLead.commentaire_commercial||'')}</textarea>`;
   }
   return h;
 }
@@ -972,7 +986,7 @@ async function delDoc(id){
 }
 
 /* ---------- PLANNING & DISTANCES ---------- */
-let planWeekStart=null, planCommercial=null, planConfId=null, planRender=null, planComShow=null, planComActive=null;
+let planWeekStart=null, planCommercial=null, planConfId=null, planRender=null, planComShow=null, planComActive=null, planCqId=null;
 const COM_COLORS=['#f59e0b','#3b82f6','#8a5cff','#16a34a','#ef4444','#06b6d4','#d946ef','#84cc16'];
 function commercialsList(){ return PROFILES.filter(p=>hasRole(p,'commercial')); }
 function comColor(id){ const ids=commercialsList().map(p=>p.id).sort(); const i=ids.indexOf(id); return COM_COLORS[(i<0?0:i)%COM_COLORS.length]; }
@@ -1082,6 +1096,33 @@ function renderPlanningConf(){
   const rows=calSlots().map(m=>({m,label:m%60===0?m2hhmm(m):'',half:m%60!==0,h:22}));
   document.getElementById('plan-body').innerHTML=calGrid(days,rows,events,ed,'placeConfRdv',todayISO);
   document.getElementById('plan-actions').innerHTML=`${ed?'<span class="hint" style="margin-right:auto">Cliquez un créneau libre pour placer le rappel. En orange : ce dossier.</span>':''}<button class="btn" onclick="closePlanning()">Fermer</button>`;
+}
+/* ----- Planning du contrôle qualité (CQ), fixé par le commercial ----- */
+async function openPlanningCQ(){
+  if(!curLead.owner_cq){ toast('Choisissez d\'abord un contrôleur qualité.'); return; }
+  const date=(curLead.rdv_cq_date||'').slice(0,10)||toISODate(new Date());
+  planCqId=curLead.owner_cq; planWeekStart=sundayOf(date); planRender=renderPlanningCQ;
+  document.getElementById('planning-view').classList.remove('hidden');
+  document.getElementById('plan-hint').style.display='none';
+  renderPlanningCQ();
+}
+async function placeCQRdv(dateISO,heure){
+  if(!canEdit('commercial')){ toast('Réservé au commercial / admin'); return; }
+  if(await updLead({rdv_cq_date:dateISO,rdv_cq_heure:heure},'RDV CQ placé le '+new Date(dateISO+'T00:00:00').toLocaleDateString('fr-FR')+' à '+heure)){
+    renderPlanningCQ(); if(!document.getElementById('lead-suivi').classList.contains('hidden')) renderSuivi();
+  }
+}
+function renderPlanningCQ(){
+  const cq=PROFILES.find(p=>p.id===planCqId), ed=canEdit('commercial'), todayISO=toISODate(new Date());
+  document.getElementById('plan-title').textContent='🔍 Planning CQ — '+(cq?(cq.nom||cq.email):'contrôle qualité');
+  document.getElementById('plan-nav').innerHTML=calNavHTML(planWeekStart);
+  const days=weekDays(planWeekStart), inWeek=iso=>days.some(d=>d.iso===iso);
+  let events=LEADS.filter(l=>l.owner_cq===planCqId && l.rdv_cq_date && inWeek(l.rdv_cq_date.slice(0,10)) && l.id!==curLead.id)
+    .map(l=>({date:l.rdv_cq_date.slice(0,10),m:slotOf((hhmm2m(l.rdv_cq_heure))??(CAL_START*60)),label:(l.rdv_cq_heure?l.rdv_cq_heure.slice(0,5)+' ':'')+leadName(l),kind:'other'}));
+  if(curLead.rdv_cq_date && inWeek(curLead.rdv_cq_date.slice(0,10))) events.push({date:curLead.rdv_cq_date.slice(0,10),m:slotOf((hhmm2m(curLead.rdv_cq_heure))??(CAL_START*60)),label:(curLead.rdv_cq_heure?curLead.rdv_cq_heure.slice(0,5)+' ':'')+leadName(curLead)+' (ce dossier)',kind:'proposed'});
+  const rows=calSlots().map(m=>({m,label:m%60===0?m2hhmm(m):'',half:m%60!==0,h:22}));
+  document.getElementById('plan-body').innerHTML=calGrid(days,rows,events,ed,'placeCQRdv',todayISO);
+  document.getElementById('plan-actions').innerHTML=`${ed?'<span class="hint" style="margin-right:auto">Cliquez un créneau libre pour placer le RDV CQ. En orange : ce dossier.</span>':''}<button class="btn" onclick="closePlanning()">Fermer</button>`;
 }
 function closePlanning(){ document.getElementById('planning-view').classList.add('hidden'); }
 function shiftWeek(n){ planWeekStart=new Date(planWeekStart); planWeekStart.setDate(planWeekStart.getDate()+n*7); (planRender||renderPlanning)(); }
@@ -1375,7 +1416,7 @@ function renderUsers(){
   if(!PROFILES.length){ box.innerHTML='<div class="hint">Aucun utilisateur (les profils apparaissent après leur première connexion)</div>'; return; }
   box.innerHTML=PROFILES.map(p=>{
     const extra=Array.isArray(p.roles)?p.roles:[], adm=p.role==='admin';
-    const checks=ROLES.map(r=>{
+    const checks=ASSIGN_ROLES.map(r=>{
       const base=p.role===r.key, checked=base||adm||extra.includes(r.key), dis=base||adm;
       return `<label class="chk" style="margin:0"><input type="checkbox" ${checked?'checked':''} ${dis?'disabled':''} onchange="toggleRole('${p.id}','${r.key}',this.checked)"> ${r.icon} ${r.label}</label>`;
     }).join('');
