@@ -140,6 +140,18 @@
   .cal-ev.other{background:#3b82f6;color:#fff}
   .cal-ev.proposed{background:var(--accent2);color:#fff;box-shadow:0 0 0 1px var(--accent2)}
   .cal-ev.warn{background:var(--bad);color:#fff}
+  /* Revalidation étape 2 : lignes info + valider/modifier */
+  .rv-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:7px;background:var(--panel2)}
+  .rv-row.ok{border-color:rgba(55,211,155,.5);background:rgba(55,211,155,.10)}
+  .rv-row.editing{flex-wrap:wrap;align-items:flex-end}
+  .rv-lab{flex:0 0 148px;color:var(--muted);font-size:13px}
+  .rv-val{flex:1;font-weight:600;font-size:14px;min-width:0;overflow-wrap:anywhere}
+  .rv-act{display:flex;gap:6px;flex-shrink:0}
+  .rv-edit{flex:1 1 100%;margin-bottom:8px}
+  .rv-badge{display:inline-flex;align-items:center;gap:4px;color:var(--good);font-weight:700;font-size:13px;white-space:nowrap}
+  .btn.rv-ok{background:var(--good);color:#052a1c;border:0}
+  .rv-done{margin-top:4px;padding:10px 12px;border-radius:9px;background:rgba(55,211,155,.12);border:1px solid rgba(55,211,155,.5);color:var(--good);font-weight:700}
+  @media(max-width:600px){.rv-lab{flex-basis:100%}.rv-val{flex-basis:100%}}
   .detail-box{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px;background:var(--panel2)}
   .subcard{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--panel)}
   .act{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
@@ -547,6 +559,7 @@ async function openLead(id){
   g('lv-source').value=l.source||''; g('lv-owner-telepro').value=l.owner_telepro||'';
   g('lv-del').classList.toggle('hidden',!IS_ADMIN);
   g('doc-upbtn').classList.toggle('hidden',false);
+  RV_EDIT=new Set();
   renderQuick(); renderBudgetCards(); renderStatuts();
   showLeadTab('suivi');
   document.getElementById('lead-view').classList.remove('hidden'); window.scrollTo(0,0);
@@ -742,6 +755,63 @@ function qualifFieldsHTML(ed){
   h+=`<div class="s-sep"></div><label>Disponibilité du client (pour le rappel du confirmateur)</label><textarea ${ed?'':'disabled'} placeholder="Ex : en semaine après 18h, samedi matin…" onchange="updLead({disponibilite:this.value||null})">${esc(curLead.disponibilite||'')}</textarea>`;
   return h;
 }
+/* ===== Revalidation étape 2 : chaque info affichée, à Valider (vert) ou Modifier ===== */
+let RV_EDIT=new Set();
+function chauffageLabel(v){ const c=CHAUFFAGE.find(x=>x[0]===v); return c?c[1]:'—'; }
+function creditsSummary(){ const l=leadCredits(); if(!l.length) return 'Aucun crédit'; return l.length+' crédit'+(l.length>1?'s':'')+' · total '+eur(creditsTotal())+' /mois'; }
+function consoElecField(ed){ return `<label>Conso élec (€/mois)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant_facture!=null?curLead.montant_facture:''}" onchange="updLead({montant_facture:this.value===''?null:Number(this.value)})">`; }
+function consoGazField(ed){ return `<label>Conso gaz (€/mois)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.conso_gaz!=null?curLead.conso_gaz:''}" onchange="updLead({conso_gaz:this.value===''?null:Number(this.value)})">`; }
+function dispoField(ed){ return `<label>Disponibilité du client</label><textarea ${ed?'':'disabled'} onchange="updLead({disponibilite:this.value||null})">${esc(curLead.disponibilite||'')}</textarea>`; }
+function rvFields(){
+  const tc=curLead.type_chauffage;
+  const f=[
+    {k:'age',lab:'Âge',val:curLead.age!=null?curLead.age+' ans':'—',edit:consoNo=>numField('age','Âge du client',consoNo)},
+    {k:'situation_familiale',lab:'Situation familiale',val:esc(curLead.situation_familiale||'—'),edit:e=>enumSelect('situation_familiale','Situation familiale',SIT_FAM,e)},
+    {k:'nb_enfants',lab:'Enfants à charge',val:curLead.nb_enfants!=null?String(curLead.nb_enfants):'—',edit:e=>numField('nb_enfants','Nombre d\'enfants à charge',e)},
+    {k:'statut_pro',lab:'Statut professionnel',val:esc(curLead.statut_pro||'—'),edit:e=>enumSelect('statut_pro','Statut professionnel',STATUT_PRO,e)},
+    {k:'type_logement',lab:'Type de logement',val:esc(curLead.type_logement||'—'),edit:e=>textField('type_logement','Type de logement',e,'Maison / Appartement')},
+    {k:'zone_abh',lab:'Maison en zone ABH',val:curLead.zone_abh==null?'—':(curLead.zone_abh?'Oui':'Non'),edit:e=>ouiNonSelect('zone_abh','Maison en zone ABH ?',e)},
+    {k:'type_chauffage',lab:'Type de chauffage',val:esc(chauffageLabel(tc)),edit:e=>chauffageSelect(e)},
+  ];
+  if(tc==='elec'||tc==='both') f.push({k:'montant_facture',lab:'Conso élec',val:curLead.montant_facture!=null?eur(curLead.montant_facture)+' /mois':'—',edit:consoElecField});
+  if(tc==='gaz'||tc==='both') f.push({k:'conso_gaz',lab:'Conso gaz',val:curLead.conso_gaz!=null?eur(curLead.conso_gaz)+' /mois':'—',edit:consoGazField});
+  f.push({k:'credits',lab:'Crédits en cours',val:esc(creditsSummary()),edit:creditsHTML});
+  f.push({k:'disponibilite',lab:'Disponibilité',val:esc(curLead.disponibilite||'—'),edit:dispoField});
+  return f;
+}
+function revalidHTML(){
+  const ed=canEdit('confirmateur');
+  const rv=(curLead.revalid&&typeof curLead.revalid==='object')?curLead.revalid:{};
+  const fields=rvFields(), done=fields.filter(f=>rv[f.k]).length, all=done===fields.length;
+  let h=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+    <span class="hint" style="flex:1">🔎 Revalidez chaque info : « ✓ Valider » si correcte, « ✎ Modifier » sinon. (${done}/${fields.length})</span>
+    ${ed&&!all?`<button class="btn small rv-ok" type="button" onclick="rvValidateAll()">✓ Tout valider</button>`:''}</div>`;
+  fields.forEach(f=>{
+    if(RV_EDIT.has(f.k)){
+      h+=`<div class="rv-row editing"><div class="rv-edit">${f.edit(ed)}</div><div class="rv-act"><button class="btn small" type="button" onclick="rvDone('${f.k}')">💾 OK</button></div></div>`;
+    } else {
+      const ok=!!rv[f.k];
+      h+=`<div class="rv-row ${ok?'ok':''}"><div class="rv-lab">${esc(f.lab)}</div><div class="rv-val">${f.val}</div><div class="rv-act">`;
+      if(ok) h+=`<span class="rv-badge">✓ Validé</span>`;
+      else if(ed) h+=`<button class="btn small rv-ok" type="button" onclick="rvValidate('${f.k}')">✓ Valider</button>`;
+      if(ed) h+=`<button class="btn ghost small" type="button" onclick="rvEdit('${f.k}')">✎ Modifier</button>`;
+      h+=`</div></div>`;
+    }
+  });
+  if(all) h+=`<div class="rv-done">✅ Toutes les infos ont été revalidées.</div>`;
+  return h;
+}
+async function saveRevalid(rv){
+  curLead.revalid=rv;
+  const all=rvFields().every(f=>rv[f.k]);
+  const patch={revalid:rv};
+  if(all!==!!curLead.infos_confirmees) patch.infos_confirmees=all;
+  await updLead(patch); renderSuivi();
+}
+function rvValidate(k){ const rv={...(curLead.revalid||{})}; rv[k]=true; saveRevalid(rv); }
+function rvValidateAll(){ const rv={}; rvFields().forEach(f=>rv[f.k]=true); saveRevalid(rv); }
+function rvEdit(k){ RV_EDIT.add(k); const rv={...(curLead.revalid||{})}; delete rv[k]; saveRevalid(rv); }
+function rvDone(k){ RV_EDIT.delete(k); renderSuivi(); }
 function rolePanelHTML(role){
   const ed=canEdit(role);
   let h='';
@@ -756,10 +826,8 @@ function rolePanelHTML(role){
     h+=`<button class="btn" type="button" style="margin-top:10px" ${ed?'':'disabled'} onclick="openPlanningConf()">📅 Voir le planning du confirmateur</button>`;
     h+=`<div class="hint" style="margin-top:6px">L'attribution du télépro se règle dans la fiche à gauche.</div>`;
   } else if(role==='confirmateur'){
-    // 1) Revalidation des infos de l'étape 1
-    h+=`<div class="hint" style="margin-bottom:8px">🔎 Revalidez les infos recueillies par le télépro et corrigez si besoin.</div>`;
-    h+=qualifFieldsHTML(ed);
-    h+=`<div class="s-sep"></div>`+checkField('infos_confirmees','Infos vérifiées et confirmées ✅','confirmateur');
+    // 1) Revalidation des infos de l'étape 1 (affichées, à Valider / Modifier)
+    h+=revalidHTML();
     // 2) Programmation du RDV commercial (pose)
     h+=`<div class="s-sep"></div><div style="font-weight:700;margin-bottom:8px">📅 RDV commercial (pose)</div>`;
     h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
