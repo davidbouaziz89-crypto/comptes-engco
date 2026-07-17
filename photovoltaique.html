@@ -1244,11 +1244,22 @@ function renderParams(){
   document.getElementById('set-cond').value=SETTINGS.commission_condition||'signe_installe';
   renderUsers(); renderProduits(); renderStatutTables(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_client_types','ct-table',CTYPES); renderRef('pv_doc_types','dt-table',DOCTYPES);
 }
+let PROD_EDIT=new Set();
 function renderProduits(){
   const box=document.getElementById('prod-tables'); if(!box) return;
   box.innerHTML=PRODUIT_CATS.map(([key,label])=>{
     const list=PRODUITS.filter(p=>p.categorie===key).sort((a,b)=>(a.ordre||0)-(b.ordre||0));
-    const rows=list.length?list.map(p=>`<tr><td>${esc(p.nom)}</td><td class="num">${eur(p.prix_ht)}</td><td class="num">${eur(p.prix_vente_ttc)}</td><td class="num">${IS_ADMIN?`<button class="btn danger small" onclick="delProduit('${p.id}')">Suppr.</button>`:''}</td></tr>`).join(''):'<tr><td class="empty" colspan="4">Aucun produit</td></tr>';
+    const rows=list.length?list.map(p=>{
+      if(IS_ADMIN&&PROD_EDIT.has(p.id)){
+        return `<tr>
+          <td><input id="prod-e-nom-${p.id}" value="${esc(p.nom||'')}"></td>
+          <td class="num"><input id="prod-e-ht-${p.id}" type="number" step="0.01" min="0" value="${p.prix_ht!=null?p.prix_ht:''}" style="max-width:120px;text-align:right"></td>
+          <td class="num"><input id="prod-e-ttc-${p.id}" type="number" step="0.01" min="0" value="${p.prix_vente_ttc!=null?p.prix_vente_ttc:''}" style="max-width:120px;text-align:right"></td>
+          <td class="num" style="white-space:nowrap"><button class="btn small" onclick="prodSave('${p.id}')">💾</button> <button class="btn ghost small" onclick="prodCancel('${p.id}')">Annuler</button></td></tr>`;
+      }
+      const act=IS_ADMIN?`<button class="btn ghost small" onclick="prodEdit('${p.id}')">✎ Modifier</button> <button class="btn danger small" onclick="delProduit('${p.id}')">Suppr.</button>`:'';
+      return `<tr><td>${esc(p.nom)}</td><td class="num">${eur(p.prix_ht)}</td><td class="num">${eur(p.prix_vente_ttc)}</td><td class="num" style="white-space:nowrap">${act}</td></tr>`;
+    }).join(''):'<tr><td class="empty" colspan="4">Aucun produit</td></tr>';
     const form=IS_ADMIN?`<form class="row" onsubmit="addProduit(event,'${key}')" style="margin-bottom:8px">
         <div class="field"><input id="prod-nom-${key}" placeholder="Nom du produit" required></div>
         <div class="field sm"><input id="prod-prix-${key}" type="number" step="0.01" min="0" placeholder="Cession HT (€)" required></div>
@@ -1274,7 +1285,17 @@ async function delProduit(id){
   if(!confirm('Supprimer ce produit ?')) return;
   const {error}=await db.from('pv_produits').delete().eq('id',id);
   if(error){ toast('Suppression refusée : '+error.message); return; }
-  await reloadProduits();
+  PROD_EDIT.delete(id); await reloadProduits();
+}
+function prodEdit(id){ PROD_EDIT.add(id); renderProduits(); }
+function prodCancel(id){ PROD_EDIT.delete(id); renderProduits(); }
+async function prodSave(id){
+  const g=k=>document.getElementById('prod-e-'+k+'-'+id);
+  const nom=g('nom').value.trim(); if(!nom){ toast('Nom du produit requis'); return; }
+  const ht=g('ht').value, ttc=g('ttc').value;
+  const {error}=await db.from('pv_produits').update({nom,prix_ht:ht===''?null:Number(ht),prix_vente_ttc:ttc===''?null:Number(ttc)}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  PROD_EDIT.delete(id); await reloadProduits(); toast('Produit modifié ✓');
 }
 async function reloadProduits(){
   const {data}=await db.from('pv_produits').select('*').order('categorie').order('ordre');
