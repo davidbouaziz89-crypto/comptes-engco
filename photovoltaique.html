@@ -831,19 +831,22 @@ function catLabel(k){ const c=PRODUIT_CATS.find(x=>x[0]===k); return c?c[1]:k; }
 function leadMateriel(){ return Array.isArray(curLead.materiel)?curLead.materiel:[]; }
 async function saveMateriel(arr){ curLead.materiel=arr; await updLead({materiel:arr}); renderSuivi(); }
 function addMateriel(id){ const p=PRODUITS.find(x=>x.id===id); if(!p) return; saveMateriel([...leadMateriel(),{id:p.id,nom:p.nom,categorie:p.categorie,qte:1}]); }
+function addMaterielLibre(){ const el=document.getElementById('mat-libre'); const nom=(el&&el.value||'').trim(); if(!nom) return; if(el) el.value=''; saveMateriel([...leadMateriel(),{id:null,nom,categorie:'libre',qte:1}]); }
 function updMaterielQte(i,q){ const a=leadMateriel().slice(); a[i]={...a[i],qte:Math.max(1,Number(q)||1)}; saveMateriel(a); }
 function delMateriel(i){ const a=leadMateriel().slice(); a.splice(i,1); saveMateriel(a); }
+function materielLabel(m){ return PRODUIT_CATS.some(c=>c[0]===m.categorie) ? catLabel(m.categorie)+' · '+m.nom : m.nom; }
 function materielHTML(ed){
-  let h=`<label>Matériel (catalogue)</label>`;
+  let h=`<label>Matériel</label>`;
   if(ed){
     const groups=PRODUIT_CATS.map(([k,lab])=>{ const list=PRODUITS.filter(p=>p.categorie===k); return list.length?`<optgroup label="${lab}">`+list.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('')+`</optgroup>`:''; }).join('');
-    h+=`<select onchange="if(this.value){addMateriel(this.value);this.value='';}"><option value="">+ Ajouter un produit…</option>${groups}</select>`;
+    h+=`<select onchange="if(this.value){addMateriel(this.value);this.value='';}"><option value="">+ Ajouter un produit du catalogue…</option>${groups}</select>`;
+    h+=`<div class="row" style="margin-top:6px;gap:8px"><div class="field" style="flex:2"><input id="mat-libre" placeholder="ou produit libre (ex : PV 3.5 kWc)" onkeydown="if(event.key==='Enter'){event.preventDefault();addMaterielLibre();}"></div><button class="btn ghost small" type="button" onclick="addMaterielLibre()">+ Ajouter</button></div>`;
   }
   const items=leadMateriel();
   if(!items.length) h+=`<div class="hint" style="margin-top:6px">Aucun produit ajouté.</div>`;
   items.forEach((m,i)=>{
     h+=`<div class="row" style="margin-top:6px;align-items:flex-end;gap:8px">
-      <div class="field" style="flex:2"><input value="${esc(catLabel(m.categorie)+' · '+m.nom)}" disabled></div>
+      <div class="field" style="flex:2"><input value="${esc(materielLabel(m))}" disabled></div>
       <div class="field sm" style="flex:0 0 84px"><label style="margin:0">Qté</label><input type="number" min="1" value="${m.qte||1}" ${ed?'':'disabled'} onchange="updMaterielQte(${i},this.value)"></div>
       ${ed?`<button class="btn danger small" type="button" onclick="delMateriel(${i})" title="Retirer">✕</button>`:''}</div>`;
   });
