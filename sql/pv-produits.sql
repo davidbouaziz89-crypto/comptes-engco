@@ -1,7 +1,7 @@
 -- CRM Photovoltaïque — catalogue produits (3 catégories : PV, Pack, Split) avec prix HT
 create table if not exists public.pv_produits (
   id         uuid primary key default gen_random_uuid(),
-  categorie  text not null,            -- 'pv' | 'pack' | 'split'
+  categorie  text not null,            -- 'pv' | 'pac' | 'split'
   nom        text not null,
   prix_ht    numeric,
   ordre      int  not null default 0,
