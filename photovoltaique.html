@@ -289,10 +289,7 @@
           <span style="font-weight:600">Informations client</span>
         </div>
         <h3 id="lv-name" style="margin:0 0 12px">—</h3>
-        <div class="grid2">
-          <div><label>Civilité</label><select id="lv-civilite"><option value="">—</option><option>M.</option><option>Mme</option></select></div>
-          <div><label>Type de client</label><select id="lv-type"></select></div>
-        </div>
+        <label>Civilité</label><select id="lv-civilite"><option value="">—</option><option>M.</option><option>Mme</option></select>
         <div class="grid2">
           <div><label>Prénom</label><input id="lv-prenom"></div>
           <div><label>Nom</label><input id="lv-nom"></div>
@@ -312,8 +309,6 @@
         <div class="s-sep" style="margin:16px 0 10px"></div>
         <div style="font-weight:700;margin-bottom:8px">Statuts par étape</div>
         <div id="lv-statuts"></div>
-        <div class="s-sep" style="margin:16px 0 10px"></div>
-        <label>Notes</label><textarea id="lv-notes" rows="3"></textarea>
         <div class="quick" id="lv-quick" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
         <div style="display:flex;justify-content:flex-end;margin-top:12px">
           <button class="btn" id="lv-save" onclick="saveLeadInfo()">💾 Enregistrer</button>
@@ -466,7 +461,6 @@ function fillSelects(){
   const ot=document.getElementById('lv-owner-telepro'); if(ot) ot.disabled=!IS_ADMIN;
   const oh=document.getElementById('lv-owner-hint'); if(oh) oh.textContent=IS_ADMIN?'(vous attribuez le lead)':'(attribué par l\'admin)';
   set('lv-source','<option value="">— Aucune —</option>'+SOURCES.map(s=>`<option value="${esc(s.nom)}">${esc(s.nom)}</option>`).join(''));
-  set('lv-type','<option value="">— Non précisé —</option>'+CTYPES.map(c=>`<option value="${esc(c.nom)}">${esc(c.nom)}</option>`).join(''));
   set('doc-type','<option value="">— Type de document —</option>'+DOCTYPES.map(d=>`<option value="${esc(d.nom)}">${esc(d.nom)}</option>`).join(''));
   set('st-role',ROLES.map(r=>`<option value="${r.key}">${r.icon} ${r.label}</option>`).join(''));
 }
@@ -521,11 +515,11 @@ async function openLead(id){
   const g=i=>document.getElementById(i);
   g('lv-num').textContent='Client N° '+(l.numero||'—');
   g('lv-name').textContent=leadName(l);
-  g('lv-civilite').value=l.civilite||''; g('lv-type').value=l.type_client||'';
+  g('lv-civilite').value=l.civilite||'';
   g('lv-prenom').value=l.prenom||''; g('lv-nom').value=l.nom||''; g('lv-email').value=l.email||'';
   g('lv-telephone').value=l.telephone||''; g('lv-telephone2').value=l.telephone2||'';
   g('lv-adresse').value=l.adresse||''; g('lv-cp').value=l.code_postal||''; g('lv-ville').value=l.ville||'';
-  g('lv-source').value=l.source||''; g('lv-owner-telepro').value=l.owner_telepro||''; g('lv-notes').value=l.notes||'';
+  g('lv-source').value=l.source||''; g('lv-owner-telepro').value=l.owner_telepro||'';
   g('lv-del').classList.toggle('hidden',!IS_ADMIN);
   g('doc-upbtn').classList.toggle('hidden',false);
   renderQuick(); renderBudgetCards(); renderStatuts();
@@ -551,11 +545,11 @@ function renderBudgetCards(){
 async function saveLeadInfo(){
   if(!curLead) return;
   const g=i=>document.getElementById(i).value;
-  const patch={ civilite:g('lv-civilite')||null, type_client:g('lv-type')||null,
+  const patch={ civilite:g('lv-civilite')||null,
     prenom:g('lv-prenom')||null, nom:g('lv-nom')||null, email:g('lv-email')||null,
     telephone:g('lv-telephone')||null, telephone2:g('lv-telephone2')||null,
     adresse:g('lv-adresse')||null, code_postal:g('lv-cp')||null, ville:g('lv-ville')||null,
-    source:g('lv-source')||null, notes:g('lv-notes')||null };
+    source:g('lv-source')||null };
   if(IS_ADMIN) patch.owner_telepro=g('lv-owner-telepro')||null;
   const btn=document.getElementById('lv-save'); btn.disabled=true; btn.textContent='Enregistrement…';
   const ok=await updLead(patch); btn.disabled=false; btn.textContent='💾 Enregistrer';
