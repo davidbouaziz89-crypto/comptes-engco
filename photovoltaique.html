@@ -742,7 +742,7 @@ function qualifFieldsHTML(ed){
   let h='';
   h+=`<div class="grid2"><div>${numField('age','Âge du client',ed)}</div><div>${enumSelect('situation_familiale','Situation familiale',SIT_FAM,ed)}</div></div>`;
   h+=`<div class="grid2"><div>${numField('nb_enfants','Nombre d\'enfants à charge',ed)}</div><div>${enumSelect('statut_pro','Statut professionnel',STATUT_PRO,ed)}</div></div>`;
-  h+=`<div class="grid2"><div>${textField('type_logement','Type de logement',ed,'Maison / Appartement')}</div><div>${ouiNonSelect('zone_abh','Maison en zone ABH ?',ed)}</div></div>`;
+  h+=ouiNonSelect('zone_abh','Maison en zone ABH ?',ed);
   h+=chauffageSelect(ed);
   const tc=curLead.type_chauffage;
   if(tc==='elec'||tc==='both'||tc==='gaz'){
@@ -769,7 +769,6 @@ function rvFields(){
     {k:'situation_familiale',lab:'Situation familiale',val:esc(curLead.situation_familiale||'—'),edit:e=>enumSelect('situation_familiale','Situation familiale',SIT_FAM,e)},
     {k:'nb_enfants',lab:'Enfants à charge',val:curLead.nb_enfants!=null?String(curLead.nb_enfants):'—',edit:e=>numField('nb_enfants','Nombre d\'enfants à charge',e)},
     {k:'statut_pro',lab:'Statut professionnel',val:esc(curLead.statut_pro||'—'),edit:e=>enumSelect('statut_pro','Statut professionnel',STATUT_PRO,e)},
-    {k:'type_logement',lab:'Type de logement',val:esc(curLead.type_logement||'—'),edit:e=>textField('type_logement','Type de logement',e,'Maison / Appartement')},
     {k:'zone_abh',lab:'Maison en zone ABH',val:curLead.zone_abh==null?'—':(curLead.zone_abh?'Oui':'Non'),edit:e=>ouiNonSelect('zone_abh','Maison en zone ABH ?',e)},
     {k:'type_chauffage',lab:'Type de chauffage',val:esc(chauffageLabel(tc)),edit:e=>chauffageSelect(e)},
   ];
