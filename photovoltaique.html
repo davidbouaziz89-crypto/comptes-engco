@@ -431,6 +431,8 @@ const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
 const SIT_FAM=['Marié(e)','Pacsé(e)','Concubinage','Célibataire','Divorcé(e)','Veuf(ve)'];
 const STATUT_PRO=['CDI','CDD','Indépendant','Retraité','Sans activité'];
 const CHAUFFAGE=[['elec','Électrique'],['gaz','Gaz'],['both','Élec + Gaz']];
+const ORIENTATIONS=['Nord','Nord-Est','Est','Sud-Est','Sud','Sud-Ouest','Ouest','Nord-Ouest'];
+const CHAUFFAGE_MODES=['Électrique','Gaz','Pompe à chaleur','Bois','Fioul','Autre'];
 
 function eur(n){ if(n==null||n===''||isNaN(Number(n))) return '—'; return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €'; }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -823,6 +825,60 @@ function rvValidate(k){ const rv={...(curLead.revalid||{})}; rv[k]=true; saveRev
 function rvValidateAll(){ const rv={}; rvFields().forEach(f=>rv[f.k]=true); saveRevalid(rv); }
 function rvEdit(k){ RV_EDIT.add(k); const rv={...(curLead.revalid||{})}; delete rv[k]; saveRevalid(rv); }
 function rvDone(k){ RV_EDIT.delete(k); renderSuivi(); }
+/* ===== Étape 3 (Commercial) : rapport de vente ===== */
+function catLabel(k){ const c=PRODUIT_CATS.find(x=>x[0]===k); return c?c[1]:k; }
+// Matériel : sélection depuis le catalogue + quantités
+function leadMateriel(){ return Array.isArray(curLead.materiel)?curLead.materiel:[]; }
+async function saveMateriel(arr){ curLead.materiel=arr; await updLead({materiel:arr}); renderSuivi(); }
+function addMateriel(id){ const p=PRODUITS.find(x=>x.id===id); if(!p) return; saveMateriel([...leadMateriel(),{id:p.id,nom:p.nom,categorie:p.categorie,qte:1}]); }
+function updMaterielQte(i,q){ const a=leadMateriel().slice(); a[i]={...a[i],qte:Math.max(1,Number(q)||1)}; saveMateriel(a); }
+function delMateriel(i){ const a=leadMateriel().slice(); a.splice(i,1); saveMateriel(a); }
+function materielHTML(ed){
+  let h=`<label>Matériel (catalogue)</label>`;
+  if(ed){
+    const groups=PRODUIT_CATS.map(([k,lab])=>{ const list=PRODUITS.filter(p=>p.categorie===k); return list.length?`<optgroup label="${lab}">`+list.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('')+`</optgroup>`:''; }).join('');
+    h+=`<select onchange="if(this.value){addMateriel(this.value);this.value='';}"><option value="">+ Ajouter un produit…</option>${groups}</select>`;
+  }
+  const items=leadMateriel();
+  if(!items.length) h+=`<div class="hint" style="margin-top:6px">Aucun produit ajouté.</div>`;
+  items.forEach((m,i)=>{
+    h+=`<div class="row" style="margin-top:6px;align-items:flex-end;gap:8px">
+      <div class="field" style="flex:2"><input value="${esc(catLabel(m.categorie)+' · '+m.nom)}" disabled></div>
+      <div class="field sm" style="flex:0 0 84px"><label style="margin:0">Qté</label><input type="number" min="1" value="${m.qte||1}" ${ed?'':'disabled'} onchange="updMaterielQte(${i},this.value)"></div>
+      ${ed?`<button class="btn danger small" type="button" onclick="delMateriel(${i})" title="Retirer">✕</button>`:''}</div>`;
+  });
+  return h;
+}
+// Aides : liste de montants qui s'additionnent
+function leadAides(){ return Array.isArray(curLead.aides)?curLead.aides:[]; }
+function aidesTotal(){ return leadAides().reduce((s,a)=>s+(Number(a.montant)||0),0); }
+async function saveAides(arr){ curLead.aides=arr; await updLead({aides:arr}); renderSuivi(); }
+function addAide(){ saveAides([...leadAides(),{label:'',montant:null}]); }
+function delAide(i){ const a=leadAides().slice(); a.splice(i,1); saveAides(a); }
+function updAide(i,f,v){ const a=leadAides().slice(); a[i]={...a[i],[f]:v}; saveAides(a); }
+function aidesHTML(ed){
+  const list=leadAides(); let h=`<label>Aides</label>`;
+  if(!list.length) h+=`<div class="hint" style="margin-bottom:6px">Aucune aide.</div>`;
+  list.forEach((a,i)=>{ h+=`<div class="row" style="margin-bottom:6px;align-items:flex-end;gap:8px">
+    <div class="field" style="flex:2"><input ${ed?'':'disabled'} placeholder="Libellé (MPR, prime…)" value="${esc(a.label||'')}" onchange="updAide(${i},'label',this.value)"></div>
+    <div class="field sm" style="flex:1"><input type="number" step="0.01" ${ed?'':'disabled'} placeholder="€" value="${a.montant!=null?a.montant:''}" onchange="updAide(${i},'montant',this.value===''?null:Number(this.value))"></div>
+    ${ed?`<button class="btn danger small" type="button" onclick="delAide(${i})">✕</button>`:''}</div>`; });
+  if(ed) h+=`<button class="btn ghost small" type="button" onclick="addAide()">+ Ajouter une aide</button>`;
+  h+=`<div style="margin-top:8px;font-weight:700">Total aides : ${eur(aidesTotal())}</div>`;
+  return h;
+}
+function financementHTML(ed){
+  const mode=curLead.financement_mode||'';
+  let h=`<label>Financement / Comptant</label><select ${ed?'':'disabled'} onchange="updLead({financement_mode:this.value||null}).then(()=>renderSuivi())">
+    <option value="">— À préciser —</option>
+    <option value="comptant" ${mode==='comptant'?'selected':''}>Comptant</option>
+    <option value="financement" ${mode==='financement'?'selected':''}>Financement</option></select>`;
+  if(mode==='financement'){
+    h+=`<div class="grid2"><div><label>Financeur</label><input ${ed?'':'disabled'} placeholder="Ex : Domofinance" value="${esc(curLead.financeur||'')}" onchange="updLead({financeur:this.value||null})"></div>
+      <div><label>Durée (ans)</label><input type="number" min="1" ${ed?'':'disabled'} value="${curLead.financement_duree!=null?curLead.financement_duree:''}" onchange="updLead({financement_duree:this.value===''?null:Number(this.value)})"></div></div>`;
+  }
+  return h;
+}
 function rolePanelHTML(role){
   const ed=canEdit(role);
   let h='';
@@ -849,11 +905,20 @@ function rolePanelHTML(role){
     }
     h+=`<button class="btn" type="button" ${ed?'':'disabled'} onclick="openPlanning()">📅 Placer le RDV (choisir le commercial et le créneau)</button>`;
   } else if(role==='commercial'){
-    h+=ownerSelect('owner_commercial','commercial');
-    h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
-    h+=`<div class="grid2"><div>${checkField('signe','Dossier signé','commercial')}</div><div>${dateField('date_signature','Date de signature','commercial')}</div></div>`;
-    h+=`<div class="grid2"><div>${checkField('installe','Installation réalisée','commercial')}</div><div>${dateField('date_installation','Date d\'installation','commercial')}</div></div>`;
-    h+=`<div class="grid2"><div>${checkField('paye','Dossier payé','commercial')}</div><div>${dateField('date_paiement','Date de paiement','commercial')}</div></div>`;
+    const _c=PROFILES.find(p=>p.id===curLead.owner_commercial);
+    h+=`<div class="hint" style="margin-bottom:8px">Client : <b style="color:var(--txt)">${esc(leadName(curLead))}</b>${_c?' · Commercial : <b style="color:var(--txt)">'+esc(_c.nom||_c.email)+'</b>':''}</div>`;
+    h+=`<label>Rapport</label><input ${ed?'':'disabled'} placeholder="Ex : Signé BH" value="${esc(curLead.rapport||'')}" onchange="updLead({rapport:this.value||null})">`;
+    h+=`<div class="s-sep"></div>`+materielHTML(ed);
+    h+=`<div class="s-sep"></div><label>Prix de vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Prix enregistré')">`;
+    h+=`<div class="s-sep"></div>`+aidesHTML(ed);
+    h+=`<div class="s-sep"></div><div class="grid2"><div><label>Conso client</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.conso_client!=null?curLead.conso_client:''}" onchange="updLead({conso_client:this.value===''?null:Number(this.value)})"></div>
+      <div>${enumSelect('orientation_toiture','Orientation toiture',ORIENTATIONS,ed)}</div></div>`;
+    h+=enumSelect('mode_chauffage','Mode de chauffage',CHAUFFAGE_MODES,ed);
+    h+=`<div class="s-sep"></div>`+financementHTML(ed);
+    h+=`<div class="s-sep"></div><div class="grid2"><div>${ouiNonSelect('dossier_complet','Dossier complet ?',ed)}</div>
+      <div><label>Documents manquants</label><input ${ed?'':'disabled'} placeholder="Ex : fiche contact" value="${esc(curLead.docs_manquants||'')}" onchange="updLead({docs_manquants:this.value||null})"></div></div>`;
+    h+=`<label>Horaire CQ (contrôle qualité)</label><input ${ed?'':'disabled'} placeholder="Ex : Demain 14h" value="${esc(curLead.horaire_cq||'')}" onchange="updLead({horaire_cq:this.value||null})">`;
+    h+=`<label>Commentaires</label><textarea ${ed?'':'disabled'} placeholder="Ex : Client top, RAS, on fonce." onchange="updLead({commentaire_commercial:this.value||null})">${esc(curLead.commentaire_commercial||'')}</textarea>`;
   }
   return h;
 }
