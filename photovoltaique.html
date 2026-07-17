@@ -102,6 +102,29 @@
   .step.done .dot{background:var(--good);border-color:var(--good);color:#052a1c}
   .step .s-lab{flex:1;font-size:13px}
   .step.active .s-lab{font-weight:700}
+  /* Étapes en cartes progressives (style koneckt) */
+  .steps{display:flex;flex-direction:column;gap:14px}
+  .s-title{margin:0 0 4px;font-size:16px}
+  .scard{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+  .scard.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(245,166,35,.18)}
+  .scard.done{border-color:rgba(55,211,155,.35)}
+  .scard.lost{border-color:rgba(220,38,38,.4)}
+  .s-rail{width:118px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-right:1px solid var(--line);background:var(--panel2);text-align:center}
+  .s-num{font-size:12px;color:var(--muted);font-weight:600}
+  .s-dot{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+  .s-dot.active{background:var(--accent);border-color:var(--accent);color:#241500}
+  .s-dot.done{background:var(--good);border-color:var(--good);color:#052a1c}
+  .s-dot.lost{background:var(--bad);border-color:var(--bad);color:#fff}
+  .s-cancel{margin-top:2px;background:none;border:none;color:var(--bad);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;padding:0}
+  .s-cancel:hover{text-decoration:underline}
+  .s-body{flex:1;padding:14px 16px;min-width:0}
+  .s-head{display:flex;align-items:center;gap:8px;font-weight:700;text-transform:uppercase;font-size:13px;letter-spacing:.03em;color:var(--muted);margin-bottom:12px}
+  .s-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .s-badge.active{background:var(--accent);color:#241500}
+  .s-badge.done{background:rgba(55,211,155,.15);color:var(--good);border:1px solid rgba(55,211,155,.4)}
+  .s-sep{height:1px;background:var(--line);margin:14px 0}
+  .s-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px}
+  @media(max-width:600px){.s-rail{width:84px}}
   .detail-box{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px;background:var(--panel2)}
   .subcard{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--panel)}
   .act{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
@@ -300,9 +323,7 @@
           <button id="ltab-comments" onclick="showLeadTab('comments')">💬 Commentaires</button>
         </div>
         <div id="lead-suivi">
-          <div class="stepper" id="lv-stepper"></div>
-          <div class="detail-box" id="lv-detail"></div>
-          <div id="lv-next" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-top:16px"></div>
+          <div id="lv-steps" class="steps"></div>
         </div>
         <div id="lead-docs" class="hidden">
           <div class="row" style="align-items:flex-end">
@@ -555,14 +576,52 @@ function showLeadTab(t){
 /* ---------- SUIVI PAR ÉTAPE ---------- */
 function stageIndex(k){ const i=ROLES.findIndex(r=>r.key===k); return i<0?0:i; }
 function renderSuivi(){
-  const cur=(curLead.stage==='termine')?ROLES.length:(curLead.stage==='perdu'?-1:stageIndex(curLead.stage));
-  document.getElementById('lv-stepper').innerHTML=ROLES.map((r,i)=>{
-    const cls=(i<cur?'done':(r.key===selRole?'active':''));
-    return `<button class="step ${cls}" onclick="selectRole('${r.key}')"><span class="dot">${i<cur?'✓':i+1}</span><span class="s-lab">${r.icon} ${r.label}</span></button>`;
-  }).join('');
-  renderRolePanel(); renderNext();
+  const box=document.getElementById('lv-steps');
+  // Dossier perdu : carte unique de ré-ouverture
+  if(curLead.stage==='perdu'){
+    box.innerHTML=`<h3 class="s-title">Étapes</h3>
+      <div class="scard lost">
+        <div class="s-rail"><div class="s-num">Dossier</div><div class="s-dot lost">✕</div></div>
+        <div class="s-body"><div class="s-head">Dossier perdu <span class="s-badge" style="background:rgba(220,38,38,.15);color:var(--bad);border:1px solid rgba(220,38,38,.4)">Perdu</span></div>
+          <div class="hint">Ce dossier a été marqué comme perdu.</div>
+          <div class="s-sep"></div>
+          <div class="s-foot"><button class="btn ghost small" onclick="setStage('telepro')">↩︎ Ré-ouvrir le dossier</button></div>
+        </div>
+      </div>`;
+    return;
+  }
+  const termine=curLead.stage==='termine';
+  const cur=termine?ROLES.length-1:stageIndex(curLead.stage);
+  const next=ROLES[cur+1];
+  let head=`<h3 class="s-title">Étapes</h3>`;
+  if(termine){
+    head+=`<div class="scard done">
+      <div class="s-rail"><div class="s-num">Dossier</div><div class="s-dot done">✓</div></div>
+      <div class="s-body"><div class="s-head">Dossier terminé <span class="s-badge done">Terminé</span></div>
+        <div class="hint">Toutes les étapes sont validées.</div>
+        <div class="s-sep"></div>
+        <div class="s-foot"><button class="btn ghost small" onclick="setStage('commercial')">↩︎ Ré-ouvrir</button></div>
+      </div></div>`;
+  }
+  let cards='';
+  for(let i=cur;i>=0;i--){
+    const r=ROLES[i], active=!termine&&i===cur, done=termine||i<cur;
+    const cancel=i>0?`<button class="s-cancel" onclick="setStage('${ROLES[i-1].key}')">↺ Revenir à cette étape</button>`:'';
+    const badge=active?'<span class="s-badge active">En cours</span>':(done?'<span class="s-badge done">Validée</span>':'');
+    let foot='';
+    if(active){
+      const validBtn=next
+        ?`<button class="btn small" onclick="setStage('${next.key}')">Passer à « ${next.label} » →</button>`
+        :`<button class="btn small" onclick="setStage('termine')">✅ Marquer terminé</button>`;
+      foot=`<div class="s-sep"></div><div class="s-foot"><button class="btn danger small" style="margin-right:auto" onclick="setStage('perdu')">Marquer perdu ✕</button>${validBtn}</div>`;
+    }
+    cards+=`<div class="scard ${active?'active':''} ${done?'done':''}">
+      <div class="s-rail"><div class="s-num">Étape ${i+1}</div><div class="s-dot ${active?'active':done?'done':''}">${done?'✓':r.icon}</div>${cancel}</div>
+      <div class="s-body"><div class="s-head">${r.icon} ${r.label}${badge}</div><div class="s-content">${rolePanelHTML(r.key)}</div>${foot}</div>
+    </div>`;
+  }
+  box.innerHTML=head+cards;
 }
-function selectRole(k){ selRole=k; renderSuivi(); }
 function ownerSelect(field,role){
   const ed=canEdit(role);
   const opts='<option value="">— Non attribué —</option>'+PROFILES.map(p=>`<option value="${p.id}" ${curLead[field]===p.id?'selected':''}>${esc(p.nom||p.email)}${p.role?' ('+roleLabel(p.role)+')':''}</option>`).join('');
@@ -586,9 +645,9 @@ function checkField(field,label,role){
   const ed=canEdit(role);
   return `<label class="chk"><input type="checkbox" ${curLead[field]?'checked':''} ${ed?'':'disabled'} onchange="updLead({${field}:this.checked},'Mis à jour').then(()=>renderSuivi())"> ${label}</label>`;
 }
-function renderRolePanel(){
-  const role=selRole, ed=canEdit(role), box=document.getElementById('lv-detail');
-  let h=`<div style="font-weight:700;margin-bottom:12px">${ROLES.find(r=>r.key===role).icon} Étape ${roleLabel(role)}</div>`;
+function rolePanelHTML(role){
+  const ed=canEdit(role);
+  let h='';
   if(!ed) h+=`<div class="hint" style="margin-bottom:10px">🔒 Lecture seule (réservé au rôle ${roleLabel(role)} ou à l'admin).</div>`;
   h+=statutSelect(role);
   if(role==='telepro'){
@@ -610,22 +669,7 @@ function renderRolePanel(){
     h+=`<div class="grid2"><div>${checkField('installe','Installation réalisée','commercial')}</div><div>${dateField('date_installation','Date d\'installation','commercial')}</div></div>`;
     h+=`<div class="grid2"><div>${checkField('paye','Dossier payé','commercial')}</div><div>${dateField('date_paiement','Date de paiement','commercial')}</div></div>`;
   }
-  box.innerHTML=h;
-}
-function renderNext(){
-  const zone=document.getElementById('lv-next');
-  if(curLead.stage==='perdu'){ zone.innerHTML=`<button class="btn ghost" onclick="setStage('telepro')">↩︎ Ré-ouvrir le dossier</button>`; return; }
-  const cur=stageIndex(curLead.stage), next=ROLES[cur+1];
-  let h='';
-  if(curLead.stage!=='termine'){
-    if(next) h+=`<button class="btn" onclick="setStage('${next.key}')">Passer à l'étape « ${next.label} » →</button>`;
-    else h+=`<button class="btn" onclick="setStage('termine')">✅ Marquer comme terminé</button>`;
-    h+=`<button class="btn danger small" onclick="setStage('perdu')">Marquer perdu ✕</button>`;
-  } else {
-    h+=`<span class="pill" style="background:#16a34a22;color:#16a34a">Dossier terminé</span>`;
-    h+=`<button class="btn ghost small" onclick="setStage('commercial')">Ré-ouvrir</button>`;
-  }
-  zone.innerHTML=h;
+  return h;
 }
 async function setStage(k){ if(await updLead({stage:k},'Étape : '+stageOf(k).label)){ selRole=ROLES.some(r=>r.key===k)?k:selRole; renderSuivi(); } }
 
