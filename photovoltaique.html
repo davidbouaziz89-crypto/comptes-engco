@@ -125,6 +125,20 @@
   .s-sep{height:1px;background:var(--line);margin:14px 0}
   .s-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px}
   @media(max-width:600px){.s-rail{width:84px}}
+  /* Calendrier hebdomadaire (grille jours × horaires) */
+  .cal-scroll{overflow-x:auto}
+  .cal{display:grid;grid-template-columns:52px repeat(7,minmax(96px,1fr));min-width:740px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .cal-corner{background:var(--panel2);border-bottom:1px solid var(--line)}
+  .cal-h{background:var(--panel2);border-bottom:1px solid var(--line);border-left:1px solid var(--line);padding:7px 4px;text-align:center;font-weight:700;font-size:12px;text-transform:capitalize}
+  .cal-h.today{color:var(--accent)}
+  .cal-time{border-top:1px solid var(--line);border-right:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:11px;text-align:right;padding:0 5px;line-height:22px;height:22px}
+  .cal-cell{border-top:1px solid var(--line);border-left:1px solid var(--line);height:22px;cursor:pointer;padding:0 1px}
+  .cal-cell.half{border-top-style:dotted}
+  .cal-cell.today{background:rgba(245,166,35,.06)}
+  .cal-cell:hover{background:rgba(245,166,35,.14)}
+  .cal-ev{display:block;background:var(--accent);color:#241500;border-radius:5px;padding:1px 5px;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:19px;margin:1px 0}
+  .cal-ev.other{background:#3b82f6;color:#fff}
+  .cal-ev.proposed{background:var(--accent2);color:#fff;box-shadow:0 0 0 1px var(--accent2)}
   .detail-box{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px;background:var(--panel2)}
   .subcard{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--panel)}
   .act{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}
@@ -348,7 +362,7 @@
 
 <!-- ===== PLANNING / DISTANCES ===== -->
 <div id="planning-view" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px">
-  <div class="card" style="max-width:780px;width:100%;max-height:92vh;overflow:auto">
+  <div class="card" style="max-width:1000px;width:100%;max-height:92vh;overflow:auto">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <h3 style="margin:0;flex:1" id="plan-title">📅 Planning du commercial</h3>
       <button class="btn ghost small" onclick="closePlanning()">✕ Fermer</button>
@@ -825,38 +839,55 @@ async function openPlanning(){
   renderPlanning();
 }
 /* Planning des rappels du confirmateur (RDV téléphonique fixé par le télépro) */
+// Grille calendaire hebdo : créneaux de 30 min de 7h à 20h
+const CAL_START=7, CAL_END=20, CAL_STEP=30;
+function calSlots(){ const s=[]; for(let m=CAL_START*60;m<CAL_END*60;m+=CAL_STEP) s.push(m); return s; }
+function m2hhmm(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function hhmm2m(h){ const p=(h||'').split(':'); return p.length<2?null:(+p[0])*60+(+p[1]); }
+function slotOf(m){ return Math.floor(m/CAL_STEP)*CAL_STEP; } // arrondit un RDV au créneau
+function sundayOf(iso){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()-d.getDay()); d.setHours(0,0,0,0); return d; } // dimanche de la semaine
 async function openPlanningConf(){
   if(!curLead.owner_confirmateur){ toast('Choisissez d\'abord un confirmateur.'); return; }
-  const date=(curLead.rdv_conf_date||'').slice(0,10);
-  if(!date){ toast('Renseignez d\'abord la date du rappel.'); return; }
-  planConfId=curLead.owner_confirmateur; planWeekStart=mondayOf(date); planRender=renderPlanningConf;
+  const date=(curLead.rdv_conf_date||'').slice(0,10)||toISODate(new Date());
+  planConfId=curLead.owner_confirmateur; planWeekStart=sundayOf(date); planRender=renderPlanningConf;
   document.getElementById('planning-view').classList.remove('hidden');
   document.getElementById('plan-hint').style.display='none';
   renderPlanningConf();
 }
+async function placeConfRdv(dateISO,heure){
+  if(!canEdit('telepro')){ toast('Réservé au télépro / admin'); return; }
+  if(await updLead({rdv_conf_date:dateISO,rdv_conf_heure:heure},'Rappel placé le '+new Date(dateISO+'T00:00:00').toLocaleDateString('fr-FR')+' à '+heure)){
+    renderPlanningConf(); if(!document.getElementById('lead-suivi').classList.contains('hidden')) renderSuivi();
+  }
+}
 function renderPlanningConf(){
-  const conf=PROFILES.find(p=>p.id===planConfId);
+  const conf=PROFILES.find(p=>p.id===planConfId), ed=canEdit('telepro');
   document.getElementById('plan-title').textContent='📅 Rappels confirmateur — '+(conf?(conf.nom||conf.email):'confirmateur');
   const start=planWeekStart, end=new Date(start); end.setDate(end.getDate()+6);
-  const startISO=toISODate(start), endISO=toISODate(end);
+  const startISO=toISODate(start), endISO=toISODate(end), todayISO=toISODate(new Date());
   document.getElementById('plan-nav').innerHTML=`<button class="btn ghost small" onclick="shiftWeek(-1)">← Semaine préc.</button>
     <div style="flex:1;text-align:center;font-weight:700">Semaine du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')}</div>
     <button class="btn ghost small" onclick="shiftWeek(1)">Semaine suiv. →</button>`;
   const inWeek=d=>{ const dd=d.slice(0,10); return dd>=startISO&&dd<=endISO; };
-  let rdvs=LEADS.filter(l=>l.owner_confirmateur===planConfId && l.rdv_conf_date && inWeek(l.rdv_conf_date) && l.id!==curLead.id)
-    .map(l=>({date:l.rdv_conf_date.slice(0,10),heure:l.rdv_conf_heure||'',nom:leadName(l)}));
-  if(curLead.rdv_conf_date) rdvs.push({date:curLead.rdv_conf_date.slice(0,10),heure:curLead.rdv_conf_heure||'',nom:leadName(curLead)+' (ce dossier)',proposed:true});
-  const days=[]; for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(d.getDate()+i); days.push(toISODate(d)); }
-  let html='';
-  days.forEach(diso=>{
-    const list=rdvs.filter(r=>r.date===diso).sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));
-    const dObj=new Date(diso+'T00:00:00'); const dName=dObj.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
-    html+=`<div class="subcard"><div style="font-weight:700;text-transform:capitalize;margin-bottom:6px">${dName}${list.length?` <span class="hint">(${list.length} rappel${list.length>1?'s':''})</span>`:' <span class="hint">— libre</span>'}</div>`;
-    list.forEach(r=>{ html+=`<div style="display:flex;gap:8px;align-items:center;${r.proposed?'background:rgba(245,166,35,.14);border-radius:8px;padding:5px 7px':'padding:3px 0'}"><b style="width:52px">${r.heure||'--:--'}</b><span style="flex:1">${esc(r.nom)}</span>${r.proposed?'<span class="pill" style="background:var(--accent);color:#241500">proposé</span>':''}</div>`; });
-    html+='</div>';
+  let evs=LEADS.filter(l=>l.owner_confirmateur===planConfId && l.rdv_conf_date && inWeek(l.rdv_conf_date) && l.id!==curLead.id)
+    .map(l=>({date:l.rdv_conf_date.slice(0,10),m:hhmm2m(l.rdv_conf_heure),nom:leadName(l),kind:'other'}));
+  if(curLead.rdv_conf_date && inWeek(curLead.rdv_conf_date)) evs.push({date:curLead.rdv_conf_date.slice(0,10),m:hhmm2m(curLead.rdv_conf_heure),nom:leadName(curLead),kind:'proposed'});
+  const dayISO=[]; for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(d.getDate()+i); dayISO.push(toISODate(d)); }
+  let html='<div class="cal-scroll"><div class="cal"><div class="cal-corner"></div>';
+  dayISO.forEach(diso=>{ const d=new Date(diso+'T00:00:00'); html+=`<div class="cal-h ${diso===todayISO?'today':''}">${d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'numeric'})}</div>`; });
+  calSlots().forEach(m=>{
+    const hour=m%60===0;
+    html+=`<div class="cal-time">${hour?m2hhmm(m):''}</div>`;
+    dayISO.forEach(diso=>{
+      const here=evs.filter(e=>e.date===diso && e.m!=null && slotOf(e.m)===m);
+      const noTime=hour&&evs.filter(e=>e.date===diso && e.m==null && m===CAL_START*60); // RDV sans heure -> 1re ligne
+      const blocks=[...here,...(noTime||[])].map(e=>`<span class="cal-ev ${e.kind}" title="${esc((e.m!=null?m2hhmm(e.m)+' ':'')+e.nom)}">${e.m!=null?m2hhmm(e.m)+' ':''}${esc(e.nom)}</span>`).join('');
+      html+=`<div class="cal-cell ${hour?'':'half'} ${diso===todayISO?'today':''}" ${ed?`onclick="placeConfRdv('${diso}','${m2hhmm(m)}')"`:''}>${blocks}</div>`;
+    });
   });
+  html+='</div></div>';
   document.getElementById('plan-body').innerHTML=html;
-  document.getElementById('plan-actions').innerHTML=`<button class="btn" onclick="closePlanning()">Fermer</button>`;
+  document.getElementById('plan-actions').innerHTML=`${ed?'<span class="hint" style="margin-right:auto">Cliquez un créneau libre pour placer le rappel. En orange : ce dossier.</span>':''}<button class="btn" onclick="closePlanning()">Fermer</button>`;
 }
 function closePlanning(){ document.getElementById('planning-view').classList.add('hidden'); }
 function shiftWeek(n){ planWeekStart=new Date(planWeekStart); planWeekStart.setDate(planWeekStart.getDate()+n*7); (planRender||renderPlanning)(); }
