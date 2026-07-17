@@ -357,7 +357,7 @@
     <div id="plan-nav" class="row" style="margin-bottom:12px;align-items:center"></div>
     <div id="plan-body"></div>
     <div id="plan-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"></div>
-    <div class="hint" style="margin-top:8px">Distances estimées (adresses géocodées via l'annuaire officiel). L'estimation route/voiture est indicative.</div>
+    <div class="hint" id="plan-hint" style="margin-top:8px">Distances estimées (adresses géocodées via l'annuaire officiel). L'estimation route/voiture est indicative.</div>
   </div>
 </div>
 
@@ -386,6 +386,10 @@ const STAGES=[
   {key:'perdu',label:'Perdu',color:'#dc2626'},
 ];
 const stageOf=k=>STAGES.find(s=>s.key===k)||STAGES[0];
+// Étape 1 (Télépro) — options de qualification
+const SIT_FAM=['Marié(e)','Pacsé(e)','Concubinage','Célibataire','Divorcé(e)','Veuf(ve)'];
+const STATUT_PRO=['CDI','CDD','Indépendant','Retraité','Sans activité'];
+const CHAUFFAGE=[['elec','Électrique'],['gaz','Gaz'],['both','Élec + Gaz']];
 
 function eur(n){ if(n==null||n===''||isNaN(Number(n))) return '—'; return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €'; }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -645,15 +649,83 @@ function checkField(field,label,role){
   const ed=canEdit(role);
   return `<label class="chk"><input type="checkbox" ${curLead[field]?'checked':''} ${ed?'':'disabled'} onchange="updLead({${field}:this.checked},'Mis à jour').then(()=>renderSuivi())"> ${label}</label>`;
 }
+/* -- Étape 1 : helpers de saisie -- */
+function numField(field,label,ed,ph){ return `<label>${esc(label)}</label><input type="number" min="0" ${ed?'':'disabled'} placeholder="${ph||''}" value="${curLead[field]!=null?curLead[field]:''}" onchange="updLead({${field}:this.value===''?null:Number(this.value)})">`; }
+function textField(field,label,ed,ph){ return `<label>${esc(label)}</label><input ${ed?'':'disabled'} placeholder="${ph||''}" value="${esc(curLead[field]||'')}" onchange="updLead({${field}:this.value||null})">`; }
+function enumSelect(field,label,options,ed){
+  const cur=curLead[field]||'';
+  const opts='<option value="">— À renseigner —</option>'+options.map(o=>`<option ${cur===o?'selected':''}>${esc(o)}</option>`).join('');
+  return `<label>${esc(label)}</label><select ${ed?'':'disabled'} onchange="updLead({${field}:this.value||null})">${opts}</select>`;
+}
+function chauffageSelect(ed){
+  const cur=curLead.type_chauffage||'';
+  const opts='<option value="">— À renseigner —</option>'+CHAUFFAGE.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('');
+  return `<label>Type de chauffage</label><select ${ed?'':'disabled'} onchange="updLead({type_chauffage:this.value||null}).then(()=>renderSuivi())">${opts}</select>`;
+}
+function ouiNonSelect(field,label,ed){
+  const v=curLead[field];
+  return `<label>${esc(label)}</label><select ${ed?'':'disabled'} onchange="updLead({${field}:this.value===''?null:this.value==='oui'})">
+    <option value="" ${v==null?'selected':''}>— À renseigner —</option>
+    <option value="oui" ${v===true?'selected':''}>Oui</option>
+    <option value="non" ${v===false?'selected':''}>Non</option></select>`;
+}
+function confirmateurSelect(ed){
+  const cons=PROFILES.filter(p=>p.role==='confirmateur'||p.role==='admin');
+  const opts='<option value="">— Aucun confirmateur —</option>'+cons.map(p=>`<option value="${p.id}" ${curLead.owner_confirmateur===p.id?'selected':''}>${esc(p.nom||p.email)}</option>`).join('');
+  return `<label>Confirmateur assigné (pour le rappel)</label><select ${ed?'':'disabled'} onchange="updLead({owner_confirmateur:this.value||null},'Confirmateur assigné')">${opts}</select>`;
+}
+/* -- Crédits en cours (liste dynamique) -- */
+function leadCredits(){ return Array.isArray(curLead.credits)?curLead.credits:[]; }
+function creditsTotal(){ return leadCredits().reduce((s,c)=>s+(Number(c.montant)||0),0); }
+async function saveCredits(arr){ curLead.credits=arr; await updLead({credits:arr}); renderSuivi(); }
+function addCredit(){ saveCredits([...leadCredits(),{label:'',montant:null}]); }
+function delCredit(i){ const a=leadCredits().slice(); a.splice(i,1); saveCredits(a); }
+function updCredit(i,field,val){ const a=leadCredits().slice(); a[i]={...a[i],[field]:val}; saveCredits(a); }
+function creditsHTML(ed){
+  const list=leadCredits();
+  let h=`<label>Crédits en cours</label>`;
+  if(!list.length) h+=`<div class="hint" style="margin-bottom:6px">Aucun crédit renseigné.</div>`;
+  list.forEach((c,i)=>{
+    h+=`<div class="row" style="margin-bottom:6px;align-items:flex-end;gap:8px">
+      <div class="field" style="flex:2"><input ${ed?'':'disabled'} placeholder="Libellé (banque, type…)" value="${esc(c.label||'')}" onchange="updCredit(${i},'label',this.value)"></div>
+      <div class="field sm" style="flex:1"><input type="number" step="0.01" ${ed?'':'disabled'} placeholder="€/mois" value="${c.montant!=null?c.montant:''}" onchange="updCredit(${i},'montant',this.value===''?null:Number(this.value))"></div>
+      ${ed?`<button class="btn danger small" type="button" onclick="delCredit(${i})" title="Supprimer ce crédit">✕</button>`:''}</div>`;
+  });
+  if(ed) h+=`<button class="btn ghost small" type="button" onclick="addCredit()">+ Ajouter un crédit</button>`;
+  h+=`<div style="margin-top:8px;font-weight:700">Total crédits en cours : ${eur(creditsTotal())} /mois</div>`;
+  return h;
+}
 function rolePanelHTML(role){
   const ed=canEdit(role);
   let h='';
   if(!ed) h+=`<div class="hint" style="margin-bottom:10px">🔒 Lecture seule (réservé au rôle ${roleLabel(role)} ou à l'admin).</div>`;
   h+=statutSelect(role);
   if(role==='telepro'){
-    h+=`<div class="grid2"><div><label>Montant facture élec. (€/mois)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant_facture!=null?curLead.montant_facture:''}" onchange="updLead({montant_facture:this.value===''?null:Number(this.value)})"></div>
-      <div><label>Type de logement</label><input ${ed?'':'disabled'} value="${esc(curLead.type_logement||'')}" placeholder="Maison / Appartement" onchange="updLead({type_logement:this.value||null})"></div></div>`;
-    h+=`<div><label>Mode de chauffage</label><input ${ed?'':'disabled'} value="${esc(curLead.mode_chauffage||'')}" placeholder="Élec / Gaz / Pompe à chaleur…" onchange="updLead({mode_chauffage:this.value||null})"></div>`;
+    // Profil client
+    h+=`<div class="grid2"><div>${numField('age','Âge du client',ed)}</div><div>${enumSelect('situation_familiale','Situation familiale',SIT_FAM,ed)}</div></div>`;
+    h+=`<div class="grid2"><div>${numField('nb_enfants','Nombre d\'enfants à charge',ed)}</div><div>${enumSelect('statut_pro','Statut professionnel',STATUT_PRO,ed)}</div></div>`;
+    // Logement
+    h+=`<div class="grid2"><div>${textField('type_logement','Type de logement',ed,'Maison / Appartement')}</div><div>${ouiNonSelect('zone_abh','Maison en zone ABH ?',ed)}</div></div>`;
+    // Chauffage + conso conditionnelle
+    h+=chauffageSelect(ed);
+    const tc=curLead.type_chauffage;
+    if(tc==='elec'||tc==='both'||tc==='gaz'){
+      const both=tc==='both';
+      let c='';
+      if(tc==='elec'||both) c+=`<div><label>Conso élec (€/mois)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant_facture!=null?curLead.montant_facture:''}" onchange="updLead({montant_facture:this.value===''?null:Number(this.value)})"></div>`;
+      if(tc==='gaz'||both) c+=`<div><label>Conso gaz (€/mois)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.conso_gaz!=null?curLead.conso_gaz:''}" onchange="updLead({conso_gaz:this.value===''?null:Number(this.value)})"></div>`;
+      h+=both?`<div class="grid2">${c}</div>`:c;
+    }
+    // Crédits
+    h+=`<div class="s-sep"></div>`+creditsHTML(ed);
+    // Disponibilité
+    h+=`<div class="s-sep"></div><label>Disponibilité du client (pour le rappel du confirmateur)</label><textarea ${ed?'':'disabled'} placeholder="Ex : en semaine après 18h, samedi matin…" onchange="updLead({disponibilite:this.value||null})">${esc(curLead.disponibilite||'')}</textarea>`;
+    // RDV de rappel confirmateur
+    h+=`<div class="s-sep"></div><div style="font-weight:700;margin-bottom:8px">📅 RDV de rappel — Confirmateur</div>`;
+    h+=confirmateurSelect(ed);
+    h+=`<div class="grid2"><div><label>Date du rappel</label><input type="date" ${ed?'':'disabled'} value="${(curLead.rdv_conf_date||'').slice(0,10)}" onchange="updLead({rdv_conf_date:this.value||null},'Date du rappel enregistrée')"></div>
+      <div><label>Heure du rappel</label><input type="time" ${ed?'':'disabled'} value="${curLead.rdv_conf_heure||''}" onchange="updLead({rdv_conf_heure:this.value||null})"></div></div>`;
+    h+=`<button class="btn" type="button" style="margin-top:10px" ${ed?'':'disabled'} onclick="openPlanningConf()">📅 Voir le planning du confirmateur</button>`;
     h+=`<div class="hint" style="margin-top:6px">L'attribution du télépro et le type de client se règlent dans la fiche à gauche.</div>`;
   } else if(role==='confirmateur'){
     h+=ownerSelect('owner_confirmateur','confirmateur');
@@ -718,7 +790,7 @@ async function delDoc(id){
 }
 
 /* ---------- PLANNING & DISTANCES ---------- */
-let planWeekStart=null, planCommercial=null;
+let planWeekStart=null, planCommercial=null, planConfId=null, planRender=null;
 function toMin(hhmm){ if(!hhmm) return null; const p=hhmm.split(':'); return (+p[0])*60+(+(p[1]||0)); }
 function mondayOf(iso){ const d=new Date(iso+'T00:00:00'); const off=(d.getDay()+6)%7; d.setDate(d.getDate()-off); d.setHours(0,0,0,0); return d; }
 function toISODate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -743,14 +815,49 @@ async function openPlanning(){
   if(!curLead.owner_commercial){ toast('Choisissez d\'abord un commercial.'); return; }
   const date=curLead.rdv_date?curLead.rdv_date.slice(0,10):'';
   if(!date){ toast('Renseignez d\'abord la date du RDV.'); return; }
-  planCommercial=curLead.owner_commercial; planWeekStart=mondayOf(date);
+  planCommercial=curLead.owner_commercial; planWeekStart=mondayOf(date); planRender=renderPlanning;
   document.getElementById('planning-view').classList.remove('hidden');
+  document.getElementById('plan-hint').style.display='';
   document.getElementById('plan-body').innerHTML='<div class="hint">Chargement du planning…</div>';
   await geocodeLead(curLead);
   renderPlanning();
 }
+/* Planning des rappels du confirmateur (RDV téléphonique fixé par le télépro) */
+async function openPlanningConf(){
+  if(!curLead.owner_confirmateur){ toast('Choisissez d\'abord un confirmateur.'); return; }
+  const date=(curLead.rdv_conf_date||'').slice(0,10);
+  if(!date){ toast('Renseignez d\'abord la date du rappel.'); return; }
+  planConfId=curLead.owner_confirmateur; planWeekStart=mondayOf(date); planRender=renderPlanningConf;
+  document.getElementById('planning-view').classList.remove('hidden');
+  document.getElementById('plan-hint').style.display='none';
+  renderPlanningConf();
+}
+function renderPlanningConf(){
+  const conf=PROFILES.find(p=>p.id===planConfId);
+  document.getElementById('plan-title').textContent='📅 Rappels confirmateur — '+(conf?(conf.nom||conf.email):'confirmateur');
+  const start=planWeekStart, end=new Date(start); end.setDate(end.getDate()+6);
+  const startISO=toISODate(start), endISO=toISODate(end);
+  document.getElementById('plan-nav').innerHTML=`<button class="btn ghost small" onclick="shiftWeek(-1)">← Semaine préc.</button>
+    <div style="flex:1;text-align:center;font-weight:700">Semaine du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')}</div>
+    <button class="btn ghost small" onclick="shiftWeek(1)">Semaine suiv. →</button>`;
+  const inWeek=d=>{ const dd=d.slice(0,10); return dd>=startISO&&dd<=endISO; };
+  let rdvs=LEADS.filter(l=>l.owner_confirmateur===planConfId && l.rdv_conf_date && inWeek(l.rdv_conf_date) && l.id!==curLead.id)
+    .map(l=>({date:l.rdv_conf_date.slice(0,10),heure:l.rdv_conf_heure||'',nom:leadName(l)}));
+  if(curLead.rdv_conf_date) rdvs.push({date:curLead.rdv_conf_date.slice(0,10),heure:curLead.rdv_conf_heure||'',nom:leadName(curLead)+' (ce dossier)',proposed:true});
+  const days=[]; for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(d.getDate()+i); days.push(toISODate(d)); }
+  let html='';
+  days.forEach(diso=>{
+    const list=rdvs.filter(r=>r.date===diso).sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));
+    const dObj=new Date(diso+'T00:00:00'); const dName=dObj.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
+    html+=`<div class="subcard"><div style="font-weight:700;text-transform:capitalize;margin-bottom:6px">${dName}${list.length?` <span class="hint">(${list.length} rappel${list.length>1?'s':''})</span>`:' <span class="hint">— libre</span>'}</div>`;
+    list.forEach(r=>{ html+=`<div style="display:flex;gap:8px;align-items:center;${r.proposed?'background:rgba(245,166,35,.14);border-radius:8px;padding:5px 7px':'padding:3px 0'}"><b style="width:52px">${r.heure||'--:--'}</b><span style="flex:1">${esc(r.nom)}</span>${r.proposed?'<span class="pill" style="background:var(--accent);color:#241500">proposé</span>':''}</div>`; });
+    html+='</div>';
+  });
+  document.getElementById('plan-body').innerHTML=html;
+  document.getElementById('plan-actions').innerHTML=`<button class="btn" onclick="closePlanning()">Fermer</button>`;
+}
 function closePlanning(){ document.getElementById('planning-view').classList.add('hidden'); }
-function shiftWeek(n){ planWeekStart=new Date(planWeekStart); planWeekStart.setDate(planWeekStart.getDate()+n*7); renderPlanning(); }
+function shiftWeek(n){ planWeekStart=new Date(planWeekStart); planWeekStart.setDate(planWeekStart.getDate()+n*7); (planRender||renderPlanning)(); }
 async function renderPlanning(){
   const com=PROFILES.find(p=>p.id===planCommercial);
   document.getElementById('plan-title').textContent='📅 Planning — '+(com?(com.nom||com.email):'commercial');
