@@ -140,6 +140,12 @@
   .cal-ev.other{background:#3b82f6;color:#fff}
   .cal-ev.proposed{background:var(--accent2);color:#fff;box-shadow:0 0 0 1px var(--accent2)}
   .cal-ev.warn{background:var(--bad);color:#fff}
+  /* Sélecteur de commerciaux dans le planning */
+  .plan-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .pchip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;background:var(--panel2)}
+  .pchip.active{background:var(--panel);box-shadow:0 0 0 2px currentColor inset}
+  .pchip .pdot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+  .pchip input{width:auto;margin:0}
   /* Revalidation étape 2 : lignes info + valider/modifier */
   .rv-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin-bottom:7px;background:var(--panel2)}
   .rv-row.ok{border-color:rgba(55,211,155,.5);background:rgba(55,211,155,.10)}
@@ -827,13 +833,15 @@ function rolePanelHTML(role){
   } else if(role==='confirmateur'){
     // 1) Revalidation des infos de l'étape 1 (affichées, à Valider / Modifier)
     h+=revalidHTML();
-    // 2) Programmation du RDV commercial (pose)
+    // 2) Programmation du RDV commercial (pose) — commercial + créneau choisis dans le planning
     h+=`<div class="s-sep"></div><div style="font-weight:700;margin-bottom:8px">📅 RDV commercial (pose)</div>`;
-    h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
-    h+=commercialSelect(ed);
-    h+=`<div class="grid2"><div>${dateField('rdv_date','Date du RDV','confirmateur')}</div>
-      <div><label>Heure du RDV</label><input type="time" ${ed?'':'disabled'} value="${curLead.rdv_heure||''}" onchange="updLead({rdv_heure:this.value||null})"></div></div>`;
-    h+=`<button class="btn" type="button" style="margin-top:12px" ${ed?'':'disabled'} onclick="openPlanning()">📅 Placer le RDV (planning du commercial)</button>`;
+    const _com=PROFILES.find(p=>p.id===curLead.owner_commercial);
+    if(curLead.rdv_date){
+      h+=`<div class="hint" style="margin-bottom:8px">RDV placé : <b style="color:var(--txt)">${_com?esc(_com.nom||_com.email)+' · ':''}${new Date(curLead.rdv_date.slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR')}${curLead.rdv_heure?' à '+curLead.rdv_heure:''}</b></div>`;
+    } else {
+      h+=`<div class="hint" style="margin-bottom:8px">Aucun RDV placé pour le moment.</div>`;
+    }
+    h+=`<button class="btn" type="button" ${ed?'':'disabled'} onclick="openPlanning()">📅 Placer le RDV (choisir le commercial et le créneau)</button>`;
   } else if(role==='commercial'){
     h+=ownerSelect('owner_commercial','commercial');
     h+=`<label>Montant de la vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Montant enregistré')">`;
@@ -890,7 +898,10 @@ async function delDoc(id){
 }
 
 /* ---------- PLANNING & DISTANCES ---------- */
-let planWeekStart=null, planCommercial=null, planConfId=null, planRender=null;
+let planWeekStart=null, planCommercial=null, planConfId=null, planRender=null, planComShow=null, planComActive=null;
+const COM_COLORS=['#f59e0b','#3b82f6','#8a5cff','#16a34a','#ef4444','#06b6d4','#d946ef','#84cc16'];
+function commercialsList(){ return PROFILES.filter(p=>hasRole(p,'commercial')); }
+function comColor(id){ const ids=commercialsList().map(p=>p.id).sort(); const i=ids.indexOf(id); return COM_COLORS[(i<0?0:i)%COM_COLORS.length]; }
 function toMin(hhmm){ if(!hhmm) return null; const p=hhmm.split(':'); return (+p[0])*60+(+(p[1]||0)); }
 function mondayOf(iso){ const d=new Date(iso+'T00:00:00'); const off=(d.getDay()+6)%7; d.setDate(d.getDate()-off); d.setHours(0,0,0,0); return d; }
 function toISODate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -925,15 +936,20 @@ async function geocodeProfile(p){
   return p;
 }
 async function openPlanning(){
-  if(!curLead.owner_commercial){ toast('Choisissez d\'abord un commercial.'); return; }
+  const coms=commercialsList();
+  if(!coms.length){ toast('Aucun commercial défini (Paramètres → Utilisateurs).'); return; }
   const date=(curLead.rdv_date?curLead.rdv_date.slice(0,10):'')||toISODate(new Date());
-  planCommercial=curLead.owner_commercial; planWeekStart=sundayOf(date); planRender=renderPlanning;
+  planComActive=(coms.find(c=>c.id===curLead.owner_commercial)||coms[0]).id;
+  planComShow=new Set(coms.map(c=>c.id)); // tous affichés par défaut
+  planWeekStart=sundayOf(date); planRender=renderPlanning;
   document.getElementById('planning-view').classList.remove('hidden');
   document.getElementById('plan-hint').style.display='';
   document.getElementById('plan-body').innerHTML='<div class="hint">Chargement du planning…</div>';
   await geocodeLead(curLead);
   renderPlanning();
 }
+function planSetActive(id){ planComActive=id; if(planComShow) planComShow.add(id); renderPlanning(); }
+function planToggleShow(id){ if(!planComShow) planComShow=new Set(); if(planComShow.has(id)) planComShow.delete(id); else planComShow.add(id); renderPlanning(); }
 /* ===== Grille calendaire hebdo partagée ===== */
 const CAL_START=7, CAL_END=20, CAL_STEP=30;              // confirmateur : 30 min de 7h à 20h
 const COM_SLOTS=[630,660,840,1020,1170];                // commercial : 10h30, 11h, 14h, 17h, 19h30
@@ -953,7 +969,14 @@ function calGrid(days, rows, events, editable, onclickFn, todayISO){
     const h=row.h||22;
     html+=`<div class="cal-time ${row.half?'half':''}" style="height:${h}px;line-height:${h}px">${row.label||''}</div>`;
     days.forEach(d=>{
-      const blocks=events.filter(e=>e.date===d.iso && e.m===row.m).map(e=>`<span class="cal-ev ${e.kind||''}${e.warn?' warn':''}" title="${esc(e.title||e.label)}">${esc(e.label)}</span>`).join('');
+      const blocks=events.filter(e=>e.date===d.iso && e.m===row.m).map(e=>{
+        let style='';
+        if(e.warn) style='background:var(--bad);color:#fff';
+        else if(e.color) style='background:'+e.color+';color:#fff';
+        if(e.proposed&&e.color) style+=';box-shadow:0 0 0 2px var(--txt)';
+        const cls='cal-ev '+((!e.color&&e.kind)?e.kind:'')+(e.warn?' warn':'');
+        return `<span class="${cls}" ${style?`style="${style}"`:''} title="${esc(e.title||e.label)}">${esc(e.label)}</span>`;
+      }).join('');
       html+=`<div class="cal-cell ${row.half?'half':''} ${d.iso===todayISO?'today':''}" style="height:${h}px" ${editable?`onclick="${onclickFn}('${d.iso}','${m2hhmm(row.m)}')"`:''}>${blocks}</div>`;
     });
   });
@@ -991,9 +1014,11 @@ function shiftWeek(n){ planWeekStart=new Date(planWeekStart); planWeekStart.setD
 /* ----- Planning commercial (pose) : créneaux fixes, max 4 RDV/jour, contrôle des distances ----- */
 async function placeComRdv(dateISO,heure){
   if(!canEdit('confirmateur')){ toast('Réservé au confirmateur / admin'); return; }
-  const others=LEADS.filter(l=>l.owner_commercial===planCommercial && l.rdv_date && l.rdv_date.slice(0,10)===dateISO && l.id!==curLead.id).length;
+  if(!planComActive){ toast('Choisissez un commercial (en haut du planning).'); return; }
+  const others=LEADS.filter(l=>l.owner_commercial===planComActive && l.rdv_date && l.rdv_date.slice(0,10)===dateISO && l.id!==curLead.id).length;
   if(others>=4){ toast('Déjà 4 RDV ce jour pour ce commercial (maximum atteint).'); return; }
-  if(await updLead({rdv_date:dateISO,rdv_heure:heure},'RDV commercial placé le '+new Date(dateISO+'T00:00:00').toLocaleDateString('fr-FR')+' à '+heure)){
+  const com=PROFILES.find(p=>p.id===planComActive);
+  if(await updLead({owner_commercial:planComActive,rdv_date:dateISO,rdv_heure:heure},'RDV placé pour '+(com?(com.nom||com.email):'')+' le '+new Date(dateISO+'T00:00:00').toLocaleDateString('fr-FR')+' à '+heure)){
     renderPlanning(); if(!document.getElementById('lead-suivi').classList.contains('hidden')) renderSuivi();
   }
 }
@@ -1036,21 +1061,35 @@ function planningDistanceDetail(days, events, home){
   return {html,warn};
 }
 async function renderPlanning(){
-  const com=PROFILES.find(p=>p.id===planCommercial), ed=canEdit('confirmateur'), todayISO=toISODate(new Date());
-  document.getElementById('plan-title').textContent='📅 Planning commercial — '+(com?(com.nom||com.email):'commercial');
+  const coms=commercialsList(), ed=canEdit('confirmateur'), todayISO=toISODate(new Date());
+  if(!planComShow) planComShow=new Set(coms.map(c=>c.id));
+  if(!planComActive || !coms.some(c=>c.id===planComActive)) planComActive=(coms.find(c=>c.id===curLead.owner_commercial)||coms[0]||{}).id||null;
+  const active=coms.find(c=>c.id===planComActive);
+  document.getElementById('plan-title').textContent='📅 Planning commercial'+(active?' — RDV pour '+(active.nom||active.email):'');
   document.getElementById('plan-nav').innerHTML=calNavHTML(planWeekStart);
   const days=weekDays(planWeekStart), inWeek=iso=>days.some(d=>d.iso===iso);
-  let leadsWeek=LEADS.filter(l=>l.owner_commercial===planCommercial && l.rdv_date && inWeek(l.rdv_date.slice(0,10)) && l.id!==curLead.id);
-  for(const l of leadsWeek){ if(l.lat==null) await geocodeLead(l); }
+  // chips : attribuer à (clic) + afficher (case)
+  const chips=`<div class="plan-chips"><span class="hint">Attribuer à&nbsp;:</span>${coms.map(c=>{
+    const col=comColor(c.id), shown=planComShow.has(c.id), act=c.id===planComActive;
+    return `<span class="pchip ${act?'active':''}" style="${act?'color:'+col:''}" onclick="planSetActive('${c.id}')" title="Attribuer le RDV à ce commercial"><input type="checkbox" ${shown?'checked':''} onclick="event.stopPropagation();planToggleShow('${c.id}')" title="Afficher son planning"><span class="pdot" style="background:${col}"></span><span style="color:var(--txt)">${esc(c.nom||c.email)}</span></span>`;
+  }).join('')}</div>`;
+  // événements de tous les commerciaux affichés (couleur par commercial)
+  let events=[];
+  for(const c of coms){
+    if(!planComShow.has(c.id)) continue;
+    const lw=LEADS.filter(l=>l.owner_commercial===c.id && l.rdv_date && inWeek(l.rdv_date.slice(0,10)) && l.id!==curLead.id);
+    for(const l of lw){ if(l.lat==null) await geocodeLead(l); events.push({date:l.rdv_date.slice(0,10),m:snapCom(hhmm2m(l.rdv_heure)),label:(l.rdv_heure?l.rdv_heure.slice(0,5)+' ':'')+leadName(l),ref:l,color:comColor(c.id),com:c.id}); }
+  }
   await geocodeLead(curLead);
-  if(com) await geocodeProfile(com); // domicile du commercial
-  let events=leadsWeek.map(l=>({date:l.rdv_date.slice(0,10),m:snapCom(hhmm2m(l.rdv_heure)),label:(l.rdv_heure?l.rdv_heure.slice(0,5)+' ':'')+leadName(l),kind:'other',ref:l}));
-  if(curLead.rdv_date && inWeek(curLead.rdv_date.slice(0,10))) events.push({date:curLead.rdv_date.slice(0,10),m:snapCom(hhmm2m(curLead.rdv_heure)),label:(curLead.rdv_heure?curLead.rdv_heure.slice(0,5)+' ':'')+leadName(curLead)+' (ce dossier)',kind:'proposed',ref:curLead});
-  const {html:distHTML,warn}=planningDistanceDetail(days,events,com);
+  if(active) await geocodeProfile(active);
+  if(curLead.rdv_date && inWeek(curLead.rdv_date.slice(0,10))) events.push({date:curLead.rdv_date.slice(0,10),m:snapCom(hhmm2m(curLead.rdv_heure)),label:(curLead.rdv_heure?curLead.rdv_heure.slice(0,5)+' ':'')+leadName(curLead)+' (ce dossier)',ref:curLead,color:comColor(planComActive),com:planComActive,proposed:true});
+  // distances : uniquement pour le commercial actif (domicile = actif)
+  const activeEvents=events.filter(e=>e.com===planComActive);
+  const {html:distHTML,warn}=planningDistanceDetail(days,activeEvents,active);
   events.forEach(e=>{ if(warn.has(e)) e.warn=true; });
   const rows=COM_SLOTS.map(m=>({m,label:m2hhmm(m),h:42}));
-  document.getElementById('plan-body').innerHTML=calGrid(days,rows,events,ed,'placeComRdv',todayISO)+distHTML;
-  document.getElementById('plan-actions').innerHTML=`${ed?'<span class="hint" style="margin-right:auto">Créneaux : 10h30 · 11h · 14h · 17h · 19h30 — max 4/jour. Cliquez pour placer.</span>':''}<button class="btn" onclick="closePlanning()">Fermer</button>`;
+  document.getElementById('plan-body').innerHTML=chips+calGrid(days,rows,events,ed,'placeComRdv',todayISO)+distHTML;
+  document.getElementById('plan-actions').innerHTML=`${ed?'<span class="hint" style="margin-right:auto">Créneaux : 10h30 · 11h · 14h · 17h · 19h30 — max 4/jour. Cliquez un créneau pour attribuer au commercial sélectionné.</span>':''}<button class="btn" onclick="closePlanning()">Fermer</button>`;
 }
 
 /* ---------- DOCUMENTS (vue globale) ---------- */
