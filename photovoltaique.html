@@ -393,7 +393,7 @@
       </section>
     </div>
     <div id="tab-commissions" class="hidden">
-      <section class="panel"><h2>💶 Commissions télépro</h2>
+      <section class="panel"><h2 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">💶 Commissions télépro<span style="flex:1"></span><button class="btn ghost small" onclick="exportCommissions()">⬇️ Exporter Excel</button></h2>
         <div class="hint" id="comm-rule" style="margin-bottom:12px"></div>
         <div class="table-wrap"><table id="comm-table"></table></div>
       </section>
@@ -423,7 +423,7 @@
           <button class="btn ghost" type="button" id="fr-cancelbtn" onclick="cancelEditFrais()" style="display:none">Annuler</button>
         </div>
       </section>
-      <section class="panel"><h2>Historique des frais</h2>
+      <section class="panel"><h2 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Historique des frais<span style="flex:1"></span><button class="btn ghost small" onclick="exportFrais()">⬇️ Exporter Excel</button></h2>
         <div class="search-box"><span class="ic">🔎</span><input type="text" id="fr-search" placeholder="Rechercher : catégorie, libellé, fournisseur, client, mois…" oninput="renderFrais()"></div>
         <div class="table-wrap"><table id="fr-table"></table></div>
       </section>
@@ -1915,6 +1915,27 @@ async function delFrais(id){
   const {error}=await db.from('pv_frais').delete().eq('id',id);
   if(error){ toast('Suppression refusée : '+error.message); return; }
   FRAIS=FRAIS.filter(f=>f.id!==id); renderFrais(); toast('Frais supprimé');
+}
+
+/* ---------- EXPORTS EXCEL ---------- */
+function exportFrais(){
+  if(!FRAIS.length){ toast('Aucun frais à exporter'); return; }
+  const rows=FRAIS.map(f=>({ Date:(f.date||'').slice(0,10), Catégorie:f.categorie||'', Libellé:f.libelle||'', Fournisseur:f.fournisseur||'', Client:f.lead_id?fraisLeadName(f.lead_id):'', 'Montant (€)':Number(f.montant)||0 }));
+  rows.push({ Date:'', Catégorie:'', Libellé:'', Fournisseur:'', Client:'TOTAL', 'Montant (€)':FRAIS.reduce((s,f)=>s+(Number(f.montant)||0),0) });
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Frais');
+  XLSX.writeFile(wb,'frais-photovoltaique-'+toISODate(new Date())+'.xlsx'); toast('Export Excel généré ✓');
+}
+function exportCommissions(){
+  const val=commissionValue(), map={};
+  LEADS.forEach(l=>{ if(!commissionEarned(l)) return; const k=l.owner_telepro||'_none'; (map[k]=map[k]||[]).push(l); });
+  const keys=Object.keys(map); if(!keys.length){ toast('Aucune commission à exporter'); return; }
+  const summary=keys.map(k=>({ 'Télépro':k==='_none'?'(non attribué)':(profileName(k)||'(inconnu)'), 'Dossiers éligibles':map[k].length, 'Commission unitaire (€)':val, 'Total (€)':map[k].length*val }));
+  summary.push({ 'Télépro':'TOTAL', 'Dossiers éligibles':keys.reduce((s,k)=>s+map[k].length,0), 'Commission unitaire (€)':'', 'Total (€)':keys.reduce((s,k)=>s+map[k].length,0)*val });
+  const detail=[]; keys.forEach(k=>{ const name=k==='_none'?'(non attribué)':(profileName(k)||'(inconnu)'); map[k].forEach(l=>detail.push({ 'Télépro':name, 'N° client':l.numero||'', 'Client':leadName(l), 'Ville':l.ville||'', 'Montant vente (€)':Number(l.montant)||0, 'Commission (€)':val })); });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(summary),'Résumé');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(detail),'Détail dossiers');
+  XLSX.writeFile(wb,'commissions-photovoltaique-'+toISODate(new Date())+'.xlsx'); toast('Export Excel généré ✓');
 }
 
 /* ---------- IMPORT ---------- */
