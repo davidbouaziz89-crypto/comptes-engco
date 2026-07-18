@@ -176,6 +176,20 @@
   .segbar button{background:transparent;border:0;color:var(--muted);padding:6px 13px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:background .16s var(--ease),color .16s var(--ease)}
   .segbar button:hover{color:var(--txt)}
   .segbar button.active{background:var(--panel);color:var(--txt);box-shadow:0 2px 8px -4px rgba(0,0,0,.4)}
+  /* Recherche globale (palette) */
+  .qs-overlay{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:78px 16px;backdrop-filter:blur(2px);animation:fadein .2s var(--ease) both}
+  .qs-box{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;animation:rise .22s var(--ease) both}
+  .qs-inp{width:100%;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;padding:16px 18px;font-size:16px}
+  .qs-inp:focus{outline:none;border-color:var(--line)}
+  .qs-results{max-height:52vh;overflow:auto}
+  .qs-item{display:flex;align-items:center;gap:11px;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--line)}
+  .qs-item:last-child{border-bottom:0}
+  .qs-item.sel{background:var(--panel2)}
+  .qs-item .qs-name{font-weight:600}
+  .qs-item .qs-meta{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qs-hint{padding:16px;color:var(--muted);font-size:13px;text-align:center}
+  .qs-foot{padding:9px 16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;display:flex;gap:14px;flex-wrap:wrap}
+  .qs-foot kbd{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:inherit;font-size:11px}
   /* Dashboard : anneau de conversion + histogramme d'étapes */
   .dash-two{display:grid;grid-template-columns:290px 1fr;gap:18px;align-items:stretch}
   @media(max-width:820px){.dash-two{grid-template-columns:1fr}}
@@ -356,6 +370,7 @@
     <h1><span class="sunlogo">☀️</span> CRM Photovoltaïque</h1><span class="spacer"></span>
     <span class="rolebadge" id="rolebadge"></span>
     <span class="who who-wrap" id="who"></span>
+    <button class="btn ghost small" onclick="openSearch()" title="Rechercher un client (Ctrl/Cmd + K)">🔎</button>
     <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
     <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
     <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
@@ -531,6 +546,15 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- ===== RECHERCHE GLOBALE ===== -->
+<div id="quicksearch" class="qs-overlay hidden" onclick="if(event.target===this)closeSearch()">
+  <div class="qs-box">
+    <input id="qs-input" class="qs-inp" placeholder="🔎 Rechercher un client : nom, téléphone, ville, N°…" oninput="renderSearch()" onkeydown="qsKey(event)" autocomplete="off">
+    <div id="qs-results" class="qs-results"></div>
+    <div class="qs-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> naviguer</span><span><kbd>↵</kbd> ouvrir</span><span><kbd>Échap</kbd> fermer</span></div>
+  </div>
 </div>
 
 <!-- ===== FICHE CLIENT ===== -->
@@ -1944,6 +1968,35 @@ async function delFrais(id){
   if(error){ toast('Suppression refusée : '+error.message); return; }
   FRAIS=FRAIS.filter(f=>f.id!==id); renderFrais(); toast('Frais supprimé');
 }
+
+/* ---------- RECHERCHE GLOBALE ---------- */
+let QS_SEL=0, QS_ROWS=[];
+function openSearch(){ const o=document.getElementById('quicksearch'); o.classList.remove('hidden'); const i=document.getElementById('qs-input'); i.value=''; renderSearch(); i.focus(); }
+function closeSearch(){ document.getElementById('quicksearch').classList.add('hidden'); }
+function renderSearch(){
+  const q=(document.getElementById('qs-input').value||'').toLowerCase().trim();
+  QS_ROWS = !q ? LEADS.slice(0,8) : LEADS.filter(l=>[leadName(l),l.email,l.telephone,l.telephone2,l.ville,l.code_postal,String(l.numero||'')].some(v=>(v||'').toString().toLowerCase().includes(q))).slice(0,25);
+  QS_SEL=0;
+  const box=document.getElementById('qs-results');
+  if(!QS_ROWS.length){ box.innerHTML='<div class="qs-hint">Aucun client trouvé pour « '+esc(q)+' »</div>'; return; }
+  box.innerHTML=QS_ROWS.map((l,i)=>{ const st=stageOf(l.stage);
+    return `<div class="qs-item ${i===0?'sel':''}" data-i="${i}" onmouseenter="qsHover(${i})" onclick="qsOpen(${i})">
+      ${avatar(leadName(l),'sm')}
+      <div style="flex:1;min-width:0"><div class="qs-name">${esc(leadName(l))}</div><div class="qs-meta">${l.numero?'N° '+l.numero+' · ':''}${esc(l.ville||'—')}${l.telephone?' · '+esc(l.telephone):''}</div></div>
+      <span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></div>`; }).join('');
+}
+function qsHover(i){ QS_SEL=i; document.querySelectorAll('#qs-results .qs-item').forEach((el,j)=>el.classList.toggle('sel',j===i)); }
+function qsOpen(i){ const l=QS_ROWS[i]; if(!l) return; closeSearch(); openLead(l.id); }
+function qsKey(e){
+  if(e.key==='Escape'){ closeSearch(); }
+  else if(e.key==='ArrowDown'){ e.preventDefault(); qsHover(Math.min(QS_SEL+1,QS_ROWS.length-1)); qsScroll(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); qsHover(Math.max(QS_SEL-1,0)); qsScroll(); }
+  else if(e.key==='Enter'){ e.preventDefault(); qsOpen(QS_SEL); }
+}
+function qsScroll(){ const el=document.querySelector('#qs-results .qs-item.sel'); if(el) el.scrollIntoView({block:'nearest'}); }
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ const av=document.getElementById('app-view'); if(av&&!av.classList.contains('hidden')){ e.preventDefault(); openSearch(); } }
+});
 
 /* ---------- EXPORTS EXCEL ---------- */
 function exportFrais(){
