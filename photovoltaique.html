@@ -147,6 +147,27 @@
   @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
+  /* ===== Passe mobile ===== */
+  html,body{overflow-x:hidden}
+  @media(max-width:640px){
+    header{flex-wrap:wrap;gap:8px 10px;padding:12px 14px}
+    header h1{font-size:16px}
+    #who span:not(.avatar){display:none}
+    main{padding:16px 12px}
+    nav{padding:8px 12px;gap:5px}
+    nav button{padding:7px 11px;font-size:13px}
+    .kpis{grid-template-columns:1fr 1fr;gap:10px}
+    .kpi{padding:13px}
+    .kpi .k-val{font-size:22px}
+    .kpi .k-ico{width:32px;height:32px;font-size:16px;margin-bottom:8px}
+    .barchart{gap:8px;height:168px}
+    .bc-val{font-size:11px}
+    .lead-head{padding:12px 14px;gap:10px}
+    .lh-id .lh-name{font-size:15px}
+    .panel{padding:16px}
+    .panel h2{font-size:16px}
+  }
+  @media(max-width:400px){ .kpis{grid-template-columns:1fr} }
   /* Dashboard : anneau de conversion + histogramme d'étapes */
   .dash-two{display:grid;grid-template-columns:290px 1fr;gap:18px;align-items:stretch}
   @media(max-width:820px){.dash-two{grid-template-columns:1fr}}
@@ -206,6 +227,23 @@
   .bc-bar{width:100%;max-width:58px;border-radius:8px 8px 0 0;background:linear-gradient(180deg,var(--accent),var(--accent2));min-height:4px;height:0;transition:height .85s var(--ease)}
   .bc-val{font-size:12px;font-weight:800;color:var(--txt);white-space:nowrap}
   .bc-lab{font-size:12px;color:var(--muted);text-transform:capitalize}
+  /* Prochains rendez-vous */
+  .rdv-row{display:grid;grid-template-columns:158px 168px 1fr 140px;align-items:center;gap:12px;padding:11px 8px;border-radius:10px;cursor:pointer;transition:background .16s var(--ease)}
+  .rdv-row:hover{background:var(--panel2)}
+  .rdv-row:not(:last-child){border-bottom:1px solid var(--line)}
+  .rdv-date{display:flex;flex-direction:column;gap:1px}
+  .rdv-day{font-weight:700;font-size:13px;text-transform:capitalize}
+  .rdv-day.today{color:var(--accent)}
+  .rdv-time{font-size:12px;color:var(--muted)}
+  .rdv-type{justify-self:start;font-size:12px;font-weight:700;padding:3px 11px;border-radius:20px;color:var(--tc,var(--accent));background:color-mix(in srgb,var(--tc,var(--accent)) 15%,transparent);white-space:nowrap}
+  .rdv-client{display:flex;align-items:center;gap:9px;min-width:0;font-weight:600}
+  .rdv-client span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rdv-owner{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media(max-width:720px){
+    .rdv-row{grid-template-columns:auto 1fr;grid-template-areas:"date client" "type owner";row-gap:6px}
+    .rdv-date{grid-area:date}.rdv-client{grid-area:client;justify-self:end}
+    .rdv-type{grid-area:type}.rdv-owner{grid-area:owner;justify-self:end;text-align:right}
+  }
   .step:hover{background:var(--panel2)}
   .step.active{border-color:var(--accent);background:rgba(245,166,35,.10)}
   .step.done{border-color:rgba(55,211,155,.4);background:rgba(55,211,155,.06)}
@@ -323,6 +361,7 @@
   <main>
     <div id="tab-dash">
       <section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
+      <section class="panel"><h2>📅 Prochains rendez-vous</h2><div id="dash-rdv"></div></section>
       <div class="dash-two">
         <section class="panel"><h2>Conversion</h2><div id="dash-donut"></div></section>
         <section class="panel"><h2>Répartition par étape</h2><div id="dash-stages"></div></section>
@@ -1607,6 +1646,25 @@ function renderDashboard(){
         return `<div class="bc-col"><div class="bc-val">${v?eur(v):''}</div><div class="bc-bar" data-h="${h}" title="${esc(m.label)} : ${eur(v)}"></div><div class="bc-lab">${esc(m.label)}</div></div>`; }).join('')}</div>`
     : emptyBox('📈','Pas encore de vente signée','Le chiffre d\'affaires signé s\'affichera ici, mois par mois.');
   requestAnimationFrame(()=>document.querySelectorAll('#dash-ca .bc-bar').forEach(b=>{ b.style.height=b.dataset.h+'%'; }));
+
+  // Prochains rendez-vous (rappel confirmateur, RDV commercial, contrôle qualité)
+  const todayISO=toISODate(new Date()), rdvs=[];
+  const addRdv=(l,date,heure,type,ownerId,color)=>{ if(!date) return; const d=date.slice(0,10); if(d<todayISO) return; rdvs.push({lead:l,date:d,heure:(heure||''),type,ownerId,color}); };
+  LEADS.forEach(l=>{
+    addRdv(l,l.rdv_conf_date,l.rdv_conf_heure,'Rappel confirmateur',l.owner_confirmateur,'#8a5cff');
+    addRdv(l,l.rdv_date,l.rdv_heure,'RDV commercial',l.owner_commercial,'#f59e0b');
+    addRdv(l,l.rdv_cq_date,l.rdv_cq_heure,'Contrôle qualité',l.owner_cq,'#38bdf8');
+  });
+  rdvs.sort((a,b)=>(a.date+'T'+(a.heure||'99')).localeCompare(b.date+'T'+(b.heure||'99')));
+  document.getElementById('dash-rdv').innerHTML = rdvs.length ? rdvs.slice(0,7).map(r=>{
+    const name=leadName(r.lead), owner=r.ownerId?profileName(r.ownerId):null, isToday=r.date===todayISO;
+    const dl=new Date(r.date+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}).replace('.','');
+    return `<div class="rdv-row" onclick="openLead('${r.lead.id}')">
+      <div class="rdv-date"><span class="rdv-day ${isToday?'today':''}">${isToday?"Aujourd'hui":esc(dl)}</span>${r.heure?`<span class="rdv-time">${esc(r.heure.slice(0,5))}</span>`:''}</div>
+      <span class="rdv-type" style="--tc:${r.color}">${r.type}</span>
+      <div class="rdv-client">${avatar(name,'sm')}<span>${esc(name)}</span></div>
+      <div class="rdv-owner hint">${owner?esc(owner):'—'}</div></div>`;
+  }).join('') : emptyBox('📅','Aucun rendez-vous à venir','Les prochains RDV (rappels, ventes, contrôles) s\'afficheront ici dès qu\'ils seront planifiés.');
 }
 
 /* ---------- PARAMÈTRES ---------- */
