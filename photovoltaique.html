@@ -107,6 +107,46 @@
   .ltabs button.active{color:var(--txt);border-color:var(--accent)}
   .stepper{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
   .step{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer;background:transparent;text-align:left;color:var(--txt);flex:1;min-width:130px}
+
+  /* ============ HABILLAGE v2 : chaleur · profondeur · mouvement ============ */
+  :root{--ease:cubic-bezier(.22,1,.36,1);--shadow:0 1px 2px rgba(0,0,0,.30),0 14px 34px -18px rgba(0,0,0,.65)}
+  :root[data-theme="light"]{--shadow:0 1px 2px rgba(20,30,50,.05),0 16px 36px -20px rgba(30,45,80,.22)}
+  /* Fond : deux halos solaires très doux */
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(880px 480px at 86% -10%,rgba(255,122,69,.11),transparent 62%),radial-gradient(1080px 560px at 6% -14%,rgba(245,166,35,.13),transparent 60%)}
+  :root[data-theme="light"] body::before{background:radial-gradient(880px 480px at 86% -10%,rgba(244,99,10,.08),transparent 62%),radial-gradient(1080px 560px at 6% -14%,rgba(224,142,0,.11),transparent 60%)}
+  /* Header : dégradé subtil + logo soleil qui respire */
+  header{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 6%,var(--panel)),var(--panel))}
+  .sunlogo{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));font-size:18px;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent),0 6px 18px -6px var(--accent);animation:sunpulse 4.6s var(--ease) infinite}
+  @keyframes sunpulse{0%,100%{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 38%,transparent),0 5px 16px -8px var(--accent)}50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 62%,transparent),0 9px 30px -4px var(--accent)}}
+  /* Avatars à initiales */
+  .avatar{display:inline-grid;place-items:center;border-radius:50%;color:#fff;font-weight:700;flex:0 0 auto;width:30px;height:30px;font-size:12px;letter-spacing:.02em;box-shadow:0 2px 8px -3px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.14);user-select:none}
+  .avatar.sm{width:24px;height:24px;font-size:10px}
+  .avatar.lg{width:40px;height:40px;font-size:15px}
+  .who-wrap{display:inline-flex;align-items:center;gap:9px}
+  .cellu{display:inline-flex;align-items:center;gap:8px}
+  /* Nav : transitions + onglet actif avec halo */
+  nav button{transition:background .2s var(--ease),color .2s var(--ease),border-color .2s var(--ease),transform .12s var(--ease)}
+  nav button:hover{color:var(--txt)}
+  nav button:active{transform:translateY(1px)}
+  nav button.active{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 15%,var(--panel)),var(--panel));border-color:color-mix(in srgb,var(--accent) 35%,var(--line));box-shadow:0 5px 16px -9px var(--accent)}
+  /* Panels + boutons : douceur & réactivité */
+  .panel{box-shadow:var(--shadow);animation:fadein .38s var(--ease) both}
+  .btn{transition:filter .15s var(--ease),transform .12s var(--ease),box-shadow .2s var(--ease);box-shadow:0 5px 16px -9px var(--accent)}
+  .btn:active{transform:translateY(1px)}
+  .btn.ghost,.btn.danger{box-shadow:none}
+  tr.clickable td{transition:background .16s var(--ease)}
+  .bcard{transition:transform .2s var(--ease),box-shadow .2s var(--ease)}
+  .bcard:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  /* KPI : cartes vivantes, entrée décalée */
+  .kpi{position:relative;overflow:hidden;background:linear-gradient(158deg,var(--panel2),color-mix(in srgb,var(--panel2) 86%,var(--panel)));transition:transform .2s var(--ease),box-shadow .2s var(--ease);animation:rise .5s var(--ease) both}
+  .kpi:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+  .kpi .k-ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:18px;margin-bottom:10px;background:color-mix(in srgb,var(--kc,var(--accent)) 18%,transparent)}
+  .kpi .k-val{font-size:26px;font-weight:800;line-height:1.1}
+  .kpi::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--kc,var(--accent)),transparent)}
+  @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
   .step:hover{background:var(--panel2)}
   .step.active{border-color:var(--accent);background:rgba(245,166,35,.10)}
   .step.done{border-color:rgba(55,211,155,.4);background:rgba(55,211,155,.06)}
@@ -205,9 +245,9 @@
 
 <div id="app-view" class="hidden">
   <header>
-    <h1>☀️ CRM Photovoltaïque</h1><span class="spacer"></span>
+    <h1><span class="sunlogo">☀️</span> CRM Photovoltaïque</h1><span class="spacer"></span>
     <span class="rolebadge" id="rolebadge"></span>
-    <span class="who" id="who"></span>
+    <span class="who who-wrap" id="who"></span>
     <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
     <button class="btn ghost small" onclick="location.href='./index.html'">🔀 Portail</button>
     <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
@@ -512,6 +552,20 @@ function leadName(l){ return ((l.prenom||'')+' '+(l.nom||'')).trim()||l.email||l
 function statutOf(id){ return STATUTS.find(s=>s.id===id); }
 function statutsFor(role){ return STATUTS.filter(s=>s.role_key===role).sort((a,b)=>(a.ordre||0)-(b.ordre||0)); }
 function profileName(id){ const p=PROFILES.find(x=>x.id===id); return p?(p.nom||p.email||'—'):null; }
+/* ---- Avatars & animations ---- */
+const prefersReduced=()=>window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+function avatarHue(str){ str=String(str||'?'); let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))>>>0; return h%360; }
+function initials(name){ const p=String(name||'').trim().split(/\s+/).filter(Boolean); if(!p.length) return '?'; const a=p[0][0]||''; const b=p.length>1?(p[p.length-1][0]||''):''; return (a+b).toUpperCase(); }
+function avatar(name,cls){ const h=avatarHue(name); const bg=`linear-gradient(135deg,hsl(${h} 68% 56%),hsl(${(h+42)%360} 70% 45%))`; return `<span class="avatar ${cls||''}" style="background:${bg}" title="${esc(name||'')}">${esc(initials(name))}</span>`; }
+function ownerCell(id){ const n=profileName(id); if(!n) return '<span class="hint">—</span>'; return `<span class="cellu">${avatar(n,'sm')}<span class="hint">${esc(n)}</span></span>`; }
+function countUp(el){
+  const target=parseFloat(el.dataset.n)||0, kind=el.dataset.fmt;
+  const f = kind==='pct'?(v=>Math.round(v)+' %') : kind==='eur'?(v=>eur(Math.round(v))) : (v=>Math.round(v).toLocaleString('fr-FR'));
+  if(prefersReduced()){ el.textContent=f(target); return; }
+  const dur=680; let t0=null;
+  function tick(now){ if(t0===null) t0=now; const p=Math.min(1,Math.max(0,(now-t0)/dur)), e=1-Math.pow(1-p,3); el.textContent=f(target*e); if(p<1) requestAnimationFrame(tick); }
+  requestAnimationFrame(tick);
+}
 function canEdit(role){ return IS_ADMIN || MY_ROLES.includes(role) || MY_ROLE===role; }
 // Un utilisateur "détient" un rôle si admin, ou via ses rôles multiples (pv_profiles.roles), ou via son rôle principal
 function hasRole(p,r){ if(!p) return false; if(p.role==='admin') return true; if(Array.isArray(p.roles)&&p.roles.includes(r)) return true; return p.role===r; }
@@ -548,7 +602,8 @@ async function afterAuth(session){
   if(!hasAccess){ document.getElementById('noaccess-view').classList.remove('hidden'); return; }
   document.getElementById('noaccess-view').classList.add('hidden');
   document.getElementById('app-view').classList.remove('hidden');
-  document.getElementById('who').textContent=session.user.email||'';
+  const _wn=session.user.email||'';
+  document.getElementById('who').innerHTML=avatar(_wn,'sm')+`<span>${esc(_wn)}</span>`;
   const rb=document.getElementById('rolebadge'); rb.textContent=IS_ADMIN?'Admin':roleLabel(MY_ROLE);
   if(!IS_ADMIN){ document.getElementById('nav-params').classList.add('hidden'); document.getElementById('nav-frais').classList.add('hidden'); } // params + frais = admin
   // enregistre / met à jour son profil (annuaire équipe)
@@ -625,7 +680,7 @@ function renderLeads(){
       <td>${esc(l.ville||'')}</td>
       <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
       <td>${statutPill(curStatutId(l))}</td>
-      <td class="hint">${esc(profileName(l.owner_telepro)||'—')}</td>
+      <td>${ownerCell(l.owner_telepro)}</td>
       <td class="num">${eur(l.montant)}</td></tr>`; }).join('');
   if(rows.length>400) document.getElementById('leads-count').textContent+=' (400 affichés)';
 }
@@ -1413,10 +1468,21 @@ function renderDashboard(){
   const perdu=LEADS.filter(l=>l.stage==='perdu').length;
   const caSigne=LEADS.filter(l=>l.signe).reduce((s,l)=>s+(Number(l.montant)||0),0);
   const commDue=LEADS.filter(commissionEarned).length*commissionValue();
-  const kpi=[{v:total,l:'Clients au total'},{v:signe,l:'Signés'},{v:installe,l:'Installés'},{v:paye,l:'Payés'},
-    {v:perdu,l:'Perdus'},{v:(total?Math.round(signe/total*100):0)+' %',l:'Taux de signature'},
-    {v:eur(caSigne),l:'CA signé'},{v:eur(commDue),l:'Commissions télépro dues'}];
-  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+  const kpi=[
+    {n:total,     l:'Clients au total',         icon:'👥', c:'var(--accent)',  f:'int'},
+    {n:signe,     l:'Signés',                    icon:'✍️', c:'var(--good)',    f:'int'},
+    {n:installe,  l:'Installés',                 icon:'☀️', c:'#38bdf8',        f:'int'},
+    {n:paye,      l:'Payés',                     icon:'💰', c:'var(--good)',    f:'int'},
+    {n:perdu,     l:'Perdus',                    icon:'✖️', c:'var(--bad)',     f:'int'},
+    {n:(total?signe/total*100:0), l:'Taux de signature', icon:'📈', c:'var(--accent2)', f:'pct'},
+    {n:caSigne,   l:'CA signé',                  icon:'💶', c:'var(--good)',    f:'eur'},
+    {n:commDue,   l:'Commissions télépro dues',  icon:'🎁', c:'var(--warn)',    f:'eur'}
+  ];
+  document.getElementById('kpi-grid').innerHTML=kpi.map((x,i)=>`<div class="kpi" style="--kc:${x.c};animation-delay:${i*55}ms">
+    <div class="k-ico" style="color:${x.c}">${x.icon}</div>
+    <div class="k-val" data-n="${x.n}" data-fmt="${x.f}">${x.f==='eur'?eur(0):x.f==='pct'?'0 %':'0'}</div>
+    <div class="k-lab">${x.l}</div></div>`).join('');
+  document.querySelectorAll('#kpi-grid .k-val').forEach(countUp);
   document.getElementById('dash-stages').innerHTML='<tr><th>Étape</th><th class="num">Nombre</th><th class="num">Montant cumulé</th></tr>'+
     STAGES.map(s=>{ const r=LEADS.filter(l=>l.stage===s.key), amt=r.reduce((a,l)=>a+(Number(l.montant)||0),0);
       return `<tr><td><span class="pill" style="background:${s.color}22;color:${s.color}">${s.label}</span></td><td class="num">${r.length}</td><td class="num">${eur(amt)}</td></tr>`; }).join('');
@@ -1510,7 +1576,7 @@ function renderUsers(){
       </div><div style="margin-top:2px">${geo}</div>`;
     }
     return `<div class="subcard"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <b>${esc(p.nom||p.email)}</b>${adm?' <span class="tag">admin</span>':''}
+      ${avatar(p.nom||p.email,'')}<b>${esc(p.nom||p.email)}</b>${adm?' <span class="tag">admin</span>':''}
       <span style="flex:1"></span>${checks}</div>${addr}</div>`;
   }).join('');
 }
