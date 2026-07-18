@@ -175,6 +175,21 @@
   .kc-head{display:flex;align-items:center;gap:8px}
   .kc-head .kc-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kcard .kc-amt{display:inline-block;background:color-mix(in srgb,var(--good) 15%,transparent);padding:2px 9px;border-radius:7px}
+  /* Écran de connexion */
+  .overlay{animation:fadein .4s var(--ease) both}
+  .authcard{box-shadow:var(--shadow);animation:rise .5s var(--ease) both}
+  .auth-logo{display:flex;flex-direction:column;align-items:center;gap:14px;margin-bottom:6px;text-align:center}
+  .auth-logo .sunlogo{width:58px;height:58px;font-size:31px;border-radius:18px}
+  .authcard.center h1,.authcard.center .sub{text-align:center}
+  /* États vides soignés */
+  .emptybox{display:flex;flex-direction:column;align-items:center;gap:6px;padding:34px 20px;text-align:center}
+  .emptybox .e-ico{font-size:36px;opacity:.92;margin-bottom:2px}
+  .emptybox .e-title{font-weight:700;color:var(--txt);font-size:15px}
+  .emptybox .e-sub{font-size:13px;color:var(--muted)}
+  td.empty{padding:0}
+  /* Confettis (célébration) */
+  .confetti-piece{position:fixed;top:-14px;width:9px;height:14px;z-index:80;pointer-events:none;border-radius:2px;will-change:transform,opacity;animation:conffall linear forwards}
+  @keyframes conffall{to{transform:translateY(106vh) rotate(680deg);opacity:.85}}
   .step:hover{background:var(--panel2)}
   .step.active{border-color:var(--accent);background:rgba(245,166,35,.10)}
   .step.done{border-color:rgba(55,211,155,.4);background:rgba(55,211,155,.06)}
@@ -256,8 +271,8 @@
 <body>
 
 <div id="login-view" class="overlay hidden">
-  <form class="authcard" onsubmit="doLogin(event)">
-    <h1>☀️ CRM Photovoltaïque</h1><div class="sub">Connecte-toi pour accéder au CRM.</div>
+  <form class="authcard center" onsubmit="doLogin(event)">
+    <div class="auth-logo"><span class="sunlogo">☀️</span><div><h1 style="margin:0">CRM Photovoltaïque</h1><div class="sub" style="margin:4px 0 0">Connecte-toi pour accéder au CRM.</div></div></div>
     <label>Email</label><input type="email" id="login-email" autocomplete="username" required>
     <label>Mot de passe</label><input type="password" id="login-pass" autocomplete="current-password" required>
     <button class="btn" type="submit" style="width:100%;margin-top:16px">Se connecter</button>
@@ -589,6 +604,18 @@ function avatarHue(str){ str=String(str||'?'); let h=0; for(let i=0;i<str.length
 function initials(name){ const p=String(name||'').trim().split(/\s+/).filter(Boolean); if(!p.length) return '?'; const a=p[0][0]||''; const b=p.length>1?(p[p.length-1][0]||''):''; return (a+b).toUpperCase(); }
 function avatar(name,cls){ const h=avatarHue(name); const bg=`linear-gradient(135deg,hsl(${h} 68% 56%),hsl(${(h+42)%360} 70% 45%))`; return `<span class="avatar ${cls||''}" style="background:${bg}" title="${esc(name||'')}">${esc(initials(name))}</span>`; }
 function ownerCell(id){ const n=profileName(id); if(!n) return '<span class="hint">—</span>'; return `<span class="cellu">${avatar(n,'sm')}<span class="hint">${esc(n)}</span></span>`; }
+function emptyRow(cols,ico,title,sub){ return `<tr><td class="empty" colspan="${cols}"><div class="emptybox"><div class="e-ico">${ico}</div><div class="e-title">${esc(title)}</div>${sub?`<div class="e-sub">${esc(sub)}</div>`:''}</div></td></tr>`; }
+function celebrate(){
+  if(prefersReduced()) return;
+  const colors=['#f5a623','#ff7a45','#37d39b','#38bdf8','#8a5cff'];
+  for(let i=0;i<90;i++){
+    const p=document.createElement('div'); p.className='confetti-piece';
+    p.style.left=(Math.random()*100)+'vw'; p.style.background=colors[i%colors.length];
+    const d=2.1+Math.random()*1.7; p.style.animationDuration=d+'s'; p.style.animationDelay=(Math.random()*.35)+'s';
+    p.style.transform='rotate('+(Math.random()*360)+'deg)'; if(Math.random()<.5) p.style.borderRadius='50%';
+    document.body.appendChild(p); setTimeout(()=>p.remove(),(d+.6)*1000);
+  }
+}
 function countUp(el){
   const target=parseFloat(el.dataset.n)||0, kind=el.dataset.fmt;
   const f = kind==='pct'?(v=>Math.round(v)+' %') : kind==='eur'?(v=>eur(Math.round(v))) : (v=>Math.round(v).toLocaleString('fr-FR'));
@@ -703,7 +730,7 @@ function filteredLeads(){
 function renderLeads(){
   const rows=filteredLeads(), t=document.getElementById('leads-table');
   document.getElementById('leads-count').textContent=rows.length+' client(s) · '+LEADS.length+' au total';
-  if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucun client. Cliquez « ＋ Nouveau client » ou importez un fichier.</td></tr>'; return; }
+  if(!rows.length){ t.innerHTML=emptyRow(7,'👋','Aucun client pour l’instant','Cliquez « ＋ Nouveau client » ou importez un fichier Excel.'); return; }
   t.innerHTML='<tr><th>ID</th><th>Nom</th><th>Ville</th><th>Étape</th><th>Statut</th><th>Télépro</th><th class="num">Montant</th></tr>'+
     rows.slice(0,400).map(l=>{ const st=stageOf(l.stage); return `<tr class="clickable" onclick="openLead('${l.id}')">
       <td class="hint">${l.numero||''}</td>
@@ -1109,7 +1136,7 @@ async function loadDocs(){
   const box=document.getElementById('doc-list');
   if(error){ box.innerHTML='<div class="hint">Erreur : '+esc(error.message)+'</div>'; return; }
   curDocs=data||[];
-  if(!curDocs.length){ box.innerHTML='<div class="hint">Aucun document. Cliquez « ⬆️ Ajouter un document ».</div>'; return; }
+  if(!curDocs.length){ box.innerHTML='<div class="emptybox"><div class="e-ico">📎</div><div class="e-title">Aucun document</div><div class="e-sub">Cliquez « ⬆️ Ajouter un document » pour joindre un fichier à cette fiche.</div></div>'; return; }
   box.innerHTML=curDocs.map(d=>{
     const del=IS_ADMIN?`<button class="btn danger small" onclick="delDoc('${d.id}')" title="Supprimer (admin)">✕</button>`:'';
     const ko=d.taille?Math.round(d.taille/1024):0;
@@ -1386,7 +1413,7 @@ function renderDocsAll(){
   });
   const t=document.getElementById('docall-table');
   document.getElementById('docall-count').textContent=rows.length+' document(s) · '+ALLDOCS.length+' au total';
-  if(!rows.length){ t.innerHTML='<tr><td class="empty">Aucun document.</td></tr>'; return; }
+  if(!rows.length){ t.innerHTML=emptyRow(7,'📁','Aucun document','Les documents ajoutés dans les fiches clients apparaîtront ici.'); return; }
   t.innerHTML='<tr><th>Type</th><th>Fichier</th><th>ID client</th><th>Client</th><th>Type client</th><th>Ajouté le</th><th></th></tr>'+
     rows.slice(0,400).map(d=>{ const c=d.client||{};
       return `<tr>
@@ -1462,7 +1489,9 @@ async function kDrop(e){
   const l=LEADS.find(x=>x.id===id); if(!l||l.stage===stage) return;
   const {error}=await db.from('pv_leads').update({stage,updated_at:new Date().toISOString()}).eq('id',id);
   if(error){ toast('Erreur : '+error.message); return; }
-  l.stage=stage; renderPipeline(); toast('Étape : '+stageOf(stage).label);
+  l.stage=stage; renderPipeline();
+  if(stage==='termine'){ celebrate(); toast('🎉 Dossier gagné : '+leadName(l)); }
+  else toast('Étape : '+stageOf(stage).label);
 }
 
 /* ---------- COMMISSIONS ---------- */
@@ -1481,7 +1510,7 @@ function renderCommissions(){
   LEADS.forEach(l=>{ if(!commissionEarned(l)) return; const k=l.owner_telepro||'_none'; (map[k]=map[k]||[]).push(l); });
   const t=document.getElementById('comm-table');
   const keys=Object.keys(map);
-  if(!keys.length){ t.innerHTML='<tr><td class="empty">Aucune commission pour l\'instant.</td></tr>'; }
+  if(!keys.length){ t.innerHTML=emptyRow(4,'💶','Aucune commission pour l’instant','Elles apparaîtront dès qu’un dossier remplira la condition de versement.'); }
   else{
     t.innerHTML='<tr><th>Télépro</th><th class="num">Dossiers éligibles</th><th class="num">Commission unitaire</th><th class="num">Total</th></tr>'+
       keys.map(k=>{ const arr=map[k], name=k==='_none'?'(non attribué)':(profileName(k)||'(inconnu)');
@@ -1727,7 +1756,7 @@ function renderFrais(){
       <td class="hint">${f.lead_id?esc(fraisLeadName(f.lead_id)):'—'}</td>
       <td class="num">${eur(f.montant)}</td>
       <td class="num" style="white-space:nowrap"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️</button> <button class="btn danger small" onclick="delFrais('${f.id}')">Suppr.</button></td>
-    </tr>`).join(''):'<tr><td class="empty" colspan="7">Aucun frais. Ajoutez-en un ci-dessus.</td></tr>');
+    </tr>`).join(''):emptyRow(7,'💸','Aucun frais enregistré','Ajoutez votre première dépense avec le formulaire ci-dessus.'));
 }
 async function saveFrais(e){
   if(e) e.preventDefault();
