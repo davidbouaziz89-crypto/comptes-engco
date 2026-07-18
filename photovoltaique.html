@@ -190,6 +190,22 @@
   /* Confettis (célébration) */
   .confetti-piece{position:fixed;top:-14px;width:9px;height:14px;z-index:80;pointer-events:none;border-radius:2px;will-change:transform,opacity;animation:conffall linear forwards}
   @keyframes conffall{to{transform:translateY(106vh) rotate(680deg);opacity:.85}}
+  /* Fiche client : identité dans l'en-tête */
+  .lh-id{display:flex;align-items:center;gap:11px;min-width:0;flex:1}
+  .lh-id .lh-name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lh-id .lh-sub{font-size:12px;color:var(--muted)}
+  /* Cartes récap de la fiche : icône + accent */
+  .bcard{position:relative;overflow:hidden}
+  .bcard .b-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .bcard .b-ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px;background:color-mix(in srgb,var(--kc,var(--accent)) 16%,transparent)}
+  .bcard .b-lab{margin:0}
+  .bcard::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--kc,var(--accent)),transparent)}
+  /* Histogramme CA / mois */
+  .barchart{display:flex;align-items:flex-end;gap:14px;height:190px;padding-top:6px}
+  .bc-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end;min-width:0}
+  .bc-bar{width:100%;max-width:58px;border-radius:8px 8px 0 0;background:linear-gradient(180deg,var(--accent),var(--accent2));min-height:4px;height:0;transition:height .85s var(--ease)}
+  .bc-val{font-size:12px;font-weight:800;color:var(--txt);white-space:nowrap}
+  .bc-lab{font-size:12px;color:var(--muted);text-transform:capitalize}
   .step:hover{background:var(--panel2)}
   .step.active{border-color:var(--accent);background:rgba(245,166,35,.10)}
   .step.done{border-color:rgba(55,211,155,.4);background:rgba(55,211,155,.06)}
@@ -311,6 +327,7 @@
         <section class="panel"><h2>Conversion</h2><div id="dash-donut"></div></section>
         <section class="panel"><h2>Répartition par étape</h2><div id="dash-stages"></div></section>
       </div>
+      <section class="panel"><h2>Chiffre d'affaires signé — 6 derniers mois</h2><div id="dash-ca"></div></section>
     </div>
     <div id="tab-leads" class="hidden">
       <section class="panel">
@@ -465,15 +482,15 @@
 <div id="lead-view" class="hidden">
   <div class="lead-head">
     <button class="btn ghost small" onclick="closeLead()">← Retour</button>
-    <span class="spacer"></span>
+    <div class="lh-id" id="lh-id"></div>
     <button class="btn danger small" id="lv-del" onclick="deleteLead()">🗑️ Supprimer</button>
   </div>
   <div class="lead-wrap">
     <div class="bcards">
-      <div class="bcard"><div class="b-lab">Étape en cours</div><div class="b-val" id="bc-stage">—</div></div>
-      <div class="bcard"><div class="b-lab">Montant vente</div><div class="b-val" id="bc-montant">—</div></div>
-      <div class="bcard"><div class="b-lab">Statut dossier</div><div class="b-val" id="bc-etat" style="font-size:15px">—</div></div>
-      <div class="bcard"><div class="b-lab">Commission télépro</div><div class="b-val" id="bc-comm">—</div></div>
+      <div class="bcard" style="--kc:var(--accent)"><div class="b-top"><span class="b-ico">🎯</span><span class="b-lab">Étape en cours</span></div><div class="b-val" id="bc-stage">—</div></div>
+      <div class="bcard" style="--kc:var(--good)"><div class="b-top"><span class="b-ico">💶</span><span class="b-lab">Montant vente</span></div><div class="b-val" id="bc-montant">—</div></div>
+      <div class="bcard" style="--kc:#38bdf8"><div class="b-top"><span class="b-ico">📋</span><span class="b-lab">Statut dossier</span></div><div class="b-val" id="bc-etat" style="font-size:15px">—</div></div>
+      <div class="bcard" style="--kc:var(--warn)"><div class="b-top"><span class="b-ico">🎁</span><span class="b-lab">Commission télépro</span></div><div class="b-val" id="bc-comm">—</div></div>
     </div>
     <div class="lead-body">
       <!-- GAUCHE : infos client -->
@@ -604,7 +621,8 @@ function avatarHue(str){ str=String(str||'?'); let h=0; for(let i=0;i<str.length
 function initials(name){ const p=String(name||'').trim().split(/\s+/).filter(Boolean); if(!p.length) return '?'; const a=p[0][0]||''; const b=p.length>1?(p[p.length-1][0]||''):''; return (a+b).toUpperCase(); }
 function avatar(name,cls){ const h=avatarHue(name); const bg=`linear-gradient(135deg,hsl(${h} 68% 56%),hsl(${(h+42)%360} 70% 45%))`; return `<span class="avatar ${cls||''}" style="background:${bg}" title="${esc(name||'')}">${esc(initials(name))}</span>`; }
 function ownerCell(id){ const n=profileName(id); if(!n) return '<span class="hint">—</span>'; return `<span class="cellu">${avatar(n,'sm')}<span class="hint">${esc(n)}</span></span>`; }
-function emptyRow(cols,ico,title,sub){ return `<tr><td class="empty" colspan="${cols}"><div class="emptybox"><div class="e-ico">${ico}</div><div class="e-title">${esc(title)}</div>${sub?`<div class="e-sub">${esc(sub)}</div>`:''}</div></td></tr>`; }
+function emptyBox(ico,title,sub){ return `<div class="emptybox"><div class="e-ico">${ico}</div><div class="e-title">${esc(title)}</div>${sub?`<div class="e-sub">${esc(sub)}</div>`:''}</div>`; }
+function emptyRow(cols,ico,title,sub){ return `<tr><td class="empty" colspan="${cols}">${emptyBox(ico,title,sub)}</td></tr>`; }
 function celebrate(){
   if(prefersReduced()) return;
   const colors=['#f5a623','#ff7a45','#37d39b','#38bdf8','#8a5cff'];
@@ -757,6 +775,7 @@ async function openLead(id){
   const g=i=>document.getElementById(i);
   g('lv-num').textContent='Client N° '+(l.numero||'—');
   g('lv-name').textContent=leadName(l);
+  g('lh-id').innerHTML=`${avatar(leadName(l),'lg')}<div style="min-width:0"><div class="lh-name">${esc(leadName(l))}</div><div class="lh-sub">N° ${l.numero||'—'}${l.ville?' · '+esc(l.ville):''}</div></div>`;
   g('lv-civilite').value=l.civilite||'';
   g('lv-prenom').value=l.prenom||''; g('lv-nom').value=l.nom||''; g('lv-email').value=l.email||'';
   g('lv-telephone').value=l.telephone||''; g('lv-telephone2').value=l.telephone2||'';
@@ -796,7 +815,9 @@ async function saveLeadInfo(){
   if(IS_ADMIN) patch.owner_telepro=g('lv-owner-telepro')||null;
   const btn=document.getElementById('lv-save'); btn.disabled=true; btn.textContent='Enregistrement…';
   const ok=await updLead(patch); btn.disabled=false; btn.textContent='💾 Enregistrer';
-  if(ok){ document.getElementById('lv-name').textContent=leadName(curLead); renderQuick(); toast('Enregistré ✓'); }
+  if(ok){ document.getElementById('lv-name').textContent=leadName(curLead);
+    const lh=document.querySelector('#lh-id .lh-name'); if(lh) lh.textContent=leadName(curLead);
+    renderQuick(); toast('Enregistré ✓'); }
 }
 async function updLead(patch,msg){
   if(!curLead) return true;
@@ -1573,6 +1594,19 @@ function renderDashboard(){
       <div class="st-meta"><b>${r.length}</b> · ${eur(amt)}</div></div>`;
   }).join('');
   requestAnimationFrame(()=>document.querySelectorAll('#dash-stages .st-fill').forEach(f=>{ f.style.width=f.dataset.w+'%'; }));
+
+  // Chiffre d'affaires signé — 6 derniers mois
+  const now=new Date(), months=[];
+  for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    months.push({key:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),label:d.toLocaleDateString('fr-FR',{month:'short'}).replace('.','')}); }
+  const caM={}; months.forEach(m=>caM[m.key]=0);
+  LEADS.filter(l=>l.signe).forEach(l=>{ const k=(l.created_at||'').slice(0,7); if(k in caM) caM[k]+=Number(l.montant)||0; });
+  const maxCA=Math.max(1,...months.map(m=>caM[m.key])), caTot=months.reduce((s,m)=>s+caM[m.key],0);
+  document.getElementById('dash-ca').innerHTML = caTot>0
+    ? `<div class="barchart">${months.map(m=>{ const v=caM[m.key], h=Math.round(v/maxCA*100);
+        return `<div class="bc-col"><div class="bc-val">${v?eur(v):''}</div><div class="bc-bar" data-h="${h}" title="${esc(m.label)} : ${eur(v)}"></div><div class="bc-lab">${esc(m.label)}</div></div>`; }).join('')}</div>`
+    : emptyBox('📈','Pas encore de vente signée','Le chiffre d\'affaires signé s\'affichera ici, mois par mois.');
+  requestAnimationFrame(()=>document.querySelectorAll('#dash-ca .bc-bar').forEach(b=>{ b.style.height=b.dataset.h+'%'; }));
 }
 
 /* ---------- PARAMÈTRES ---------- */
