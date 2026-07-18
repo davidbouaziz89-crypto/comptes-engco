@@ -242,6 +242,9 @@
   .rdv-date{display:flex;flex-direction:column;gap:1px}
   .rdv-day{font-weight:700;font-size:13px;text-transform:capitalize}
   .rdv-day.today{color:var(--accent)}
+  .rdv-day.overdue{color:var(--bad)}
+  .rdv-row.overdue{background:color-mix(in srgb,var(--bad) 7%,transparent)}
+  .rdv-row.overdue:hover{background:color-mix(in srgb,var(--bad) 12%,transparent)}
   .rdv-time{font-size:12px;color:var(--muted)}
   .rdv-type{justify-self:start;font-size:12px;font-weight:700;padding:3px 11px;border-radius:20px;color:var(--tc,var(--accent));background:color-mix(in srgb,var(--tc,var(--accent)) 15%,transparent);white-space:nowrap}
   .rdv-client{display:flex;align-items:center;gap:9px;min-width:0;font-weight:600}
@@ -1684,20 +1687,24 @@ function renderDashboard(){
     : emptyBox('📈','Pas encore de vente signée','Le chiffre d\'affaires signé s\'affichera ici, mois par mois.');
   requestAnimationFrame(()=>document.querySelectorAll('#dash-ca .bc-bar').forEach(b=>{ b.style.height=b.dataset.h+'%'; }));
 
-  // Prochains rendez-vous (rappel confirmateur, RDV commercial, contrôle qualité)
-  const todayISO=toISODate(new Date()), rdvs=[];
-  const addRdv=(l,date,heure,type,ownerId,color)=>{ if(!date) return; const d=date.slice(0,10); if(d<todayISO) return; rdvs.push({lead:l,date:d,heure:(heure||''),type,ownerId,color}); };
+  // Rendez-vous : en retard (dossiers encore ouverts) + à venir
+  const todayISO=toISODate(new Date()), rdvs=[], activeStages=new Set(['telepro','confirmateur','commercial']);
+  const addRdv=(l,date,heure,type,ownerId,color)=>{ if(!date) return; const d=date.slice(0,10);
+    const overdue=d<todayISO; if(overdue && !activeStages.has(l.stage)) return; // ignore les RDV passés sur dossiers clos/perdus
+    rdvs.push({lead:l,date:d,heure:(heure||''),type,ownerId,color,overdue}); };
   LEADS.forEach(l=>{
     addRdv(l,l.rdv_conf_date,l.rdv_conf_heure,'Rappel confirmateur',l.owner_confirmateur,'#8a5cff');
     addRdv(l,l.rdv_date,l.rdv_heure,'RDV commercial',l.owner_commercial,'#f59e0b');
     addRdv(l,l.rdv_cq_date,l.rdv_cq_heure,'Contrôle qualité',l.owner_cq,'#38bdf8');
   });
   rdvs.sort((a,b)=>(a.date+'T'+(a.heure||'99')).localeCompare(b.date+'T'+(b.heure||'99')));
-  document.getElementById('dash-rdv').innerHTML = rdvs.length ? rdvs.slice(0,7).map(r=>{
+  document.getElementById('dash-rdv').innerHTML = rdvs.length ? rdvs.slice(0,8).map(r=>{
     const name=leadName(r.lead), owner=r.ownerId?profileName(r.ownerId):null, isToday=r.date===todayISO;
     const dl=new Date(r.date+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}).replace('.','');
-    return `<div class="rdv-row" onclick="openLead('${r.lead.id}')">
-      <div class="rdv-date"><span class="rdv-day ${isToday?'today':''}">${isToday?"Aujourd'hui":esc(dl)}</span>${r.heure?`<span class="rdv-time">${esc(r.heure.slice(0,5))}</span>`:''}</div>
+    const dayCls=r.overdue?'overdue':isToday?'today':'', dayTxt=r.overdue?'⏰ En retard':isToday?"Aujourd'hui":esc(dl);
+    const sub=r.overdue?esc(dl)+(r.heure?' · '+r.heure.slice(0,5):''):(r.heure?esc(r.heure.slice(0,5)):'');
+    return `<div class="rdv-row ${r.overdue?'overdue':''}" onclick="openLead('${r.lead.id}')">
+      <div class="rdv-date"><span class="rdv-day ${dayCls}">${dayTxt}</span>${sub?`<span class="rdv-time">${sub}</span>`:''}</div>
       <span class="rdv-type" style="--tc:${r.color}">${r.type}</span>
       <div class="rdv-client">${avatar(name,'sm')}<span>${esc(name)}</span></div>
       <div class="rdv-owner hint">${owner?esc(owner):'—'}</div></div>`;
