@@ -147,6 +147,34 @@
   @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
+  /* Dashboard : anneau de conversion + histogramme d'étapes */
+  .dash-two{display:grid;grid-template-columns:290px 1fr;gap:18px;align-items:stretch}
+  @media(max-width:820px){.dash-two{grid-template-columns:1fr}}
+  .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}
+  .donut{position:relative;width:172px;height:172px}
+  .donut svg{transform:rotate(-90deg)}
+  .donut .st-fillring{transition:stroke-dashoffset 1s var(--ease)}
+  .donut .d-center{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+  .donut .d-pct{font-size:32px;font-weight:800;line-height:1}
+  .donut .d-sub{font-size:12px;color:var(--muted);margin-top:3px}
+  .donut-legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+  .dl{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
+  .dl .dot{width:9px;height:9px;border-radius:3px}
+  .dl b{color:var(--txt);font-weight:800}
+  .sbar{display:grid;grid-template-columns:118px 1fr auto;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .sbar:last-child{border-bottom:0}
+  .st-track{height:12px;border-radius:7px;background:var(--panel2);overflow:hidden}
+  .st-fill{height:100%;border-radius:7px;width:0;transition:width .85s var(--ease)}
+  .st-meta{font-size:13px;color:var(--muted);white-space:nowrap;text-align:right}
+  .st-meta b{color:var(--txt);font-weight:800}
+  /* Kanban : cartes vivantes */
+  .kcol{transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
+  .kcol h3 .kcount{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:1px 9px;font-size:12px;color:var(--muted);letter-spacing:0;font-weight:700}
+  .kcard{transition:transform .16s var(--ease),box-shadow .2s var(--ease),border-color .2s var(--ease)}
+  .kcard:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}
+  .kc-head{display:flex;align-items:center;gap:8px}
+  .kc-head .kc-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kcard .kc-amt{display:inline-block;background:color-mix(in srgb,var(--good) 15%,transparent);padding:2px 9px;border-radius:7px}
   .step:hover{background:var(--panel2)}
   .step.active{border-color:var(--accent);background:rgba(245,166,35,.10)}
   .step.done{border-color:rgba(55,211,155,.4);background:rgba(55,211,155,.06)}
@@ -264,7 +292,10 @@
   <main>
     <div id="tab-dash">
       <section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
-      <section class="panel"><h2>Répartition par étape</h2><div class="table-wrap"><table id="dash-stages"></table></div></section>
+      <div class="dash-two">
+        <section class="panel"><h2>Conversion</h2><div id="dash-donut"></div></section>
+        <section class="panel"><h2>Répartition par étape</h2><div id="dash-stages"></div></section>
+      </div>
     </div>
     <div id="tab-leads" class="hidden">
       <section class="panel">
@@ -1414,9 +1445,10 @@ function renderPipeline(){
   document.getElementById('kanban').innerHTML=STAGES.map(s=>{
     const cards=LEADS.filter(l=>l.stage===s.key);
     return `<div class="kcol" data-stage="${s.key}" ondragover="kOver(event)" ondragleave="kLeave(event)" ondrop="kDrop(event)">
-      <h3><span style="color:${s.color}">${s.label}</span><span>${cards.length}</span></h3>
+      <h3><span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:3px;background:${s.color}"></span><span style="color:${s.color}">${s.label}</span></span><span class="kcount">${cards.length}</span></h3>
       ${cards.slice(0,60).map(l=>`<div class="kcard" draggable="true" ondragstart="kStart(event,'${l.id}')" onclick="openLead('${l.id}')">
-        <div class="kc-name">${esc(leadName(l))}</div><div class="kc-meta">${esc(l.ville||'')} ${l.owner_telepro?'· '+esc(profileName(l.owner_telepro)||''):''}</div>
+        <div class="kc-head">${l.owner_telepro?avatar(profileName(l.owner_telepro),'sm'):''}<div class="kc-name">${esc(leadName(l))}</div></div>
+        <div class="kc-meta">${esc(l.ville||'')}${l.owner_telepro?' · '+esc(profileName(l.owner_telepro)||''):''}</div>
         ${l.montant?`<div class="kc-amt">${eur(l.montant)}</div>`:''}</div>`).join('')}</div>`;
   }).join('');
 }
@@ -1483,9 +1515,35 @@ function renderDashboard(){
     <div class="k-val" data-n="${x.n}" data-fmt="${x.f}">${x.f==='eur'?eur(0):x.f==='pct'?'0 %':'0'}</div>
     <div class="k-lab">${x.l}</div></div>`).join('');
   document.querySelectorAll('#kpi-grid .k-val').forEach(countUp);
-  document.getElementById('dash-stages').innerHTML='<tr><th>Étape</th><th class="num">Nombre</th><th class="num">Montant cumulé</th></tr>'+
-    STAGES.map(s=>{ const r=LEADS.filter(l=>l.stage===s.key), amt=r.reduce((a,l)=>a+(Number(l.montant)||0),0);
-      return `<tr><td><span class="pill" style="background:${s.color}22;color:${s.color}">${s.label}</span></td><td class="num">${r.length}</td><td class="num">${eur(amt)}</td></tr>`; }).join('');
+
+  // Anneau de conversion (taux de signature)
+  const rate=total?signe/total:0, R=70, C=2*Math.PI*R;
+  document.getElementById('dash-donut').innerHTML=`<div class="donut-wrap">
+    <div class="donut">
+      <svg width="172" height="172" viewBox="0 0 172 172">
+        <circle cx="86" cy="86" r="${R}" fill="none" style="stroke:var(--panel2)" stroke-width="15"/>
+        <circle id="donut-ring" class="st-fillring" cx="86" cy="86" r="${R}" fill="none" style="stroke:var(--accent)" stroke-width="15" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}"/>
+      </svg>
+      <div class="d-center"><div><div class="d-pct" data-n="${rate*100}" data-fmt="pct">0 %</div><div class="d-sub">de signature</div></div></div>
+    </div>
+    <div class="donut-legend">
+      <div class="dl"><span class="dot" style="background:var(--good)"></span>Signés <b>${signe}</b></div>
+      <div class="dl"><span class="dot" style="background:#38bdf8"></span>Installés <b>${installe}</b></div>
+      <div class="dl"><span class="dot" style="background:var(--warn)"></span>Payés <b>${paye}</b></div>
+    </div></div>`;
+  document.querySelectorAll('#dash-donut .d-pct').forEach(countUp);
+  requestAnimationFrame(()=>{ const ring=document.getElementById('donut-ring'); if(ring) ring.style.strokeDashoffset=(C*(1-rate)).toFixed(1); });
+
+  // Histogramme par étape
+  const maxC=Math.max(1,...STAGES.map(s=>LEADS.filter(l=>l.stage===s.key).length));
+  document.getElementById('dash-stages').innerHTML=STAGES.map(s=>{
+    const r=LEADS.filter(l=>l.stage===s.key), amt=r.reduce((a,l)=>a+(Number(l.montant)||0),0), w=Math.round(r.length/maxC*100);
+    return `<div class="sbar">
+      <span class="pill" style="background:${s.color}22;color:${s.color}">${s.label}</span>
+      <div class="st-track"><div class="st-fill" style="background:${s.color}" data-w="${w}"></div></div>
+      <div class="st-meta"><b>${r.length}</b> · ${eur(amt)}</div></div>`;
+  }).join('');
+  requestAnimationFrame(()=>document.querySelectorAll('#dash-stages .st-fill').forEach(f=>{ f.style.width=f.dataset.w+'%'; }));
 }
 
 /* ---------- PARAMÈTRES ---------- */
