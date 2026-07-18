@@ -63,6 +63,19 @@
   .search{max-width:280px}
   .hint{color:var(--muted);font-size:13px}
   .pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+  .params-layout{display:flex;gap:18px;align-items:flex-start}
+  .params-menu{flex:0 0 230px;position:sticky;top:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px}
+  .params-menu button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;border:0;color:var(--muted);padding:10px 12px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  .params-menu button:hover{color:var(--txt);background:var(--panel2)}
+  .params-menu button.active{color:var(--txt);background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+  .params-content{flex:1;min-width:0}
+  .params-sec{display:none}
+  .params-sec.active{display:block}
+  @media(max-width:820px){
+    .params-layout{flex-direction:column}
+    .params-menu{position:static;flex:none;width:100%;display:flex;flex-wrap:wrap;gap:4px}
+    .params-menu button{width:auto}
+  }
   .tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--muted)}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
   .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
@@ -284,60 +297,80 @@
       </section>
     </div>
     <div id="tab-params" class="hidden">
-      <section class="panel"><h2>💶 Commission du télépro</h2>
-        <div class="row">
-          <div class="field sm"><label>Montant fixe (€) par dossier</label><input id="set-comm" type="number" step="0.01"></div>
-          <div class="field"><label>Condition de versement</label>
-            <select id="set-cond">
-              <option value="signe_installe">Uniquement si signé ET installé</option>
-              <option value="signe">Si signé</option>
-              <option value="toujours">Toujours (dès le confirmé)</option>
-            </select></div>
-          <button class="btn small" onclick="saveSettings()">💾 Enregistrer</button>
+      <div class="params-layout">
+        <div class="params-menu" id="params-menu">
+          <button data-ps="commission" class="active" onclick="showParam('commission')">💶 Commission télépro</button>
+          <button data-ps="users" onclick="showParam('users')">👥 Utilisateurs & rôles</button>
+          <button data-ps="produits" onclick="showParam('produits')">🛒 Produits & prix</button>
+          <button data-ps="statuts" onclick="showParam('statuts')">🎨 Statuts par rôle</button>
+          <button data-ps="sources" onclick="showParam('sources')">📥 Sources de leads</button>
+          <button data-ps="frais" onclick="showParam('frais')">💸 Catégories de frais</button>
+          <button data-ps="docs" onclick="showParam('docs')">📄 Types de documents</button>
         </div>
-      </section>
-      <section class="panel"><h2>👥 Utilisateurs & rôles</h2>
-        <div class="hint" style="margin-bottom:8px">Cochez les rôles de chaque utilisateur. Une même personne peut cumuler plusieurs rôles (ex : télépro <b>et</b> confirmateur). Le rôle principal (attribué à la connexion) est verrouillé ; ajoutez les rôles supplémentaires. Pour un <b>commercial</b>, renseignez l'adresse de son domicile (utilisée pour la distance du 1er RDV du jour).</div>
-        <div id="users-list"></div>
-      </section>
-      <section class="panel"><h2>🛒 Produits & prix (HT)</h2>
-        <div class="hint" style="margin-bottom:10px">Trois catégories : PV, PAC, Split. Pour chaque produit : le <b>prix de cession (HT)</b> et le <b>prix de vente (TTC)</b>. Ils seront proposés au commercial à l'étape 3.</div>
-        <div id="prod-tables"></div>
-      </section>
-      <section class="panel"><h2>🎨 Statuts par rôle</h2>
-        <form class="row" onsubmit="addStatut(event)" style="margin-bottom:12px">
-          <div class="field sm"><label>Rôle</label><select id="st-role"></select></div>
-          <div class="field"><label>Nom du statut</label><input id="st-nom" placeholder="ex : RDV pris" required></div>
-          <div class="field sm"><label>Couleur</label><input id="st-couleur" type="color" value="#f5a623" style="height:42px;padding:4px"></div>
-          <div class="field sm"><label>Ordre</label><input id="st-ordre" type="number" value="0"></div>
-          <button class="btn small" type="submit">Ajouter</button>
-        </form>
-        <div id="st-tables"></div>
-      </section>
-      <div class="grid2">
-        <section class="panel"><h2>📥 Sources de leads</h2>
-          <form class="row" onsubmit="addRef(event,'pv_sources','src-nom')" style="margin-bottom:12px">
-            <div class="field"><input id="src-nom" placeholder="ex : Achat de leads" required></div><button class="btn small" type="submit">Ajouter</button>
-          </form><div class="table-wrap"><table id="src-table"></table></div>
-        </section>
-        <section class="panel"><h2>🏠 Types de client</h2>
-          <form class="row" onsubmit="addRef(event,'pv_client_types','ct-nom')" style="margin-bottom:12px">
-            <div class="field"><input id="ct-nom" placeholder="ex : Propriétaire" required></div><button class="btn small" type="submit">Ajouter</button>
-          </form><div class="table-wrap"><table id="ct-table"></table></div>
-        </section>
+        <div class="params-content">
+          <div class="params-sec active" id="ps-commission">
+            <section class="panel"><h2>💶 Commission du télépro</h2>
+              <div class="row">
+                <div class="field sm"><label>Montant fixe (€) par dossier</label><input id="set-comm" type="number" step="0.01"></div>
+                <div class="field"><label>Condition de versement</label>
+                  <select id="set-cond">
+                    <option value="signe_installe">Uniquement si signé ET installé</option>
+                    <option value="signe">Si signé</option>
+                    <option value="toujours">Toujours (dès le confirmé)</option>
+                  </select></div>
+                <button class="btn small" onclick="saveSettings()">💾 Enregistrer</button>
+              </div>
+            </section>
+          </div>
+          <div class="params-sec" id="ps-users">
+            <section class="panel"><h2>👥 Utilisateurs & rôles</h2>
+              <div class="hint" style="margin-bottom:8px">Cochez les rôles de chaque utilisateur. Une même personne peut cumuler plusieurs rôles (ex : télépro <b>et</b> confirmateur). Le rôle principal (attribué à la connexion) est verrouillé ; ajoutez les rôles supplémentaires. Pour un <b>commercial</b>, renseignez l'adresse de son domicile (utilisée pour la distance du 1er RDV du jour).</div>
+              <div id="users-list"></div>
+            </section>
+          </div>
+          <div class="params-sec" id="ps-produits">
+            <section class="panel"><h2>🛒 Produits & prix (HT)</h2>
+              <div class="hint" style="margin-bottom:10px">Trois catégories : PV, PAC, Split. Pour chaque produit : le <b>prix de cession (HT)</b> et le <b>prix de vente (TTC)</b>. Ils seront proposés au commercial à l'étape 3.</div>
+              <div id="prod-tables"></div>
+            </section>
+          </div>
+          <div class="params-sec" id="ps-statuts">
+            <section class="panel"><h2>🎨 Statuts par rôle</h2>
+              <form class="row" onsubmit="addStatut(event)" style="margin-bottom:12px">
+                <div class="field sm"><label>Rôle</label><select id="st-role"></select></div>
+                <div class="field"><label>Nom du statut</label><input id="st-nom" placeholder="ex : RDV pris" required></div>
+                <div class="field sm"><label>Couleur</label><input id="st-couleur" type="color" value="#f5a623" style="height:42px;padding:4px"></div>
+                <div class="field sm"><label>Ordre</label><input id="st-ordre" type="number" value="0"></div>
+                <button class="btn small" type="submit">Ajouter</button>
+              </form>
+              <div id="st-tables"></div>
+            </section>
+          </div>
+          <div class="params-sec" id="ps-sources">
+            <section class="panel"><h2>📥 Sources de leads</h2>
+              <form class="row" onsubmit="addRef(event,'pv_sources','src-nom')" style="margin-bottom:12px">
+                <div class="field"><input id="src-nom" placeholder="ex : Achat de leads" required></div><button class="btn small" type="submit">Ajouter</button>
+              </form><div class="table-wrap"><table id="src-table"></table></div>
+            </section>
+          </div>
+          <div class="params-sec" id="ps-frais">
+            <section class="panel"><h2>💸 Catégories de frais</h2>
+              <div class="hint" style="margin-bottom:8px">Ces catégories apparaissent dans le menu déroulant de l'onglet 💸 Frais.</div>
+              <form class="row" onsubmit="addRef(event,'pv_frais_cats','frc-nom')" style="margin-bottom:12px">
+                <div class="field"><input id="frc-nom" placeholder="ex : Carburant / déplacement" required></div><button class="btn small" type="submit">Ajouter</button>
+              </form><div class="table-wrap"><table id="frc-table"></table></div>
+            </section>
+          </div>
+          <div class="params-sec" id="ps-docs">
+            <section class="panel"><h2>📄 Types de documents</h2>
+              <div class="hint" style="margin-bottom:8px">Ces noms apparaissent dans le menu déroulant quand on importe un document dans une fiche client.</div>
+              <form class="row" onsubmit="addRef(event,'pv_doc_types','dt-nom')" style="margin-bottom:12px">
+                <div class="field"><input id="dt-nom" placeholder="ex : Pièce d'identité" required></div><button class="btn small" type="submit">Ajouter</button>
+              </form><div class="table-wrap"><table id="dt-table"></table></div>
+            </section>
+          </div>
+        </div>
       </div>
-      <section class="panel"><h2>💸 Catégories de frais</h2>
-        <div class="hint" style="margin-bottom:8px">Ces catégories apparaissent dans le menu déroulant de l'onglet 💸 Frais.</div>
-        <form class="row" onsubmit="addRef(event,'pv_frais_cats','frc-nom')" style="margin-bottom:12px">
-          <div class="field"><input id="frc-nom" placeholder="ex : Carburant / déplacement" required></div><button class="btn small" type="submit">Ajouter</button>
-        </form><div class="table-wrap"><table id="frc-table"></table></div>
-      </section>
-      <section class="panel"><h2>📄 Types de documents</h2>
-        <div class="hint" style="margin-bottom:8px">Ces noms apparaissent dans le menu déroulant quand on importe un document dans une fiche client.</div>
-        <form class="row" onsubmit="addRef(event,'pv_doc_types','dt-nom')" style="margin-bottom:12px">
-          <div class="field"><input id="dt-nom" placeholder="ex : Pièce d'identité" required></div><button class="btn small" type="submit">Ajouter</button>
-        </form><div class="table-wrap"><table id="dt-table"></table></div>
-      </section>
     </div>
   </main>
 </div>
@@ -1393,7 +1426,11 @@ function renderDashboard(){
 function renderParams(){
   document.getElementById('set-comm').value=SETTINGS.commission_telepro!=null?SETTINGS.commission_telepro:'';
   document.getElementById('set-cond').value=SETTINGS.commission_condition||'signe_installe';
-  renderUsers(); renderProduits(); renderStatutTables(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_client_types','ct-table',CTYPES); renderRef('pv_doc_types','dt-table',DOCTYPES); renderRef('pv_frais_cats','frc-table',FRAISCATS);
+  renderUsers(); renderProduits(); renderStatutTables(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_doc_types','dt-table',DOCTYPES); renderRef('pv_frais_cats','frc-table',FRAISCATS);
+}
+function showParam(key){
+  document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.ps===key));
+  document.querySelectorAll('#tab-params .params-sec').forEach(s=>s.classList.toggle('active',s.id==='ps-'+key));
 }
 let PROD_EDIT=new Set();
 function renderProduits(){
