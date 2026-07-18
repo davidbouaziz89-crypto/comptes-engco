@@ -1480,7 +1480,7 @@ function renderDocsAll(){
         <td>${d.type_doc?`<span class="tag">${esc(d.type_doc)}</span>`:'<span class="hint">—</span>'}</td>
         <td>${esc(d.nom||'document')}</td>
         <td><a href="#" onclick="openLead('${d.lead_id}');return false;" style="font-weight:700">N° ${c.numero!=null?c.numero:'—'}</a></td>
-        <td>${esc(((c.prenom||'')+' '+(c.nom||'')).trim()||'—')}</td>
+        <td>${(((c.prenom||'')+' '+(c.nom||'')).trim())?`<span class="cellu">${avatar(((c.prenom||'')+' '+(c.nom||'')).trim(),'sm')}<span>${esc(((c.prenom||'')+' '+(c.nom||'')).trim())}</span></span>`:'<span class="hint">—</span>'}</td>
         <td>${esc(c.type_client||'—')}</td>
         <td class="hint">${new Date(d.created_at).toLocaleDateString('fr-FR')}</td>
         <td><button class="btn ghost small" onclick="openDocGlobal('${d.id}')">⬇️ Ouvrir</button></td></tr>`; }).join('');
@@ -1573,14 +1573,20 @@ function renderCommissions(){
   if(!keys.length){ t.innerHTML=emptyRow(4,'💶','Aucune commission pour l’instant','Elles apparaîtront dès qu’un dossier remplira la condition de versement.'); }
   else{
     t.innerHTML='<tr><th>Télépro</th><th class="num">Dossiers éligibles</th><th class="num">Commission unitaire</th><th class="num">Total</th></tr>'+
-      keys.map(k=>{ const arr=map[k], name=k==='_none'?'(non attribué)':(profileName(k)||'(inconnu)');
-        return `<tr><td>${esc(name)}</td><td class="num">${arr.length}</td><td class="num">${eur(val)}</td><td class="num"><b>${eur(arr.length*val)}</b></td></tr>`; }).join('')+
+      keys.map(k=>{ const arr=map[k], isNone=k==='_none', name=isNone?'(non attribué)':(profileName(k)||'(inconnu)');
+        const cell=isNone?`<span class="hint">${esc(name)}</span>`:`<span class="cellu">${avatar(name,'sm')}<span>${esc(name)}</span></span>`;
+        return `<tr><td>${cell}</td><td class="num">${arr.length}</td><td class="num">${eur(val)}</td><td class="num"><b>${eur(arr.length*val)}</b></td></tr>`; }).join('')+
       `<tr><td><b>Total</b></td><td class="num"><b>${keys.reduce((s,k)=>s+map[k].length,0)}</b></td><td></td><td class="num"><b>${eur(keys.reduce((s,k)=>s+map[k].length,0)*val)}</b></td></tr>`;
   }
   const installes=LEADS.filter(l=>l.installe), ca=installes.reduce((s,l)=>s+(Number(l.montant)||0),0);
   const commTot=LEADS.filter(commissionEarned).length*val;
-  const renta=[{v:installes.length,l:'Dossiers installés'},{v:eur(ca),l:'CA installé'},{v:eur(commTot),l:'Commissions télépro'},{v:eur(ca-commTot),l:'Marge (provisoire)'}];
-  document.getElementById('renta-grid').innerHTML=renta.map(x=>`<div class="kpi"><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+  const renta=[
+    {n:installes.length,l:'Dossiers installés',icon:'☀️',c:'#38bdf8',f:'int'},
+    {n:ca,l:'CA installé',icon:'💶',c:'var(--good)',f:'eur'},
+    {n:commTot,l:'Commissions télépro',icon:'🎁',c:'var(--warn)',f:'eur'},
+    {n:ca-commTot,l:'Marge (provisoire)',icon:'📊',c:'var(--accent)',f:'eur'}];
+  document.getElementById('renta-grid').innerHTML=renta.map((x,i)=>`<div class="kpi" style="--kc:${x.c};animation-delay:${i*55}ms"><div class="k-ico" style="color:${x.c}">${x.icon}</div><div class="k-val" data-n="${x.n}" data-fmt="${x.f}">${x.f==='eur'?eur(0):'0'}</div><div class="k-lab">${x.l}</div></div>`).join('');
+  document.querySelectorAll('#renta-grid .k-val').forEach(countUp);
 }
 
 /* ---------- DASHBOARD ---------- */
