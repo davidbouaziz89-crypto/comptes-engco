@@ -156,6 +156,7 @@
     main{padding:16px 12px}
     nav{padding:8px 12px;gap:5px}
     nav button{padding:7px 11px;font-size:13px}
+    .lead-head{flex-wrap:wrap}
     .kpis{grid-template-columns:1fr 1fr;gap:10px}
     .kpi{padding:13px}
     .kpi .k-val{font-size:22px}
@@ -332,7 +333,7 @@
   .rv-badge{display:inline-flex;align-items:center;gap:4px;color:var(--good);font-weight:700;font-size:13px;white-space:nowrap}
   .btn.rv-ok{background:var(--good);color:#052a1c;border:0}
   .rv-done{margin-top:4px;padding:10px 12px;border-radius:9px;background:rgba(55,211,155,.12);border:1px solid rgba(55,211,155,.5);color:var(--good);font-weight:700}
-  @media(max-width:600px){.rv-lab{flex-basis:100%}.rv-val{flex-basis:100%}}
+  @media(max-width:600px){.rv-row{flex-wrap:wrap}.rv-lab{flex:1 1 100%}.rv-val{flex:1 1 100%}.rv-act{flex:1 1 100%;justify-content:flex-end}}
   .detail-box{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px;background:var(--panel2)}
   .subcard{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--panel)}
   .act{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:8px}

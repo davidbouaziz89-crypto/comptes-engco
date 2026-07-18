@@ -286,11 +286,14 @@
   .qs-hint{padding:16px;color:var(--muted);font-size:13px;text-align:center}
   .qs-foot{padding:9px 16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;display:flex;gap:14px;flex-wrap:wrap}
   .qs-foot kbd{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:inherit;font-size:11px}
+  html,body{overflow-x:hidden}
   @media(max-width:640px){
     header{flex-wrap:wrap;gap:8px 10px;padding:12px 14px}
     header h1{font-size:16px}
     main{padding:16px 12px}
     .kpis{grid-template-columns:1fr 1fr;gap:10px}
+    .lead-head{flex-wrap:wrap}
+    .cal-grid{gap:4px}
   }
   @media(max-width:400px){ .kpis{grid-template-columns:1fr} }
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
