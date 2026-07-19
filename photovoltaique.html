@@ -528,6 +528,16 @@
               </form>
               <div class="table-wrap"><table id="cqs-table"></table></div>
             </section>
+            <section class="panel"><h2>🏦 Statuts du financement</h2>
+              <div class="hint" style="margin-bottom:10px">Statuts proposés à l'étape Financement. Cochez « passe en Perdu » pour qu'un statut bascule automatiquement le dossier en Perdu (ex : Refusé). Si la liste est vide, 3 par défaut sont utilisés (ACCEPTÉ, REFUSÉ→Perdu, EN ATTENTE).</div>
+              <form class="row" onsubmit="addFinStatut(event)" style="margin-bottom:12px">
+                <div class="field"><label>Nom du statut</label><input id="fins-nom" placeholder="ex : ACCEPTÉ" required></div>
+                <div class="field sm"><label>Couleur</label><input id="fins-couleur" type="color" value="#16a34a" style="height:42px;padding:4px"></div>
+                <div class="field sm"><label>Bascule</label><label style="height:42px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--txt)"><input type="checkbox" id="fins-perd" style="width:auto"> passe en Perdu</label></div>
+                <button class="btn small" type="submit">Ajouter</button>
+              </form>
+              <div class="table-wrap"><table id="fins-table"></table></div>
+            </section>
           </div>
           <div class="params-sec" id="ps-sources">
             <section class="panel"><h2>📥 Sources de leads</h2>
@@ -669,7 +679,7 @@ const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let SESSION=null, IS_ADMIN=false, MY_ROLE=null, MY_ROLES=[];
 let LEADS=[], STATUTS=[], SOURCES=[], CTYPES=[], DOCTYPES=[], PROFILES=[], SETTINGS={}, PRODUITS=[];
-let FRAIS=[], FRAISCATS=[], CQSTATUTS=[];
+let FRAIS=[], FRAISCATS=[], CQSTATUTS=[], FINSTATUTS=[];
 const PRODUIT_CATS=[['pv','PV'],['pac','PAC'],['split','Split']];
 let curLead=null, curDocs=[], selRole='telepro', ALLDOCS=[];
 
@@ -785,7 +795,7 @@ async function afterAuth(session){
   await loadAll(); showTab('dash');
 }
 async function loadAll(){
-  const [st,sr,ct,dt,pr,se,l,pd,fc,fr,cq]=await Promise.all([
+  const [st,sr,ct,dt,pr,se,l,pd,fc,fr,cq,fs]=await Promise.all([
     db.from('pv_statuts').select('*').order('role_key').order('ordre'),
     db.from('pv_sources').select('*').order('ordre'),
     db.from('pv_client_types').select('*').order('ordre'),
@@ -797,10 +807,11 @@ async function loadAll(){
     db.from('pv_frais_cats').select('*').order('ordre'),
     db.from('pv_frais').select('*').order('date',{ascending:false}),
     db.from('pv_cq_statuts').select('*').order('ordre'),
+    db.from('pv_financement_statuts').select('*').order('ordre'),
   ]);
   STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; PROFILES=pr.data||[];
   SETTINGS=(se.data&&se.data.value)||{}; LEADS=l.data||[]; PRODUITS=pd.data||[];
-  FRAISCATS=fc.data||[]; FRAIS=fr.data||[]; CQSTATUTS=cq.data||[];
+  FRAISCATS=fc.data||[]; FRAIS=fr.data||[]; CQSTATUTS=cq.data||[]; FINSTATUTS=fs.data||[];
   const me=PROFILES.find(p=>p.id===(SESSION&&SESSION.user.id));
   const _extra=(me&&Array.isArray(me.roles))?me.roles:[];
   MY_ROLES=IS_ADMIN?['admin','telepro','confirmateur','commercial','cq','financement']:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),..._extra]));
@@ -1060,13 +1071,21 @@ function cqStatutSelect(ed){
   return `<label>Statut du contrôle qualité${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="updLead({cq_statut:this.value||null},'Statut CQ enregistré').then(()=>{renderSuivi();renderBudgetCards();})">${opts}</select>`;
 }
 function cqStatutPill(v){ if(!v) return ''; const c=cqColor(v); return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
-const FIN_STATUTS=[{nom:'ACCEPTÉ',couleur:'#16a34a'},{nom:'REFUSÉ',couleur:'#dc2626'},{nom:'EN ATTENTE',couleur:'#f59e0b'}];
-function finColor(nom){ const s=FIN_STATUTS.find(x=>x.nom===nom); return s&&s.couleur?s.couleur:'#a855f7'; }
+const DEFAULT_FIN_STATUTS=[{nom:'ACCEPTÉ',couleur:'#16a34a',perd:false},{nom:'REFUSÉ',couleur:'#dc2626',perd:true},{nom:'EN ATTENTE',couleur:'#f59e0b',perd:false}];
+function finStatutList(){ return FINSTATUTS.length?FINSTATUTS:DEFAULT_FIN_STATUTS; }
+function finColor(nom){ const s=finStatutList().find(x=>x.nom===nom); return s&&s.couleur?s.couleur:'#a855f7'; }
+function onFinStatut(val){
+  updLead({financement_statut:val||null},'Statut financement enregistré').then(()=>{
+    const s=finStatutList().find(x=>x.nom===val);
+    if(s && s.perd){ toast('Financement refusé → dossier marqué Perdu'); setStage('perdu'); }
+    else { renderSuivi(); renderBudgetCards(); }
+  });
+}
 function finStatutSelect(ed){
-  const cur=curLead.financement_statut||'', list=FIN_STATUTS.map(s=>s.nom);
+  const cur=curLead.financement_statut||'', list=finStatutList().map(s=>s.nom);
   if(cur && !list.includes(cur)) list.unshift(cur);
   const opts='<option value="">— À définir —</option>'+list.map(o=>`<option ${cur===o?'selected':''}>${esc(o)}</option>`).join('');
-  return `<label>Statut du financement${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="updLead({financement_statut:this.value||null},'Statut financement enregistré').then(()=>{renderSuivi();renderBudgetCards();})">${opts}</select>`;
+  return `<label>Statut du financement${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="onFinStatut(this.value)">${opts}</select>`;
 }
 function finStatutPill(v){ if(!v) return ''; const c=finColor(v); return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
 /* -- Crédits en cours (liste dynamique) -- */
@@ -1790,7 +1809,20 @@ function renderDashboard(){
 function renderParams(){
   document.getElementById('set-comm').value=SETTINGS.commission_telepro!=null?SETTINGS.commission_telepro:'';
   document.getElementById('set-cond').value=SETTINGS.commission_condition||'signe_installe';
-  renderUsers(); renderProduits(); renderStatutTables(); renderCqStatuts(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_doc_types','dt-table',DOCTYPES); renderRef('pv_frais_cats','frc-table',FRAISCATS);
+  renderUsers(); renderProduits(); renderStatutTables(); renderCqStatuts(); renderFinStatuts(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_doc_types','dt-table',DOCTYPES); renderRef('pv_frais_cats','frc-table',FRAISCATS);
+}
+function renderFinStatuts(){
+  const t=document.getElementById('fins-table'); if(!t) return;
+  if(!FINSTATUTS.length){ t.innerHTML='<tr><td class="hint" style="padding:10px">Aucun statut personnalisé — 3 par défaut utilisés (ACCEPTÉ, REFUSÉ→Perdu, EN ATTENTE). Ajoutez-en pour remplacer la liste.</td></tr>'; return; }
+  t.innerHTML='<tr><th>Statut</th><th>Couleur</th><th>Bascule</th><th></th></tr>'+FINSTATUTS.map(s=>`<tr><td>${finStatutPill(s.nom)}</td><td><span class="tag" style="background:${esc(s.couleur||'')};color:#fff">${esc(s.couleur||'')}</span></td><td>${s.perd?'➜ Perdu':'—'}</td><td class="num"><button class="btn danger small" onclick="delRef('pv_financement_statuts','${s.id}')">Suppr.</button></td></tr>`).join('');
+}
+async function addFinStatut(e){
+  e.preventDefault();
+  const nom=document.getElementById('fins-nom').value.trim(); if(!nom) return;
+  const couleur=document.getElementById('fins-couleur').value, perd=document.getElementById('fins-perd').checked;
+  const {error}=await db.from('pv_financement_statuts').insert({nom,couleur,perd,ordre:FINSTATUTS.length});
+  if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('fins-nom').value=''; document.getElementById('fins-perd').checked=false; await reloadRefs(); toast('Statut financement ajouté');
 }
 function renderCqStatuts(){
   const t=document.getElementById('cqs-table'); if(!t) return;
@@ -1947,14 +1979,15 @@ async function delRef(table,id){
   await reloadRefs();
 }
 async function reloadRefs(){
-  const [st,sr,ct,dt,fc,cq]=await Promise.all([
+  const [st,sr,ct,dt,fc,cq,fs]=await Promise.all([
     db.from('pv_statuts').select('*').order('role_key').order('ordre'),
     db.from('pv_sources').select('*').order('ordre'),
     db.from('pv_client_types').select('*').order('ordre'),
     db.from('pv_doc_types').select('*').order('ordre'),
     db.from('pv_frais_cats').select('*').order('ordre'),
-    db.from('pv_cq_statuts').select('*').order('ordre')]);
-  STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; FRAISCATS=fc.data||[]; CQSTATUTS=cq.data||[]; fillSelects(); renderParams();
+    db.from('pv_cq_statuts').select('*').order('ordre'),
+    db.from('pv_financement_statuts').select('*').order('ordre')]);
+  STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; FRAISCATS=fc.data||[]; CQSTATUTS=cq.data||[]; FINSTATUTS=fs.data||[]; fillSelects(); renderParams();
 }
 
 /* ---------- FRAIS ---------- */
