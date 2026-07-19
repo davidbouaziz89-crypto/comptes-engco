@@ -324,6 +324,13 @@
   .ptog:hover{border-color:var(--accent)}
   .ptog .pdot2{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
   .ptog.off{opacity:.42;text-decoration:line-through}
+  /* Sélecteur de période dashboard */
+  .segbar{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
+  .segbar button{background:transparent;border:0;color:var(--muted);padding:6px 13px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:background .16s var(--ease),color .16s var(--ease)}
+  .segbar button:hover{color:var(--txt)}
+  .segbar button.active{background:var(--panel);color:var(--txt);box-shadow:0 2px 8px -4px rgba(0,0,0,.3)}
+  .dash-range{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:400}
+  .dash-range input[type=date]{width:auto;padding:6px 9px;font-size:13px}
 </style>
 </head>
 <body>
@@ -364,7 +371,12 @@
   <main>
     <div id="notif-bar" class="hidden" onclick="showTab('agenda')"></div>
     <div id="tab-dash">
-      <section class="panel"><h2>Vue d'ensemble</h2><div class="kpis" id="kpi-grid"></div></section>
+      <section class="panel"><h2 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Vue d'ensemble<span style="flex:1"></span><span class="segbar" id="dash-period">
+        <button data-p="all" class="active" onclick="setDashPeriod('all')">Tout</button>
+        <button data-p="month" onclick="setDashPeriod('month')">Ce mois</button>
+        <button data-p="quarter" onclick="setDashPeriod('quarter')">Trimestre</button>
+        <button data-p="year" onclick="setDashPeriod('year')">Année</button>
+      </span><span class="dash-range"><span class="hint">Du</span><input type="date" id="dash-from" onchange="setCustomPeriod()"><span class="hint">au</span><input type="date" id="dash-to" onchange="setCustomPeriod()"><button class="btn ghost small" id="dash-range-clear" onclick="clearCustomPeriod()" style="display:none">✕</button></span></h2><div class="kpis" id="kpi-grid"></div></section>
       <section class="panel"><h2>Chiffre d'affaires gagné par mois</h2><div class="chart-box"><canvas id="ch-ca"></canvas></div></section>
       <div class="grid3">
         <section class="panel"><h2>Leads par étape</h2><div class="chart-box sm"><canvas id="ch-etape"></canvas></div></section>
@@ -1220,10 +1232,25 @@ function lastMonths(n){ const arr=[], now=new Date(); for(let i=n-1;i>=0;i--){ c
 const CHART_PALETTE=['#4f7cff','#8a5cff','#16a34a','#f59e0b','#0ea5e9','#e11d48','#14b8a6','#a855f7','#f97316','#64748b','#eab308','#ec4899'];
 function mkChart(id,cfg){ if(typeof Chart==='undefined') return; if(CHARTS[id]) CHARTS[id].destroy(); const el=document.getElementById(id); if(!el) return; CHARTS[id]=new Chart(el,cfg); }
 
+let DASH_PERIOD='all';
+function setDashPeriod(p){ DASH_PERIOD=p; const f=document.getElementById('dash-from'),t=document.getElementById('dash-to'); if(f)f.value=''; if(t)t.value=''; const c=document.getElementById('dash-range-clear'); if(c)c.style.display='none'; document.querySelectorAll('#dash-period button').forEach(b=>b.classList.toggle('active',b.dataset.p===p)); renderDashboard(); }
+function setCustomPeriod(){ DASH_PERIOD='custom'; document.querySelectorAll('#dash-period button').forEach(b=>b.classList.remove('active')); const c=document.getElementById('dash-range-clear'); if(c)c.style.display=''; renderDashboard(); }
+function clearCustomPeriod(){ setDashPeriod('all'); }
+function periodStartISO(){ const now=new Date();
+  if(DASH_PERIOD==='month') return isoDate(now.getFullYear(),now.getMonth(),1);
+  if(DASH_PERIOD==='quarter') return isoDate(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);
+  if(DASH_PERIOD==='year') return isoDate(now.getFullYear(),0,1);
+  return null; }
+function periodLeads(){
+  if(DASH_PERIOD==='custom'){ const f=document.getElementById('dash-from').value, t=document.getElementById('dash-to').value;
+    return LEADS.filter(l=>{ const d=(l.created_at||'').slice(0,10); if(f&&d<f) return false; if(t&&d>t) return false; return true; }); }
+  const s=periodStartISO(); return s?LEADS.filter(l=>(l.created_at||'').slice(0,10)>=s):LEADS;
+}
 function renderDashboard(){
-  const total=LEADS.length, won=LEADS.filter(l=>l.stage==='gagne'), open=LEADS.filter(l=>l.stage!=='gagne'&&l.stage!=='perdu');
+  const L=periodLeads();
+  const total=L.length, won=L.filter(l=>l.stage==='gagne'), open=L.filter(l=>l.stage!=='gagne'&&l.stage!=='perdu');
   const wonAmt=won.reduce((s,l)=>s+(Number(l.montant)||0),0), openAmt=open.reduce((s,l)=>s+(Number(l.montant)||0),0);
-  const toBill=LEADS.filter(l=>l.etape==='a_facturer').length;
+  const toBill=L.filter(l=>l.etape==='a_facturer').length;
   const nbFormations=FORMATIONS.filter(f=>f.actif!==false).length;
   const kpi=[
     {v:total,l:'Leads au total',i:'👥',c:'#4f7cff',filt:'all'},
@@ -1235,9 +1262,10 @@ function renderDashboard(){
     {v:toBill,l:'À facturer',i:'🧾',c:'#e11d48',filt:'abill'},
     {v:nbFormations,l:'Formations actives',i:'🎓',c:'#8a5cff',tab:'formations'}];
   document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi clickable" style="--kc:${x.c}" onclick="${x.tab?`showTab('${x.tab}')`:`goLeadsFilter('${x.filt}')`}" title="Voir le détail"><div class="k-ic">${x.i}</div><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
-  renderCharts(won);
+  renderCharts(won,L);
 }
-function renderCharts(won){
+function renderCharts(won,L){
+  L=L||LEADS;
   if(typeof Chart==='undefined') return;
   const tc=themeColors();
   Chart.defaults.color=tc.muted; Chart.defaults.borderColor=tc.line; Chart.defaults.font.family='system-ui,-apple-system,sans-serif';
@@ -1254,27 +1282,27 @@ function renderCharts(won){
       scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:gridC},ticks:{callback:v=>eur0(v)}}}}});
 
   // Nouveaux leads par mois (courbe)
-  const leadData=months.map(m=>LEADS.filter(l=>monthKey(l.created_at)===m.key).length);
+  const leadData=months.map(m=>L.filter(l=>monthKey(l.created_at)===m.key).length);
   mkChart('ch-leads',{type:'line',
     data:{labels:months.map(m=>m.label),datasets:[{label:'Nouveaux leads',data:leadData,borderColor:'#8a5cff',backgroundColor:'rgba(138,92,255,.15)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#8a5cff',borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
       scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:gridC},ticks:{precision:0}}}}});
 
   // Camembert — leads par étape (parcours)
-  const et=PARCOURS.map(p=>({label:p.label,color:p.color,n:LEADS.filter(l=>(l.etape||'infos_lead')===p.code).length})).filter(x=>x.n>0);
+  const et=PARCOURS.map(p=>({label:p.label,color:p.color,n:L.filter(l=>(l.etape||'infos_lead')===p.code).length})).filter(x=>x.n>0);
   mkChart('ch-etape',{type:'doughnut',
     data:{labels:et.map(x=>x.label),datasets:[{data:et.map(x=>x.n),backgroundColor:et.map(x=>x.color),borderColor:tc.panel,borderWidth:2}]},
     options:doughOpts});
 
   // Camembert — leads par statut
-  const st=STATUTS.map((s,i)=>({label:s.nom,color:s.couleur||CHART_PALETTE[i%CHART_PALETTE.length],n:LEADS.filter(l=>l.statut_id===s.id).length})).filter(x=>x.n>0);
-  const noStat=LEADS.filter(l=>!l.statut_id).length; if(noStat) st.push({label:'Sans statut',color:'#64748b',n:noStat});
+  const st=STATUTS.map((s,i)=>({label:s.nom,color:s.couleur||CHART_PALETTE[i%CHART_PALETTE.length],n:L.filter(l=>l.statut_id===s.id).length})).filter(x=>x.n>0);
+  const noStat=L.filter(l=>!l.statut_id).length; if(noStat) st.push({label:'Sans statut',color:'#64748b',n:noStat});
   mkChart('ch-statut',{type:'doughnut',
     data:{labels:st.map(x=>x.label),datasets:[{data:st.map(x=>x.n),backgroundColor:st.map(x=>x.color),borderColor:tc.panel,borderWidth:2}]},
     options:doughOpts});
 
   // Camembert — leads par source
-  const srcMap={}; LEADS.forEach(l=>{ const s=((l.source||'').trim())||'Sans source'; srcMap[s]=(srcMap[s]||0)+1; });
+  const srcMap={}; L.forEach(l=>{ const s=((l.source||'').trim())||'Sans source'; srcMap[s]=(srcMap[s]||0)+1; });
   const srcK=Object.keys(srcMap);
   mkChart('ch-source',{type:'doughnut',
     data:{labels:srcK,datasets:[{data:srcK.map(k=>srcMap[k]),backgroundColor:srcK.map((k,i)=>CHART_PALETTE[i%CHART_PALETTE.length]),borderColor:tc.panel,borderWidth:2}]},
