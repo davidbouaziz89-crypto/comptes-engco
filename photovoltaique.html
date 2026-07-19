@@ -93,8 +93,17 @@
   #lead-view{position:fixed;inset:0;background:var(--bg);overflow:auto;z-index:50}
   .lead-head{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
   .lead-wrap{max-width:1760px;margin:0 auto;padding:20px}
-  .bcards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
-  @media(max-width:820px){.bcards{grid-template-columns:1fr 1fr}}
+  .bcards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;position:sticky;top:66px;z-index:4;background:var(--bg);padding:8px 0}
+  @media(max-width:880px){.bcards{position:static;padding:0;grid-template-columns:1fr 1fr}}
+  /* Carte marge : popover de détail au survol */
+  .marge-card{overflow:visible!important;cursor:help}
+  .marge-pop{position:absolute;top:calc(100% + 8px);left:0;min-width:280px;max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;z-index:30;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .16s var(--ease),transform .16s var(--ease)}
+  .marge-card:hover .marge-pop{opacity:1;transform:none;pointer-events:auto}
+  .marge-pop .mp-title{font-weight:700;font-size:13px;margin-bottom:8px}
+  .marge-pop .mp-row{display:flex;justify-content:space-between;gap:18px;padding:3px 0;font-size:13px}
+  .marge-pop .mp-row.total{font-weight:800;font-size:14px}
+  .marge-pop .mp-sep{height:1px;background:var(--line);margin:6px 0}
+  @media(max-width:880px){.marge-pop{left:auto;right:0}}
   .bcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
   .bcard .b-lab{color:var(--muted);font-size:12px}
   .bcard .b-val{font-size:20px;font-weight:800;margin-top:4px}
@@ -663,11 +672,10 @@
     <button class="btn danger small" id="lv-del" onclick="deleteLead()">🗑️ Supprimer</button>
   </div>
   <div class="lead-wrap">
-    <div class="bcards">
+    <div class="bcards" id="bcards">
+      <div class="bcard" style="--kc:var(--good)"><div class="b-top"><span class="b-ico">💶</span><span class="b-lab">CA (HT)</span></div><div class="b-val" id="bc-ca">—</div></div>
+      <div class="bcard marge-card" id="bc-marge-card" style="--kc:var(--accent2)"><div class="b-top"><span class="b-ico">📊</span><span class="b-lab">Marge <span class="hint" style="font-weight:600">ⓘ</span></span></div><div class="b-val" id="bc-marge">—</div><div class="marge-pop" id="marge-pop"></div></div>
       <div class="bcard" style="--kc:var(--accent)"><div class="b-top"><span class="b-ico">🎯</span><span class="b-lab">Étape en cours</span></div><div class="b-val" id="bc-stage">—</div></div>
-      <div class="bcard" style="--kc:var(--good)"><div class="b-top"><span class="b-ico">💶</span><span class="b-lab">Montant vente</span></div><div class="b-val" id="bc-montant">—</div></div>
-      <div class="bcard" style="--kc:#38bdf8"><div class="b-top"><span class="b-ico">📋</span><span class="b-lab">Statut dossier</span></div><div class="b-val" id="bc-etat" style="font-size:15px">—</div></div>
-      <div class="bcard" style="--kc:var(--warn)"><div class="b-top"><span class="b-ico">🎁</span><span class="b-lab">Commission télépro</span></div><div class="b-val" id="bc-comm">—</div></div>
     </div>
     <div class="lead-body">
       <!-- GAUCHE : infos client -->
@@ -1062,17 +1070,25 @@ function renderQuick(){
   document.getElementById('lv-quick').innerHTML=q.join('');
 }
 function renderBudgetCards(){
-  const l=curLead, st=stageOf(l.stage);
+  const l=curLead, st=stageOf(l.stage), m=leadMarge(l), see=canSeeMarge();
   document.getElementById('bc-stage').innerHTML=`<span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span>`;
-  const bm=document.getElementById('bc-montant'); bm.dataset.n=Number(l.montant)||0; bm.dataset.fmt='eur'; bm.textContent=l.montant!=null?eur(l.montant):'—';
-  const etat=[]; etat.push(l.signe?'✅ Signé':'⬜ Non signé'); etat.push(l.installe?'✅ Installé':'⬜ Non installé'); etat.push(l.paye?'✅ Payé':'⬜ Non payé');
-  document.getElementById('bc-etat').innerHTML=etat.join('<br>')+(l.cq_statut?'<br><span style="display:inline-block;margin-top:6px">'+cqStatutPill(l.cq_statut)+'</span>':'')+(l.financement_statut?'<br><span style="display:inline-block;margin-top:6px">'+finStatutPill(l.financement_statut)+'</span>':'')+(l.paiement_statut?'<br><span style="display:inline-block;margin-top:6px">'+paiStatutPill(l.paiement_statut)+'</span>':'');
-  const bc=document.getElementById('bc-comm'); const cv=commissionEarned(l)?commissionValue():0; bc.dataset.n=cv; bc.dataset.fmt='eur'; bc.textContent=commissionEarned(l)?eur(cv):'—';
+  const bca=document.getElementById('bc-ca'); bca.dataset.n=m.caHT; bca.dataset.fmt='eur'; bca.textContent=eur(m.caHT);
+  const grid=document.getElementById('bcards'); if(grid) grid.style.gridTemplateColumns='repeat('+(see?3:2)+',1fr)';
+  const mc=document.getElementById('bc-marge-card'); if(mc) mc.style.display=see?'':'none';
+  if(see){
+    const bm=document.getElementById('bc-marge'); bm.dataset.n=m.marge; bm.dataset.fmt='eur'; bm.textContent=eur(m.marge); bm.style.color=m.marge<0?'var(--bad)':'';
+    document.getElementById('marge-pop').innerHTML=`<div class="mp-title">Calcul de la marge (HT)</div>
+      <div class="mp-row"><span>Chiffre d'affaires HT</span><b>${eur(m.caHT)}</b></div>
+      <div class="mp-row"><span>− Commission télépro</span><b>${eur(m.commTel)}</b></div>
+      <div class="mp-row"><span>− Commission commercial (13 %)</span><b>${eur(m.commCom)}</b></div>
+      <div class="mp-row"><span>− Prix de cession produits</span><b>${eur(m.cession)}</b></div>
+      <div class="mp-sep"></div><div class="mp-row total"><span>= Marge</span><b style="color:${m.marge<0?'var(--bad)':'var(--good)'}">${eur(m.marge)}</b></div>`;
+  }
 }
 function animateBudgetCards(){
   const l=curLead; if(!l) return;
-  if(l.montant!=null) countUp(document.getElementById('bc-montant'));
-  if(commissionEarned(l)) countUp(document.getElementById('bc-comm'));
+  countUp(document.getElementById('bc-ca'));
+  if(canSeeMarge()) countUp(document.getElementById('bc-marge'));
 }
 async function saveLeadInfo(){
   if(!curLead) return;
@@ -1368,10 +1384,12 @@ function rvDone(k){ RV_EDIT.delete(k); renderSuivi(); }
 function catLabel(k){ const c=PRODUIT_CATS.find(x=>x[0]===k); return c?c[1]:k; }
 // Matériel : sélection depuis le catalogue + quantités
 function leadMateriel(){ return Array.isArray(curLead.materiel)?curLead.materiel:[]; }
-async function saveMateriel(arr){ curLead.materiel=arr; await updLead({materiel:arr}); renderSuivi(); }
-function addMateriel(id){ const p=PRODUITS.find(x=>x.id===id); if(!p) return; saveMateriel([...leadMateriel(),{id:p.id,nom:p.nom,categorie:p.categorie,qte:1}]); }
-function addMaterielLibre(){ const el=document.getElementById('mat-libre'); const nom=(el&&el.value||'').trim(); if(!nom) return; if(el) el.value=''; saveMateriel([...leadMateriel(),{id:null,nom,categorie:'libre',qte:1}]); }
+function materielCaTTC(arr){ return (arr||[]).reduce((s,it)=>s+(Number(it.prix_vente)||0)*(Number(it.qte)||1),0); }
+async function saveMateriel(arr){ curLead.materiel=arr; const patch={materiel:arr}; if(arr.length) patch.montant=Math.round(materielCaTTC(arr)*100)/100; await updLead(patch); renderSuivi(); }
+function addMateriel(id){ const p=PRODUITS.find(x=>x.id===id); if(!p) return; saveMateriel([...leadMateriel(),{id:p.id,nom:p.nom,categorie:p.categorie,qte:1,prix_vente:p.prix_vente_ttc!=null?p.prix_vente_ttc:null,prix_cession:p.prix_ht!=null?p.prix_ht:0}]); }
+function addMaterielLibre(){ const el=document.getElementById('mat-libre'); const nom=(el&&el.value||'').trim(); if(!nom) return; if(el) el.value=''; saveMateriel([...leadMateriel(),{id:null,nom,categorie:'libre',qte:1,prix_vente:null,prix_cession:0}]); }
 function updMaterielQte(i,q){ const a=leadMateriel().slice(); a[i]={...a[i],qte:Math.max(1,Number(q)||1)}; saveMateriel(a); }
+function updMaterielPrix(i,v){ const a=leadMateriel().slice(); a[i]={...a[i],prix_vente:v===''?null:Number(v)}; saveMateriel(a); }
 function delMateriel(i){ const a=leadMateriel().slice(); a.splice(i,1); saveMateriel(a); }
 function materielLabel(m){ return PRODUIT_CATS.some(c=>c[0]===m.categorie) ? catLabel(m.categorie)+' · '+m.nom : m.nom; }
 function materielHTML(ed){
@@ -1385,10 +1403,13 @@ function materielHTML(ed){
   if(!items.length) h+=`<div class="hint" style="margin-top:6px">Aucun produit ajouté.</div>`;
   items.forEach((m,i)=>{
     h+=`<div class="row" style="margin-top:6px;align-items:flex-end;gap:8px">
-      <div class="field" style="flex:2"><input value="${esc(materielLabel(m))}" disabled></div>
-      <div class="field sm" style="flex:0 0 84px"><label style="margin:0">Qté</label><input type="number" min="1" value="${m.qte||1}" ${ed?'':'disabled'} onchange="updMaterielQte(${i},this.value)"></div>
+      <div class="field" style="flex:2;min-width:120px"><input value="${esc(materielLabel(m))}" disabled></div>
+      <div class="field sm" style="flex:0 0 66px"><label style="margin:0">Qté</label><input type="number" min="1" value="${m.qte||1}" ${ed?'':'disabled'} onchange="updMaterielQte(${i},this.value)"></div>
+      <div class="field sm" style="flex:0 0 118px"><label style="margin:0">Prix vente TTC</label><input type="number" step="0.01" min="0" placeholder="0.00" value="${m.prix_vente!=null?m.prix_vente:''}" ${ed?'':'disabled'} onchange="updMaterielPrix(${i},this.value)"></div>
       ${ed?`<button class="btn danger small" type="button" onclick="delMateriel(${i})" title="Retirer">✕</button>`:''}</div>`;
   });
+  if(items.length){ const ca=materielCaTTC(items);
+    h+=`<div class="s-sep"></div><div style="display:flex;justify-content:space-between;align-items:baseline;font-weight:700"><span>Total vente</span><span>${eur(ca)} TTC <span class="hint" style="font-weight:600">· ${eur(ca/1.2)} HT</span></span></div>`; }
   return h;
 }
 // Aides : liste de montants qui s'additionnent
@@ -1451,7 +1472,6 @@ function rolePanelHTML(role){
     h+=`<div class="hint" style="margin-bottom:8px">Client : <b style="color:var(--txt)">${esc(leadName(curLead))}</b>${_c?' · Commercial : <b style="color:var(--txt)">'+esc(_c.nom||_c.email)+'</b>':''}</div>`;
     h+=`<label>Rapport</label><input ${ed?'':'disabled'} placeholder="Ex : Signé BH" value="${esc(curLead.rapport||'')}" onchange="updLead({rapport:this.value||null})">`;
     h+=`<div class="s-sep"></div>`+materielHTML(ed);
-    h+=`<div class="s-sep"></div><label>Prix de vente (€)</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.montant!=null?curLead.montant:''}" onchange="updLead({montant:this.value===''?null:Number(this.value)},'Prix enregistré')">`;
     h+=`<div class="s-sep"></div>`+aidesHTML(ed);
     h+=`<div class="s-sep"></div><div class="grid2"><div><label>Conso client</label><input type="number" step="0.01" ${ed?'':'disabled'} value="${curLead.conso_client!=null?curLead.conso_client:''}" onchange="updLead({conso_client:this.value===''?null:Number(this.value)})"></div>
       <div>${enumSelect('orientation_toiture','Orientation toiture',ORIENTATIONS,ed)}</div></div>`;
@@ -1871,6 +1891,18 @@ async function kDrop(e){
 }
 
 /* ---------- COMMISSIONS ---------- */
+const TVA=0.20, COMM_COMMERCIAL_PCT=0.13;
+function leadCaTTC(l){ const s=materielCaTTC(Array.isArray(l.materiel)?l.materiel:[]); return s>0?s:(Number(l.montant)||0); }
+function leadCaHT(l){ return leadCaTTC(l)/(1+TVA); }
+function leadMarge(l){
+  const items=Array.isArray(l.materiel)?l.materiel:[];
+  const caHT=leadCaHT(l);
+  const cession=items.reduce((a,it)=>a+(Number(it.prix_cession)||0)*(Number(it.qte)||1),0);
+  const commTel=l.owner_telepro?commissionValue():0;
+  const commCom=caHT*COMM_COMMERCIAL_PCT;
+  return {caTTC:leadCaTTC(l),caHT,cession,commTel,commCom,marge:caHT-commTel-commCom-cession};
+}
+function canSeeMarge(){ return IS_ADMIN || MY_ROLES.includes('commercial') || MY_ROLES.includes('financement'); }
 function commissionValue(){ return Number(SETTINGS.commission_telepro||0)||0; }
 function commissionEarned(l){
   const cond=SETTINGS.commission_condition||'signe_installe';
@@ -1894,13 +1926,14 @@ function renderCommissions(){
         return `<tr><td>${cell}</td><td class="num">${arr.length}</td><td class="num">${eur(val)}</td><td class="num"><b>${eur(arr.length*val)}</b></td></tr>`; }).join('')+
       `<tr><td><b>Total</b></td><td class="num"><b>${keys.reduce((s,k)=>s+map[k].length,0)}</b></td><td></td><td class="num"><b>${eur(keys.reduce((s,k)=>s+map[k].length,0)*val)}</b></td></tr>`;
   }
-  const installes=LEADS.filter(l=>l.installe), ca=installes.reduce((s,l)=>s+(Number(l.montant)||0),0);
+  const installes=LEADS.filter(l=>l.installe), ca=installes.reduce((s,l)=>s+leadCaHT(l),0);
   const commTot=LEADS.filter(commissionEarned).length*val;
+  const margeTot=installes.reduce((s,l)=>s+leadMarge(l).marge,0);
   const renta=[
     {n:installes.length,l:'Dossiers installés',icon:'☀️',c:'#38bdf8',f:'int'},
-    {n:ca,l:'CA installé',icon:'💶',c:'var(--good)',f:'eur'},
+    {n:ca,l:'CA installé (HT)',icon:'💶',c:'var(--good)',f:'eur'},
     {n:commTot,l:'Commissions télépro',icon:'🎁',c:'var(--warn)',f:'eur'},
-    {n:ca-commTot,l:'Marge (provisoire)',icon:'📊',c:'var(--accent)',f:'eur'}];
+    {n:margeTot,l:'Marge (HT)',icon:'📊',c:'var(--accent)',f:'eur'}];
   document.getElementById('renta-grid').innerHTML=renta.map((x,i)=>`<div class="kpi" style="--kc:${x.c};animation-delay:${i*55}ms"><div class="k-ico" style="color:${x.c}">${x.icon}</div><div class="k-val" data-n="${x.n}" data-fmt="${x.f}">${x.f==='eur'?eur(0):'0'}</div><div class="k-lab">${x.l}</div></div>`).join('');
   document.querySelectorAll('#renta-grid .k-val').forEach(countUp);
 }
@@ -1926,7 +1959,7 @@ function renderDashboard(){
   const L=periodLeads();
   const total=L.length, signe=L.filter(l=>l.signe).length, installe=L.filter(l=>l.installe).length, paye=L.filter(l=>l.paye).length;
   const perdu=L.filter(l=>l.stage==='perdu').length;
-  const caSigne=L.filter(l=>l.signe).reduce((s,l)=>s+(Number(l.montant)||0),0);
+  const caSigne=L.filter(l=>l.signe).reduce((s,l)=>s+leadCaHT(l),0);
   const commDue=L.filter(commissionEarned).length*commissionValue();
   const kpi=[
     {n:total,     l:'Clients au total',         icon:'👥', c:'var(--accent)',  f:'int', filt:'all'},
@@ -1965,7 +1998,7 @@ function renderDashboard(){
   // Histogramme par étape
   const maxC=Math.max(1,...STAGES.map(s=>L.filter(l=>l.stage===s.key).length));
   document.getElementById('dash-stages').innerHTML=STAGES.map(s=>{
-    const r=L.filter(l=>l.stage===s.key), amt=r.reduce((a,l)=>a+(Number(l.montant)||0),0), w=Math.round(r.length/maxC*100);
+    const r=L.filter(l=>l.stage===s.key), amt=r.reduce((a,l)=>a+leadCaHT(l),0), w=Math.round(r.length/maxC*100);
     return `<div class="sbar">
       <span class="pill" style="background:${s.color}22;color:${s.color}">${s.label}</span>
       <div class="st-track"><div class="st-fill" style="background:${s.color}" data-w="${w}"></div></div>
@@ -1978,7 +2011,7 @@ function renderDashboard(){
   for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1);
     months.push({key:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),label:d.toLocaleDateString('fr-FR',{month:'short'}).replace('.','')}); }
   const caM={}; months.forEach(m=>caM[m.key]=0);
-  LEADS.filter(l=>l.signe).forEach(l=>{ const k=(l.created_at||'').slice(0,7); if(k in caM) caM[k]+=Number(l.montant)||0; });
+  LEADS.filter(l=>l.signe).forEach(l=>{ const k=(l.created_at||'').slice(0,7); if(k in caM) caM[k]+=leadCaHT(l); });
   const maxCA=Math.max(1,...months.map(m=>caM[m.key])), caTot=months.reduce((s,m)=>s+caM[m.key],0);
   document.getElementById('dash-ca').innerHTML = caTot>0
     ? `<div class="barchart">${months.map(m=>{ const v=caM[m.key], h=Math.round(v/maxCA*100);
