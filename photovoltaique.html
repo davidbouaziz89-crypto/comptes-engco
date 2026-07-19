@@ -668,15 +668,18 @@ const ROLES=[
   {key:'telepro',label:'Télépro',icon:'📞'},
   {key:'confirmateur',label:'Confirmateur',icon:'✅'},
   {key:'commercial',label:'Commercial',icon:'🤝'},
+  {key:'cq',label:'Contrôle Qualité',icon:'🔍'},
 ];
-const ROLE_CQ={key:'cq',label:'CQ',icon:'🔍'};
-// Rôles assignables aux utilisateurs (CQ est un rôle mais pas une étape du pipeline)
-const ASSIGN_ROLES=[...ROLES,ROLE_CQ];
+const ROLE_CQ=ROLES[3];
+// CQ est désormais une étape à part entière (la dernière avant « Terminé »).
+const ASSIGN_ROLES=ROLES;
+const CQ_STATUTS=['CQ OK','À travailler','MORT','Dossier envoyé'];
 const roleLabel=k=>{ const r=ASSIGN_ROLES.find(x=>x.key===k); return r?r.label:k; };
 const STAGES=[
   {key:'telepro',label:'Télépro',color:'#3b82f6'},
   {key:'confirmateur',label:'Confirmateur',color:'#8a5cff'},
   {key:'commercial',label:'Commercial',color:'#f59e0b'},
+  {key:'cq',label:'Contrôle Qualité',color:'#38bdf8'},
   {key:'termine',label:'Terminé',color:'#16a34a'},
   {key:'perdu',label:'Perdu',color:'#dc2626'},
 ];
@@ -784,7 +787,7 @@ async function loadAll(){
   FRAISCATS=fc.data||[]; FRAIS=fr.data||[];
   const me=PROFILES.find(p=>p.id===(SESSION&&SESSION.user.id));
   const _extra=(me&&Array.isArray(me.roles))?me.roles:[];
-  MY_ROLES=IS_ADMIN?['admin','telepro','confirmateur','commercial']:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),..._extra]));
+  MY_ROLES=IS_ADMIN?['admin','telepro','confirmateur','commercial','cq']:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),..._extra]));
   if(!IS_ADMIN){ const rb=document.getElementById('rolebadge'); if(rb&&MY_ROLES.length) rb.textContent=MY_ROLES.map(roleLabel).join(' + '); }
   fillSelects(); renderLeads(); updateNavBadge();
 }
@@ -805,7 +808,7 @@ function fillSelects(){
   const oh=document.getElementById('lv-owner-hint'); if(oh) oh.textContent=IS_ADMIN?'(vous attribuez le lead)':'(attribué par l\'admin)';
   set('lv-source','<option value="">— Aucune —</option>'+SOURCES.map(s=>`<option value="${esc(s.nom)}">${esc(s.nom)}</option>`).join(''));
   set('doc-type','<option value="">— Type de document —</option>'+DOCTYPES.map(d=>`<option value="${esc(d.nom)}">${esc(d.nom)}</option>`).join(''));
-  set('st-role',ROLES.map(r=>`<option value="${r.key}">${r.icon} ${r.label}</option>`).join(''));
+  set('st-role',ROLES.filter(r=>r.key!=='cq').map(r=>`<option value="${r.key}">${r.icon} ${r.label}</option>`).join(''));
   const fcSel=document.getElementById('fr-categorie');
   if(fcSel){ const prev=fcSel.value; fcSel.innerHTML=(FRAISCATS.length?FRAISCATS:[{nom:'Autre'}]).map(c=>`<option value="${esc(c.nom)}">${esc(c.nom)}</option>`).join(''); if(prev&&FRAISCATS.some(c=>c.nom===prev)) fcSel.value=prev; }
   set('fr-lead','<option value="">— Aucun (frais global) —</option>'+LEADS.map(l=>`<option value="${l.id}">${esc(leadName(l))}${l.ville?' — '+esc(l.ville):''}</option>`).join(''));
@@ -842,7 +845,7 @@ function renderLeads(){
       <td><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</td>
       <td>${esc(l.ville||'')}</td>
       <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
-      <td>${statutPill(curStatutId(l))}</td>
+      <td>${l.stage==='cq'&&l.cq_statut?cqStatutPill(l.cq_statut):statutPill(curStatutId(l))}</td>
       <td>${ownerCell(l.owner_telepro)}</td>
       <td class="num">${eur(l.montant)}</td></tr>`; }).join('');
   if(rows.length>400) document.getElementById('leads-count').textContent+=' (400 affichés)';
@@ -888,7 +891,7 @@ function renderBudgetCards(){
   document.getElementById('bc-stage').innerHTML=`<span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span>`;
   document.getElementById('bc-montant').textContent=eur(l.montant);
   const etat=[]; etat.push(l.signe?'✅ Signé':'⬜ Non signé'); etat.push(l.installe?'✅ Installé':'⬜ Non installé'); etat.push(l.paye?'✅ Payé':'⬜ Non payé');
-  document.getElementById('bc-etat').innerHTML=etat.join('<br>');
+  document.getElementById('bc-etat').innerHTML=etat.join('<br>')+(l.cq_statut?'<br><span style="display:inline-block;margin-top:6px">'+cqStatutPill(l.cq_statut)+'</span>':'');
   document.getElementById('bc-comm').textContent=commissionEarned(l)?eur(commissionValue()):'—';
 }
 async function saveLeadInfo(){
@@ -938,7 +941,7 @@ function renderSuivi(){
         <div class="s-body"><div class="s-head">Dossier perdu <span class="s-badge" style="background:rgba(220,38,38,.15);color:var(--bad);border:1px solid rgba(220,38,38,.4)">Perdu</span></div>
           <div class="hint">Ce dossier a été marqué comme perdu.</div>
           <div class="s-sep"></div>
-          <div class="s-foot"><button class="btn ghost small" onclick="setStage('telepro')">↩︎ Ré-ouvrir le dossier</button></div>
+          <div class="s-foot">${IS_ADMIN?`<button class="btn ghost small" onclick="setStage('telepro')">↩︎ Ré-ouvrir le dossier</button>`:'<span class="hint">Réservé à l\'admin.</span>'}</div>
         </div>
       </div>`;
     return;
@@ -953,19 +956,19 @@ function renderSuivi(){
       <div class="s-body"><div class="s-head">Dossier terminé <span class="s-badge done">Terminé</span></div>
         <div class="hint">Toutes les étapes sont validées.</div>
         <div class="s-sep"></div>
-        <div class="s-foot"><button class="btn ghost small" onclick="setStage('commercial')">↩︎ Ré-ouvrir</button></div>
+        <div class="s-foot">${IS_ADMIN?`<button class="btn ghost small" onclick="setStage('cq')">↩︎ Ré-ouvrir</button>`:'<span class="hint">Dossier clôturé.</span>'}</div>
       </div></div>`;
   }
   let cards='';
   for(let i=cur;i>=0;i--){
     const r=ROLES[i], active=!termine&&i===cur, done=termine||i<cur;
-    const cancel=i>0?`<button class="s-cancel" onclick="setStage('${ROLES[i-1].key}')">↺ Revenir à cette étape</button>`:'';
+    const cancel=(i>0 && IS_ADMIN)?`<button class="s-cancel" onclick="setStage('${ROLES[i-1].key}')">↺ Revenir à cette étape</button>`:'';
     const badge=active?'<span class="s-badge active">En cours</span>':(done?'<span class="s-badge done">Validée</span>':'');
     let foot='';
-    if(active){
+    if(active && canEdit(r.key)){
       const validBtn=next
-        ?`<button class="btn small" onclick="setStage('${next.key}')">Passer à « ${next.label} » →</button>`
-        :`<button class="btn small" onclick="setStage('termine')">✅ Marquer terminé</button>`;
+        ?`<button class="btn small" onclick="setStage('${next.key}')">Valider et passer à « ${next.label} » →</button>`
+        :`<button class="btn small" onclick="setStage('termine')">✅ Valider et terminer</button>`;
       foot=`<div class="s-sep"></div><div class="s-foot"><button class="btn danger small" style="margin-right:auto" onclick="setStage('perdu')">Marquer perdu ✕</button>${validBtn}</div>`;
     }
     cards+=`<div class="scard ${active?'active':''} ${done?'done':''}">
@@ -994,7 +997,7 @@ function statutSelect(role){
 // Bloc "Statuts par étape" dans les infos client : un statut par rôle, éditable seulement par le rôle concerné (ou admin)
 function renderStatuts(){
   const box=document.getElementById('lv-statuts'); if(!box||!curLead) return;
-  box.innerHTML=ROLES.map(r=>statutSelect(r.key)).join('');
+  box.innerHTML=ROLES.filter(r=>r.key!=='cq').map(r=>statutSelect(r.key)).join('');
 }
 function dateField(field,label,role){
   const ed=canEdit(role);
@@ -1034,6 +1037,13 @@ function cqSelect(ed){
   const opts='<option value="">— Aucun contrôleur qualité —</option>'+list.map(p=>`<option value="${p.id}" ${curLead.owner_cq===p.id?'selected':''}>${esc(p.nom||p.email)}</option>`).join('');
   return `<label>Contrôleur qualité assigné</label><select ${ed?'':'disabled'} onchange="updLead({owner_cq:this.value||null},'CQ assigné').then(()=>renderSuivi())">${opts}</select>`;
 }
+const CQ_STATUT_COLOR={'CQ OK':'#16a34a','À travailler':'#f59e0b','MORT':'#dc2626','Dossier envoyé':'#38bdf8'};
+function cqStatutSelect(ed){
+  const cur=curLead.cq_statut||'';
+  const opts='<option value="">— À définir —</option>'+CQ_STATUTS.map(o=>`<option ${cur===o?'selected':''}>${esc(o)}</option>`).join('');
+  return `<label>Statut du contrôle qualité${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="updLead({cq_statut:this.value||null},'Statut CQ enregistré').then(()=>{renderSuivi();renderBudgetCards();})">${opts}</select>`;
+}
+function cqStatutPill(v){ if(!v) return ''; const c=CQ_STATUT_COLOR[v]||'#38bdf8'; return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
 /* -- Crédits en cours (liste dynamique) -- */
 function leadCredits(){ return Array.isArray(curLead.credits)?curLead.credits:[]; }
 function creditsTotal(){ return leadCredits().reduce((s,c)=>s+(Number(c.montant)||0),0); }
@@ -1232,6 +1242,16 @@ function rolePanelHTML(role){
     } else { h+=`<div class="hint" style="margin:8px 0">Aucun RDV CQ placé.</div>`; }
     h+=`<button class="btn" type="button" ${ed?'':'disabled'} onclick="openPlanningCQ()">📅 Placer le RDV CQ</button>`;
     h+=`<div class="s-sep"></div><label>Commentaires</label><textarea ${ed?'':'disabled'} placeholder="Ex : Client top, RAS, on fonce." onchange="updLead({commentaire_commercial:this.value||null})">${esc(curLead.commentaire_commercial||'')}</textarea>`;
+  } else if(role==='cq'){
+    // Étape Contrôle Qualité : le CQ a une vision (lecture seule) sur le reste et agit ici.
+    const _cq=PROFILES.find(p=>p.id===curLead.owner_cq);
+    h+=`<div class="hint" style="margin-bottom:8px">Contrôleur qualité : <b style="color:var(--txt)">${_cq?esc(_cq.nom||_cq.email):'— non assigné (à définir par le commercial ou l\'admin) —'}</b></div>`;
+    if(curLead.rdv_cq_date){
+      h+=`<div class="hint" style="margin-bottom:8px">RDV CQ : <b style="color:var(--txt)">${new Date(curLead.rdv_cq_date.slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR')}${curLead.rdv_cq_heure?' à '+curLead.rdv_cq_heure:''}</b></div>`;
+    }
+    h+=`<div class="s-sep"></div>`+cqStatutSelect(ed);
+    h+=`<label style="margin-top:12px">Commentaire du contrôle qualité</label><textarea ${ed?'':'disabled'} placeholder="Observations du contrôle (pièces, conformité, points à corriger…)" onchange="updLead({cq_commentaire:this.value||null})">${esc(curLead.cq_commentaire||'')}</textarea>`;
+    if(!ed) h+=`<div class="hint" style="margin-top:6px">Seul le contrôle qualité (ou l'admin) peut modifier le statut et le commentaire de cette étape.</div>`;
   }
   return h;
 }
@@ -1853,7 +1873,7 @@ async function saveSettings(){
   SETTINGS=val; toast('Réglages enregistrés ✓');
 }
 function renderStatutTables(){
-  document.getElementById('st-tables').innerHTML=ROLES.map(r=>{
+  document.getElementById('st-tables').innerHTML=ROLES.filter(r=>r.key!=='cq').map(r=>{
     const list=statutsFor(r.key);
     const rows=list.length?list.map(s=>`<tr><td>${statutPill(s.id)}</td><td><span class="tag" style="background:${s.couleur};color:#fff">${esc(s.couleur||'')}</span></td><td class="num">${s.ordre}</td><td class="num"><button class="btn danger small" onclick="delRef('pv_statuts','${s.id}')">Suppr.</button></td></tr>`).join(''):'<tr><td class="empty">Aucun statut</td></tr>';
     return `<div style="margin-bottom:14px"><div style="font-weight:700;margin-bottom:6px">${r.icon} ${r.label}</div><div class="table-wrap"><table><tr><th>Statut</th><th>Couleur</th><th class="num">Ordre</th><th></th></tr>${rows}</table></div></div>`;
