@@ -458,6 +458,7 @@
           <select id="lead-fowner" class="field sm" onchange="renderLeads()"><option value="">Tous télépros</option></select>
           <span class="spacer" style="flex:1"></span>
           <button class="btn small" onclick="newLead()">＋ Nouveau client</button>
+          <button class="btn ghost small" onclick="exportLeads()">⬇️ Exporter</button>
           <button class="btn ghost small" onclick="downloadLeadsTemplate()">⬇️ Modèle</button>
           <label class="btn ghost small" style="margin:0;cursor:pointer">⬆️ Importer<input type="file" id="lead-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importLeadsFile(event)"></label>
         </div>
@@ -2317,6 +2318,13 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ---------- EXPORTS EXCEL ---------- */
+function exportLeads(){
+  const rows=filteredLeads();
+  if(!rows.length){ toast('Aucun client à exporter'); return; }
+  const data=rows.map(l=>({ 'N°':l.numero||'', Civilité:l.civilite||'', Prénom:l.prenom||'', Nom:l.nom||'', Email:l.email||'', Téléphone:l.telephone||'', 'Téléphone 2':l.telephone2||'', Adresse:l.adresse||'', 'Code postal':l.code_postal||'', Ville:l.ville||'', Source:l.source||'', Étape:stageOf(l.stage).label, Télépro:profileName(l.owner_telepro)||'', 'Montant (€)':Number(l.montant)||0, Signé:l.signe?'Oui':'', Installé:l.installe?'Oui':'', Payé:l.paye?'Oui':'', 'Créé le':(l.created_at||'').slice(0,10) }));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),'Clients');
+  XLSX.writeFile(wb,'clients-photovoltaique-'+toISODate(new Date())+'.xlsx'); toast(data.length+' client(s) exporté(s) ✓');
+}
 function exportFrais(){
   if(!FRAIS.length){ toast('Aucun frais à exporter'); return; }
   const rows=FRAIS.map(f=>({ Date:(f.date||'').slice(0,10), Catégorie:f.categorie||'', Libellé:f.libelle||'', Fournisseur:f.fournisseur||'', Client:f.lead_id?fraisLeadName(f.lead_id):'', 'Montant (€)':Number(f.montant)||0 }));

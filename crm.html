@@ -393,6 +393,7 @@
           <select id="lead-fstatut" class="field sm" onchange="renderLeads()"><option value="">Tous statuts</option></select>
           <span class="spacer" style="flex:1"></span>
           <button class="btn small" onclick="newLead()">＋ Nouveau lead</button>
+          <button class="btn ghost small" onclick="exportLeads()">⬇️ Exporter</button>
           <button class="btn ghost small" onclick="downloadLeadsTemplate()">⬇️ Modèle</button>
           <label class="btn ghost small" style="margin:0;cursor:pointer">⬆️ Importer<input type="file" id="lead-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importLeadsFile(event)"></label>
         </div>
@@ -1399,6 +1400,13 @@ async function reloadRefs(){
 function downloadLeadsTemplate(){
   const ws=XLSX.utils.aoa_to_sheet([['prenom','nom','email','telephone','source','montant','en_activite','situation_actuelle','type_formation','formation','disponibilite','identite_numerique'],['Jean','Dupont','jean@acme.fr','0600000000','CALL IA','4000','oui','Salarié','Bureautique','Excel avancé','Lun-Ven 9h-12h','FranceConnect']]);
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Leads'); XLSX.writeFile(wb,'modele-leads-crm.xlsx');
+}
+function exportLeads(){
+  const rows=filteredLeads();
+  if(!rows.length){ toast('Aucun lead à exporter'); return; }
+  const data=rows.map(l=>({ 'N°':l.numero||'', Prénom:l.prenom||'', Nom:l.nom||'', Entreprise:l.entreprise||'', Email:l.email||'', Téléphone:l.telephone||'', Source:l.source||'', Étape:parcoursOf(l.etape).label, Statut:((STATUTS.find(s=>s.id===l.statut_id)||{}).nom)||'', Pipeline:stageOf(l.stage).label, 'Montant (€)':Number(l.montant)||0, 'Créé le':(l.created_at||'').slice(0,10) }));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),'Leads');
+  XLSX.writeFile(wb,'leads-formation-'+todayStr()+'.xlsx'); toast(data.length+' lead(s) exporté(s) ✓');
 }
 async function importLeadsFile(e){
   const file=e.target.files[0]; if(!file) return;
