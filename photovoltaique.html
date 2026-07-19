@@ -560,6 +560,15 @@
               </form>
               <div class="table-wrap"><table id="fins-table"></table></div>
             </section>
+            <section class="panel"><h2>💳 Statuts du paiement</h2>
+              <div class="hint" style="margin-bottom:10px">Statuts proposés à l'étape Paiement. Si la liste est vide, 4 par défaut sont utilisés (EN ATTENTE, PAYÉ, PROBLÈME, FINANCEMENT FINALISÉ).</div>
+              <form class="row" onsubmit="addPaiStatut(event)" style="margin-bottom:12px">
+                <div class="field"><label>Nom du statut</label><input id="pais-nom" placeholder="ex : PAYÉ" required></div>
+                <div class="field sm"><label>Couleur</label><input id="pais-couleur" type="color" value="#16a34a" style="height:42px;padding:4px"></div>
+                <button class="btn small" type="submit">Ajouter</button>
+              </form>
+              <div class="table-wrap"><table id="pais-table"></table></div>
+            </section>
           </div>
           <div class="params-sec" id="ps-sources">
             <section class="panel"><h2>📥 Sources de leads</h2>
@@ -701,7 +710,7 @@ const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let SESSION=null, IS_ADMIN=false, MY_ROLE=null, MY_ROLES=[];
 let LEADS=[], STATUTS=[], SOURCES=[], CTYPES=[], DOCTYPES=[], PROFILES=[], SETTINGS={}, PRODUITS=[];
-let FRAIS=[], FRAISCATS=[], CQSTATUTS=[], FINSTATUTS=[];
+let FRAIS=[], FRAISCATS=[], CQSTATUTS=[], FINSTATUTS=[], PAISTATUTS=[];
 const PRODUIT_CATS=[['pv','PV'],['pac','PAC'],['split','Split']];
 let curLead=null, curDocs=[], selRole='telepro', ALLDOCS=[];
 
@@ -712,12 +721,13 @@ const ROLES=[
   {key:'cq',label:'Contrôle Qualité',icon:'🔍'},
   {key:'financement',label:'Financement',icon:'🏦'},
   {key:'pose',label:'Envoi en pose',icon:'🚚'},
+  {key:'paiement',label:'Paiement',icon:'💳'},
 ];
 const ROLE_CQ=ROLES[3];
 // « pose » est éditée par le rôle Financement (rôle-alias, voir canEdit) ; pas un rôle assignable séparément.
 const ROLE_ALIAS={pose:'financement'};
 // Rôles ayant leur propre système de statut fixe/dédié (exclus des « statuts par rôle » configurables)
-const SPECIAL_STATUT_ROLES=['cq','financement','pose'];
+const SPECIAL_STATUT_ROLES=['cq','financement','pose','paiement'];
 // Rôles assignables aux utilisateurs (pose exclue : gérée par le rôle Financement).
 const ASSIGN_ROLES=ROLES.filter(r=>r.key!=='pose');
 const DEFAULT_CQ_STATUTS=[{nom:'CQ OK',couleur:'#16a34a'},{nom:'À travailler',couleur:'#f59e0b'},{nom:'MORT',couleur:'#dc2626'},{nom:'Dossier envoyé',couleur:'#38bdf8'}];
@@ -731,6 +741,7 @@ const STAGES=[
   {key:'cq',label:'Contrôle Qualité',color:'#38bdf8'},
   {key:'financement',label:'Financement',color:'#a855f7'},
   {key:'pose',label:'Envoi en pose',color:'#14b8a6'},
+  {key:'paiement',label:'Paiement',color:'#22c55e'},
   {key:'termine',label:'Terminé',color:'#16a34a'},
   {key:'perdu',label:'Perdu',color:'#dc2626'},
 ];
@@ -821,7 +832,7 @@ async function afterAuth(session){
   await loadAll(); showTab('dash');
 }
 async function loadAll(){
-  const [st,sr,ct,dt,pr,se,l,pd,fc,fr,cq,fs]=await Promise.all([
+  const [st,sr,ct,dt,pr,se,l,pd,fc,fr,cq,fs,pa]=await Promise.all([
     db.from('pv_statuts').select('*').order('role_key').order('ordre'),
     db.from('pv_sources').select('*').order('ordre'),
     db.from('pv_client_types').select('*').order('ordre'),
@@ -834,13 +845,14 @@ async function loadAll(){
     db.from('pv_frais').select('*').order('date',{ascending:false}),
     db.from('pv_cq_statuts').select('*').order('ordre'),
     db.from('pv_financement_statuts').select('*').order('ordre'),
+    db.from('pv_paiement_statuts').select('*').order('ordre'),
   ]);
   STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; PROFILES=pr.data||[];
   SETTINGS=(se.data&&se.data.value)||{}; LEADS=l.data||[]; PRODUITS=pd.data||[];
-  FRAISCATS=fc.data||[]; FRAIS=fr.data||[]; CQSTATUTS=cq.data||[]; FINSTATUTS=fs.data||[];
+  FRAISCATS=fc.data||[]; FRAIS=fr.data||[]; CQSTATUTS=cq.data||[]; FINSTATUTS=fs.data||[]; PAISTATUTS=pa.data||[];
   const me=PROFILES.find(p=>p.id===(SESSION&&SESSION.user.id));
   const _extra=(me&&Array.isArray(me.roles))?me.roles:[];
-  MY_ROLES=IS_ADMIN?['admin','telepro','confirmateur','commercial','cq','financement']:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),..._extra]));
+  MY_ROLES=IS_ADMIN?['admin','telepro','confirmateur','commercial','cq','financement','paiement']:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),..._extra]));
   if(!IS_ADMIN){ const rb=document.getElementById('rolebadge'); if(rb&&MY_ROLES.length) rb.textContent=MY_ROLES.map(roleLabel).join(' + '); }
   const np=document.getElementById('nav-poses'); if(np) np.classList.toggle('hidden',!(IS_ADMIN||MY_ROLES.includes('financement')));
   fillSelects(); renderLeads(); updateNavBadge();
@@ -922,7 +934,7 @@ function renderLeads(){
       <td><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</td>
       <td>${esc(l.ville||'')}</td>
       <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
-      <td>${l.stage==='cq'&&l.cq_statut?cqStatutPill(l.cq_statut):l.stage==='financement'&&l.financement_statut?finStatutPill(l.financement_statut):statutPill(curStatutId(l))}</td>
+      <td>${l.stage==='cq'&&l.cq_statut?cqStatutPill(l.cq_statut):l.stage==='financement'&&l.financement_statut?finStatutPill(l.financement_statut):l.stage==='paiement'&&l.paiement_statut?paiStatutPill(l.paiement_statut):statutPill(curStatutId(l))}</td>
       <td>${ownerCell(l.owner_telepro)}</td>
       <td class="num">${eur(l.montant)}</td></tr>`; }).join('');
   if(rows.length>400) document.getElementById('leads-count').textContent+=' (400 affichés)';
@@ -968,7 +980,7 @@ function renderBudgetCards(){
   document.getElementById('bc-stage').innerHTML=`<span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span>`;
   document.getElementById('bc-montant').textContent=eur(l.montant);
   const etat=[]; etat.push(l.signe?'✅ Signé':'⬜ Non signé'); etat.push(l.installe?'✅ Installé':'⬜ Non installé'); etat.push(l.paye?'✅ Payé':'⬜ Non payé');
-  document.getElementById('bc-etat').innerHTML=etat.join('<br>')+(l.cq_statut?'<br><span style="display:inline-block;margin-top:6px">'+cqStatutPill(l.cq_statut)+'</span>':'')+(l.financement_statut?'<br><span style="display:inline-block;margin-top:6px">'+finStatutPill(l.financement_statut)+'</span>':'');
+  document.getElementById('bc-etat').innerHTML=etat.join('<br>')+(l.cq_statut?'<br><span style="display:inline-block;margin-top:6px">'+cqStatutPill(l.cq_statut)+'</span>':'')+(l.financement_statut?'<br><span style="display:inline-block;margin-top:6px">'+finStatutPill(l.financement_statut)+'</span>':'')+(l.paiement_statut?'<br><span style="display:inline-block;margin-top:6px">'+paiStatutPill(l.paiement_statut)+'</span>':'');
   document.getElementById('bc-comm').textContent=commissionEarned(l)?eur(commissionValue()):'—';
 }
 async function saveLeadInfo(){
@@ -1033,7 +1045,7 @@ function renderSuivi(){
       <div class="s-body"><div class="s-head">Dossier terminé <span class="s-badge done">Terminé</span></div>
         <div class="hint">Toutes les étapes sont validées.</div>
         <div class="s-sep"></div>
-        <div class="s-foot">${IS_ADMIN?`<button class="btn ghost small" onclick="setStage('pose')">↩︎ Ré-ouvrir</button>`:'<span class="hint">Dossier clôturé.</span>'}</div>
+        <div class="s-foot">${IS_ADMIN?`<button class="btn ghost small" onclick="setStage('paiement')">↩︎ Ré-ouvrir</button>`:'<span class="hint">Dossier clôturé.</span>'}</div>
       </div></div>`;
   }
   let cards='';
@@ -1138,6 +1150,16 @@ function finStatutSelect(ed){
   return `<label>Statut du financement${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="onFinStatut(this.value)">${opts}</select>`;
 }
 function finStatutPill(v){ if(!v) return ''; const c=finColor(v); return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
+const DEFAULT_PAI_STATUTS=[{nom:'EN ATTENTE',couleur:'#f59e0b'},{nom:'PAYÉ',couleur:'#16a34a'},{nom:'PROBLÈME',couleur:'#dc2626'},{nom:'FINANCEMENT FINALISÉ',couleur:'#38bdf8'}];
+function paiStatutList(){ return PAISTATUTS.length?PAISTATUTS:DEFAULT_PAI_STATUTS; }
+function paiColor(nom){ const s=paiStatutList().find(x=>x.nom===nom); return s&&s.couleur?s.couleur:'#22c55e'; }
+function paiStatutSelect(ed){
+  const cur=curLead.paiement_statut||'', list=paiStatutList().map(s=>s.nom);
+  if(cur && !list.includes(cur)) list.unshift(cur);
+  const opts='<option value="">— À définir —</option>'+list.map(o=>`<option ${cur===o?'selected':''}>${esc(o)}</option>`).join('');
+  return `<label>Statut du paiement${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="updLead({paiement_statut:this.value||null},'Statut paiement enregistré').then(()=>{renderSuivi();renderBudgetCards();})">${opts}</select>`;
+}
+function paiStatutPill(v){ if(!v) return ''; const c=paiColor(v); return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
 /* -- Crédits en cours (liste dynamique) -- */
 function leadCredits(){ return Array.isArray(curLead.credits)?curLead.credits:[]; }
 function creditsTotal(){ return leadCredits().reduce((s,c)=>s+(Number(c.montant)||0),0); }
@@ -1358,6 +1380,11 @@ function rolePanelHTML(role){
       <div><label>Heure d'installation</label><input type="time" ${ed?'':'disabled'} value="${curLead.pose_heure||''}" onchange="updLead({pose_heure:this.value||null})"></div></div>`;
     h+=`<label style="margin-top:12px">Commentaire (pose)</label><textarea ${ed?'':'disabled'} placeholder="Ex : accès toiture, matériel à prévoir, contact sur place…" onchange="updLead({pose_commentaire:this.value||null})">${esc(curLead.pose_commentaire||'')}</textarea>`;
     if(!ed) h+=`<div class="hint" style="margin-top:6px">Réservé au rôle Financement (ou l'admin).</div>`;
+  } else if(role==='paiement'){
+    // Étape Paiement : rôle dédié, statut (configurable) + commentaire.
+    h+=paiStatutSelect(ed);
+    h+=`<label style="margin-top:12px">Commentaire du paiement</label><textarea ${ed?'':'disabled'} placeholder="Ex : acompte reçu, problème de virement, financement soldé…" onchange="updLead({paiement_commentaire:this.value||null})">${esc(curLead.paiement_commentaire||'')}</textarea>`;
+    if(!ed) h+=`<div class="hint" style="margin-top:6px">Seul le rôle Paiement (ou l'admin) peut modifier le statut et le commentaire de cette étape.</div>`;
   }
   return h;
 }
@@ -1866,7 +1893,20 @@ function renderDashboard(){
 function renderParams(){
   document.getElementById('set-comm').value=SETTINGS.commission_telepro!=null?SETTINGS.commission_telepro:'';
   document.getElementById('set-cond').value=SETTINGS.commission_condition||'signe_installe';
-  renderUsers(); renderProduits(); renderStatutTables(); renderCqStatuts(); renderFinStatuts(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_doc_types','dt-table',DOCTYPES); renderRef('pv_frais_cats','frc-table',FRAISCATS);
+  renderUsers(); renderProduits(); renderStatutTables(); renderCqStatuts(); renderFinStatuts(); renderPaiStatuts(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_doc_types','dt-table',DOCTYPES); renderRef('pv_frais_cats','frc-table',FRAISCATS);
+}
+function renderPaiStatuts(){
+  const t=document.getElementById('pais-table'); if(!t) return;
+  if(!PAISTATUTS.length){ t.innerHTML='<tr><td class="hint" style="padding:10px">Aucun statut personnalisé — 4 par défaut utilisés (EN ATTENTE, PAYÉ, PROBLÈME, FINANCEMENT FINALISÉ). Ajoutez-en pour remplacer la liste.</td></tr>'; return; }
+  t.innerHTML='<tr><th>Statut</th><th>Couleur</th><th></th></tr>'+PAISTATUTS.map(s=>`<tr><td>${paiStatutPill(s.nom)}</td><td><span class="tag" style="background:${esc(s.couleur||'')};color:#fff">${esc(s.couleur||'')}</span></td><td class="num"><button class="btn danger small" onclick="delRef('pv_paiement_statuts','${s.id}')">Suppr.</button></td></tr>`).join('');
+}
+async function addPaiStatut(e){
+  e.preventDefault();
+  const nom=document.getElementById('pais-nom').value.trim(); if(!nom) return;
+  const couleur=document.getElementById('pais-couleur').value;
+  const {error}=await db.from('pv_paiement_statuts').insert({nom,couleur,ordre:PAISTATUTS.length});
+  if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('pais-nom').value=''; await reloadRefs(); toast('Statut paiement ajouté');
 }
 function renderFinStatuts(){
   const t=document.getElementById('fins-table'); if(!t) return;
@@ -2036,15 +2076,16 @@ async function delRef(table,id){
   await reloadRefs();
 }
 async function reloadRefs(){
-  const [st,sr,ct,dt,fc,cq,fs]=await Promise.all([
+  const [st,sr,ct,dt,fc,cq,fs,pa]=await Promise.all([
     db.from('pv_statuts').select('*').order('role_key').order('ordre'),
     db.from('pv_sources').select('*').order('ordre'),
     db.from('pv_client_types').select('*').order('ordre'),
     db.from('pv_doc_types').select('*').order('ordre'),
     db.from('pv_frais_cats').select('*').order('ordre'),
     db.from('pv_cq_statuts').select('*').order('ordre'),
-    db.from('pv_financement_statuts').select('*').order('ordre')]);
-  STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; FRAISCATS=fc.data||[]; CQSTATUTS=cq.data||[]; FINSTATUTS=fs.data||[]; fillSelects(); renderParams();
+    db.from('pv_financement_statuts').select('*').order('ordre'),
+    db.from('pv_paiement_statuts').select('*').order('ordre')]);
+  STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; FRAISCATS=fc.data||[]; CQSTATUTS=cq.data||[]; FINSTATUTS=fs.data||[]; PAISTATUTS=pa.data||[]; fillSelects(); renderParams();
 }
 
 /* ---------- FRAIS ---------- */
