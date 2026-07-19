@@ -925,7 +925,7 @@ async function loadAll(){
 }
 function updateNavBadge(){
   const today=toISODate(new Date()); let n=0;
-  LEADS.forEach(l=>{ [l.rdv_conf_date,l.rdv_date,l.rdv_cq_date].forEach(d=>{ if(d && d.slice(0,10)===today) n++; }); });
+  LEADS.forEach(l=>{ [['confirmateur',l.rdv_conf_date],['commercial',l.rdv_date],['cq',l.rdv_cq_date],['pose',l.pose_date]].forEach(([tk,d])=>{ if(d && d.slice(0,10)===today && rdvMine(l,tk)) n++; }); });
   const b=document.getElementById('nav-dash-badge'); if(!b) return;
   if(n>0){ b.textContent=n; b.title=n+' rendez-vous aujourd’hui'; b.classList.remove('hidden'); }
   else b.classList.add('hidden');
@@ -980,10 +980,10 @@ function renderPoses(){
 function shiftPosesWeek(n){ posesWeekStart=new Date(posesWeekStart); posesWeekStart.setDate(posesWeekStart.getDate()+n*7); renderPoses(); }
 function posesToday(){ posesWeekStart=sundayOf(toISODate(new Date())); renderPoses(); }
 let calWeekStart=null;
-const CAL_TYPES=[{c:'#8a5cff',ic:'📞',lab:'Rappel confirmateur',df:'rdv_conf_date',hf:'rdv_conf_heure'},
-                 {c:'#f59e0b',ic:'🤝',lab:'RDV commercial',df:'rdv_date',hf:'rdv_heure'},
-                 {c:'#38bdf8',ic:'🔍',lab:'Contrôle qualité',df:'rdv_cq_date',hf:'rdv_cq_heure'},
-                 {c:'#14b8a6',ic:'🚚',lab:'Pose (installation)',df:'pose_date',hf:'pose_heure'}];
+const CAL_TYPES=[{c:'#8a5cff',ic:'📞',lab:'Rappel confirmateur',df:'rdv_conf_date',hf:'rdv_conf_heure',tk:'confirmateur'},
+                 {c:'#f59e0b',ic:'🤝',lab:'RDV commercial',df:'rdv_date',hf:'rdv_heure',tk:'commercial'},
+                 {c:'#38bdf8',ic:'🔍',lab:'Contrôle qualité',df:'rdv_cq_date',hf:'rdv_cq_heure',tk:'cq'},
+                 {c:'#14b8a6',ic:'🚚',lab:'Pose (installation)',df:'pose_date',hf:'pose_heure',tk:'pose'}];
 function renderCalendar(){
   if(!calWeekStart) calWeekStart=sundayOf(toISODate(new Date()));
   const days=weekDays(calWeekStart), todayISO=toISODate(new Date());
@@ -992,6 +992,7 @@ function renderCalendar(){
   document.getElementById('cal-legend').innerHTML=CAL_TYPES.map(t=>`<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:11px;border-radius:3px;background:${t.c}"></span>${t.ic} ${esc(t.lab)}</span>`).join('');
   const events=[]; let anyNoTime=0;
   LEADS.forEach(l=>{ CAL_TYPES.forEach(t=>{
+    if(!rdvMine(l,t.tk)) return;
     const date=l[t.df]; if(!date) return; const d=date.slice(0,10); if(!days.some(x=>x.iso===d)) return;
     const heure=l[t.hf]; const mm=hhmm2m(heure);
     if(mm==null){ anyNoTime++; events.push({date:d,m:-60,color:t.c,leadId:l.id,label:t.ic+' '+leadName(l),title:t.lab+' — '+leadName(l)+' (heure ?)'}); return; }
@@ -1916,6 +1917,24 @@ function leadMarge(l){
   return {caTTC:leadCaTTC(l),caHT,cession,commTel,commCom,marge:caHT-commTel-commCom-cession};
 }
 function canSeeMarge(){ return IS_ADMIN || MY_ROLES.includes('commercial') || MY_ROLES.includes('financement'); }
+// Périmètre : les dossiers/RDV qui concernent l'utilisateur connecté selon ses rôles (l'admin voit tout)
+function leadMine(l){
+  if(IS_ADMIN) return true; const uid=SESSION&&SESSION.user.id;
+  return (MY_ROLES.includes('telepro') && l.owner_telepro===uid)
+      || (MY_ROLES.includes('confirmateur') && l.owner_confirmateur===uid)
+      || (MY_ROLES.includes('commercial') && l.owner_commercial===uid)
+      || (MY_ROLES.includes('cq') && l.owner_cq===uid)
+      || (MY_ROLES.includes('financement') && ['financement','pose','paiement'].includes(l.stage))
+      || (MY_ROLES.includes('paiement') && l.stage==='paiement');
+}
+function rdvMine(l,type){
+  if(IS_ADMIN) return true; const uid=SESSION&&SESSION.user.id;
+  if(type==='confirmateur') return MY_ROLES.includes('confirmateur') && l.owner_confirmateur===uid;
+  if(type==='commercial') return MY_ROLES.includes('commercial') && l.owner_commercial===uid;
+  if(type==='cq') return MY_ROLES.includes('cq') && l.owner_cq===uid;
+  if(type==='pose') return MY_ROLES.includes('financement');
+  return false;
+}
 function commissionValue(){ return Number(SETTINGS.commission_telepro||0)||0; }
 function commissionEarned(l){
   const cond=SETTINGS.commission_condition||'signe_installe';
@@ -1964,9 +1983,10 @@ function periodStartISO(){
   return null;
 }
 function periodLeads(){
+  const base=IS_ADMIN?LEADS:LEADS.filter(leadMine);
   if(DASH_PERIOD==='custom'){ const f=document.getElementById('dash-from').value, t=document.getElementById('dash-to').value;
-    return LEADS.filter(l=>{ const d=(l.created_at||'').slice(0,10); if(f && d<f) return false; if(t && d>t) return false; return true; }); }
-  const s=periodStartISO(); return s?LEADS.filter(l=>(l.created_at||'').slice(0,10)>=s):LEADS;
+    return base.filter(l=>{ const d=(l.created_at||'').slice(0,10); if(f && d<f) return false; if(t && d>t) return false; return true; }); }
+  const s=periodStartISO(); return s?base.filter(l=>(l.created_at||'').slice(0,10)>=s):base;
 }
 let PVCHARTS={};
 const PV_PALETTE=['#f5a623','#ff7a45','#8a5cff','#38bdf8','#16a34a','#dc2626','#14b8a6','#a855f7','#f97316','#64748b','#eab308','#ec4899'];
@@ -2006,13 +2026,13 @@ function renderDashboard(){
   const caReal=won.reduce((s,l)=>s+leadCaHT(l),0), margeReal=won.reduce((s,l)=>s+leadMarge(l).marge,0);
   const commDue=L.filter(commissionEarned).length*commissionValue();
   const kpi=[
-    {n:total,        l:'Clients au total',      icon:'👥', c:'var(--accent)',  f:'int', filt:'all'},
+    {n:total,        l:IS_ADMIN?'Clients au total':'Mes clients', icon:'👥', c:'var(--accent)',  f:'int', filt:'all'},
     {n:open.length,  l:'En cours',              icon:'⏳', c:'#8a5cff',        f:'int', filt:'open'},
     {n:won.length,   l:'Gagnés',                icon:'🏆', c:'var(--good)',    f:'int', filt:'gagne'},
     {n:perdu.length, l:'Perdus',                icon:'✖️', c:'var(--bad)',     f:'int', filt:'perdu'},
     {n:(total?won.length/total*100:0), l:'Taux de conversion', icon:'📈', c:'var(--accent2)', f:'pct', filt:'gagne'},
     {n:caReal,       l:'CA réalisé (HT)',       icon:'💶', c:'var(--good)',    f:'eur', filt:'gagne'},
-    {n:margeReal,    l:'Marge réalisée (HT)',   icon:'📊', c:'#14b8a6',        f:'eur', filt:'gagne'},
+    ...(canSeeMarge()?[{n:margeReal, l:'Marge réalisée (HT)', icon:'📊', c:'#14b8a6', f:'eur', filt:'gagne'}]:[]),
     {n:commDue,      l:'Commissions dues',      icon:'🎁', c:'var(--warn)',    f:'eur', filt:'comm'}
   ];
   document.getElementById('kpi-grid').innerHTML=kpi.map((x,i)=>`<div class="kpi clickable" style="--kc:${x.c};animation-delay:${i*55}ms" onclick="goLeadsFilter('${x.filt}')" title="Voir ces clients">
@@ -2028,10 +2048,10 @@ function renderDashboard(){
     const overdue=d<todayISO; if(overdue && (l.stage==='termine'||l.stage==='perdu')) return; // ignore les RDV passés sur dossiers clos/perdus
     rdvs.push({lead:l,date:d,heure:(heure||''),type,ownerId,color,overdue,tk}); };
   LEADS.forEach(l=>{
-    addRdv(l,l.rdv_conf_date,l.rdv_conf_heure,'Rappel confirmateur',l.owner_confirmateur,'#8a5cff','confirmateur');
-    addRdv(l,l.rdv_date,l.rdv_heure,'RDV commercial',l.owner_commercial,'#f59e0b','commercial');
-    addRdv(l,l.rdv_cq_date,l.rdv_cq_heure,'Contrôle qualité',l.owner_cq,'#38bdf8','cq');
-    addRdv(l,l.pose_date,l.pose_heure,'Pose (installation)',null,'#14b8a6','pose');
+    if(rdvMine(l,'confirmateur')) addRdv(l,l.rdv_conf_date,l.rdv_conf_heure,'Rappel confirmateur',l.owner_confirmateur,'#8a5cff','confirmateur');
+    if(rdvMine(l,'commercial')) addRdv(l,l.rdv_date,l.rdv_heure,'RDV commercial',l.owner_commercial,'#f59e0b','commercial');
+    if(rdvMine(l,'cq')) addRdv(l,l.rdv_cq_date,l.rdv_cq_heure,'Contrôle qualité',l.owner_cq,'#38bdf8','cq');
+    if(rdvMine(l,'pose')) addRdv(l,l.pose_date,l.pose_heure,'Pose (installation)',null,'#14b8a6','pose');
   });
   const rdvsF=(RDVFILTER==='all')?rdvs:rdvs.filter(r=>r.tk===RDVFILTER);
   rdvsF.sort((a,b)=>(a.date+'T'+(a.heure||'99')).localeCompare(b.date+'T'+(b.heure||'99')));
