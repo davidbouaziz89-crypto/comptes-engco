@@ -117,7 +117,7 @@
   .scard{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
   .scard.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(79,124,255,.18)}
   .scard.done{border-color:rgba(55,211,155,.35)}
-  .s-rail{width:118px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-right:1px solid var(--line);background:var(--panel2);text-align:center}
+  .s-rail{width:82px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 5px;border-right:1px solid var(--line);background:var(--panel2);text-align:center}
   .s-num{font-size:12px;color:var(--muted);font-weight:600}
   .s-dot{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
   .s-dot.active{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -198,7 +198,7 @@
   .kcard:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
   /* Parcours du lead : timeline verticale + relief */
   .steps{position:relative}
-  .steps::before{content:"";position:absolute;left:59px;top:64px;bottom:24px;width:2px;background:var(--line);z-index:0}
+  .steps::before{content:"";position:absolute;left:41px;top:60px;bottom:24px;width:2px;background:var(--line);z-index:0}
   .scard{position:relative;z-index:1;border-radius:var(--radius);box-shadow:var(--shadow-sm);transition:box-shadow .18s}
   .scard.active{box-shadow:var(--shadow)}
   .s-dot{box-shadow:var(--shadow-sm)}
@@ -297,6 +297,33 @@
   }
   @media(max-width:400px){ .kpis{grid-template-columns:1fr} }
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
+  /* Port design v2 (suite) : KPI cliquables, étapes repliables + progression, toggles pipeline */
+  .kpi.clickable{cursor:pointer}
+  .s-dot{width:32px;height:32px;font-size:15px}
+  .s-num{font-size:11px}
+  .s-cancel{font-size:11px}
+  .s-head.clickable{cursor:pointer;user-select:none}
+  .s-head.clickable:hover{color:var(--txt)}
+  .s-chev{display:inline-block;transition:transform .18s var(--ease);color:var(--muted);font-size:11px;margin-right:2px}
+  .scard:not(.collapsed) .s-chev{transform:rotate(90deg)}
+  .scard.collapsed .s-body>.s-content{display:none}
+  .scard.collapsed .s-head{margin-bottom:0}
+  .s-sum{margin-left:auto;text-transform:none}
+  .s-progress{display:flex;gap:2px;margin-bottom:18px;overflow-x:auto;padding:4px 2px 8px}
+  .sp-item{flex:1;min-width:82px;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;text-align:center}
+  .sp-item::before{content:"";position:absolute;top:13px;right:50%;width:100%;height:2px;background:var(--line);z-index:0}
+  .sp-item:first-child::before{display:none}
+  .sp-item.done::before,.sp-item.active::before{background:var(--good)}
+  .sp-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--panel2);border:1px solid var(--line);color:var(--muted);position:relative;z-index:1}
+  .sp-item.done .sp-dot{background:var(--good);border-color:var(--good);color:#052a1c}
+  .sp-item.active .sp-dot{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .sp-lab{font-size:11px;color:var(--muted);line-height:1.2}
+  .sp-item.active .sp-lab{color:var(--txt);font-weight:700}
+  .pipe-toggles{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+  .ptog{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;background:var(--panel2);user-select:none;transition:opacity .15s var(--ease)}
+  .ptog:hover{border-color:var(--accent)}
+  .ptog .pdot2{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+  .ptog.off{opacity:.42;text-decoration:line-through}
 </style>
 </head>
 <body>
@@ -357,13 +384,15 @@
           <button class="btn ghost small" onclick="downloadLeadsTemplate()">⬇️ Modèle</button>
           <label class="btn ghost small" style="margin:0;cursor:pointer">⬆️ Importer<input type="file" id="lead-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importLeadsFile(event)"></label>
         </div>
+        <div id="lead-kpifilter" class="hidden" style="margin-bottom:12px"></div>
         <div class="table-wrap"><table id="leads-table"></table></div>
         <div class="hint" id="leads-count" style="margin-top:8px"></div>
       </section>
     </div>
     <div id="tab-pipeline" class="hidden">
       <section class="panel"><h2>Pipeline commercial</h2>
-        <div class="hint" style="margin-bottom:12px">Glissez une carte pour changer l'étape. Cliquez-la pour ouvrir la fiche.</div>
+        <div class="hint" style="margin-bottom:10px">Glissez une carte pour changer l'étape. Cliquez-la pour ouvrir la fiche. Cliquez une étape ci-dessous pour l'afficher / la masquer.</div>
+        <div id="pipe-toggles" class="pipe-toggles" style="margin-bottom:14px"></div>
         <div class="kanban" id="kanban"></div>
       </section>
     </div>
@@ -681,15 +710,27 @@ function showTab(t){
 
 /* ---------- LEADS liste ---------- */
 function statutPill(id){ const s=statutOf(id); if(!s) return '<span class="hint">—</span>'; const c=s.couleur||'#4f7cff'; return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(s.nom)}</span>`; }
+const LEAD_FILTERS={
+  won:{label:'Leads gagnés',pred:l=>l.stage==='gagne'},
+  open:{label:'Leads en cours',pred:l=>l.stage!=='gagne'&&l.stage!=='perdu'},
+  perdu:{label:'Leads perdus',pred:l=>l.stage==='perdu'},
+  abill:{label:'À facturer',pred:l=>l.etape==='a_facturer'}
+};
+let LEADFILTER=null;
+function goLeadsFilter(key){ LEADFILTER=(key&&LEAD_FILTERS[key])?{key,...LEAD_FILTERS[key]}:null; showTab('leads'); renderLeads(); }
+function clearLeadFilter(){ LEADFILTER=null; renderLeads(); }
 function filteredLeads(){
   const q=(document.getElementById('lead-search').value||'').toLowerCase().trim();
   const fs=document.getElementById('lead-fstage').value, fst=document.getElementById('lead-fstatut').value;
   return LEADS.filter(l=>{
+    if(LEADFILTER && !LEADFILTER.pred(l)) return false;
     if(fs&&(l.etape||'infos_lead')!==fs) return false; if(fst&&l.statut_id!==fst) return false;
     if(!q) return true; return [leadName(l),l.email,l.telephone,l.entreprise,l.source].some(v=>(v||'').toLowerCase().includes(q));
   });
 }
 function renderLeads(){
+  const kf=document.getElementById('lead-kpifilter');
+  if(kf){ if(LEADFILTER){ kf.classList.remove('hidden'); kf.innerHTML=`<span class="pill" style="background:var(--accent);color:#fff">🔎 ${esc(LEADFILTER.label)}</span> <button class="btn ghost small" onclick="clearLeadFilter()">✕ Retirer le filtre</button>`; } else kf.classList.add('hidden'); }
   const rows=filteredLeads(), t=document.getElementById('leads-table');
   document.getElementById('leads-count').textContent=rows.length+' lead(s) · '+LEADS.length+' au total';
   if(!rows.length){ t.innerHTML=emptyRow(6,'👋','Aucun lead pour l’instant','Cliquez « ＋ Nouveau lead » ou importez un fichier Excel.'); return; }
@@ -722,6 +763,7 @@ async function openLead(id){
   showLeadTab('etapes');
   document.getElementById('lead-view').classList.remove('hidden'); window.scrollTo(0,0);
   await loadLeadFormations(id);   // met à jour cartes budget + étape
+  animateBudgetCards();
   loadActivities(id);
   renderLeadRdvs();
 }
@@ -768,14 +810,23 @@ function showLeadTab(t){
 /* budget */
 function budgetOf(){ return Number(curLead&&curLead.montant||0)||0; }
 function totalFormations(){ return curLeadFormations.reduce((s,lf)=>s+(Number(lf.prix)||0),0); }
+function countUp(el){
+  if(!el) return; const target=parseFloat(el.dataset.n)||0;
+  const f=v=>Math.round(v).toLocaleString('fr-FR')+' €';
+  if(prefersReduced()){ el.textContent=f(target); return; }
+  const dur=680; let t0=null;
+  function tick(now){ if(t0===null) t0=now; const p=Math.min(1,Math.max(0,(now-t0)/dur)), e=1-Math.pow(1-p,3); el.textContent=f(target*e); if(p<1) requestAnimationFrame(tick); }
+  requestAnimationFrame(tick);
+}
 function renderBudgetCards(){
   const b=budgetOf(), tot=totalFormations(), rest=b-tot;
-  document.getElementById('bc-montant').textContent=b.toLocaleString('fr-FR')+' €';
-  document.getElementById('bc-formations').textContent=tot.toLocaleString('fr-FR')+' €';
-  const el=document.getElementById('bc-restant'); el.textContent=rest.toLocaleString('fr-FR')+' €';
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el){ el.dataset.n=v; el.textContent=Math.round(v).toLocaleString('fr-FR')+' €'; } };
+  set('bc-montant',b); set('bc-formations',tot);
+  const el=document.getElementById('bc-restant'); el.dataset.n=rest; el.textContent=Math.round(rest).toLocaleString('fr-FR')+' €';
   el.style.color=rest<0?'var(--bad)':'var(--txt)';
   const card=document.getElementById('bc-restant-card'); if(card) card.style.setProperty('--kc',rest<0?'var(--bad)':'var(--good)');
 }
+function animateBudgetCards(){ ['bc-montant','bc-formations','bc-restant'].forEach(id=>countUp(document.getElementById(id))); }
 
 /* Étapes / parcours */
 /* Rendu koneckt : étapes en cartes progressives décroissantes */
@@ -816,6 +867,13 @@ function stepContentHTML(code){
   if(code==='a_facturer') return `<div class="hint">Ce lead est à l'étape finale, prêt à être facturé.</div>`;
   return '';
 }
+function stepProgressHTML(){
+  const curIdx=parcoursIndex(curLead.etape);
+  return `<div class="s-progress">`+PARCOURS.map((p,i)=>{
+    const done=i<curIdx, active=i===curIdx;
+    return `<div class="sp-item ${done?'done':''} ${active?'active':''}" title="${esc(p.label)}"><div class="sp-dot">${done?'✓':i+1}</div><div class="sp-lab">${esc(p.label)}</div></div>`;
+  }).join('')+`</div>`;
+}
 function renderEtapes(){
   const cur=parcoursIndex(curLead.etape), next=PARCOURS[cur+1];
   let cards='';
@@ -829,12 +887,13 @@ function renderEtapes(){
     if(active&&next) validBtn=`<button class="btn small" ${block?'disabled':''} onclick="setEtape('${next.code}')">✓ Valider l'étape</button>`;
     else if(active&&!next) validBtn=`<span class="s-badge done">Dossier finalisé</span>`;
     const foot=`<div class="s-foot">${block?`<span class="s-block">${block}</span>`:''}<button class="btn ghost small" onclick="saveLeadInfo()">Enregistrer modifications</button>${validBtn}</div>`;
-    cards+=`<div class="scard ${active?'active':''} ${done?'done':''}">
+    const collapsible=done&&!active;
+    cards+=`<div class="scard ${active?'active':''} ${done?'done':''} ${collapsible?'collapsed':''}">
       <div class="s-rail"><div class="s-num">Étape ${i+1}</div><div class="s-dot ${active?'active':done?'done':''}">${done?'✓':icon}</div>${cancel}</div>
-      <div class="s-body"><div class="s-head">${p.label}${badge}</div><div class="s-content">${stepContentHTML(p.code)}</div><div class="s-sep"></div>${foot}</div>
+      <div class="s-body"><div class="s-head${collapsible?' clickable':''}"${collapsible?' onclick="this.closest(\'.scard\').classList.toggle(\'collapsed\')"':''}>${collapsible?'<span class="s-chev">▸</span>':''}${p.label}${badge}</div><div class="s-content">${stepContentHTML(p.code)}<div class="s-sep"></div>${foot}</div></div>
     </div>`;
   }
-  document.getElementById('lv-steps').innerHTML=`<h3 class="s-title">Étapes</h3>`+cards;
+  document.getElementById('lv-steps').innerHTML=`<h3 class="s-title">Étapes</h3>`+stepProgressHTML()+cards;
 }
 async function setEtape(code){ if(await updLead({etape:code},'Étape mise à jour')) renderEtapes(); }
 
@@ -988,8 +1047,12 @@ async function deleteLead(){
 }
 
 /* ---------- PIPELINE ---------- */
+let PIPE_HIDDEN=(()=>{try{return new Set(JSON.parse(localStorage.getItem('crm-pipe-hidden')||'[]'));}catch(e){return new Set();}})();
+function togglePipeStage(k){ if(PIPE_HIDDEN.has(k)) PIPE_HIDDEN.delete(k); else PIPE_HIDDEN.add(k); try{localStorage.setItem('crm-pipe-hidden',JSON.stringify([...PIPE_HIDDEN]));}catch(e){} renderPipeline(); }
 function renderPipeline(){
-  document.getElementById('kanban').innerHTML=STAGES.map(s=>{
+  const tog=document.getElementById('pipe-toggles');
+  if(tog) tog.innerHTML=`<span class="hint" style="align-self:center;margin-right:2px">Colonnes :</span>`+STAGES.map(s=>`<span class="ptog ${PIPE_HIDDEN.has(s.key)?'off':''}" onclick="togglePipeStage('${s.key}')"><span class="pdot2" style="background:${s.color}"></span>${esc(s.label)}</span>`).join('');
+  document.getElementById('kanban').innerHTML=STAGES.filter(s=>!PIPE_HIDDEN.has(s.key)).map(s=>{
     const cards=LEADS.filter(l=>l.stage===s.key);
     return `<div class="kcol" style="--kc:${s.color}" data-stage="${s.key}" ondragover="kOver(event)" ondragleave="kLeave(event)" ondrop="kDrop(event)">
       <h3><span style="color:${s.color}">${s.label}</span><span>${cards.length}</span></h3>
@@ -1163,15 +1226,15 @@ function renderDashboard(){
   const toBill=LEADS.filter(l=>l.etape==='a_facturer').length;
   const nbFormations=FORMATIONS.filter(f=>f.actif!==false).length;
   const kpi=[
-    {v:total,l:'Leads au total',i:'👥',c:'#4f7cff'},
-    {v:open.length,l:'En cours',i:'⏳',c:'#8a5cff'},
-    {v:won.length,l:'Gagnés',i:'🏆',c:'#16a34a'},
-    {v:(total?Math.round(won.length/total*100):0)+' %',l:'Conversion',i:'📈',c:'#0ea5e9'},
-    {v:eur(wonAmt),l:'CA gagné',i:'💰',c:'#16a34a'},
-    {v:eur(openAmt),l:'Pipeline en cours',i:'🎯',c:'#f59e0b'},
-    {v:toBill,l:'À facturer',i:'🧾',c:'#e11d48'},
-    {v:nbFormations,l:'Formations actives',i:'🎓',c:'#8a5cff'}];
-  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi" style="--kc:${x.c}"><div class="k-ic">${x.i}</div><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
+    {v:total,l:'Leads au total',i:'👥',c:'#4f7cff',filt:'all'},
+    {v:open.length,l:'En cours',i:'⏳',c:'#8a5cff',filt:'open'},
+    {v:won.length,l:'Gagnés',i:'🏆',c:'#16a34a',filt:'won'},
+    {v:(total?Math.round(won.length/total*100):0)+' %',l:'Conversion',i:'📈',c:'#0ea5e9',filt:'won'},
+    {v:eur(wonAmt),l:'CA gagné',i:'💰',c:'#16a34a',filt:'won'},
+    {v:eur(openAmt),l:'Pipeline en cours',i:'🎯',c:'#f59e0b',filt:'open'},
+    {v:toBill,l:'À facturer',i:'🧾',c:'#e11d48',filt:'abill'},
+    {v:nbFormations,l:'Formations actives',i:'🎓',c:'#8a5cff',tab:'formations'}];
+  document.getElementById('kpi-grid').innerHTML=kpi.map(x=>`<div class="kpi clickable" style="--kc:${x.c}" onclick="${x.tab?`showTab('${x.tab}')`:`goLeadsFilter('${x.filt}')`}" title="Voir le détail"><div class="k-ic">${x.i}</div><div class="k-val">${x.v}</div><div class="k-lab">${x.l}</div></div>`).join('');
   renderCharts(won);
 }
 function renderCharts(won){
