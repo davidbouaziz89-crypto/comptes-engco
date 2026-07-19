@@ -141,6 +141,13 @@
   /* KPI : cartes vivantes, entrée décalée */
   .kpi{position:relative;overflow:hidden;background:linear-gradient(158deg,var(--panel2),color-mix(in srgb,var(--panel2) 86%,var(--panel)));transition:transform .2s var(--ease),box-shadow .2s var(--ease);animation:rise .5s var(--ease) both}
   .kpi:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+  .kpi.clickable{cursor:pointer}
+  /* Pipeline : bascule d'affichage des colonnes */
+  .pipe-toggles{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+  .ptog{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;background:var(--panel2);user-select:none;transition:opacity .15s var(--ease)}
+  .ptog:hover{border-color:var(--accent)}
+  .ptog .pdot2{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+  .ptog.off{opacity:.42;text-decoration:line-through}
   .kpi .k-ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:18px;margin-bottom:10px;background:color-mix(in srgb,var(--kc,var(--accent)) 18%,transparent)}
   .kpi .k-val{font-size:26px;font-weight:800;line-height:1.1}
   .kpi::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,var(--kc,var(--accent)),transparent)}
@@ -298,9 +305,10 @@
   .scard.active{border-color:var(--accent);box-shadow:0 0 0 1px rgba(245,166,35,.18)}
   .scard.done{border-color:rgba(55,211,155,.35)}
   .scard.lost{border-color:rgba(220,38,38,.4)}
-  .s-rail{width:118px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-right:1px solid var(--line);background:var(--panel2);text-align:center}
-  .s-num{font-size:12px;color:var(--muted);font-weight:600}
-  .s-dot{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+  .s-rail{width:78px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 5px;border-right:1px solid var(--line);background:var(--panel2);text-align:center}
+  .s-num{font-size:11px;color:var(--muted);font-weight:600}
+  .s-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+  .s-cancel{font-size:11px}
   .s-dot.active{background:var(--accent);border-color:var(--accent);color:#241500}
   .s-dot.done{background:var(--good);border-color:var(--good);color:#052a1c}
   .s-dot.lost{background:var(--bad);border-color:var(--bad);color:#fff}
@@ -331,7 +339,7 @@
   .s-badge.done{background:rgba(55,211,155,.15);color:var(--good);border:1px solid rgba(55,211,155,.4)}
   .s-sep{height:1px;background:var(--line);margin:14px 0}
   .s-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px}
-  @media(max-width:600px){.s-rail{width:84px}}
+  @media(max-width:600px){.s-rail{width:62px;padding:10px 3px}.s-cancel{font-size:10px}}
   /* Calendrier hebdomadaire (grille jours × horaires) */
   .cal-scroll{overflow-x:auto}
   .cal{display:grid;grid-template-columns:52px repeat(7,minmax(96px,1fr));min-width:740px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
@@ -425,7 +433,14 @@
         <button data-p="quarter" onclick="setDashPeriod('quarter')">Trimestre</button>
         <button data-p="year" onclick="setDashPeriod('year')">Année</button>
       </span></h2><div class="kpis" id="kpi-grid"></div></section>
-      <section class="panel"><h2>📅 Prochains rendez-vous</h2><div id="dash-rdv"></div></section>
+      <section class="panel"><h2 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">📅 Prochains rendez-vous<span style="flex:1"></span>
+        <select id="rdv-filter" class="field sm" style="min-width:190px;flex:0 0 auto" onchange="RDVFILTER=this.value;renderDashboard()">
+          <option value="all">Tous les types</option>
+          <option value="confirmateur">📞 Rappel confirmateur</option>
+          <option value="commercial">🤝 RDV commercial</option>
+          <option value="cq">🔍 Contrôle qualité</option>
+          <option value="pose">🚚 Pose (installation)</option>
+        </select></h2><div id="dash-rdv"></div></section>
       <div class="dash-two">
         <section class="panel"><h2>Conversion</h2><div id="dash-donut"></div></section>
         <section class="panel"><h2>Répartition par étape</h2><div id="dash-stages"></div></section>
@@ -443,13 +458,15 @@
           <button class="btn ghost small" onclick="downloadLeadsTemplate()">⬇️ Modèle</button>
           <label class="btn ghost small" style="margin:0;cursor:pointer">⬆️ Importer<input type="file" id="lead-import" accept=".xlsx,.xls,.csv" class="hidden" onchange="importLeadsFile(event)"></label>
         </div>
+        <div id="lead-kpifilter" class="hidden" style="margin-bottom:12px"></div>
         <div class="table-wrap"><table id="leads-table"></table></div>
         <div class="hint" id="leads-count" style="margin-top:8px"></div>
       </section>
     </div>
     <div id="tab-pipeline" class="hidden">
       <section class="panel"><h2>Pipeline</h2>
-        <div class="hint" style="margin-bottom:12px">Glissez une carte pour changer l'étape. Cliquez-la pour ouvrir la fiche.</div>
+        <div class="hint" style="margin-bottom:10px">Glissez une carte pour changer l'étape. Cliquez-la pour ouvrir la fiche. Cliquez une étape ci-dessous pour l'afficher / la masquer.</div>
+        <div id="pipe-toggles" class="pipe-toggles" style="margin-bottom:14px"></div>
         <div class="kanban" id="kanban"></div>
       </section>
     </div>
@@ -934,15 +951,28 @@ function posesToday(){ posesWeekStart=sundayOf(toISODate(new Date())); renderPos
 /* ---------- LISTE CLIENTS ---------- */
 function statutPill(id){ const s=statutOf(id); if(!s) return '<span class="hint">—</span>'; const c=s.couleur||'#f5a623'; return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(s.nom)}</span>`; }
 function curStatutId(l){ return l['statut_'+(l.stage==='confirmateur'?'confirmateur':l.stage==='commercial'?'commercial':'telepro')]; }
+const LEAD_FILTERS={
+  signe:{label:'Dossiers signés',pred:l=>!!l.signe},
+  installe:{label:'Dossiers installés',pred:l=>!!l.installe},
+  paye:{label:'Dossiers payés',pred:l=>!!l.paye},
+  perdu:{label:'Dossiers perdus',pred:l=>l.stage==='perdu'},
+  comm:{label:'Commissions dues',pred:l=>commissionEarned(l)}
+};
+let LEADFILTER=null;
+function goLeadsFilter(key){ LEADFILTER=(key&&LEAD_FILTERS[key])?{key,...LEAD_FILTERS[key]}:null; showTab('leads'); renderLeads(); }
+function clearLeadFilter(){ LEADFILTER=null; renderLeads(); }
 function filteredLeads(){
   const q=(document.getElementById('lead-search').value||'').toLowerCase().trim();
   const fs=document.getElementById('lead-fstage').value, fo=document.getElementById('lead-fowner').value;
   return LEADS.filter(l=>{
+    if(LEADFILTER && !LEADFILTER.pred(l)) return false;
     if(fs&&l.stage!==fs) return false; if(fo&&l.owner_telepro!==fo) return false;
     if(!q) return true; return [leadName(l),l.email,l.telephone,l.ville,l.code_postal,l.source].some(v=>(v||'').toLowerCase().includes(q));
   });
 }
 function renderLeads(){
+  const kf=document.getElementById('lead-kpifilter');
+  if(kf){ if(LEADFILTER){ kf.classList.remove('hidden'); kf.innerHTML=`<span class="pill" style="background:var(--accent);color:#241500">🔎 ${esc(LEADFILTER.label)}</span> <button class="btn ghost small" onclick="clearLeadFilter()">✕ Retirer le filtre</button>`; } else kf.classList.add('hidden'); }
   const rows=filteredLeads(), t=document.getElementById('leads-table');
   document.getElementById('leads-count').textContent=rows.length+' client(s) · '+LEADS.length+' au total';
   if(!rows.length){ t.innerHTML=emptyRow(7,'👋','Aucun client pour l’instant','Cliquez « ＋ Nouveau client » ou importez un fichier Excel.'); return; }
@@ -981,7 +1011,7 @@ async function openLead(id){
   g('lv-del').classList.toggle('hidden',!IS_ADMIN);
   g('doc-upbtn').classList.toggle('hidden',false);
   RV_EDIT=new Set();
-  renderQuick(); renderBudgetCards(); renderStatuts();
+  renderQuick(); renderBudgetCards(); renderStatuts(); animateBudgetCards();
   showLeadTab('suivi');
   document.getElementById('lead-view').classList.remove('hidden'); window.scrollTo(0,0);
 }
@@ -996,10 +1026,15 @@ function renderQuick(){
 function renderBudgetCards(){
   const l=curLead, st=stageOf(l.stage);
   document.getElementById('bc-stage').innerHTML=`<span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span>`;
-  document.getElementById('bc-montant').textContent=eur(l.montant);
+  const bm=document.getElementById('bc-montant'); bm.dataset.n=Number(l.montant)||0; bm.dataset.fmt='eur'; bm.textContent=l.montant!=null?eur(l.montant):'—';
   const etat=[]; etat.push(l.signe?'✅ Signé':'⬜ Non signé'); etat.push(l.installe?'✅ Installé':'⬜ Non installé'); etat.push(l.paye?'✅ Payé':'⬜ Non payé');
   document.getElementById('bc-etat').innerHTML=etat.join('<br>')+(l.cq_statut?'<br><span style="display:inline-block;margin-top:6px">'+cqStatutPill(l.cq_statut)+'</span>':'')+(l.financement_statut?'<br><span style="display:inline-block;margin-top:6px">'+finStatutPill(l.financement_statut)+'</span>':'')+(l.paiement_statut?'<br><span style="display:inline-block;margin-top:6px">'+paiStatutPill(l.paiement_statut)+'</span>':'');
-  document.getElementById('bc-comm').textContent=commissionEarned(l)?eur(commissionValue()):'—';
+  const bc=document.getElementById('bc-comm'); const cv=commissionEarned(l)?commissionValue():0; bc.dataset.n=cv; bc.dataset.fmt='eur'; bc.textContent=commissionEarned(l)?eur(cv):'—';
+}
+function animateBudgetCards(){
+  const l=curLead; if(!l) return;
+  if(l.montant!=null) countUp(document.getElementById('bc-montant'));
+  if(commissionEarned(l)) countUp(document.getElementById('bc-comm'));
 }
 async function saveLeadInfo(){
   if(!curLead) return;
@@ -1765,8 +1800,13 @@ async function deleteLead(){
 }
 
 /* ---------- PIPELINE ---------- */
+let PIPE_HIDDEN=(()=>{try{return new Set(JSON.parse(localStorage.getItem('pv-pipe-hidden')||'[]'));}catch(e){return new Set();}})();
+function togglePipeStage(k){ if(PIPE_HIDDEN.has(k)) PIPE_HIDDEN.delete(k); else PIPE_HIDDEN.add(k); try{localStorage.setItem('pv-pipe-hidden',JSON.stringify([...PIPE_HIDDEN]));}catch(e){} renderPipeline(); }
 function renderPipeline(){
-  document.getElementById('kanban').innerHTML=STAGES.map(s=>{
+  const tog=document.getElementById('pipe-toggles');
+  if(tog) tog.innerHTML=`<span class="hint" style="align-self:center;margin-right:2px">Colonnes :</span>`+STAGES.map(s=>`<span class="ptog ${PIPE_HIDDEN.has(s.key)?'off':''}" onclick="togglePipeStage('${s.key}')"><span class="pdot2" style="background:${s.color}"></span>${esc(s.label)}</span>`).join('');
+  const vis=STAGES.filter(s=>!PIPE_HIDDEN.has(s.key));
+  document.getElementById('kanban').innerHTML=vis.map(s=>{
     const cards=LEADS.filter(l=>l.stage===s.key);
     return `<div class="kcol" data-stage="${s.key}" ondragover="kOver(event)" ondragleave="kLeave(event)" ondrop="kDrop(event)">
       <h3><span style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:3px;background:${s.color}"></span><span style="color:${s.color}">${s.label}</span></span><span class="kcount">${cards.length}</span></h3>
@@ -1827,7 +1867,7 @@ function renderCommissions(){
 }
 
 /* ---------- DASHBOARD ---------- */
-let DASH_PERIOD='all';
+let DASH_PERIOD='all', RDVFILTER='all';
 function setDashPeriod(p){ DASH_PERIOD=p; document.querySelectorAll('#dash-period button').forEach(b=>b.classList.toggle('active',b.dataset.p===p)); renderDashboard(); }
 function periodStartISO(){
   const now=new Date();
@@ -1844,16 +1884,16 @@ function renderDashboard(){
   const caSigne=L.filter(l=>l.signe).reduce((s,l)=>s+(Number(l.montant)||0),0);
   const commDue=L.filter(commissionEarned).length*commissionValue();
   const kpi=[
-    {n:total,     l:'Clients au total',         icon:'👥', c:'var(--accent)',  f:'int'},
-    {n:signe,     l:'Signés',                    icon:'✍️', c:'var(--good)',    f:'int'},
-    {n:installe,  l:'Installés',                 icon:'☀️', c:'#38bdf8',        f:'int'},
-    {n:paye,      l:'Payés',                     icon:'💰', c:'var(--good)',    f:'int'},
-    {n:perdu,     l:'Perdus',                    icon:'✖️', c:'var(--bad)',     f:'int'},
-    {n:(total?signe/total*100:0), l:'Taux de signature', icon:'📈', c:'var(--accent2)', f:'pct'},
-    {n:caSigne,   l:'CA signé',                  icon:'💶', c:'var(--good)',    f:'eur'},
-    {n:commDue,   l:'Commissions télépro dues',  icon:'🎁', c:'var(--warn)',    f:'eur'}
+    {n:total,     l:'Clients au total',         icon:'👥', c:'var(--accent)',  f:'int', filt:'all'},
+    {n:signe,     l:'Signés',                    icon:'✍️', c:'var(--good)',    f:'int', filt:'signe'},
+    {n:installe,  l:'Installés',                 icon:'☀️', c:'#38bdf8',        f:'int', filt:'installe'},
+    {n:paye,      l:'Payés',                     icon:'💰', c:'var(--good)',    f:'int', filt:'paye'},
+    {n:perdu,     l:'Perdus',                    icon:'✖️', c:'var(--bad)',     f:'int', filt:'perdu'},
+    {n:(total?signe/total*100:0), l:'Taux de signature', icon:'📈', c:'var(--accent2)', f:'pct', filt:'signe'},
+    {n:caSigne,   l:'CA signé',                  icon:'💶', c:'var(--good)',    f:'eur', filt:'signe'},
+    {n:commDue,   l:'Commissions télépro dues',  icon:'🎁', c:'var(--warn)',    f:'eur', filt:'comm'}
   ];
-  document.getElementById('kpi-grid').innerHTML=kpi.map((x,i)=>`<div class="kpi" style="--kc:${x.c};animation-delay:${i*55}ms">
+  document.getElementById('kpi-grid').innerHTML=kpi.map((x,i)=>`<div class="kpi clickable" style="--kc:${x.c};animation-delay:${i*55}ms" onclick="goLeadsFilter('${x.filt}')" title="Voir ces clients">
     <div class="k-ico" style="color:${x.c}">${x.icon}</div>
     <div class="k-val" data-n="${x.n}" data-fmt="${x.f}">${x.f==='eur'?eur(0):x.f==='pct'?'0 %':'0'}</div>
     <div class="k-lab">${x.l}</div></div>`).join('');
@@ -1901,18 +1941,20 @@ function renderDashboard(){
     : emptyBox('📈','Pas encore de vente signée','Le chiffre d\'affaires signé s\'affichera ici, mois par mois.');
   requestAnimationFrame(()=>document.querySelectorAll('#dash-ca .bc-bar').forEach(b=>{ b.style.height=b.dataset.h+'%'; }));
 
-  // Rendez-vous : en retard (dossiers encore ouverts) + à venir
-  const todayISO=toISODate(new Date()), rdvs=[], activeStages=new Set(['telepro','confirmateur','commercial']);
-  const addRdv=(l,date,heure,type,ownerId,color)=>{ if(!date) return; const d=date.slice(0,10);
-    const overdue=d<todayISO; if(overdue && !activeStages.has(l.stage)) return; // ignore les RDV passés sur dossiers clos/perdus
-    rdvs.push({lead:l,date:d,heure:(heure||''),type,ownerId,color,overdue}); };
+  // Rendez-vous : en retard (dossiers encore ouverts) + à venir, filtrable par type
+  const todayISO=toISODate(new Date()), rdvs=[];
+  const addRdv=(l,date,heure,type,ownerId,color,tk)=>{ if(!date) return; const d=date.slice(0,10);
+    const overdue=d<todayISO; if(overdue && (l.stage==='termine'||l.stage==='perdu')) return; // ignore les RDV passés sur dossiers clos/perdus
+    rdvs.push({lead:l,date:d,heure:(heure||''),type,ownerId,color,overdue,tk}); };
   LEADS.forEach(l=>{
-    addRdv(l,l.rdv_conf_date,l.rdv_conf_heure,'Rappel confirmateur',l.owner_confirmateur,'#8a5cff');
-    addRdv(l,l.rdv_date,l.rdv_heure,'RDV commercial',l.owner_commercial,'#f59e0b');
-    addRdv(l,l.rdv_cq_date,l.rdv_cq_heure,'Contrôle qualité',l.owner_cq,'#38bdf8');
+    addRdv(l,l.rdv_conf_date,l.rdv_conf_heure,'Rappel confirmateur',l.owner_confirmateur,'#8a5cff','confirmateur');
+    addRdv(l,l.rdv_date,l.rdv_heure,'RDV commercial',l.owner_commercial,'#f59e0b','commercial');
+    addRdv(l,l.rdv_cq_date,l.rdv_cq_heure,'Contrôle qualité',l.owner_cq,'#38bdf8','cq');
+    addRdv(l,l.pose_date,l.pose_heure,'Pose (installation)',null,'#14b8a6','pose');
   });
-  rdvs.sort((a,b)=>(a.date+'T'+(a.heure||'99')).localeCompare(b.date+'T'+(b.heure||'99')));
-  document.getElementById('dash-rdv').innerHTML = rdvs.length ? rdvs.slice(0,8).map(r=>{
+  const rdvsF=(RDVFILTER==='all')?rdvs:rdvs.filter(r=>r.tk===RDVFILTER);
+  rdvsF.sort((a,b)=>(a.date+'T'+(a.heure||'99')).localeCompare(b.date+'T'+(b.heure||'99')));
+  document.getElementById('dash-rdv').innerHTML = rdvsF.length ? rdvsF.slice(0,8).map(r=>{
     const name=leadName(r.lead), owner=r.ownerId?profileName(r.ownerId):null, isToday=r.date===todayISO;
     const dl=new Date(r.date+'T00:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}).replace('.','');
     const dayCls=r.overdue?'overdue':isToday?'today':'', dayTxt=r.overdue?'⏰ En retard':isToday?"Aujourd'hui":esc(dl);
