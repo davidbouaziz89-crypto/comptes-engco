@@ -424,6 +424,7 @@
     <button data-tab="frais" id="nav-frais" onclick="showTab('frais')">💸 Frais</button>
     <button data-tab="docsall" onclick="showTab('docsall')">📁 Documents</button>
     <button data-tab="params" id="nav-params" onclick="showTab('params')">⚙️ Paramètres</button>
+    <button data-tab="calendrier" onclick="showTab('calendrier')">📆 Calendrier</button>
   </nav>
   <main>
     <div id="tab-dash">
@@ -630,6 +631,14 @@
           </div>
         </div>
       </div>
+    </div>
+    <div id="tab-calendrier" class="hidden">
+      <section class="panel">
+        <h2 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">📆 Calendrier de la semaine<span style="flex:1"></span></h2>
+        <div class="row" id="cal-nav" style="align-items:center;gap:8px;margin-bottom:8px"></div>
+        <div id="cal-legend" style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px;font-size:13px"></div>
+        <div id="cal-grid-wrap"></div>
+      </section>
     </div>
   </main>
 </div>
@@ -916,10 +925,11 @@ function fillSelects(){
 }
 function showTab(t){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dash','leads','pipeline','poses','commissions','frais','docsall','params'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  ['dash','leads','pipeline','poses','commissions','frais','docsall','params','calendrier'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
   if(t==='dash') renderDashboard();
   if(t==='pipeline') renderPipeline();
   if(t==='poses') renderPoses();
+  if(t==='calendrier') renderCalendar();
   if(t==='commissions') renderCommissions();
   if(t==='frais') renderFrais();
   if(t==='docsall') loadDocsAll();
@@ -947,6 +957,31 @@ function renderPoses(){
 }
 function shiftPosesWeek(n){ posesWeekStart=new Date(posesWeekStart); posesWeekStart.setDate(posesWeekStart.getDate()+n*7); renderPoses(); }
 function posesToday(){ posesWeekStart=sundayOf(toISODate(new Date())); renderPoses(); }
+let calWeekStart=null;
+const CAL_TYPES=[{c:'#8a5cff',ic:'📞',lab:'Rappel confirmateur',df:'rdv_conf_date',hf:'rdv_conf_heure'},
+                 {c:'#f59e0b',ic:'🤝',lab:'RDV commercial',df:'rdv_date',hf:'rdv_heure'},
+                 {c:'#38bdf8',ic:'🔍',lab:'Contrôle qualité',df:'rdv_cq_date',hf:'rdv_cq_heure'},
+                 {c:'#14b8a6',ic:'🚚',lab:'Pose (installation)',df:'pose_date',hf:'pose_heure'}];
+function renderCalendar(){
+  if(!calWeekStart) calWeekStart=sundayOf(toISODate(new Date()));
+  const days=weekDays(calWeekStart), todayISO=toISODate(new Date());
+  const start=new Date(calWeekStart), end=new Date(calWeekStart); end.setDate(end.getDate()+6);
+  document.getElementById('cal-nav').innerHTML=`<button class="btn ghost small" onclick="shiftCalWeek(-1)">← Semaine préc.</button><button class="btn ghost small" onclick="calToday()">Cette semaine</button><div style="flex:1;text-align:center;font-weight:700;min-width:180px">Semaine du ${start.toLocaleDateString('fr-FR')} au ${end.toLocaleDateString('fr-FR')}</div><button class="btn ghost small" onclick="shiftCalWeek(1)">Semaine suiv. →</button>`;
+  document.getElementById('cal-legend').innerHTML=CAL_TYPES.map(t=>`<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:11px;border-radius:3px;background:${t.c}"></span>${t.ic} ${esc(t.lab)}</span>`).join('');
+  const events=[]; let anyNoTime=0;
+  LEADS.forEach(l=>{ CAL_TYPES.forEach(t=>{
+    const date=l[t.df]; if(!date) return; const d=date.slice(0,10); if(!days.some(x=>x.iso===d)) return;
+    const heure=l[t.hf]; const mm=hhmm2m(heure);
+    if(mm==null){ anyNoTime++; events.push({date:d,m:-60,color:t.c,leadId:l.id,label:t.ic+' '+leadName(l),title:t.lab+' — '+leadName(l)+' (heure ?)'}); return; }
+    events.push({date:d,m:Math.floor(mm/60)*60,color:t.c,leadId:l.id,label:(heure||'').slice(0,5)+' '+t.ic+' '+leadName(l),title:t.lab+' — '+leadName(l)+' à '+(heure||'').slice(0,5)});
+  }); });
+  const rows=[]; if(anyNoTime) rows.push({m:-60,label:'Sans h.',h:32});
+  for(let hh=7;hh<=20;hh++) rows.push({m:hh*60,label:hh+'h',h:44});
+  const total=events.length;
+  document.getElementById('cal-grid-wrap').innerHTML = total? calGrid(days,rows,events,false,null,todayISO) : emptyBox('📆','Aucun rendez-vous cette semaine','Les RDV (rappels, ventes, contrôles, poses) planifiés cette semaine apparaîtront ici.');
+}
+function shiftCalWeek(n){ calWeekStart=new Date(calWeekStart); calWeekStart.setDate(calWeekStart.getDate()+n*7); renderCalendar(); }
+function calToday(){ calWeekStart=sundayOf(toISODate(new Date())); renderCalendar(); }
 
 /* ---------- LISTE CLIENTS ---------- */
 function statutPill(id){ const s=statutOf(id); if(!s) return '<span class="hint">—</span>'; const c=s.couleur||'#f5a623'; return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(s.nom)}</span>`; }
@@ -1583,7 +1618,8 @@ function calGrid(days, rows, events, editable, onclickFn, todayISO){
         else if(e.color) style='background:'+e.color+';color:#fff';
         if(e.proposed&&e.color) style+=';box-shadow:0 0 0 2px var(--txt)';
         const cls='cal-ev '+((!e.color&&e.kind)?e.kind:'')+(e.warn?' warn':'');
-        return `<span class="${cls}" ${style?`style="${style}"`:''} title="${esc(e.title||e.label)}">${esc(e.label)}</span>`;
+        const clickAttr=e.leadId?` onclick="event.stopPropagation();openLead('${e.leadId}')" style="cursor:pointer;${style}"`:(style?` style="${style}"`:'');
+        return `<span class="${cls}"${clickAttr} title="${esc(e.title||e.label)}">${esc(e.label)}</span>`;
       }).join('');
       html+=`<div class="cal-cell ${row.half?'half':''} ${d.iso===todayISO?'today':''}" style="height:${h}px" ${editable?`onclick="${onclickFn}('${d.iso}','${m2hhmm(row.m)}')"`:''}>${blocks}</div>`;
     });
