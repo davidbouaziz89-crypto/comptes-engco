@@ -519,6 +519,15 @@
               </form>
               <div id="st-tables"></div>
             </section>
+            <section class="panel"><h2>🔍 Statuts du contrôle qualité</h2>
+              <div class="hint" style="margin-bottom:10px">Statuts proposés au contrôle qualité (étape CQ). Si la liste est vide, 4 statuts par défaut sont utilisés (CQ OK, À travailler, MORT, Dossier envoyé).</div>
+              <form class="row" onsubmit="addCqStatut(event)" style="margin-bottom:12px">
+                <div class="field"><label>Nom du statut</label><input id="cqs-nom" placeholder="ex : CQ OK" required></div>
+                <div class="field sm"><label>Couleur</label><input id="cqs-couleur" type="color" value="#38bdf8" style="height:42px;padding:4px"></div>
+                <button class="btn small" type="submit">Ajouter</button>
+              </form>
+              <div class="table-wrap"><table id="cqs-table"></table></div>
+            </section>
           </div>
           <div class="params-sec" id="ps-sources">
             <section class="panel"><h2>📥 Sources de leads</h2>
@@ -660,7 +669,7 @@ const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let SESSION=null, IS_ADMIN=false, MY_ROLE=null, MY_ROLES=[];
 let LEADS=[], STATUTS=[], SOURCES=[], CTYPES=[], DOCTYPES=[], PROFILES=[], SETTINGS={}, PRODUITS=[];
-let FRAIS=[], FRAISCATS=[];
+let FRAIS=[], FRAISCATS=[], CQSTATUTS=[];
 const PRODUIT_CATS=[['pv','PV'],['pac','PAC'],['split','Split']];
 let curLead=null, curDocs=[], selRole='telepro', ALLDOCS=[];
 
@@ -673,7 +682,9 @@ const ROLES=[
 const ROLE_CQ=ROLES[3];
 // CQ est désormais une étape à part entière (la dernière avant « Terminé »).
 const ASSIGN_ROLES=ROLES;
-const CQ_STATUTS=['CQ OK','À travailler','MORT','Dossier envoyé'];
+const DEFAULT_CQ_STATUTS=[{nom:'CQ OK',couleur:'#16a34a'},{nom:'À travailler',couleur:'#f59e0b'},{nom:'MORT',couleur:'#dc2626'},{nom:'Dossier envoyé',couleur:'#38bdf8'}];
+function cqStatutList(){ return CQSTATUTS.length?CQSTATUTS:DEFAULT_CQ_STATUTS; }
+function cqColor(nom){ const s=cqStatutList().find(x=>x.nom===nom); return s&&s.couleur?s.couleur:'#38bdf8'; }
 const roleLabel=k=>{ const r=ASSIGN_ROLES.find(x=>x.key===k); return r?r.label:k; };
 const STAGES=[
   {key:'telepro',label:'Télépro',color:'#3b82f6'},
@@ -770,7 +781,7 @@ async function afterAuth(session){
   await loadAll(); showTab('dash');
 }
 async function loadAll(){
-  const [st,sr,ct,dt,pr,se,l,pd,fc,fr]=await Promise.all([
+  const [st,sr,ct,dt,pr,se,l,pd,fc,fr,cq]=await Promise.all([
     db.from('pv_statuts').select('*').order('role_key').order('ordre'),
     db.from('pv_sources').select('*').order('ordre'),
     db.from('pv_client_types').select('*').order('ordre'),
@@ -781,10 +792,11 @@ async function loadAll(){
     db.from('pv_produits').select('*').order('categorie').order('ordre'),
     db.from('pv_frais_cats').select('*').order('ordre'),
     db.from('pv_frais').select('*').order('date',{ascending:false}),
+    db.from('pv_cq_statuts').select('*').order('ordre'),
   ]);
   STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; PROFILES=pr.data||[];
   SETTINGS=(se.data&&se.data.value)||{}; LEADS=l.data||[]; PRODUITS=pd.data||[];
-  FRAISCATS=fc.data||[]; FRAIS=fr.data||[];
+  FRAISCATS=fc.data||[]; FRAIS=fr.data||[]; CQSTATUTS=cq.data||[];
   const me=PROFILES.find(p=>p.id===(SESSION&&SESSION.user.id));
   const _extra=(me&&Array.isArray(me.roles))?me.roles:[];
   MY_ROLES=IS_ADMIN?['admin','telepro','confirmateur','commercial','cq']:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),..._extra]));
@@ -1037,13 +1049,13 @@ function cqSelect(ed){
   const opts='<option value="">— Aucun contrôleur qualité —</option>'+list.map(p=>`<option value="${p.id}" ${curLead.owner_cq===p.id?'selected':''}>${esc(p.nom||p.email)}</option>`).join('');
   return `<label>Contrôleur qualité assigné</label><select ${ed?'':'disabled'} onchange="updLead({owner_cq:this.value||null},'CQ assigné').then(()=>renderSuivi())">${opts}</select>`;
 }
-const CQ_STATUT_COLOR={'CQ OK':'#16a34a','À travailler':'#f59e0b','MORT':'#dc2626','Dossier envoyé':'#38bdf8'};
 function cqStatutSelect(ed){
-  const cur=curLead.cq_statut||'';
-  const opts='<option value="">— À définir —</option>'+CQ_STATUTS.map(o=>`<option ${cur===o?'selected':''}>${esc(o)}</option>`).join('');
+  const cur=curLead.cq_statut||'', list=cqStatutList().map(s=>s.nom);
+  if(cur && !list.includes(cur)) list.unshift(cur);
+  const opts='<option value="">— À définir —</option>'+list.map(o=>`<option ${cur===o?'selected':''}>${esc(o)}</option>`).join('');
   return `<label>Statut du contrôle qualité${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="updLead({cq_statut:this.value||null},'Statut CQ enregistré').then(()=>{renderSuivi();renderBudgetCards();})">${opts}</select>`;
 }
-function cqStatutPill(v){ if(!v) return ''; const c=CQ_STATUT_COLOR[v]||'#38bdf8'; return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
+function cqStatutPill(v){ if(!v) return ''; const c=cqColor(v); return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
 /* -- Crédits en cours (liste dynamique) -- */
 function leadCredits(){ return Array.isArray(curLead.credits)?curLead.credits:[]; }
 function creditsTotal(){ return leadCredits().reduce((s,c)=>s+(Number(c.montant)||0),0); }
@@ -1760,7 +1772,20 @@ function renderDashboard(){
 function renderParams(){
   document.getElementById('set-comm').value=SETTINGS.commission_telepro!=null?SETTINGS.commission_telepro:'';
   document.getElementById('set-cond').value=SETTINGS.commission_condition||'signe_installe';
-  renderUsers(); renderProduits(); renderStatutTables(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_doc_types','dt-table',DOCTYPES); renderRef('pv_frais_cats','frc-table',FRAISCATS);
+  renderUsers(); renderProduits(); renderStatutTables(); renderCqStatuts(); renderRef('pv_sources','src-table',SOURCES); renderRef('pv_doc_types','dt-table',DOCTYPES); renderRef('pv_frais_cats','frc-table',FRAISCATS);
+}
+function renderCqStatuts(){
+  const t=document.getElementById('cqs-table'); if(!t) return;
+  if(!CQSTATUTS.length){ t.innerHTML='<tr><td class="hint" style="padding:10px">Aucun statut personnalisé — les 4 par défaut sont utilisés (CQ OK, À travailler, MORT, Dossier envoyé). Ajoutez-en pour remplacer la liste.</td></tr>'; return; }
+  t.innerHTML='<tr><th>Statut</th><th>Couleur</th><th></th></tr>'+CQSTATUTS.map(s=>`<tr><td>${cqStatutPill(s.nom)}</td><td><span class="tag" style="background:${esc(s.couleur||'')};color:#fff">${esc(s.couleur||'')}</span></td><td class="num"><button class="btn danger small" onclick="delRef('pv_cq_statuts','${s.id}')">Suppr.</button></td></tr>`).join('');
+}
+async function addCqStatut(e){
+  e.preventDefault();
+  const nom=document.getElementById('cqs-nom').value.trim(); if(!nom) return;
+  const couleur=document.getElementById('cqs-couleur').value;
+  const {error}=await db.from('pv_cq_statuts').insert({nom,couleur,ordre:CQSTATUTS.length});
+  if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('cqs-nom').value=''; await reloadRefs(); toast('Statut CQ ajouté');
 }
 function showParam(key){
   document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.ps===key));
@@ -1904,13 +1929,14 @@ async function delRef(table,id){
   await reloadRefs();
 }
 async function reloadRefs(){
-  const [st,sr,ct,dt,fc]=await Promise.all([
+  const [st,sr,ct,dt,fc,cq]=await Promise.all([
     db.from('pv_statuts').select('*').order('role_key').order('ordre'),
     db.from('pv_sources').select('*').order('ordre'),
     db.from('pv_client_types').select('*').order('ordre'),
     db.from('pv_doc_types').select('*').order('ordre'),
-    db.from('pv_frais_cats').select('*').order('ordre')]);
-  STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; FRAISCATS=fc.data||[]; fillSelects(); renderParams();
+    db.from('pv_frais_cats').select('*').order('ordre'),
+    db.from('pv_cq_statuts').select('*').order('ordre')]);
+  STATUTS=st.data||[]; SOURCES=sr.data||[]; CTYPES=ct.data||[]; DOCTYPES=dt.data||[]; FRAISCATS=fc.data||[]; CQSTATUTS=cq.data||[]; fillSelects(); renderParams();
 }
 
 /* ---------- FRAIS ---------- */
