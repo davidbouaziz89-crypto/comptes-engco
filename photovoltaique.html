@@ -678,8 +678,11 @@ const ROLES=[
   {key:'confirmateur',label:'Confirmateur',icon:'✅'},
   {key:'commercial',label:'Commercial',icon:'🤝'},
   {key:'cq',label:'Contrôle Qualité',icon:'🔍'},
+  {key:'financement',label:'Financement',icon:'🏦'},
 ];
 const ROLE_CQ=ROLES[3];
+// Rôles ayant leur propre système de statut fixe/dédié (exclus des « statuts par rôle » configurables)
+const SPECIAL_STATUT_ROLES=['cq','financement'];
 // CQ est désormais une étape à part entière (la dernière avant « Terminé »).
 const ASSIGN_ROLES=ROLES;
 const DEFAULT_CQ_STATUTS=[{nom:'CQ OK',couleur:'#16a34a'},{nom:'À travailler',couleur:'#f59e0b'},{nom:'MORT',couleur:'#dc2626'},{nom:'Dossier envoyé',couleur:'#38bdf8'}];
@@ -691,6 +694,7 @@ const STAGES=[
   {key:'confirmateur',label:'Confirmateur',color:'#8a5cff'},
   {key:'commercial',label:'Commercial',color:'#f59e0b'},
   {key:'cq',label:'Contrôle Qualité',color:'#38bdf8'},
+  {key:'financement',label:'Financement',color:'#a855f7'},
   {key:'termine',label:'Terminé',color:'#16a34a'},
   {key:'perdu',label:'Perdu',color:'#dc2626'},
 ];
@@ -799,7 +803,7 @@ async function loadAll(){
   FRAISCATS=fc.data||[]; FRAIS=fr.data||[]; CQSTATUTS=cq.data||[];
   const me=PROFILES.find(p=>p.id===(SESSION&&SESSION.user.id));
   const _extra=(me&&Array.isArray(me.roles))?me.roles:[];
-  MY_ROLES=IS_ADMIN?['admin','telepro','confirmateur','commercial','cq']:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),..._extra]));
+  MY_ROLES=IS_ADMIN?['admin','telepro','confirmateur','commercial','cq','financement']:Array.from(new Set([...(MY_ROLE?[MY_ROLE]:[]),..._extra]));
   if(!IS_ADMIN){ const rb=document.getElementById('rolebadge'); if(rb&&MY_ROLES.length) rb.textContent=MY_ROLES.map(roleLabel).join(' + '); }
   fillSelects(); renderLeads(); updateNavBadge();
 }
@@ -820,7 +824,7 @@ function fillSelects(){
   const oh=document.getElementById('lv-owner-hint'); if(oh) oh.textContent=IS_ADMIN?'(vous attribuez le lead)':'(attribué par l\'admin)';
   set('lv-source','<option value="">— Aucune —</option>'+SOURCES.map(s=>`<option value="${esc(s.nom)}">${esc(s.nom)}</option>`).join(''));
   set('doc-type','<option value="">— Type de document —</option>'+DOCTYPES.map(d=>`<option value="${esc(d.nom)}">${esc(d.nom)}</option>`).join(''));
-  set('st-role',ROLES.filter(r=>r.key!=='cq').map(r=>`<option value="${r.key}">${r.icon} ${r.label}</option>`).join(''));
+  set('st-role',ROLES.filter(r=>!SPECIAL_STATUT_ROLES.includes(r.key)).map(r=>`<option value="${r.key}">${r.icon} ${r.label}</option>`).join(''));
   const fcSel=document.getElementById('fr-categorie');
   if(fcSel){ const prev=fcSel.value; fcSel.innerHTML=(FRAISCATS.length?FRAISCATS:[{nom:'Autre'}]).map(c=>`<option value="${esc(c.nom)}">${esc(c.nom)}</option>`).join(''); if(prev&&FRAISCATS.some(c=>c.nom===prev)) fcSel.value=prev; }
   set('fr-lead','<option value="">— Aucun (frais global) —</option>'+LEADS.map(l=>`<option value="${l.id}">${esc(leadName(l))}${l.ville?' — '+esc(l.ville):''}</option>`).join(''));
@@ -857,7 +861,7 @@ function renderLeads(){
       <td><b>${esc(leadName(l))}</b>${l.telephone?`<br><span class="hint">${esc(l.telephone)}</span>`:''}</td>
       <td>${esc(l.ville||'')}</td>
       <td><span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span></td>
-      <td>${l.stage==='cq'&&l.cq_statut?cqStatutPill(l.cq_statut):statutPill(curStatutId(l))}</td>
+      <td>${l.stage==='cq'&&l.cq_statut?cqStatutPill(l.cq_statut):l.stage==='financement'&&l.financement_statut?finStatutPill(l.financement_statut):statutPill(curStatutId(l))}</td>
       <td>${ownerCell(l.owner_telepro)}</td>
       <td class="num">${eur(l.montant)}</td></tr>`; }).join('');
   if(rows.length>400) document.getElementById('leads-count').textContent+=' (400 affichés)';
@@ -903,7 +907,7 @@ function renderBudgetCards(){
   document.getElementById('bc-stage').innerHTML=`<span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span>`;
   document.getElementById('bc-montant').textContent=eur(l.montant);
   const etat=[]; etat.push(l.signe?'✅ Signé':'⬜ Non signé'); etat.push(l.installe?'✅ Installé':'⬜ Non installé'); etat.push(l.paye?'✅ Payé':'⬜ Non payé');
-  document.getElementById('bc-etat').innerHTML=etat.join('<br>')+(l.cq_statut?'<br><span style="display:inline-block;margin-top:6px">'+cqStatutPill(l.cq_statut)+'</span>':'');
+  document.getElementById('bc-etat').innerHTML=etat.join('<br>')+(l.cq_statut?'<br><span style="display:inline-block;margin-top:6px">'+cqStatutPill(l.cq_statut)+'</span>':'')+(l.financement_statut?'<br><span style="display:inline-block;margin-top:6px">'+finStatutPill(l.financement_statut)+'</span>':'');
   document.getElementById('bc-comm').textContent=commissionEarned(l)?eur(commissionValue()):'—';
 }
 async function saveLeadInfo(){
@@ -968,7 +972,7 @@ function renderSuivi(){
       <div class="s-body"><div class="s-head">Dossier terminé <span class="s-badge done">Terminé</span></div>
         <div class="hint">Toutes les étapes sont validées.</div>
         <div class="s-sep"></div>
-        <div class="s-foot">${IS_ADMIN?`<button class="btn ghost small" onclick="setStage('cq')">↩︎ Ré-ouvrir</button>`:'<span class="hint">Dossier clôturé.</span>'}</div>
+        <div class="s-foot">${IS_ADMIN?`<button class="btn ghost small" onclick="setStage('financement')">↩︎ Ré-ouvrir</button>`:'<span class="hint">Dossier clôturé.</span>'}</div>
       </div></div>`;
   }
   let cards='';
@@ -1009,7 +1013,7 @@ function statutSelect(role){
 // Bloc "Statuts par étape" dans les infos client : un statut par rôle, éditable seulement par le rôle concerné (ou admin)
 function renderStatuts(){
   const box=document.getElementById('lv-statuts'); if(!box||!curLead) return;
-  box.innerHTML=ROLES.filter(r=>r.key!=='cq').map(r=>statutSelect(r.key)).join('');
+  box.innerHTML=ROLES.filter(r=>!SPECIAL_STATUT_ROLES.includes(r.key)).map(r=>statutSelect(r.key)).join('');
 }
 function dateField(field,label,role){
   const ed=canEdit(role);
@@ -1056,6 +1060,15 @@ function cqStatutSelect(ed){
   return `<label>Statut du contrôle qualité${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="updLead({cq_statut:this.value||null},'Statut CQ enregistré').then(()=>{renderSuivi();renderBudgetCards();})">${opts}</select>`;
 }
 function cqStatutPill(v){ if(!v) return ''; const c=cqColor(v); return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
+const FIN_STATUTS=[{nom:'ACCEPTÉ',couleur:'#16a34a'},{nom:'REFUSÉ',couleur:'#dc2626'},{nom:'EN ATTENTE',couleur:'#f59e0b'}];
+function finColor(nom){ const s=FIN_STATUTS.find(x=>x.nom===nom); return s&&s.couleur?s.couleur:'#a855f7'; }
+function finStatutSelect(ed){
+  const cur=curLead.financement_statut||'', list=FIN_STATUTS.map(s=>s.nom);
+  if(cur && !list.includes(cur)) list.unshift(cur);
+  const opts='<option value="">— À définir —</option>'+list.map(o=>`<option ${cur===o?'selected':''}>${esc(o)}</option>`).join('');
+  return `<label>Statut du financement${ed?'':' <span class="hint">🔒</span>'}</label><select ${ed?'':'disabled'} onchange="updLead({financement_statut:this.value||null},'Statut financement enregistré').then(()=>{renderSuivi();renderBudgetCards();})">${opts}</select>`;
+}
+function finStatutPill(v){ if(!v) return ''; const c=finColor(v); return `<span class="pill" style="background:${c}22;color:${c};border:1px solid ${c}66">${esc(v)}</span>`; }
 /* -- Crédits en cours (liste dynamique) -- */
 function leadCredits(){ return Array.isArray(curLead.credits)?curLead.credits:[]; }
 function creditsTotal(){ return leadCredits().reduce((s,c)=>s+(Number(c.montant)||0),0); }
@@ -1264,6 +1277,11 @@ function rolePanelHTML(role){
     h+=`<div class="s-sep"></div>`+cqStatutSelect(ed);
     h+=`<label style="margin-top:12px">Commentaire du contrôle qualité</label><textarea ${ed?'':'disabled'} placeholder="Observations du contrôle (pièces, conformité, points à corriger…)" onchange="updLead({cq_commentaire:this.value||null})">${esc(curLead.cq_commentaire||'')}</textarea>`;
     if(!ed) h+=`<div class="hint" style="margin-top:6px">Seul le contrôle qualité (ou l'admin) peut modifier le statut et le commentaire de cette étape.</div>`;
+  } else if(role==='financement'){
+    // Étape Financement : rôle dédié, statut (ACCEPTÉ / REFUSÉ / EN ATTENTE) + commentaire.
+    h+=finStatutSelect(ed);
+    h+=`<label style="margin-top:12px">Commentaire du financement</label><textarea ${ed?'':'disabled'} placeholder="Ex : accord de principe, pièces à fournir, motif du refus…" onchange="updLead({financement_commentaire:this.value||null})">${esc(curLead.financement_commentaire||'')}</textarea>`;
+    if(!ed) h+=`<div class="hint" style="margin-top:6px">Seul le rôle Financement (ou l'admin) peut modifier le statut et le commentaire de cette étape.</div>`;
   }
   return h;
 }
@@ -1898,7 +1916,7 @@ async function saveSettings(){
   SETTINGS=val; toast('Réglages enregistrés ✓');
 }
 function renderStatutTables(){
-  document.getElementById('st-tables').innerHTML=ROLES.filter(r=>r.key!=='cq').map(r=>{
+  document.getElementById('st-tables').innerHTML=ROLES.filter(r=>!SPECIAL_STATUT_ROLES.includes(r.key)).map(r=>{
     const list=statutsFor(r.key);
     const rows=list.length?list.map(s=>`<tr><td>${statutPill(s.id)}</td><td><span class="tag" style="background:${s.couleur};color:#fff">${esc(s.couleur||'')}</span></td><td class="num">${s.ordre}</td><td class="num"><button class="btn danger small" onclick="delRef('pv_statuts','${s.id}')">Suppr.</button></td></tr>`).join(''):'<tr><td class="empty">Aucun statut</td></tr>';
     return `<div style="margin-bottom:14px"><div style="font-weight:700;margin-bottom:6px">${r.icon} ${r.label}</div><div class="table-wrap"><table><tr><th>Statut</th><th>Couleur</th><th class="num">Ordre</th><th></th></tr>${rows}</table></div></div>`;
