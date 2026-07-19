@@ -308,6 +308,24 @@
   .s-cancel:hover{text-decoration:underline}
   .s-body{flex:1;padding:14px 16px;min-width:0}
   .s-head{display:flex;align-items:center;gap:8px;font-weight:700;text-transform:uppercase;font-size:13px;letter-spacing:.03em;color:var(--muted);margin-bottom:12px}
+  .s-head.clickable{cursor:pointer;user-select:none}
+  .s-head.clickable:hover{color:var(--txt)}
+  .s-chev{display:inline-block;transition:transform .18s var(--ease);color:var(--muted);font-size:11px}
+  .scard:not(.collapsed) .s-chev{transform:rotate(90deg)}
+  .scard.collapsed .s-body>.s-content{display:none}
+  .scard.collapsed .s-head{margin-bottom:0}
+  .s-sum{margin-left:auto;text-transform:none}
+  /* Barre de progression du parcours */
+  .s-progress{display:flex;gap:2px;margin-bottom:18px;overflow-x:auto;padding:4px 2px 8px}
+  .sp-item{flex:1;min-width:82px;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;text-align:center}
+  .sp-item::before{content:"";position:absolute;top:13px;right:50%;width:100%;height:2px;background:var(--line);z-index:0}
+  .sp-item:first-child::before{display:none}
+  .sp-item.done::before,.sp-item.active::before{background:var(--good)}
+  .sp-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--panel2);border:1px solid var(--line);color:var(--muted);position:relative;z-index:1}
+  .sp-item.done .sp-dot{background:var(--good);border-color:var(--good);color:#052a1c}
+  .sp-item.active .sp-dot{background:var(--accent);border-color:var(--accent);color:#241500;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .sp-lab{font-size:11px;color:var(--muted);line-height:1.2}
+  .sp-item.active .sp-lab{color:var(--txt);font-weight:700}
   .s-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
   .s-badge.active{background:var(--accent);color:#241500}
   .s-badge.done{background:rgba(55,211,155,.15);color:var(--good);border:1px solid rgba(55,211,155,.4)}
@@ -1038,7 +1056,7 @@ function renderSuivi(){
   const termine=curLead.stage==='termine';
   const cur=termine?ROLES.length-1:stageIndex(curLead.stage);
   const next=ROLES[cur+1];
-  let head=`<h3 class="s-title">Étapes</h3>`;
+  let head=`<h3 class="s-title">Étapes</h3>`+stepProgressHTML();
   if(termine){
     head+=`<div class="scard done">
       <div class="s-rail"><div class="s-num">Dossier</div><div class="s-dot done">✓</div></div>
@@ -1060,12 +1078,30 @@ function renderSuivi(){
         :`<button class="btn small" onclick="setStage('termine')">✅ Valider et terminer</button>`;
       foot=`<div class="s-sep"></div><div class="s-foot"><button class="btn danger small" style="margin-right:auto" onclick="setStage('perdu')">Marquer perdu ✕</button>${validBtn}</div>`;
     }
-    cards+=`<div class="scard ${active?'active':''} ${done?'done':''}">
+    const collapsible=done&&!active;
+    cards+=`<div class="scard ${active?'active':''} ${done?'done':''} ${collapsible?'collapsed':''}">
       <div class="s-rail"><div class="s-num">Étape ${i+1}</div><div class="s-dot ${active?'active':done?'done':''}">${done?'✓':r.icon}</div>${cancel}</div>
-      <div class="s-body"><div class="s-head">${r.icon} ${r.label}${badge}</div><div class="s-content">${rolePanelHTML(r.key)}</div>${foot}</div>
+      <div class="s-body"><div class="s-head${collapsible?' clickable':''}"${collapsible?' onclick="this.closest(\'.scard\').classList.toggle(\'collapsed\')"':''}>${collapsible?'<span class="s-chev">▸</span>':''}${r.icon} ${r.label}${badge}${collapsible?stepSummary(r.key):''}</div><div class="s-content">${rolePanelHTML(r.key)}${foot}</div></div>
     </div>`;
   }
   box.innerHTML=head+cards;
+}
+function stepSummary(role){
+  let pill='';
+  if(role==='cq') pill=cqStatutPill(curLead.cq_statut);
+  else if(role==='financement') pill=finStatutPill(curLead.financement_statut);
+  else if(role==='paiement') pill=paiStatutPill(curLead.paiement_statut);
+  else if(role==='pose') pill=curLead.pose_date?`<span class="pill" style="background:#14b8a622;color:#14b8a6;border:1px solid #14b8a666">🚚 ${new Date(curLead.pose_date.slice(0,10)+'T00:00:00').toLocaleDateString('fr-FR')}${curLead.pose_heure?' '+curLead.pose_heure.slice(0,5):''}</span>`:'';
+  else { const sid=curLead['statut_'+role]; pill=sid?statutPill(sid):''; }
+  return pill?`<span class="s-sum">${pill}</span>`:'';
+}
+function stepProgressHTML(){
+  const perdu=curLead.stage==='perdu', termine=curLead.stage==='termine';
+  const curIdx=termine?ROLES.length:(perdu?-1:stageIndex(curLead.stage));
+  return `<div class="s-progress">`+ROLES.map((r,i)=>{
+    const done=termine||i<curIdx, active=!perdu&&!termine&&i===curIdx;
+    return `<div class="sp-item ${done?'done':''} ${active?'active':''}" title="${esc(r.label)}"><div class="sp-dot">${done?'✓':i+1}</div><div class="sp-lab">${esc(r.label)}</div></div>`;
+  }).join('')+`</div>`;
 }
 function ownerSelect(field,role){
   const ed=canEdit(role);
