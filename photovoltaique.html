@@ -197,6 +197,8 @@
   .segbar button{background:transparent;border:0;color:var(--muted);padding:6px 13px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:background .16s var(--ease),color .16s var(--ease)}
   .segbar button:hover{color:var(--txt)}
   .segbar button.active{background:var(--panel);color:var(--txt);box-shadow:0 2px 8px -4px rgba(0,0,0,.4)}
+  .dash-range{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:400}
+  .dash-range input[type=date]{width:auto;padding:6px 9px;font-size:13px}
   /* Recherche globale (palette) */
   .qs-overlay{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:78px 16px;backdrop-filter:blur(2px);animation:fadein .2s var(--ease) both}
   .qs-box{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;animation:rise .22s var(--ease) both}
@@ -433,7 +435,7 @@
         <button data-p="month" onclick="setDashPeriod('month')">Ce mois</button>
         <button data-p="quarter" onclick="setDashPeriod('quarter')">Trimestre</button>
         <button data-p="year" onclick="setDashPeriod('year')">Année</button>
-      </span></h2><div class="kpis" id="kpi-grid"></div></section>
+      </span><span class="dash-range"><span class="hint">Du</span><input type="date" id="dash-from" onchange="setCustomPeriod()"><span class="hint">au</span><input type="date" id="dash-to" onchange="setCustomPeriod()"><button class="btn ghost small" id="dash-range-clear" onclick="clearCustomPeriod()" style="display:none">✕</button></span></h2><div class="kpis" id="kpi-grid"></div></section>
       <section class="panel"><h2 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">📅 Prochains rendez-vous<span style="flex:1"></span>
         <select id="rdv-filter" class="field sm" style="min-width:190px;flex:0 0 auto" onchange="RDVFILTER=this.value;renderDashboard()">
           <option value="all">Tous les types</option>
@@ -1904,7 +1906,9 @@ function renderCommissions(){
 
 /* ---------- DASHBOARD ---------- */
 let DASH_PERIOD='all', RDVFILTER='all';
-function setDashPeriod(p){ DASH_PERIOD=p; document.querySelectorAll('#dash-period button').forEach(b=>b.classList.toggle('active',b.dataset.p===p)); renderDashboard(); }
+function setDashPeriod(p){ DASH_PERIOD=p; const f=document.getElementById('dash-from'),t=document.getElementById('dash-to'); if(f)f.value=''; if(t)t.value=''; const c=document.getElementById('dash-range-clear'); if(c)c.style.display='none'; document.querySelectorAll('#dash-period button').forEach(b=>b.classList.toggle('active',b.dataset.p===p)); renderDashboard(); }
+function setCustomPeriod(){ DASH_PERIOD='custom'; document.querySelectorAll('#dash-period button').forEach(b=>b.classList.remove('active')); const c=document.getElementById('dash-range-clear'); if(c)c.style.display=''; renderDashboard(); }
+function clearCustomPeriod(){ setDashPeriod('all'); }
 function periodStartISO(){
   const now=new Date();
   if(DASH_PERIOD==='month') return toISODate(new Date(now.getFullYear(),now.getMonth(),1));
@@ -1912,7 +1916,11 @@ function periodStartISO(){
   if(DASH_PERIOD==='year') return toISODate(new Date(now.getFullYear(),0,1));
   return null;
 }
-function periodLeads(){ const s=periodStartISO(); return s?LEADS.filter(l=>(l.created_at||'').slice(0,10)>=s):LEADS; }
+function periodLeads(){
+  if(DASH_PERIOD==='custom'){ const f=document.getElementById('dash-from').value, t=document.getElementById('dash-to').value;
+    return LEADS.filter(l=>{ const d=(l.created_at||'').slice(0,10); if(f && d<f) return false; if(t && d>t) return false; return true; }); }
+  const s=periodStartISO(); return s?LEADS.filter(l=>(l.created_at||'').slice(0,10)>=s):LEADS;
+}
 function renderDashboard(){
   const L=periodLeads();
   const total=L.length, signe=L.filter(l=>l.signe).length, installe=L.filter(l=>l.installe).length, paye=L.filter(l=>l.paye).length;
