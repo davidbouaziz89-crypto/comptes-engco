@@ -221,6 +221,13 @@
   .fiche-add{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:flex-end}
   .fiche-add .field{flex:1;min-width:130px}
   .fiche-empty{color:var(--muted);font-size:13px;font-style:italic;padding:8px 0}
+  /* Check-list dossiers */
+  .chk-box{width:19px;height:19px;accent-color:var(--accent);cursor:pointer}
+  .chk-auto{display:inline-block;font-size:11px;font-weight:700;color:var(--good);background:color-mix(in srgb,var(--accent2) 16%,transparent);border:1px solid color-mix(in srgb,var(--accent2) 40%,transparent);border-radius:20px;padding:2px 8px}
+  #check-table td.num,#check-table th.num{text-align:center}
+  .chk-prog{display:inline-block;width:64px;height:7px;border-radius:6px;background:var(--panel2);overflow:hidden;vertical-align:middle;border:1px solid var(--line)}
+  .chk-prog-bar{height:100%;background:var(--grad-lime);border-radius:6px;transition:width .4s ease}
+  .chk-prog-txt{font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-left:8px}
 </style>
 </head>
 <body>
@@ -267,6 +274,7 @@
   <button data-tab="apports" onclick="showTab('apports')">💶 Apports</button>
   <button data-tab="frais" onclick="showTab('frais')">🧾 Frais / Dépenses</button>
   <button data-tab="documents" id="nav-documents" onclick="showTab('documents')" style="display:none">📎 Documents</button>
+  <button data-tab="check" id="nav-check" onclick="showTab('check')" style="display:none">✅ Check</button>
   <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
   <button data-tab="monespace" onclick="showTab('monespace')">🤝 Mon espace</button>
 </nav>
@@ -559,6 +567,28 @@
     </section>
   </div>
 
+  <!-- CHECK (LED) : check-list par dossier -->
+  <div id="tab-check" class="hidden">
+    <section class="panel">
+      <h2>🧩 Éléments à checker</h2>
+      <div class="hint" style="margin-bottom:8px">Définis ce qu'il faut vérifier sur chaque dossier. Si tu relies un élément à une <b>catégorie de frais</b>, sa case se coche automatiquement dès qu'un frais de cette catégorie est rattaché au dossier (par son ID CRM).</div>
+      <form class="row" onsubmit="addCheckItem(event)">
+        <div class="field"><label>Élément à vérifier</label><input type="text" id="ci-nom" placeholder="ex. Facture matériel, Attestation sur l'honneur…" required></div>
+        <div class="field"><label>Coché auto. par la catégorie de frais</label><select id="ci-cat"><option value="">— aucune (coche manuelle) —</option></select></div>
+        <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+      </form>
+      <div id="check-items-list" style="margin-top:6px"></div>
+    </section>
+    <section class="panel panel-wide">
+      <h2>✅ Check-list des dossiers</h2>
+      <div class="search-box"><span class="ic">🔎</span><input type="text" id="check-search" placeholder="Rechercher un dossier (client, ID, ville…)" oninput="renderCheck()"></div>
+      <div class="table-wrap"><table id="check-table">
+        <thead><tr id="check-head"></tr></thead>
+        <tbody id="check-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
   <!-- PARAMÈTRES (menu latéral) -->
   <div id="tab-parametres" class="hidden">
     <div class="params-layout">
@@ -846,13 +876,14 @@ function showTab(t){
   buildParamsLayout();
   if(PARAM_SECS.includes(t)){ // raccourci legacy vers une section de Paramètres
     document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab==='parametres'));
-    ['dashboard','dossiers','apports','frais','documents','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!=='parametres'); });
+    ['dashboard','dossiers','apports','frais','documents','check','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!=='parametres'); });
     showParam(t); return;
   }
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
-  ['dashboard','dossiers','apports','frais','documents','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
+  ['dashboard','dossiers','apports','frais','documents','check','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
   if(t==='parametres') showParam(window._curParam||'statuts');
   if(t==='documents') renderDocuments();
+  if(t==='check') renderCheck();
   if(t==='dashboard') replayDashboard();
 }
 // Rejoue l'animation des chiffres + graphes à chaque retour sur le dashboard
@@ -1136,7 +1167,7 @@ async function loadAll(){
   await loadRegiesConfig();
   await loadStatuts();
   await Promise.all([loadApports(), loadDossiers(), loadRemboursements(), loadFrais()]);
-  renderRegies(); loadRecurrents(); loadFraisCats(); loadDelegataires();
+  renderRegies(); loadRecurrents(); loadFraisCats(); loadDelegataires(); loadCheck();
   if(CURRENT_ROLE==='admin') loadUsers();
 }
 
@@ -1451,6 +1482,7 @@ function renderFrais(){
   const df=document.getElementById('f-dossier-field'); if(df) df.style.display=led?'':'none';
   const ddf=document.getElementById('f-doc-field'); if(ddf) ddf.style.display=led?'':'none';
   const nd=document.getElementById('nav-documents'); if(nd) nd.style.display=led?'':'none';
+  const ncheck=document.getElementById('nav-check'); if(ncheck) ncheck.style.display=led?'':'none';
   const fm=document.getElementById('f-mois'); if(fm&&!fm.value) fm.value=today().slice(0,7);
   populateFraisFilters();
   const rows=filterFraisRows();
@@ -1608,6 +1640,86 @@ async function openFraisDoc(path){
   const {data,error}=await db.storage.from('engco-docs').createSignedUrl(path,3600);
   if(error){ toast('Erreur : '+error.message); return; }
   window.open(data.signedUrl,'_blank','noopener');
+}
+
+// ===== Check-list des dossiers (LED) =====
+async function loadCheck(){
+  const isLed=!!(PROJ&&PROJ.key==='led');
+  const nc=document.getElementById('nav-check'); if(nc) nc.style.display=isLed?'':'none';
+  if(!isLed){ window._checkItems=[]; window._checkState=[]; return; }
+  const [it,st]=await Promise.all([
+    db.from('engco_check_items').select('*').order('ordre').order('created_at'),
+    db.from('engco_check_state').select('*')
+  ]);
+  window._checkItems=(it&&it.data)||[];
+  window._checkState=(st&&st.data)||[];
+  fillCheckCatSelect();
+  renderCheck();
+}
+function fillCheckCatSelect(){
+  const sel=document.getElementById('ci-cat'); if(!sel) return; const prev=sel.value;
+  const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle)])].filter(Boolean).sort();
+  sel.innerHTML='<option value="">— aucune (coche manuelle) —</option>'+cats.map(c=>`<option${c===prev?' selected':''}>${escH(c)}</option>`).join('');
+  if(prev) sel.value=prev;
+}
+// Un frais est-il rattaché à ce dossier ? (par ID CRM)
+function fraisOfDossier(d){ const cid=(d.crm_id||'').toString().trim(); if(!cid) return []; return (window._frais||[]).filter(f=>(f.dossier_crm_id||'').toString().trim()===cid); }
+// Élément auto-satisfait : au moins un frais lié de la catégorie de l'élément
+function checkAuto(d,item){ if(!item.categorie) return false; return fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie); }
+function checkManual(d,item){ const s=(window._checkState||[]).find(x=>x.dossier_id===d.id&&x.item_id===item.id); return !!(s&&s.checked); }
+function checkDone(d,item){ return checkAuto(d,item)||checkManual(d,item); }
+function renderCheckItemsList(){
+  const box=document.getElementById('check-items-list'); if(!box) return;
+  const items=window._checkItems||[];
+  if(!items.length){ box.innerHTML='<div class="fiche-empty">Aucun élément. Ajoute ce que tu veux vérifier sur tes dossiers (ex. « Facture matériel »).</div>'; return; }
+  box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Élément</th><th>Coché auto. par</th><th></th></tr></thead><tbody>'+
+    items.map(i=>`<tr><td><b>${escH(i.nom)}</b></td><td>${i.categorie?`<span class="pill">🧾 ${escH(i.categorie)}</span>`:'<span style="color:var(--muted)">coche manuelle</span>'}</td>
+      <td class="num"><button class="btn danger small" onclick="delCheckItem('${i.id}')">Suppr.</button></td></tr>`).join('')+
+    '</tbody></table></div>';
+}
+function renderCheck(){
+  renderCheckItemsList();
+  const head=document.getElementById('check-head'), body=document.getElementById('check-body'); if(!head||!body) return;
+  const items=window._checkItems||[];
+  head.innerHTML=`<th>Date</th><th>ID</th><th>Client</th>`+items.map(i=>`<th class="num" title="${escH(i.nom)}">${escH(i.nom)}</th>`).join('')+`<th class="num">Progression</th>`;
+  const term=(document.getElementById('check-search')||{}).value||'';
+  const rows=(window._dossiers||[]).filter(d=>matchSearch(term,[fdate(d.date),d.crm_id,d.nom_client,d.ville,d.numero_depot].join(' ')));
+  if(!items.length){ body.innerHTML=`<tr><td colspan="4" class="empty">Ajoute d'abord des éléments à vérifier ci-dessus.</td></tr>`; return; }
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="${items.length+4}" class="empty">${term?'Aucun dossier trouvé':'Aucun dossier'}</td></tr>`; return; }
+  body.innerHTML=rows.map(d=>{
+    let done=0;
+    const cells=items.map(i=>{
+      const auto=checkAuto(d,i), on=auto||checkManual(d,i); if(on) done++;
+      if(auto) return `<td class="num"><span class="chk-auto" title="Coché automatiquement (frais ${escH(i.categorie)} rattaché)">✅ auto</span></td>`;
+      return `<td class="num"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
+    }).join('');
+    const pct=items.length?Math.round(done/items.length*100):0;
+    const prog=`<div class="chk-prog"><div class="chk-prog-bar" style="width:${pct}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span>`;
+    return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${escH(d.nom_client||'')}</td>${cells}<td class="num">${prog}</td></tr>`;
+  }).join('');
+}
+async function addCheckItem(e){
+  e.preventDefault();
+  const nom=(document.getElementById('ci-nom').value||'').trim(); if(!nom){ toast('Indique un nom'); return; }
+  const categorie=(document.getElementById('ci-cat').value||'')||null;
+  const ordre=(window._checkItems||[]).length;
+  const {error}=await db.from('engco_check_items').insert({nom,categorie,ordre});
+  if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('ci-nom').value=''; document.getElementById('ci-cat').value='';
+  toast('Élément ajouté ✅'); loadCheck();
+}
+async function delCheckItem(id){
+  if(!confirm('Supprimer cet élément de la check-list ?')) return;
+  const {error}=await db.from('engco_check_items').delete().eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('Supprimé'); loadCheck();
+}
+async function toggleCheckState(dossierId,itemId,checked){
+  const {error}=await db.from('engco_check_state').upsert({dossier_id:dossierId,item_id:itemId,checked,updated_at:new Date().toISOString()},{onConflict:'dossier_id,item_id'});
+  if(error){ toast('Erreur : '+error.message); return; }
+  const st=window._checkState||[]; const ex=st.find(x=>x.dossier_id===dossierId&&x.item_id===itemId);
+  if(ex) ex.checked=checked; else st.push({dossier_id:dossierId,item_id:itemId,checked});
+  window._checkState=st;
 }
 
 // ===== Tableau de bord =====
