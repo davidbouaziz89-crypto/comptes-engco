@@ -372,12 +372,13 @@
       <h2>Ajouter un frais / une dépense</h2>
       <div class="hint">Dépenses hors dossier. Si ça concerne une régie, indique le % refacturé.</div>
       <form class="row" onsubmit="addFrais(event)">
-        <div class="field"><label>Date</label><input type="date" id="f-date" required></div>
+        <div class="field"><label>Date d'ajout</label><input type="date" id="f-date" required></div>
+        <div class="field"><label>Mois concerné</label><input type="month" id="f-mois"></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
         <div class="field" id="f-dossier-field" style="display:none"><label>Dossier lié (ID CRM)</label><input type="text" id="f-dossier" placeholder="ex. 12345 — laisser vide si hors dossier"></div>
         <div class="field"><label>Fournisseur</label><input type="text" id="f-fournisseur" placeholder="nom du fournisseur"></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source"></select></div>
-        <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00" required oninput="fraisPreview()"></div>
+        <div class="field"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" required oninput="fraisPreview()"></div>
         <div class="field"><label>Régie concernée</label><input type="text" id="f-regie" placeholder="ex. JO, ADN…"></div>
         <div class="field"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
         <div class="field" id="f-doc-field" style="display:none"><label>Justificatif (facture, document)</label><input type="file" id="f-doc" accept="image/*,.pdf"><div class="hint" id="f-doc-current" style="display:none;margin-top:4px"></div></div>
@@ -1186,21 +1187,24 @@ async function loadFrais(){
   if(error){showError(error);return;}
   window._frais=data||[]; renderFrais(); refreshDashboard(); renderRegies(); checkMissingRecurrents();
 }
+function fraisMonth(f){ return (f&&f.mois_concerne)||((f&&f.date||'').slice(0,7)); } // 'YYYY-MM' concerné
+function moisConcerneLabel(f){ const m=fraisMonth(f); return m?moisLabel(m+'-01'):''; }
 function renderFrais(){
   const led=!!(PROJ&&PROJ.key==='led');
   const df=document.getElementById('f-dossier-field'); if(df) df.style.display=led?'':'none';
   const ddf=document.getElementById('f-doc-field'); if(ddf) ddf.style.display=led?'':'none';
   const nd=document.getElementById('nav-documents'); if(nd) nd.style.display=led?'':'none';
+  const fm=document.getElementById('f-mois'); if(fm&&!fm.value) fm.value=today().slice(0,7);
   const term=(document.getElementById('frais-search')||{}).value||'';
   const rows=(window._frais||[]).filter(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
-    return matchSearch(term,[fdate(f.date),moisLabel(f.date),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,f.dossier_crm_id].join(' '));
+    return matchSearch(term,[fdate(f.date),moisConcerneLabel(f),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,f.dossier_crm_id].join(' '));
   });
   document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
     const dtag=f.dossier_crm_id?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier lié (ID CRM)">🔗 ${escH(f.dossier_crm_id)}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
-    return `<tr><td>${fdate(f.date)}</td><td>${moisLabel(f.date)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}${dtag}${doctag}</td><td>${f.fournisseur||''}</td>
+    return `<tr><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}${dtag}${doctag}</td><td>${f.fournisseur||''}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
@@ -1474,6 +1478,7 @@ let editingFraisId=null;
 function editFrais(id){
   const f=(window._frais||[]).find(x=>x.id===id); if(!f) return;
   document.getElementById('f-date').value=f.date||today();
+  document.getElementById('f-mois').value=f.mois_concerne||((f.date||'').slice(0,7));
   const csel=document.getElementById('f-categorie');
   if(f.categorie && ![...csel.options].some(o=>o.value===f.categorie)) csel.insertAdjacentHTML('afterbegin',`<option>${f.categorie}</option>`);
   csel.value=f.categorie||'Autre';
@@ -1494,6 +1499,7 @@ function editFrais(id){
 function cancelEditFrais(){
   editingFraisId=null;
   ['f-fournisseur','f-montant','f-regie','f-dossier','f-doc'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  { const fm=document.getElementById('f-mois'); if(fm) fm.value=today().slice(0,7); }
   { const cur=document.getElementById('f-doc-current'); if(cur){ cur.style.display='none'; cur.innerHTML=''; } }
   document.getElementById('f-pct').value='0'; document.getElementById('f-preview').innerHTML='';
   document.getElementById('f-savebtn').textContent='+ Enregistrer le frais';
@@ -1503,6 +1509,7 @@ async function addFrais(e){
   e.preventDefault();
   const montant=Number(document.getElementById('f-montant').value); if(!montant){toast('Indique un montant');return;}
   const row={ date:document.getElementById('f-date').value||today(), categorie:document.getElementById('f-categorie').value,
+    mois_concerne:document.getElementById('f-mois').value||null,
     fournisseur:document.getElementById('f-fournisseur').value||null, montant,
     source_id:document.getElementById('f-source').value||null, regie_concernee:document.getElementById('f-regie').value||null,
     pct_decompte:Number(document.getElementById('f-pct').value)||0 };
@@ -1518,8 +1525,8 @@ async function addFrais(e){
     }
   }
   if(!editingFraisId){
-    const ym=(row.date||'').slice(0,7);
-    const dup=(window._frais||[]).find(f=>(f.date||'').slice(0,7)===ym && Number(f.montant)===Number(row.montant));
+    const ym=row.mois_concerne||(row.date||'').slice(0,7);
+    const dup=(window._frais||[]).find(f=>fraisMonth(f)===ym && Number(f.montant)===Number(row.montant));
     if(dup){
       const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais du MÊME montant ('+eur(row.montant)+') existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+(dup.libelle||dup.categorie||'')+(dup.fournisseur?' — '+dup.fournisseur:'')+' le '+fdate(dup.date)+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
       if(!ok) return;
@@ -1642,7 +1649,7 @@ function checkMissingRecurrents(){
   const recs=(window._recurrents||[]).filter(r=>r.actif!==false), frais=window._frais||[];
   const now=new Date(), curY=now.getFullYear(), curM=now.getMonth(); const missing=[];
   recs.forEach(r=>{ if(!r.mois_debut) return; const st=new Date(r.mois_debut+'T00:00:00'); let y=st.getFullYear(),m=st.getMonth(); const mm=[]; let g=0;
-    while((y<curY||(y===curY&&m<=curM))&&g<600){ g++; const has=frais.some(f=>{ if((f.categorie||'')!==r.libelle) return false; const fd=new Date((f.date||'')+'T00:00:00'); return fd.getFullYear()===y&&fd.getMonth()===m; }); if(!has) mm.push(new Date(y,m,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})); m++; if(m>11){m=0;y++;} }
+    while((y<curY||(y===curY&&m<=curM))&&g<600){ g++; const ym=y+'-'+String(m+1).padStart(2,'0'); const has=frais.some(f=>(f.categorie||'')===r.libelle && fraisMonth(f)===ym); if(!has) mm.push(new Date(y,m,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})); m++; if(m>11){m=0;y++;} }
     if(mm.length) missing.push(`<b>${r.libelle}</b> : ${mm.join(', ')}`);
   });
   if(missing.length){ el.style.display='block'; el.innerHTML='⚠️ Frais mensuels manquants — '+missing.join(' &nbsp;•&nbsp; '); } else { el.style.display='none'; }
