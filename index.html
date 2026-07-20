@@ -578,14 +578,25 @@
   <div id="tab-check" class="hidden">
     <section class="panel panel-wide">
       <h2>✅ Check-list des dossiers</h2>
-      <div class="hint" style="margin-bottom:10px">Choisis les colonnes à afficher. Les colonnes de <b>check</b> (paramétrées dans ⚙️ Paramètres → Check) se cochent toutes seules quand un frais de la catégorie liée est rattaché au dossier (par son ID CRM).</div>
-      <div class="check-cols" id="check-cols"></div>
-      <div class="search-box" style="margin-top:12px"><span class="ic">🔎</span><input type="text" id="check-search" placeholder="Rechercher un dossier (client, ID, ville…)" oninput="renderCheck()"></div>
+      <div class="hint" style="margin-bottom:10px">Les colonnes de <b>check</b> (paramétrées dans ⚙️ Paramètres → Check) se cochent toutes seules quand un frais de la catégorie liée est rattaché au dossier (par son ID CRM).</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn ghost" type="button" onclick="openCheckColsModal()">🧩 Colonnes <span id="check-cols-count" class="pill" style="margin-left:6px"></span></button>
+        <div class="search-box" style="margin:0;flex:1;min-width:220px"><span class="ic">🔎</span><input type="text" id="check-search" placeholder="Rechercher un dossier (client, ID, ville…)" oninput="renderCheck()"></div>
+      </div>
       <div class="table-wrap"><table id="check-table">
         <thead><tr id="check-head"></tr></thead>
         <tbody id="check-body"></tbody>
       </table></div>
     </section>
+    <!-- Popup de choix des colonnes -->
+    <div id="check-cols-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeCheckColsModal()">
+      <div class="modal-card">
+        <div class="modal-head"><h3>🧩 Colonnes à afficher</h3><button class="btn ghost small" type="button" onclick="closeCheckColsModal()">✕</button></div>
+        <div class="hint" style="margin-bottom:12px">Coche les colonnes que tu veux voir dans la liste. Ton choix est mémorisé.</div>
+        <div class="check-cols" id="check-cols"></div>
+        <div style="margin-top:18px;text-align:right"><button class="btn" type="button" onclick="closeCheckColsModal()">Fermer</button></div>
+      </div>
+    </div>
   </div>
 
   <!-- PARAMÈTRES (menu latéral) -->
@@ -1717,9 +1728,13 @@ function getCheckCols(){ try{ const v=localStorage.getItem(checkColsKey()); if(v
 function setCheckCols(a){ try{ localStorage.setItem(checkColsKey(),JSON.stringify(a)); }catch(e){} }
 function toggleCheckCol(key){ let cols=getCheckCols(); cols=cols.includes(key)?cols.filter(k=>k!==key):[...cols,key]; setCheckCols(cols); renderCheck(); }
 function renderCheckCols(){
-  const box=document.getElementById('check-cols'); if(!box) return; const sel=getCheckCols();
+  const sel=getCheckCols();
+  const cnt=document.getElementById('check-cols-count'); if(cnt) cnt.textContent=sel.length;
+  const box=document.getElementById('check-cols'); if(!box) return;
   box.innerHTML=CHECK_COL_DEFS.map(c=>`<label class="col-chip${sel.includes(c.key)?' on':''}"><input type="checkbox" ${sel.includes(c.key)?'checked':''} onchange="toggleCheckCol('${c.key}')"> ${escH(c.label)}</label>`).join('');
 }
+function openCheckColsModal(){ renderCheckCols(); const m=document.getElementById('check-cols-modal'); if(m) m.classList.remove('hidden'); }
+function closeCheckColsModal(){ const m=document.getElementById('check-cols-modal'); if(m) m.classList.add('hidden'); }
 function renderCheck(){
   renderCheckCols();
   const head=document.getElementById('check-head'), body=document.getElementById('check-body'); if(!head||!body) return;
@@ -1751,7 +1766,7 @@ async function addCheckItem(e){
   const categorie=(document.getElementById('ci-cat').value||'')||null;
   const ordre=(window._checkItems||[]).length;
   const {error}=await db.from('engco_check_items').insert({nom,categorie,ordre});
-  if(error){ toast('Erreur : '+error.message); return; }
+  if(error){ const m=/relation|does not exist|schema cache|not find/i.test(error.message||'')?'Les tables Check ne sont pas encore créées — exécute sql/engco-check.sql dans Supabase.':error.message; toast('Erreur : '+m); return; }
   document.getElementById('ci-nom').value=''; document.getElementById('ci-cat').value='';
   toast('Élément ajouté ✅'); loadCheck();
 }
