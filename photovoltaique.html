@@ -566,6 +566,7 @@
           <button data-ps="sources" onclick="showParam('sources')">📥 Sources de leads</button>
           <button data-ps="frais" onclick="showParam('frais')">💸 Catégories de frais</button>
           <button data-ps="associes" onclick="showParam('associes')">🤝 Associés</button>
+          <button data-ps="emails" onclick="showParam('emails')">📧 Emails</button>
           <button data-ps="docs" onclick="showParam('docs')">📄 Types de documents</button>
         </div>
         <div class="params-content">
@@ -659,6 +660,17 @@
                 <button class="btn small" type="submit">Ajouter</button>
               </form>
               <div id="assoc-list"></div>
+            </section>
+          </div>
+          <div class="params-sec" id="ps-emails">
+            <section class="panel"><h2>📧 Envoi d'emails</h2>
+              <div class="hint" style="margin-bottom:10px">Les emails sont envoyés via Resend depuis <b>ProFormationPlus &lt;noreply@leadscall-ia.com&gt;</b>. Sers-toi de ce testeur pour vérifier que tout fonctionne.</div>
+              <div class="row">
+                <div class="field"><label>Destinataire</label><input type="email" id="mail-to" placeholder="email@exemple.fr"></div>
+                <div class="field"><label>Sujet</label><input id="mail-subject" value="Test d'envoi CRM"></div>
+              </div>
+              <label>Message</label><textarea id="mail-body" rows="4">Ceci est un test d'envoi depuis le CRM Photovoltaïque. Si tu reçois ce message, tout fonctionne ✅</textarea>
+              <div style="margin-top:10px"><button class="btn" id="mail-send-btn" onclick="sendTestEmail()">📧 Envoyer le test</button></div>
             </section>
           </div>
           <div class="params-sec" id="ps-docs">
@@ -790,6 +802,20 @@
 const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+// Envoi d'email via l'edge function partagée « send-email » (Resend).
+async function sendEmail(opts){
+  const {data:{session}}=await db.auth.getSession();
+  const token=session&&session.access_token;
+  if(!token) throw new Error('Non connecté');
+  const res=await fetch(SUPABASE_URL+'/functions/v1/send-email',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify(opts)
+  });
+  let out={}; try{ out=await res.json(); }catch(e){}
+  if(!res.ok) throw new Error(out.error||('Échec de l\'envoi ('+res.status+')'));
+  return out;
+}
 
 let SESSION=null, IS_ADMIN=false, MY_ROLE=null, MY_ROLES=[];
 let LEADS=[], STATUTS=[], SOURCES=[], CTYPES=[], DOCTYPES=[], PROFILES=[], SETTINGS={}, PRODUITS=[];
@@ -2136,6 +2162,19 @@ async function addCqStatut(e){
 function showParam(key){
   document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.ps===key));
   document.querySelectorAll('#tab-params .params-sec').forEach(s=>s.classList.toggle('active',s.id==='ps-'+key));
+  if(key==='emails'){ const mt=document.getElementById('mail-to'); if(mt&&!mt.value&&SESSION) mt.value=SESSION.user.email||''; }
+}
+async function sendTestEmail(){
+  const to=document.getElementById('mail-to').value.trim();
+  if(!to){ toast('Indique un destinataire'); return; }
+  const subject=document.getElementById('mail-subject').value.trim()||'Test CRM';
+  const body=document.getElementById('mail-body').value;
+  const btn=document.getElementById('mail-send-btn'), old=btn.textContent; btn.disabled=true; btn.textContent='Envoi…';
+  try{
+    await sendEmail({to,subject,html:`<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;color:#1a2230;white-space:pre-wrap">${esc(body)}</div>`});
+    toast('Email envoyé ✓');
+  }catch(e){ toast('Erreur : '+e.message); }
+  btn.disabled=false; btn.textContent=old;
 }
 let PROD_EDIT=new Set();
 function renderProduits(){
