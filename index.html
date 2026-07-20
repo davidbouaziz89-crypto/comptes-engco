@@ -388,6 +388,17 @@
     </section>
   </div>
 
+  <!-- DÉTAIL DOSSIER (LED) -->
+  <div id="dossier-detail" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;align-items:flex-start;justify-content:center;padding:24px;overflow:auto">
+    <div class="panel" style="max-width:760px;width:100%;margin:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <h2 id="dd-title" style="margin:0;flex:1">Détail du dossier</h2>
+        <button class="btn ghost small" onclick="closeDossierDetail()">✕ Fermer</button>
+      </div>
+      <div id="dd-body"></div>
+    </div>
+  </div>
+
   <!-- STATUTS -->
   <div id="tab-statuts" class="hidden">
     <section class="panel">
@@ -1048,13 +1059,46 @@ function renderDossiers(){
   let html=shown.map(d=>{
     const reg=`${d.commercial_regie||'—'}${velo?(d.regie_interne?` <span style="color:var(--muted);font-size:11px">(interne)</span>`:''):(d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:'')}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
-    const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num"><button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
+    const detailBtn=velo?'':`<button class="btn ghost small" onclick="openDossierDetail('${d.id}')" title="Détail du dossier & frais liés">📄</button> `;
+    const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num">${detailBtn}<button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
     return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
   }).join('');
   if(rows.length>shown.length) html+=`<tr><td colspan="${velo?13:12}" class="empty">${shown.length} dossiers affichés sur ${rows.length}. Affine ta recherche (client, ville, ID…) pour voir les autres.</td></tr>`;
   body.innerHTML=html;
 }
+// Détail d'un dossier (LED) : montant + frais liés (factures) + net
+function openDossierDetail(id){
+  const d=(window._dossiers||[]).find(x=>x.id===id); if(!d) return;
+  const cid=(d.crm_id||'').toString().trim();
+  const linked=(window._frais||[]).filter(f=>cid && (f.dossier_crm_id||'').toString().trim()===cid);
+  const totalFrais=linked.reduce((s,f)=>s+Number(f.montant||0),0);
+  const prime=Number(d.montant_prime||0), net=prime-totalFrais;
+  const couts=[['Matériel',d.cout_materiel],['Installation',d.cout_installation],['Nacelle',d.cout_nacelle],['Audit',d.cout_audit],['Livraison',d.cout_livraison],['Frais supp.',d.frais_supp],['Coût manager',d.cout_david]].filter(x=>Number(x[1]||0)!==0);
+  document.getElementById('dd-title').innerHTML=`📄 ${escH(d.nom_client||'Dossier')}${cid?` — <a href="${crmLink(cid)||'#'}" target="_blank" rel="noopener">${escH(cid)} ↗</a>`:''}`;
+  let h=`<div class="hint" style="margin-bottom:10px">${fdate(d.date)}${d.numero_depot?(' · Dépôt '+escH(d.numero_depot)):''} · ${statutBadge(d.statut)}</div>`;
+  h+=`<div class="row" style="gap:10px;margin-bottom:12px">
+    <div class="card" style="flex:1"><div class="label">Montant (prime)</div><div class="value val-good">${eur(prime)}</div></div>
+    <div class="card" style="flex:1"><div class="label">Frais liés (${linked.length})</div><div class="value val-bad">${eur(totalFrais)}</div></div>
+    <div class="card" style="flex:1"><div class="label">Net (prime − frais liés)</div><div class="value ${net>=0?'val-good':'val-bad'}"><b>${eur(net)}</b></div></div>
+  </div>`;
+  h+=`<h3 style="margin:10px 0 6px">Frais / factures liés à ce dossier</h3>`;
+  if(!cid){ h+=`<div class="hint">Renseigne l'<b>ID CRM</b> de ce dossier (via ✏️) pour pouvoir y rattacher des frais.</div>`; }
+  else if(!linked.length){ h+=`<div class="hint">Aucun frais lié pour l'instant. À l'ajout d'un frais, indique l'ID CRM <b>${escH(cid)}</b> dans « Dossier lié ».</div>`; }
+  else{
+    h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th class="num">Montant</th></tr></thead><tbody>`
+      +linked.map(f=>`<tr><td>${fdate(f.date)}</td><td><span class="pill">${escH(f.categorie||'')}</span></td><td>${escH(f.libelle||'')}</td><td>${escH(f.fournisseur||'')}</td><td class="num">${eur(f.montant)}</td></tr>`).join('')
+      +`<tr><td colspan="4" class="num"><b>Total frais liés</b></td><td class="num val-bad"><b>${eur(totalFrais)}</b></td></tr></tbody></table></div>`;
+  }
+  if(couts.length){
+    h+=`<h3 style="margin:14px 0 6px">Coûts déclarés dans la fiche</h3><div class="table-wrap"><table><tbody>`
+      +couts.map(c=>`<tr><td>${c[0]}</td><td class="num">${eur(c[1])}</td></tr>`).join('')
+      +`</tbody></table></div><div class="hint" style="margin-top:6px">Marge nette calculée du dossier : <b class="${d.marge_nette>=0?'val-good':'val-bad'}">${eur(d.marge_nette)}</b></div>`;
+  }
+  document.getElementById('dd-body').innerHTML=h;
+  document.getElementById('dossier-detail').style.display='flex';
+}
+function closeDossierDetail(){ document.getElementById('dossier-detail').style.display='none'; }
 async function loadRemboursements(){
   const {data,error}=await db.from(T('remboursements')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
