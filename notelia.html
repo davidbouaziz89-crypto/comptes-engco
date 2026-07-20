@@ -95,6 +95,8 @@
   tr.filter-row th{padding-top:4px;padding-bottom:8px}
   tr.filter-row input,tr.filter-row select{padding:5px 7px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
   tr.totals-row td{border-top:2px solid var(--accent);font-weight:700;background:rgba(99,102,241,.06)}
+  tr.inline-edit-row>td{padding:0;background:transparent}
+  tr.inline-edit-row .panel,tr.inline-edit-row section.panel{margin:6px 0;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow);white-space:normal}
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -353,7 +355,7 @@
     <section class="panel">
       <h2>💸 Récupérations d'argent</h2>
       <div class="hint">Quand un associé retire de l'argent de la boîte (récupère une partie de son investissement).</div>
-      <form class="row" onsubmit="addRemboursement(event)">
+      <form class="row" id="remb-form" onsubmit="addRemboursement(event)">
         <div class="field"><label>Date</label><input type="date" id="r-date" required></div>
         <div class="field"><label>Qui récupère ?</label><select id="r-benef" required></select></div>
         <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="r-montant" placeholder="0.00" required></div>
@@ -376,7 +378,7 @@
       <button class="btn small" onclick="document.getElementById('imp-dossiers').click()">⬆️ Importer</button>
       <input type="file" id="imp-dossiers" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('dossiers',this.files[0]);this.value='';">
     </section>
-    <section class="panel">
+    <section class="panel" id="dossier-form-panel">
       <h2>Ajouter un dossier</h2>
       <div class="hint" id="dossier-hint"></div>
       <div id="dossier-fields"></div>
@@ -405,7 +407,7 @@
     <section class="panel">
       <h2 id="rg-title">⚙️ Régies configurées</h2>
       <div class="hint" id="rg-hint"></div>
-      <form class="row" onsubmit="addRegieConfig(event)">
+      <form class="row" id="regie-form" onsubmit="addRegieConfig(event)">
         <div class="field"><label>Nom de la régie</label><input type="text" id="rg-nom" placeholder="ex. JO" required></div>
         <span id="rg-extra-fields" style="display:contents"></span>
         <div class="field"><button class="btn" type="submit" id="rg-savebtn">+ Ajouter</button></div>
@@ -444,7 +446,7 @@
       <button class="btn small" onclick="document.getElementById('imp-apports').click()">⬆️ Importer</button>
       <input type="file" id="imp-apports" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('apports',this.files[0]);this.value='';">
     </section>
-    <section class="panel">
+    <section class="panel" id="apport-form-panel">
       <h2>Ajouter un apport</h2>
       <div class="hint">L'argent entré, ou une dépense payée par une société (comptée comme un investissement).</div>
       <form class="row" onsubmit="addApport(event)">
@@ -637,7 +639,7 @@
     <section class="panel">
       <h2>🏷️ Statuts des dossiers</h2>
       <div class="hint">Crée tes propres statuts. « Compte comme » indique comment le tableau de bord classe le dossier : <b>Gagné</b> = compté dans le résultat et ce qui se partage ; <b>En cours</b> = potentiel (pas encore compté) ; <b>Perdu</b> = mis de côté.</div>
-      <form class="row" onsubmit="addStatut(event)">
+      <form class="row" id="statut-form" onsubmit="addStatut(event)">
         <div class="field"><label>Nom du statut</label><input type="text" id="st-nom" placeholder="ex. Signé, En attente…" required></div>
         <div class="field"><label>Compte comme</label><select id="st-cat"><option value="realise">✅ Gagné / validé</option><option value="potentiel">⏳ En cours (potentiel)</option><option value="perdu">❌ Perdu</option></select></div>
         <div class="field"><button class="btn" type="submit" id="st-savebtn">+ Ajouter</button></div>
@@ -655,7 +657,7 @@
     <section class="panel">
       <h2>Ajouter une source (société qui finance)</h2>
       <div class="hint">La répartition sera pré-remplie automatiquement quand tu choisis cette source dans un apport.</div>
-      <form class="row" onsubmit="addSource(event)">
+      <form class="row" id="source-form" onsubmit="addSource(event)">
         <div class="field"><label>Nom</label><input type="text" id="s-nom" placeholder="ex. DB Telecom" required></div>
         <span id="s-parts" style="display:contents"></span>
         <div class="field"><label>Devise</label><select id="s-devise"><option value="EUR">Euro (€)</option><option value="ILS">Shekel (₪)</option></select></div>
@@ -815,15 +817,17 @@ function fillStatutUI(){
 function renderStatutsConfig(){
   const body=document.getElementById('statuts-body'); if(!body) return;
   body.innerHTML=STATUTS_CFG.length? STATUTS_CFG.map(s=>`<tr><td>${statutBadge(s.nom)}</td><td>${STATUT_CAT_LABEL[s.categorie]||s.categorie}</td>
-    <td class="num">${s.id?`<button class="btn ghost small" onclick="editStatut('${s.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_statuts','${s.id}')">Suppr.</button>`:'<span style="color:var(--muted)">défaut</span>'}</td></tr>`).join('') : `<tr><td colspan="3" class="empty">Aucun statut</td></tr>`;
+    <td class="num">${s.id?`<button class="btn ghost small" onclick="editStatut('${s.id}',this)">✏️</button> <button class="btn danger small" onclick="delRow('app_statuts','${s.id}')">Suppr.</button>`:'<span style="color:var(--muted)">défaut</span>'}</td></tr>`).join('') : `<tr><td colspan="3" class="empty">Aucun statut</td></tr>`;
 }
-function editStatut(id){
+function editStatut(id,btn){
   const s=STATUTS_CFG.find(x=>x.id===id); if(!s) return;
   document.getElementById('st-nom').value=s.nom; document.getElementById('st-cat').value=s.categorie;
   editingStatutId=id; document.getElementById('st-savebtn').textContent='💾 Modifier'; document.getElementById('st-cancelbtn').style.display='';
+  inlineEditAtRow(document.getElementById('statut-form'),btn);
 }
 function cancelEditStatut(){
-  editingStatutId=null; document.getElementById('st-nom').value=''; document.getElementById('st-cat').value='potentiel';
+  editingStatutId=null; restoreInlineForm(document.getElementById('statut-form'));
+  document.getElementById('st-nom').value=''; document.getElementById('st-cat').value='potentiel';
   document.getElementById('st-savebtn').textContent='+ Ajouter'; document.getElementById('st-cancelbtn').style.display='none';
 }
 async function addStatut(e){
@@ -1239,7 +1243,7 @@ async function loadSources(){
   document.getElementById('sources-body').innerHTML = SOURCES.length? SOURCES.map(s=>`<tr>
     <td>${s.nom}</td>${as.map(a=>`<td class="num">${num(s['part_'+a.k])} %</td>`).join('')}
     <td><span class="pill">${s.devise==='ILS'?'Shekel ₪':'Euro €'}</span></td>
-    <td class="num"><button class="btn ghost small" onclick="editSource('${s.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('sources')}','${s.id}')">Suppr.</button></td>
+    <td class="num"><button class="btn ghost small" onclick="editSource('${s.id}',this)">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('sources')}','${s.id}')">Suppr.</button></td>
   </tr>`).join('') : `<tr><td colspan="${as.length+3}" class="empty">Aucune source</td></tr>`;
 }
 async function loadRegiesConfig(){
@@ -1256,9 +1260,9 @@ async function loadRegiesConfig(){
   if(!REGIES_CFG.length){ body.innerHTML=`<tr><td colspan="${velo?6:3}" class="empty">Aucune régie configurée</td></tr>`; return; }
   body.innerHTML=REGIES_CFG.map(r=> velo
     ? `<tr><td><b>${r.nom}</b></td><td class="num">${eur(r.montant_france)}</td><td class="num">${eur(r.montant_corse)}</td><td class="num">${eur(r.montant_domtom)}</td><td>${r.interne?'✅ Oui':'—'}</td>
-        <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td></tr>`
+        <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}',this)">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td></tr>`
     : `<tr><td><b>${r.nom}</b></td><td class="num">${num(r.pct_defaut)} %</td>
-        <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td></tr>`
+        <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}',this)">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td></tr>`
   ).join('');
 }
 // Frais : quand on choisit une régie, le % refacturé vient de la régie (paramètres)
@@ -1286,7 +1290,7 @@ function onDossierRegie(){
   dossierPreview();
 }
 let editingRegieCfgId=null;
-function editRegieCfg(id){
+function editRegieCfg(id,btn){
   const r=REGIES_CFG.find(x=>x.id===id); if(!r) return;
   document.getElementById('rg-nom').value=r.nom;
   if(PROJ.dossierType==='velo'){
@@ -1299,9 +1303,11 @@ function editRegieCfg(id){
   editingRegieCfgId=id;
   document.getElementById('rg-savebtn').textContent='💾 Modifier';
   document.getElementById('rg-cancelbtn').style.display='';
+  inlineEditAtRow(document.getElementById('regie-form'),btn);
 }
 function cancelEditRegieCfg(){
   editingRegieCfgId=null;
+  restoreInlineForm(document.getElementById('regie-form'));
   document.getElementById('rg-nom').value='';
   ['rg-pct','rg-mf','rg-mc','rg-md'].forEach(i=>{const el=document.getElementById(i); if(el) el.value='0';});
   const ci=document.getElementById('rg-interne'); if(ci) ci.checked=false;
@@ -1343,7 +1349,7 @@ function renderApports(){
       <td class="num">${num(ap.montant_depense)} ${ap.devise==='ILS'?'₪':'€'}</td>
       <td class="num">${num(ap.pourcentage_compte)} %</td><td class="num">${eur(ap.montant_eur)}</td>
       ${as.map(a=>`<td class="num">${eur(ap['montant_'+a.k])}</td>`).join('')}
-      <td class="num"><button class="btn ghost small" onclick="editApport('${ap.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('apports')}','${ap.id}')">Suppr.</button></td></tr>`;
+      <td class="num"><button class="btn ghost small" onclick="editApport('${ap.id}',this)">✏️</button> <button class="btn danger small" onclick="delRow('${T('apports')}','${ap.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="${as.length+8}" class="empty">${term?'Aucun apport ne correspond à la recherche':'Aucun apport'}</td></tr>`;
 }
 async function loadDossiers(){
@@ -1395,7 +1401,7 @@ function renderDossiers(){
     const reg=`${d.commercial_regie||'—'}${velo?(d.regie_interne?` <span style="color:var(--muted);font-size:11px">(interne)</span>`:''):(d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:'')}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
     const detailBtn=velo?'':`<button class="btn ghost small" onclick="openDossierDetail('${d.id}')" title="Détail du dossier & frais liés">📄</button> `;
-    const tail=`<td class="num">${eur(d.marge_brute)}</td>${velo?`<td class="num">${manager}</td>`:''}<td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num">${detailBtn}<button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
+    const tail=`<td class="num">${eur(d.marge_brute)}</td>${velo?`<td class="num">${manager}</td>`:''}<td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num">${detailBtn}<button class="btn ghost small" onclick="editDossier('${d.id}',this)">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
     if(PROJ.dossierType==='telecom'){
       const ls=(window._leaseurs||[]).find(x=>x.id===d.leaseur_id);
@@ -1446,7 +1452,7 @@ async function loadRemboursements(){
   if(error){showError(error);return;}
   document.getElementById('remb-body').innerHTML=(data&&data.length)? data.map(r=>`<tr>
     <td>${fdate(r.date)}</td><td>${r.beneficiaire}</td><td class="num">${eur(r.montant)}</td><td>${r.note||''}</td>
-    <td class="num"><button class="btn ghost small" onclick="editRemboursement('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('remboursements')}','${r.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune récupération</td></tr>`;
+    <td class="num"><button class="btn ghost small" onclick="editRemboursement('${r.id}',this)">✏️</button> <button class="btn danger small" onclick="delRow('${T('remboursements')}','${r.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune récupération</td></tr>`;
   window._remb=data||[]; refreshDashboard();
 }
 async function loadFrais(){
@@ -1912,7 +1918,23 @@ function apportPreview(){
   document.getElementById('a-preview').innerHTML=`Montant compté : <b>${eur(compte)}</b>${note} &nbsp;→&nbsp; ${parts}`;
 }
 let editingApportId=null;
-function editApport(id){
+// ===== Édition inline générique : déplace le formulaire juste sous la ligne cliquée =====
+function inlineEditAtRow(panel,btn){
+  if(!panel||!btn) return false;
+  const tr=btn.closest('tr'); if(!tr) return false;
+  if(window._inlineHolder){ try{window._inlineHolder.remove();}catch(e){} window._inlineHolder=null; }
+  if(!panel._slot){ panel._slot=document.createComment('inline-form-slot'); panel.parentNode.insertBefore(panel._slot,panel); }
+  const holder=document.createElement('tr'); holder.className='inline-edit-row';
+  const td=document.createElement('td'); td.colSpan=tr.children.length||99; td.appendChild(panel); holder.appendChild(td);
+  tr.after(holder); window._inlineHolder=holder;
+  setTimeout(()=>{ try{panel.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(e){} },30);
+  return true;
+}
+function restoreInlineForm(panel){
+  if(panel&&panel._slot){ panel._slot.parentNode.insertBefore(panel,panel._slot); panel._slot.remove(); panel._slot=null; }
+  if(window._inlineHolder){ try{window._inlineHolder.remove();}catch(e){} window._inlineHolder=null; }
+}
+function editApport(id,btn){
   const ap=(window._apports||[]).find(x=>x.id===id); if(!ap) return;
   document.getElementById('a-date').value=ap.date||today();
   document.getElementById('a-source').value=ap.source_id||'';
@@ -1928,10 +1950,12 @@ function editApport(id){
   document.getElementById('a-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('a-cancelbtn').style.display='';
   apportPreview();
-  document.getElementById('a-preview').scrollIntoView({behavior:'smooth',block:'center'});
+  if(!inlineEditAtRow(document.getElementById('apport-form-panel'),btn))
+    document.getElementById('a-preview').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function cancelEditApport(){
   editingApportId=null;
+  restoreInlineForm(document.getElementById('apport-form-panel'));
   document.getElementById('a-montant').value=''; document.getElementById('a-libelle').value='';
   document.getElementById('a-savebtn').textContent="+ Enregistrer l'apport";
   document.getElementById('a-cancelbtn').style.display='none';
@@ -1979,7 +2003,7 @@ function dossierPreview(){
     `<br>Marge nette : <b class="${nette>=0?'val-good':'val-bad'}" style="font-size:18px">${eur(nette)}</b> <span style="color:var(--muted)">(${A().map(a=>a.label+' '+eur(per)).join(' / ')})</span>`;
 }
 let editingDossierId=null;
-function editDossier(id){
+function editDossier(id,btn){
   const d=(window._dossiers||[]).find(x=>x.id===id); if(!d) return;
   const S=(i,val)=>{const el=document.getElementById(i); if(el) el.value=(val==null?'':val);};
   S('d-date',d.date||today()); S('d-client',d.nom_client); S('d-depot',d.numero_depot); S('d-crmid',d.crm_id); S('d-statut',d.statut||'En cours');
@@ -1996,10 +2020,12 @@ function editDossier(id){
   document.getElementById('d-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('d-cancelbtn').style.display='';
   dossierPreview();
-  document.getElementById('d-preview').scrollIntoView({behavior:'smooth',block:'center'});
+  if(!inlineEditAtRow(document.getElementById('dossier-form-panel'),btn))
+    document.getElementById('d-preview').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function cancelEditDossier(){
   editingDossierId=null;
+  restoreInlineForm(document.getElementById('dossier-form-panel'));
   ['d-client','d-depot','d-crmid','d-adresse','d-cp','d-ville','d-tel','d-email'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
   document.getElementById('d-commercial').value=''; document.getElementById('d-davidpct').value='5';
   const st=document.getElementById('d-statut'); if(st) st.value=(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours');
@@ -2041,7 +2067,7 @@ async function addDossier(e){
 
 // ===== Sources =====
 let editingSourceId=null;
-function editSource(id){
+function editSource(id,btn){
   const s=SOURCES.find(x=>x.id===id); if(!s) return;
   document.getElementById('s-nom').value=s.nom;
   A().forEach(a=>{ const el=document.getElementById('s-part-'+a.k); if(el) el.value=s['part_'+a.k]; });
@@ -2049,10 +2075,12 @@ function editSource(id){
   editingSourceId=id;
   document.getElementById('s-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('s-cancelbtn').style.display='';
-  document.getElementById('s-nom').scrollIntoView({behavior:'smooth',block:'center'});
+  if(!inlineEditAtRow(document.getElementById('source-form'),btn))
+    document.getElementById('s-nom').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function cancelEditSource(){
   editingSourceId=null;
+  restoreInlineForm(document.getElementById('source-form'));
   document.getElementById('s-nom').value='';
   A().forEach(a=>{ const el=document.getElementById('s-part-'+a.k); if(el) el.value='0'; });
   document.getElementById('s-savebtn').textContent='+ Ajouter';
@@ -2340,7 +2368,7 @@ function renderRegieDetail(){
 
 // ===== Remboursements =====
 let editingRembId=null;
-function editRemboursement(id){
+function editRemboursement(id,btn){
   const r=(window._remb||[]).find(x=>x.id===id); if(!r) return;
   document.getElementById('r-date').value=r.date||today();
   document.getElementById('r-benef').value=r.beneficiaire;
@@ -2349,9 +2377,11 @@ function editRemboursement(id){
   editingRembId=id;
   document.getElementById('r-savebtn').textContent='💾 Modifier';
   document.getElementById('r-cancelbtn').style.display='';
+  inlineEditAtRow(document.getElementById('remb-form'),btn);
 }
 function cancelEditRemboursement(){
   editingRembId=null;
+  restoreInlineForm(document.getElementById('remb-form'));
   document.getElementById('r-montant').value=''; document.getElementById('r-note').value='';
   document.getElementById('r-savebtn').textContent='+ Ajouter';
   document.getElementById('r-cancelbtn').style.display='none';
