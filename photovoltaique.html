@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CRM Photovoltaïque</title>
 <script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -12,13 +14,20 @@
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
     --accent:#f5a623;--accent2:#ff7a45;--good:#37d39b;--bad:#ff6b6b;--warn:#ffb454;
+    --font-display:"Space Grotesk","Segoe UI",system-ui,sans-serif;
+    --font-body:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",monospace;
+    --grad-accent:linear-gradient(135deg,var(--accent),var(--accent2));
+    --glow:0 0 0 1px color-mix(in srgb,var(--accent) 16%,transparent),0 14px 40px -18px color-mix(in srgb,var(--accent) 50%,transparent);
   }
   :root[data-theme="light"]{
     --bg:#f4f6fb;--panel:#ffffff;--panel2:#eef1f7;--line:#dde3ec;--txt:#1a2230;--muted:#5b6675;
     --accent:#e08e00;--accent2:#f4630a;--good:#16a34a;--bad:#dc2626;--warn:#d97706;
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+  body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--txt);-webkit-font-smoothing:antialiased}
+  h1,h2,h3,header h1,.authcard h1{font-family:var(--font-display);letter-spacing:-.2px}
+  .kpi .k-val,.b-val,td.num,.k-value{font-family:var(--font-mono)}
   .hidden{display:none!important}
   a{color:var(--accent)}
   .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(1200px 600px at 50% -10%,rgba(245,166,35,.15),transparent),var(--bg)}
@@ -403,6 +412,21 @@
   #toast.show{opacity:1}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:600px){.grid2{grid-template-columns:1fr}}
+  /* ===== Propagation design « Cockpit » (accent solaire) ===== */
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(60% 45% at 12% -5%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 60%),
+      radial-gradient(55% 45% at 95% 0%,color-mix(in srgb,var(--accent2) 12%,transparent),transparent 60%)}
+  header{position:relative;overflow:hidden}
+  header::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(115deg,transparent 30%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 62%,color-mix(in srgb,var(--accent2) 10%,transparent),transparent 85%);
+    background-size:250% 100%;animation:aurora 15s linear infinite}
+  @keyframes aurora{0%{background-position:0 0}100%{background-position:250% 0}}
+  header h1,header .spacer,header>*{position:relative}
+  .card,.panel{transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease)}
+  .kpi .k-val{letter-spacing:-.5px}
+  /* Édition inline : formulaire déplacé sous la ligne cliquée */
+  tr.inline-edit-row>td{padding:0;background:transparent}
+  tr.inline-edit-row .panel{margin:6px 0;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow)}
 </style>
 </head>
 <body>
@@ -518,7 +542,7 @@
         <div class="bcard"><div class="b-lab">Frais ce mois-ci</div><div class="b-val" id="fr-mois">—</div></div>
         <div class="bcard"><div class="b-lab">Nombre de frais</div><div class="b-val" id="fr-count">—</div></div>
       </div>
-      <section class="panel"><h2 id="fr-formtitle">➕ Ajouter un frais</h2>
+      <section class="panel" id="fr-form-panel"><h2 id="fr-formtitle">➕ Ajouter un frais</h2>
         <div class="hint" style="margin-bottom:10px">Une dépense de l'activité photovoltaïque. Le client est <b>optionnel</b> : renseigne-le seulement si le frais concerne un dossier précis.</div>
         <form class="row" onsubmit="saveFrais(event)">
           <div class="field sm"><label>Date</label><input type="date" id="fr-date" required></div>
@@ -2503,7 +2527,7 @@ function renderFrais(){
       <td class="hint">${f.lead_id?esc(fraisLeadName(f.lead_id)):'—'}</td>
       <td>${f.paye_par?esc(associeName(f.paye_par)||'—'):'<span class="hint">—</span>'}</td>
       <td class="num">${eur(f.montant)}</td>
-      <td class="num" style="white-space:nowrap"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️</button> <button class="btn danger small" onclick="delFrais('${f.id}')">Suppr.</button></td>
+      <td class="num" style="white-space:nowrap"><button class="btn ghost small" onclick="editFrais('${f.id}',this)">✏️</button> <button class="btn danger small" onclick="delFrais('${f.id}')">Suppr.</button></td>
     </tr>`).join(''):emptyRow(8,'💸','Aucun frais enregistré','Ajoutez votre première dépense avec le formulaire ci-dessus.'));
   renderRepartition();
 }
@@ -2527,7 +2551,23 @@ async function saveFrais(e){
   const {data}=await db.from('pv_frais').select('*').order('date',{ascending:false}); FRAIS=data||[];
   renderFrais(); toast(wasEdit?'Frais modifié ✓':'Frais ajouté ✓');
 }
-function editFrais(id){
+// ===== Édition inline générique : déplace le formulaire juste sous la ligne cliquée =====
+function inlineEditAtRow(panel,btn){
+  if(!panel||!btn) return false;
+  const tr=btn.closest('tr'); if(!tr) return false;
+  if(window._inlineHolder){ try{window._inlineHolder.remove();}catch(e){} window._inlineHolder=null; }
+  if(!panel._slot){ panel._slot=document.createComment('inline-form-slot'); panel.parentNode.insertBefore(panel._slot,panel); }
+  const holder=document.createElement('tr'); holder.className='inline-edit-row';
+  const td=document.createElement('td'); td.colSpan=tr.children.length||99; td.appendChild(panel); holder.appendChild(td);
+  tr.after(holder); window._inlineHolder=holder;
+  setTimeout(()=>{ try{panel.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(e){} },30);
+  return true;
+}
+function restoreInlineForm(panel){
+  if(panel&&panel._slot){ panel._slot.parentNode.insertBefore(panel,panel._slot); panel._slot.remove(); panel._slot=null; }
+  if(window._inlineHolder){ try{window._inlineHolder.remove();}catch(e){} window._inlineHolder=null; }
+}
+function editFrais(id,btn){
   const f=FRAIS.find(x=>x.id===id); if(!f) return;
   editingFraisId=id;
   document.getElementById('fr-date').value=(f.date||'').slice(0,10);
@@ -2542,10 +2582,12 @@ function editFrais(id){
   document.getElementById('fr-formtitle').textContent='✏️ Modifier le frais';
   document.getElementById('fr-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('fr-cancelbtn').style.display='';
-  document.getElementById('fr-formtitle').scrollIntoView({behavior:'smooth',block:'center'});
+  if(!inlineEditAtRow(document.getElementById('fr-form-panel'),btn))
+    document.getElementById('fr-formtitle').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function cancelEditFrais(){
   editingFraisId=null;
+  restoreInlineForm(document.getElementById('fr-form-panel'));
   ['fr-libelle','fr-fournisseur','fr-montant'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('fr-lead').value=''; document.getElementById('fr-paye').value='';
   document.getElementById('fr-date').value=new Date().toISOString().slice(0,10);
