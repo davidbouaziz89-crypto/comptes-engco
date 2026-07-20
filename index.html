@@ -56,6 +56,9 @@
   tr.rowedit input[type=date],tr.rowedit input[type=month]{min-width:132px}
   tr.rowedit input[type=file]{font-size:11px;padding:4px 6px}
   tr.rowedit .inline-secondary{margin-top:5px}
+  tr.filter-row th{padding-top:4px;padding-bottom:8px}
+  tr.filter-row input,tr.filter-row select{padding:5px 7px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
+  tr.totals-row td{border-top:2px solid var(--accent);font-weight:700;background:rgba(99,102,241,.06)}
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -400,8 +403,24 @@
       <h2>Historique des frais</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="frais-search" placeholder="Rechercher : payé par (ex. DB Telecom), fournisseur, catégorie, mois…" oninput="renderFrais()"></div>
       <div class="table-wrap"><table id="frais-table">
-        <thead><tr><th>Date</th><th>Mois</th><th>Ajout</th><th>Catégorie</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
+        <thead>
+        <tr><th>Date</th><th>Mois</th><th>Ajout</th><th>Catégorie</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr>
+        <tr class="filter-row">
+          <th><input type="text" id="frf-date" placeholder="filtrer…" oninput="renderFrais()"></th>
+          <th><select id="frf-mois" onchange="renderFrais()"><option value="">Tous</option></select></th>
+          <th><select id="frf-type" onchange="renderFrais()"><option value="">Tous</option><option value="auto">🤖 Auto</option><option value="manuel">✍️ Manuel</option></select></th>
+          <th><select id="frf-cat" onchange="renderFrais()"><option value="">Toutes</option></select></th>
+          <th><input type="text" id="frf-fourn" placeholder="filtrer…" oninput="renderFrais()"></th>
+          <th><select id="frf-source" onchange="renderFrais()"><option value="">Tous</option></select></th>
+          <th class="num"></th>
+          <th><select id="frf-regie" onchange="renderFrais()"><option value="">Toutes</option></select></th>
+          <th class="num"></th>
+          <th class="num"></th>
+          <th><button class="btn ghost small" type="button" onclick="resetFraisFilters()">Réinit.</button></th>
+        </tr>
+        </thead>
         <tbody id="frais-body"></tbody>
+        <tfoot><tr id="frais-totals" class="totals-row"></tr></tfoot>
       </table></div>
     </section>
   </div>
@@ -1208,11 +1227,8 @@ function renderFrais(){
   const ddf=document.getElementById('f-doc-field'); if(ddf) ddf.style.display=led?'':'none';
   const nd=document.getElementById('nav-documents'); if(nd) nd.style.display=led?'':'none';
   const fm=document.getElementById('f-mois'); if(fm&&!fm.value) fm.value=today().slice(0,7);
-  const term=(document.getElementById('frais-search')||{}).value||'';
-  const rows=(window._frais||[]).filter(f=>{
-    const src=SOURCES.find(s=>s.id===f.source_id);
-    return matchSearch(term,[fdate(f.date),moisConcerneLabel(f),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,f.dossier_crm_id].join(' '));
-  });
+  populateFraisFilters();
+  const rows=filterFraisRows();
   document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
     if(f.id===inlineFraisId) return fraisEditRow(f);
     const src=SOURCES.find(s=>s.id===f.source_id);
@@ -1224,7 +1240,62 @@ function renderFrais(){
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
       <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="11" class="empty">${term?'Aucun frais ne correspond à la recherche':'Aucun frais'}</td></tr>`;
+  }).join('') : `<tr><td colspan="11" class="empty">${fraisFiltersActive()?'Aucun frais ne correspond aux filtres':'Aucun frais'}</td></tr>`;
+  renderFraisTotals(rows);
+}
+// ----- Filtres par colonne + totaux de l'historique des frais -----
+function fraisFilterState(){
+  const g=id=>((document.getElementById(id)||{}).value||'');
+  return { term:g('frais-search'), date:g('frf-date').toLowerCase().trim(), mois:g('frf-mois'),
+    type:g('frf-type'), cat:g('frf-cat'), fourn:g('frf-fourn').toLowerCase().trim(),
+    source:g('frf-source'), regie:g('frf-regie') };
+}
+function fraisFiltersActive(){ const q=fraisFilterState(); return !!(q.term||q.date||q.mois||q.type||q.cat||q.fourn||q.source||q.regie); }
+function filterFraisRows(){
+  const q=fraisFilterState();
+  return (window._frais||[]).filter(f=>{
+    const src=SOURCES.find(s=>s.id===f.source_id);
+    if(q.term && !matchSearch(q.term,[fdate(f.date),moisConcerneLabel(f),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,f.dossier_crm_id].join(' '))) return false;
+    if(q.date && !((fdate(f.date)+' '+moisConcerneLabel(f)).toLowerCase().includes(q.date))) return false;
+    if(q.mois && fraisMonth(f)!==q.mois) return false;
+    if(q.type==='auto' && !f.auto) return false;
+    if(q.type==='manuel' && f.auto) return false;
+    if(q.cat && (f.categorie||'')!==q.cat) return false;
+    if(q.fourn && !((f.fournisseur||'').toLowerCase().includes(q.fourn))) return false;
+    if(q.source && (f.source_id||'')!==q.source) return false;
+    if(q.regie && (f.regie_concernee||'')!==q.regie) return false;
+    return true;
+  });
+}
+function populateFraisFilters(){
+  const frais=window._frais||[];
+  const fill=(id,items)=>{ const sel=document.getElementById(id); if(!sel) return; const prev=sel.value;
+    const first=sel.querySelector('option'); const firstHtml=first?first.outerHTML:'<option value="">Tous</option>';
+    sel.innerHTML=firstHtml+items.map(it=>`<option value="${escH(it.v)}"${it.v===prev?' selected':''}>${escH(it.l)}</option>`).join('');
+    sel.value=prev; };
+  const mois=[...new Set(frais.map(fraisMonth).filter(Boolean))].sort().reverse();
+  fill('frf-mois',mois.map(m=>({v:m,l:moisLabel(m+'-01')})));
+  const cats=[...new Set(frais.map(f=>f.categorie).filter(Boolean))].sort();
+  fill('frf-cat',cats.map(c=>({v:c,l:c})));
+  const srcIds=[...new Set(frais.map(f=>f.source_id).filter(Boolean))];
+  fill('frf-source',srcIds.map(id=>{ const s=SOURCES.find(x=>x.id===id); return {v:id,l:s?s.nom:id}; }));
+  const regies=[...new Set(frais.map(f=>f.regie_concernee).filter(Boolean))].sort();
+  fill('frf-regie',regies.map(r=>({v:r,l:r})));
+}
+function renderFraisTotals(rows){
+  const tr=document.getElementById('frais-totals'); if(!tr) return;
+  const sMontant=rows.reduce((s,f)=>s+Number(f.montant||0),0);
+  const sRefac=rows.reduce((s,f)=>s+Number(f.montant_regie||0),0);
+  const sSociete=rows.reduce((s,f)=>s+Number(f.montant_societe||0),0);
+  tr.innerHTML=`<td colspan="6">Σ TOTAL — ${rows.length} frais${fraisFiltersActive()?' (filtré)':''}</td>`+
+    `<td class="num">${eur(sMontant)}</td><td></td>`+
+    `<td class="num">${eur(sRefac)}</td>`+
+    `<td class="num val-bad">${eur(sSociete)}</td><td></td>`;
+}
+function resetFraisFilters(){
+  ['frais-search','frf-date','frf-fourn','frf-mois','frf-type','frf-cat','frf-source','frf-regie']
+    .forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  renderFrais();
 }
 // ----- Édition d'un frais directement sur sa ligne -----
 function fraisCatOptions(cur){
