@@ -374,7 +374,6 @@
       <form class="row" onsubmit="addFrais(event)">
         <div class="field"><label>Date</label><input type="date" id="f-date" required></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
-        <div class="field"><label>Libellé</label><input type="text" id="f-libelle" placeholder="ex. audit client Dupont"></div>
         <div class="field" id="f-dossier-field" style="display:none"><label>Dossier lié (ID CRM)</label><input type="text" id="f-dossier" placeholder="ex. 12345 — laisser vide si hors dossier"></div>
         <div class="field"><label>Fournisseur</label><input type="text" id="f-fournisseur" placeholder="nom du fournisseur"></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source"></select></div>
@@ -1478,7 +1477,6 @@ function editFrais(id){
   const csel=document.getElementById('f-categorie');
   if(f.categorie && ![...csel.options].some(o=>o.value===f.categorie)) csel.insertAdjacentHTML('afterbegin',`<option>${f.categorie}</option>`);
   csel.value=f.categorie||'Autre';
-  document.getElementById('f-libelle').value=f.libelle||'';
   document.getElementById('f-fournisseur').value=f.fournisseur||'';
   document.getElementById('f-source').value=f.source_id||'';
   { const dv=document.getElementById('f-dossier'); if(dv) dv.value=f.dossier_crm_id||''; }
@@ -1495,7 +1493,7 @@ function editFrais(id){
 }
 function cancelEditFrais(){
   editingFraisId=null;
-  ['f-libelle','f-fournisseur','f-montant','f-regie','f-dossier','f-doc'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  ['f-fournisseur','f-montant','f-regie','f-dossier','f-doc'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
   { const cur=document.getElementById('f-doc-current'); if(cur){ cur.style.display='none'; cur.innerHTML=''; } }
   document.getElementById('f-pct').value='0'; document.getElementById('f-preview').innerHTML='';
   document.getElementById('f-savebtn').textContent='+ Enregistrer le frais';
@@ -1505,7 +1503,7 @@ async function addFrais(e){
   e.preventDefault();
   const montant=Number(document.getElementById('f-montant').value); if(!montant){toast('Indique un montant');return;}
   const row={ date:document.getElementById('f-date').value||today(), categorie:document.getElementById('f-categorie').value,
-    libelle:document.getElementById('f-libelle').value||null, fournisseur:document.getElementById('f-fournisseur').value||null, montant,
+    fournisseur:document.getElementById('f-fournisseur').value||null, montant,
     source_id:document.getElementById('f-source').value||null, regie_concernee:document.getElementById('f-regie').value||null,
     pct_decompte:Number(document.getElementById('f-pct').value)||0 };
   if(PROJ&&PROJ.key==='led'){
