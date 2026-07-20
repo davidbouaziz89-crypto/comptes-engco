@@ -232,6 +232,9 @@
   .col-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:13px;cursor:pointer;user-select:none;transition:all .15s ease}
   .col-chip input{width:auto;accent-color:var(--accent)}
   .col-chip.on{color:var(--txt);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:color-mix(in srgb,var(--accent) 12%,var(--panel2))}
+  .d-mat-line{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap}
+  .d-mat-line .dm-mat{flex:2;min-width:170px}
+  .d-mat-line .dm-ql,.d-mat-line .dm-qv{flex:1;min-width:120px}
   /* Édition inline : formulaire déplacé sous la ligne cliquée */
   tr.inline-edit-row>td{padding:0;background:transparent}
   tr.inline-edit-row .panel{margin:6px 0;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow);white-space:normal}
@@ -511,7 +514,7 @@
         <div class="field"><label>Mois concerné</label><input type="month" id="f-mois"></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
         <div class="field" id="f-dossier-field" style="display:none"><label>Dossier lié (ID CRM)</label><input type="text" id="f-dossier" placeholder="ex. 12345 — laisser vide si hors dossier"></div>
-        <div class="field"><label>Fournisseur</label><input type="text" id="f-fournisseur" placeholder="nom du fournisseur"></div>
+        <div class="field"><label>Fournisseur</label><input type="text" id="f-fournisseur" list="fournisseurs-list" placeholder="choisis ou laisse vide"><datalist id="fournisseurs-list"></datalist></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source"></select></div>
         <div class="field"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" required oninput="fraisPreview()"></div>
         <div class="field"><label>Régie concernée</label><select id="f-regie" onchange="onFraisRegie()"></select></div>
@@ -607,7 +610,10 @@
         <button data-psec="regies" onclick="showParam('regies')">🤝 Régies</button>
         <button data-psec="sources" onclick="showParam('sources')">🏢 Sources</button>
         <button data-psec="delegataires" id="pm-delegataires" onclick="showParam('delegataires')">🏛️ Délégataires CEE</button>
+        <button data-psec="materiels" id="pm-materiels" onclick="showParam('materiels')">🔧 Matériels</button>
+        <button data-psec="fournisseurs" id="pm-fournisseurs" onclick="showParam('fournisseurs')">🚚 Fournisseurs</button>
         <button data-psec="check" id="pm-check" onclick="showParam('check')">🧩 Check</button>
+        <button data-psec="liencrm" id="pm-liencrm" onclick="showParam('liencrm')">🔗 Lien CRM</button>
         <button data-psec="categories" onclick="showParam('categories')">🏷️ Catégories de frais</button>
       </div>
       <div class="params-content" id="params-content">
@@ -620,6 +626,36 @@
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter le délégataire</button></div>
             </form>
             <div id="deleg-list" style="margin-top:8px"></div>
+          </section>
+        </div>
+        <div class="params-sec" id="ps-materiels">
+          <section class="panel"><h2>🔧 Matériels</h2>
+            <div class="hint" style="margin-bottom:8px">Ta liste de matériels. Tu les choisiras ensuite sur chaque dossier (avec quantité livrée et quantité valorisée).</div>
+            <form class="row" onsubmit="addMateriel(event)">
+              <div class="field"><label>Nom du matériel</label><input type="text" id="mt-nom" placeholder="ex. Tube LED 120cm, Projecteur 100W…" required></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+            </form>
+            <div class="table-wrap"><table><thead><tr><th>Matériel</th><th></th></tr></thead><tbody id="materiels-body"></tbody></table></div>
+          </section>
+        </div>
+        <div class="params-sec" id="ps-fournisseurs">
+          <section class="panel"><h2>🚚 Fournisseurs</h2>
+            <div class="hint" style="margin-bottom:8px">Tes fournisseurs. Ils te seront proposés à la saisie d'un frais (le champ peut aussi rester vide).</div>
+            <form class="row" onsubmit="addFournisseur(event)">
+              <div class="field"><label>Nom du fournisseur</label><input type="text" id="fo-nom" placeholder="ex. Rexel, Sonepar…" required></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+            </form>
+            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
+          </section>
+        </div>
+        <div class="params-sec" id="ps-liencrm">
+          <section class="panel"><h2>🔗 Lien vers ton autre CRM</h2>
+            <div class="hint" style="margin-bottom:8px">Colle l'URL d'une fiche client de ton CRM externe, avec <b>{id}</b> à l'endroit où va l'identifiant. Les <b>ID des dossiers</b> deviendront alors cliquables et t'y renverront. Laisse vide pour désactiver le lien.</div>
+            <form class="row" onsubmit="saveCrmUrl(event)">
+              <div class="field" style="flex:1;min-width:280px"><label>Modèle d'URL</label><input type="text" id="crmurl-input" placeholder="https://mon-crm.fr/fiche?id={id}"></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">💾 Enregistrer</button></div>
+            </form>
+            <div class="hint" id="crmurl-preview" style="margin-top:8px"></div>
           </section>
         </div>
         <div class="params-sec" id="ps-check">
@@ -814,7 +850,11 @@ function A(){ return PROJ.associes; }
 // Lien vers le CRM par projet. Mettre l'URL d'une fiche client avec {id} là où va l'identifiant
 // (ex. 'https://mon-crm.com/fiche/{id}'). Si pas de {id}, l'ID est ajouté à la fin. Vide = ID non cliquable.
 const CRM_URL_TEMPLATE = { led:'https://nrj.koneckt.fr/crm/contact.php?id_contact={id}', velo:'https://nrj.koneckt.fr/crm/contact.php?id_contact={id}' };
-function crmLink(id){ if(id==null||id===''||!PROJ) return null; const t=(CRM_URL_TEMPLATE[PROJ.key]||'').trim(); if(!t) return null; return t.includes('{id}')?t.replace(/\{id\}/g,encodeURIComponent(id)):(t+encodeURIComponent(id)); }
+function crmUrlKey(){ return 'pfp-crmurl-'+(PROJ?PROJ.key:''); }
+function getCrmUrl(){ try{ const v=localStorage.getItem(crmUrlKey()); if(v!=null) return v; }catch(e){} return (CRM_URL_TEMPLATE[PROJ?PROJ.key:'']||''); }
+function crmLink(id){ if(id==null||id===''||!PROJ) return null; const t=(getCrmUrl()||'').trim(); if(!t) return null; return t.includes('{id}')?t.replace(/\{id\}/g,encodeURIComponent(id)):(t+encodeURIComponent(id)); }
+function renderCrmUrl(){ const i=document.getElementById('crmurl-input'); if(i) i.value=getCrmUrl(); const p=document.getElementById('crmurl-preview'); if(p){ const u=getCrmUrl(); p.innerHTML=u?('Aperçu : '+escH(u.replace(/\{id\}/g,'12345'))):'Lien désactivé (les ID ne seront pas cliquables).'; } }
+function saveCrmUrl(e){ e.preventDefault(); const v=(document.getElementById('crmurl-input').value||'').trim(); try{ localStorage.setItem(crmUrlKey(),v); }catch(err){} toast('Lien CRM enregistré ✅'); renderCrmUrl(); if(typeof renderDossiers==='function') renderDossiers(); if(typeof renderCheck==='function') renderCheck(); }
 function dossierIdCell(d){ const id=d.crm_id||''; if(!id) return '<td>—</td>'; const url=crmLink(id); return url?`<td><a href="${url}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${id} ↗</a></td>`:`<td>${id}</td>`; }
 
 let STATUTS_CFG=[{nom:'En cours',categorie:'potentiel'},{nom:'Validé',categorie:'realise'},{nom:'Perdu',categorie:'perdu'}];
@@ -1111,7 +1151,12 @@ function ledDossierForm(){ return `
     <div class="field"><label>Coût livraison</label><input type="number" step="0.01" id="d-livraison" value="0" oninput="dossierPreview()"></div>
     <div class="field"><label>Frais supp.</label><input type="number" step="0.01" id="d-fraissupp" value="0" oninput="dossierPreview()"></div>
     <div class="field"><label>Coût audit</label><input type="number" step="0.01" id="d-audit" value="0" oninput="dossierPreview()"></div>
-  </form>`; }
+  </form>
+  <div style="margin-top:6px">
+    <div class="hint" style="margin:8px 0 8px">🔧 Matériels du dossier (plusieurs possibles) — quantité livrée &amp; quantité valorisée :</div>
+    <div id="d-materiels"></div>
+    <button class="btn ghost small" type="button" onclick="addDMaterielLine()">+ Ajouter un matériel</button>
+  </div>`; }
 function veloDossierForm(){ return `
   <form class="row" onsubmit="addDossier(event)">
     <div class="field"><label>Date</label><input type="date" id="d-date" required></div>
@@ -1192,11 +1237,49 @@ async function loadAll(){
   await loadRegiesConfig();
   await loadStatuts();
   await Promise.all([loadApports(), loadDossiers(), loadRemboursements(), loadFrais()]);
-  renderRegies(); loadRecurrents(); loadFraisCats(); loadDelegataires(); loadCheck();
+  renderRegies(); loadRecurrents(); loadFraisCats(); loadDelegataires(); loadCheck(); loadMateriels(); loadFournisseurs(); renderCrmUrl();
   if(CURRENT_ROLE==='admin') loadUsers();
 }
 
 // ===== Délégataires CEE (projet LED) : nom + fiches CEE avec taux propre =====
+// ===== Matériels & Fournisseurs (projet LED) =====
+async function loadMateriels(){
+  const isLed=!!(PROJ&&PROJ.key==='led');
+  const pm=document.getElementById('pm-materiels'); if(pm) pm.style.display=isLed?'':'none';
+  if(!isLed){ window._materiels=[]; return; }
+  const {data}=await db.from('engco_materiels').select('*').order('nom');
+  window._materiels=data||[]; renderMateriels();
+}
+function renderMateriels(){
+  const b=document.getElementById('materiels-body'); if(!b) return; const m=window._materiels||[];
+  b.innerHTML=m.length?m.map(x=>`<tr><td>${escH(x.nom)}</td><td class="num"><button class="btn danger small" onclick="delMateriel('${x.id}')">Suppr.</button></td></tr>`).join(''):`<tr><td colspan="2" class="empty">Aucun matériel</td></tr>`;
+}
+async function addMateriel(e){ e.preventDefault(); const nom=(document.getElementById('mt-nom').value||'').trim(); if(!nom) return; const {error}=await db.from('engco_materiels').insert({nom}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('mt-nom').value=''; toast('Matériel ajouté ✅'); loadMateriels(); }
+async function delMateriel(id){ if(!confirm('Supprimer ce matériel ?')) return; const {error}=await db.from('engco_materiels').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadMateriels(); }
+// Lignes matériel sur un dossier (matériel + qté livrée + qté valorisée)
+function materielOptions(sel){ return '<option value="">— matériel —</option>'+(window._materiels||[]).map(m=>`<option value="${escH(m.id)}"${m.id===sel?' selected':''}>${escH(m.nom)}</option>`).join(''); }
+function dMaterielLineHtml(sel,ql,qv){ return `<div class="d-mat-line">
+    <select class="dm-mat">${materielOptions(sel||'')}</select>
+    <input type="number" step="0.01" class="dm-ql" placeholder="Qté livrée" value="${ql!=null?ql:''}">
+    <input type="number" step="0.01" class="dm-qv" placeholder="Qté valorisée" value="${qv!=null?qv:''}">
+    <button class="btn danger small" type="button" onclick="this.closest('.d-mat-line').remove()">✕</button></div>`; }
+function addDMaterielLine(sel,ql,qv){ const box=document.getElementById('d-materiels'); if(box) box.insertAdjacentHTML('beforeend',dMaterielLineHtml(sel,ql,qv)); }
+function renderDMaterielLines(lines){ const box=document.getElementById('d-materiels'); if(box) box.innerHTML=(lines||[]).map(l=>dMaterielLineHtml(l.materiel_id,l.qte_livree,l.qte_valorisee)).join(''); }
+function collectDMateriels(){ const box=document.getElementById('d-materiels'); if(!box) return []; return [...box.querySelectorAll('.d-mat-line')].map(el=>({ materiel_id:el.querySelector('.dm-mat').value||null, qte_livree:Number(el.querySelector('.dm-ql').value)||0, qte_valorisee:Number(el.querySelector('.dm-qv').value)||0 })).filter(l=>l.materiel_id); }
+async function loadFournisseurs(){
+  const isLed=!!(PROJ&&PROJ.key==='led');
+  const pm=document.getElementById('pm-fournisseurs'); if(pm) pm.style.display=isLed?'':'none';
+  if(!isLed){ window._fournisseurs=[]; fillFournisseurDatalist(); return; }
+  const {data}=await db.from('engco_fournisseurs').select('*').order('nom');
+  window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurDatalist();
+}
+function renderFournisseurs(){
+  const b=document.getElementById('fournisseurs-body'); if(!b) return; const f=window._fournisseurs||[];
+  b.innerHTML=f.length?f.map(x=>`<tr><td>${escH(x.nom)}</td><td class="num"><button class="btn danger small" onclick="delFournisseur('${x.id}')">Suppr.</button></td></tr>`).join(''):`<tr><td colspan="2" class="empty">Aucun fournisseur</td></tr>`;
+}
+function fillFournisseurDatalist(){ const dl=document.getElementById('fournisseurs-list'); if(!dl) return; dl.innerHTML=(window._fournisseurs||[]).map(f=>`<option value="${escH(f.nom)}"></option>`).join(''); }
+async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const {error}=await db.from('engco_fournisseurs').insert({nom}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
+async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
 async function loadDelegataires(){
   const isLed=!!(PROJ&&PROJ.key==='led');
   const pm=document.getElementById('pm-delegataires'); if(pm) pm.style.display=isLed?'':'none';
@@ -1411,6 +1494,7 @@ async function loadDossiers(){
   // texte de recherche pré-calculé (accents retirés) une seule fois par dossier → recherche rapide
   list.forEach(d=>{ d._hay=searchNorm([fdate(d.date),moisLabel(d.date),d.crm_id,d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette,d.adresse,d.code_postal,d.ville,d.telephone,d.email].join(' ')); });
   window._dossiers=list; fillDossierRegieFilter(); renderDossiers(); refreshDashboard(); renderRegies();
+  if(PROJ&&PROJ.key==='led'){ const {data:dm}=await db.from('engco_dossier_materiels').select('*'); window._dossierMat=dm||[]; }
 }
 function fillDossierRegieFilter(){
   const freg=document.getElementById('dossiers-fregie'); if(!freg) return;
@@ -1633,7 +1717,7 @@ async function saveFraisInline(id){
   const _cat=g('if-categorie').value;
   const row={ date:g('if-date').value||today(), categorie:_cat,
     mois_concerne:g('if-mois').value||null,
-    fournisseur:(g('if-fournisseur').value.trim())||_cat||null, montant,
+    fournisseur:(g("if-fournisseur").value.trim())||null, montant,
     source_id:g('if-source').value||null, regie_concernee:g('if-regie').value||null,
     pct_decompte:Number(g('if-pct').value)||0 };
   if(PROJ&&PROJ.key==='led'){
@@ -2089,7 +2173,8 @@ function editDossier(id,btn){
   csel.value=d.commercial_regie||'';
   if(PROJ.dossierType==='velo'){ S('d-region',d.region||'France'); S('d-nbvelos',d.nb_velos); S('d-tarif',d.tarif_unitaire); S('d-autrescouts',d.autres_couts); S('d-regie-montant',d.regie_montant_unitaire); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=!!d.regie_interne; }
   else { S('d-prime',d.montant_prime); S('d-install',d.cout_installation); S('d-materiel',d.cout_materiel); S('d-nacelle',d.cout_nacelle); S('d-hamid',d.cout_hamid); S('d-livraison',d.cout_livraison); S('d-fraissupp',d.frais_supp); S('d-audit',d.cout_audit);
-    S('d-cumac',d.cumac); S('d-delegataire',d.delegataire_id); }
+    S('d-cumac',d.cumac); S('d-delegataire',d.delegataire_id);
+    renderDMaterielLines((window._dossierMat||[]).filter(x=>x.dossier_id===d.id)); }
   editingDossierId=id;
   document.getElementById('d-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('d-cancelbtn').style.display='';
@@ -2106,7 +2191,8 @@ function cancelEditDossier(){
   const rp=document.getElementById('d-regiepct'); if(rp) rp.value='0';
   if(PROJ.dossierType==='velo'){ ['d-nbvelos','d-autrescouts','d-regie-montant'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';}); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=false; }
   else { ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit','d-cumac'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';});
-    const dg=document.getElementById('d-delegataire'); if(dg) dg.value=''; }
+    const dg=document.getElementById('d-delegataire'); if(dg) dg.value='';
+    const mb=document.getElementById('d-materiels'); if(mb) mb.innerHTML=''; }
   document.getElementById('d-savebtn').textContent='+ Enregistrer le dossier';
   document.getElementById('d-cancelbtn').style.display='none';
   dossierPreview();
@@ -2131,8 +2217,16 @@ async function addDossier(e){
     }
   }
   const wasEdit=!!editingDossierId;
-  const res = wasEdit ? await db.from(T('dossiers')).update(row).eq('id',editingDossierId) : await db.from(T('dossiers')).insert(row);
+  const mats = (PROJ.key==='led') ? collectDMateriels() : [];
+  const res = wasEdit ? await db.from(T('dossiers')).update(row).eq('id',editingDossierId) : await db.from(T('dossiers')).insert(row).select('id').single();
   if(res.error){toast('Erreur : '+res.error.message);return;}
+  if(PROJ.key==='led'){
+    const dossId = wasEdit ? editingDossierId : (res.data&&res.data.id);
+    if(dossId){
+      await db.from('engco_dossier_materiels').delete().eq('dossier_id',dossId);
+      if(mats.length) await db.from('engco_dossier_materiels').insert(mats.map(m=>({...m,dossier_id:dossId})));
+    }
+  }
   cancelEditDossier();
   toast(wasEdit?'Dossier modifié ✅':'Dossier enregistré ✅'); loadDossiers();
 }
@@ -2205,7 +2299,7 @@ async function addFrais(e){
   const _cat=document.getElementById('f-categorie').value;
   const row={ date:document.getElementById('f-date').value||today(), categorie:_cat,
     mois_concerne:document.getElementById('f-mois').value||null,
-    fournisseur:(document.getElementById('f-fournisseur').value.trim())||_cat||null, montant,
+    fournisseur:(document.getElementById('f-fournisseur').value.trim())||null, montant,
     source_id:document.getElementById('f-source').value||null, regie_concernee:document.getElementById('f-regie').value||null,
     pct_decompte:Number(document.getElementById('f-pct').value)||0 };
   if(PROJ&&PROJ.key==='led'){
