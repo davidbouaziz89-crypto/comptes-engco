@@ -430,19 +430,24 @@
         <button data-psec="statuts" onclick="showParam('statuts')">🏷️ Statuts</button>
         <button data-psec="regies" onclick="showParam('regies')">🤝 Régies</button>
         <button data-psec="sources" onclick="showParam('sources')">🏢 Sources</button>
-        <button data-psec="recurrents" onclick="showParam('recurrents')">🔁 Frais récurrents</button>
         <button data-psec="categories" onclick="showParam('categories')">🏷️ Catégories de frais</button>
       </div>
       <div class="params-content" id="params-content">
         <!-- ps-statuts / ps-regies / ps-sources / ps-recurrents : injectés par buildParamsLayout() -->
         <div class="params-sec" id="ps-categories">
-          <section class="panel"><h2>🏷️ Catégories de frais / dépenses</h2>
-            <div class="hint" style="margin-bottom:8px">Ces catégories apparaissent dans le menu « Catégorie » à l'ajout d'un frais. Les frais récurrents s'ajoutent aussi automatiquement à la liste.</div>
-            <form class="row" onsubmit="addFraisCat(event)">
-              <div class="field"><input type="text" id="fc-nom" placeholder="ex. Carburant / déplacement" required></div>
-              <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
+          <section class="panel"><h2>🏷️ Catégories de frais</h2>
+            <div class="hint" style="margin-bottom:8px">Ajoute tes catégories (elles apparaissent dans le menu « Catégorie » à l'ajout d'un frais). Choisis <b>Dépense</b> (catégorie simple) ou <b>Récurrent mensuel</b> — dans ce cas l'appli te rappellera chaque mois de le saisir.</div>
+            <form class="row" onsubmit="addCat(event)">
+              <div class="field"><label>Nom de la catégorie</label><input type="text" id="fc-nom" placeholder="ex. Loyer, Carburant…" required></div>
+              <div class="field"><label>Type</label><select id="fc-type" onchange="onCatType()"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent mensuel</option></select></div>
+              <div class="field fc-rec" style="display:none"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fc-montant" placeholder="ex. 1000"></div>
+              <div class="field fc-rec" style="display:none"><label>À partir du mois</label><input type="month" id="fc-mois"></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
-            <div class="table-wrap"><table><tbody id="fraiscats-body"></tbody></table></div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Catégorie</th><th>Type</th><th class="num">Montant récurrent</th><th>Depuis</th><th></th></tr></thead>
+              <tbody id="cats-body"></tbody>
+            </table></div>
           </section>
         </div>
       </div>
@@ -673,13 +678,13 @@ const PARAM_SECS=['statuts','regies','sources','recurrents','categories'];
 // Déplace (une seule fois) les sections Statuts/Régies/Sources + Frais récurrents dans le menu latéral Paramètres
 function buildParamsLayout(){
   const content=document.getElementById('params-content'); if(!content||content._built) return;
-  [['statuts','tab-statuts'],['regies','tab-regies'],['sources','tab-sources'],['recurrents','recur-section']].forEach(([sec,srcId])=>{
+  [['statuts','tab-statuts'],['regies','tab-regies'],['sources','tab-sources']].forEach(([sec,srcId])=>{
     const el=document.getElementById(srcId); if(!el) return;
     const wrap=document.createElement('div'); wrap.className='params-sec'; wrap.id='ps-'+sec;
-    if(srcId==='recur-section'){ wrap.appendChild(el); }           // déplace la section entière
-    else { while(el.firstChild) wrap.appendChild(el.firstChild); el.remove(); } // déplace le contenu, retire l'ancien onglet vide
+    while(el.firstChild) wrap.appendChild(el.firstChild); el.remove(); // déplace le contenu, retire l'ancien onglet vide
     content.insertBefore(wrap, document.getElementById('ps-categories'));
   });
+  const rs=document.getElementById('recur-section'); if(rs) rs.style.display='none'; // ancienne config récurrents masquée (remplacée par Catégories)
   content._built=true;
 }
 function showParam(sec){
@@ -1541,7 +1546,7 @@ async function loadRecurrents(){
       <td>${r.regie_defaut||'—'}</td><td class="num">${num(r.pct_defaut)} %</td><td>${moisLabel(r.mois_debut)}</td>
       <td class="num"><button class="btn ghost small" onclick="editRecurrent('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('recurrents')}','${r.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="7" class="empty">Aucun frais récurrent</td></tr>`;
-  fillCategorieOptions(); checkMissingRecurrents();
+  fillCategorieOptions(); checkMissingRecurrents(); renderCats();
 }
 function fillCategorieOptions(){
   const sel=document.getElementById('f-categorie'); if(!sel) return; const prev=sel.value;
@@ -1550,26 +1555,49 @@ function fillCategorieOptions(){
   const all=[...new Set([...(window._recurrents||[]).map(r=>r.libelle),...base])];
   sel.innerHTML=all.map(c=>`<option>${escH(c)}</option>`).join(''); if(prev&&all.includes(prev)) sel.value=prev;
 }
-// ===== Catégories de frais / dépenses (configurables) =====
+// ===== Catégories de frais (Dépense ou Récurrent mensuel) =====
 async function loadFraisCats(){
   const {data,error}=await db.from(T('frais_cats')).select('*').order('nom');
-  if(error){ window._fraiscats=window._fraiscats||[]; renderFraisCats(); fillCategorieOptions(); return; }
-  window._fraiscats=data||[]; renderFraisCats(); fillCategorieOptions();
+  window._fraiscats=error?(window._fraiscats||[]):(data||[]);
+  renderCats(); fillCategorieOptions();
 }
-function renderFraisCats(){
-  const b=document.getElementById('fraiscats-body'); if(!b) return;
-  const list=window._fraiscats||[];
-  b.innerHTML=list.length? list.map(c=>`<tr><td>${escH(c.nom)}</td><td class="num"><button class="btn danger small" onclick="delFraisCat('${c.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td class="empty">Aucune catégorie personnalisée — par défaut : Audit client, Fournisseur, Autre.</td></tr>`;
+function renderCats(){
+  const b=document.getElementById('cats-body'); if(!b) return;
+  const deps=(window._fraiscats||[]).map(c=>({nom:c.nom,type:'depense',id:c.id}));
+  const recs=(window._recurrents||[]).map(r=>({nom:r.libelle,type:'recurrent',id:r.id,montant:r.montant_defaut,mois:r.mois_debut}));
+  const all=[...recs,...deps].sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
+  b.innerHTML=all.length? all.map(c=>`<tr><td>${escH(c.nom)}</td>
+    <td>${c.type==='recurrent'?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'}</td>
+    <td class="num">${c.type==='recurrent'&&c.montant!=null?eur(c.montant):'—'}</td>
+    <td>${c.type==='recurrent'?(moisLabel(c.mois)||'—'):'—'}</td>
+    <td class="num"><button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune catégorie</td></tr>`;
 }
-async function addFraisCat(e){
-  e.preventDefault(); const nom=document.getElementById('fc-nom').value.trim(); if(!nom) return;
-  const {error}=await db.from(T('frais_cats')).insert({nom}); if(error){ toast('Erreur : '+error.message); return; }
-  document.getElementById('fc-nom').value=''; loadFraisCats(); toast('Catégorie ajoutée ✅');
+function onCatType(){
+  const rec=document.getElementById('fc-type').value==='recurrent';
+  document.querySelectorAll('.fc-rec').forEach(el=>el.style.display=rec?'':'none');
+  if(rec){ const m=document.getElementById('fc-mois'); if(m&&!m.value) m.value=today().slice(0,7); }
 }
-async function delFraisCat(id){
+async function addCat(e){
+  e.preventDefault();
+  const nom=document.getElementById('fc-nom').value.trim(); if(!nom) return;
+  const type=document.getElementById('fc-type').value; let error;
+  if(type==='recurrent'){
+    const montant=document.getElementById('fc-montant').value;
+    const mois=document.getElementById('fc-mois').value||today().slice(0,7);
+    ({error}=await db.from(T('recurrents')).insert({libelle:nom, montant_defaut:montant===''?null:Number(montant), mois_debut:mois+'-01', pct_defaut:0}));
+  } else {
+    ({error}=await db.from(T('frais_cats')).insert({nom}));
+  }
+  if(error){ toast('Erreur : '+error.message); return; }
+  ['fc-nom','fc-montant','fc-mois'].forEach(i=>document.getElementById(i).value='');
+  await loadFraisCats(); await loadRecurrents(); toast('Catégorie ajoutée ✅');
+}
+async function delCat(type,id){
   if(!confirm('Supprimer cette catégorie ?')) return;
-  const {error}=await db.from(T('frais_cats')).delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; }
-  loadFraisCats();
+  const table=type==='recurrent'?T('recurrents'):T('frais_cats');
+  const {error}=await db.from(table).delete().eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  await loadFraisCats(); await loadRecurrents();
 }
 let editingRecurId=null;
 function editRecurrent(id){
