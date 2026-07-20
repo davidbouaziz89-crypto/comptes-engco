@@ -390,7 +390,7 @@
       <h2>Historique des frais</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="frais-search" placeholder="Rechercher : payé par (ex. DB Telecom), fournisseur, catégorie, mois…" oninput="renderFrais()"></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Mois</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Mois</th><th>Ajout</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
         <tbody id="frais-body"></tbody>
       </table></div>
     </section>
@@ -1204,12 +1204,13 @@ function renderFrais(){
     const src=SOURCES.find(s=>s.id===f.source_id);
     const dtag=f.dossier_crm_id?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier lié (ID CRM)">🔗 ${escH(f.dossier_crm_id)}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
-    return `<tr><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}${dtag}${doctag}</td><td>${f.fournisseur||''}</td>
+    const autotag=f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)" title="Généré automatiquement (frais récurrent)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️ Manuel</span>';
+    return `<tr><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}${dtag}${doctag}</td><td>${f.fournisseur||''}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
       <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="11" class="empty">${term?'Aucun frais ne correspond à la recherche':'Aucun frais'}</td></tr>`;
+  }).join('') : `<tr><td colspan="12" class="empty">${term?'Aucun frais ne correspond à la recherche':'Aucun frais'}</td></tr>`;
 }
 // ===== Documents / justificatifs (LED) =====
 function renderDocuments(){
@@ -1551,7 +1552,7 @@ async function loadRecurrents(){
       <td>${r.regie_defaut||'—'}</td><td class="num">${num(r.pct_defaut)} %</td><td>${moisLabel(r.mois_debut)}</td>
       <td class="num"><button class="btn ghost small" onclick="editRecurrent('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('recurrents')}','${r.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="7" class="empty">Aucun frais récurrent</td></tr>`;
-  fillCategorieOptions(); checkMissingRecurrents(); renderCats();
+  fillCategorieOptions(); checkMissingRecurrents(); renderCats(); generateRecurrents();
 }
 function fillCategorieOptions(){
   const sel=document.getElementById('f-categorie'); if(!sel) return; const prev=sel.value;
@@ -1653,6 +1654,36 @@ function checkMissingRecurrents(){
     if(mm.length) missing.push(`<b>${r.libelle}</b> : ${mm.join(', ')}`);
   });
   if(missing.length){ el.style.display='block'; el.innerHTML='⚠️ Frais mensuels manquants — '+missing.join(' &nbsp;•&nbsp; '); } else { el.style.display='none'; }
+}
+// Génère automatiquement les frais des catégories récurrentes (montant + mois de départ),
+// de leur mois de début jusqu'au mois courant, s'ils n'existent pas déjà. Marqués "auto".
+let _genRecurLock=false;
+async function generateRecurrents(){
+  if(!PROJ || _genRecurLock) return;
+  if(!Array.isArray(window._frais)) return; // frais pas encore chargés
+  const recs=(window._recurrents||[]).filter(r=>r.actif!==false && r.mois_debut && r.montant_defaut!=null);
+  if(!recs.length) return;
+  const frais=window._frais||[];
+  const now=new Date(), curY=now.getFullYear(), curM=now.getMonth();
+  const toInsert=[];
+  recs.forEach(r=>{
+    const st=new Date(r.mois_debut+'T00:00:00'); let y=st.getFullYear(), m=st.getMonth(), g=0;
+    while((y<curY||(y===curY&&m<=curM))&&g<600){ g++;
+      const ym=y+'-'+String(m+1).padStart(2,'0');
+      const exists=frais.some(f=>(f.categorie||'')===r.libelle && fraisMonth(f)===ym);
+      if(!exists) toInsert.push({ date:today(), mois_concerne:ym, categorie:r.libelle, montant:Number(r.montant_defaut||0),
+        source_id:r.source_id||null, regie_concernee:r.regie_defaut||null, pct_decompte:Number(r.pct_defaut||0), auto:true });
+      m++; if(m>11){m=0;y++;}
+    }
+  });
+  if(!toInsert.length) return;
+  _genRecurLock=true;
+  try{
+    const {error}=await db.from(T('frais')).insert(toInsert);
+    if(error){ toast('Génération récurrents : '+error.message); return; }
+    toast(toInsert.length+' frais récurrent'+(toInsert.length>1?'s':'')+' généré'+(toInsert.length>1?'s':'')+' 🤖');
+    await loadFrais();
+  } finally { _genRecurLock=false; }
 }
 
 // ===== Régies (suivi) =====
