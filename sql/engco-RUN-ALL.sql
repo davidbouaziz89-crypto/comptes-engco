@@ -89,3 +89,7 @@ alter table public.engco_dossiers
   add column if not exists delegataire_id uuid,
   add column if not exists fiche_id uuid,
   add column if not exists fiche_taux numeric;
+
+-- ===== engco-cumac.sql =====
+-- Volume CEE (kWh cumac) sur le dossier LED
+alter table public.engco_dossiers add column if not exists cumac numeric;

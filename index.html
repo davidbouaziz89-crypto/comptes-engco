@@ -1036,6 +1036,7 @@ function ledDossierForm(){ return `
     <div class="field"><label>Téléphone</label><input type="text" id="d-tel"></div>
     <div class="field"><label>Email</label><input type="email" id="d-email"></div>
     <div class="field"><label>N° de dépôt</label><input type="text" id="d-depot"></div>
+    <div class="field"><label>Cumac (kWh cumac)</label><input type="number" step="1" id="d-cumac" value="0"></div>
     <div class="field"><label>Prime (HT)</label><input type="number" step="0.01" id="d-prime" value="0" oninput="dossierPreview()"></div>
     <div class="field"><label>Coût installation</label><input type="number" step="0.01" id="d-install" value="0" oninput="dossierPreview()"></div>
     <div class="field"><label>Coût matériel</label><input type="number" step="0.01" id="d-materiel" value="0" oninput="dossierPreview()"></div>
@@ -1062,7 +1063,7 @@ function veloDossierForm(){ return `
     <div class="field"><label>Tarif / vélo (€)</label><input type="number" step="0.01" id="d-tarif" value="80" oninput="dossierPreview()"></div>
     <div class="field"><label>Autres coûts (€)</label><input type="number" step="0.01" id="d-autrescouts" value="0" oninput="dossierPreview()"></div>
   </form>`; }
-function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>N° dépôt</th><th>Délégataire</th><th class="num">Prime</th><th class="num">Marge brute</th><th class="num">Manager</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
+function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>N° dépôt</th><th>Délégataire</th><th class="num">Cumac</th><th class="num">Prime</th><th class="num">Marge brute</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
 function regionFromCP(cp){ cp=(cp||'').toString(); if(/^20/.test(cp)) return 'Corse'; if(/^9[78]/.test(cp)) return 'DOM-TOM'; return 'France'; }
@@ -1110,11 +1111,10 @@ function managerRegieRow(){
     ${statutField}
   </form>`;
   return `<form class="row" onsubmit="addDossier(event)">
-    <div class="field"><label>% manager</label><input type="number" step="0.01" id="d-davidpct" value="5" oninput="dossierPreview()"></div>
+    <input type="hidden" id="d-davidpct" value="5">
     <div class="field"><label>Régie</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
     <div class="field"><label>% commission régie</label><input type="number" step="0.01" id="d-regiepct" value="0" oninput="dossierPreview()"></div>
-    <div class="field"><label>Délégataire</label><select id="d-delegataire" onchange="onDelegataireChange()"></select></div>
-    <div class="field"><label>Fiche CEE</label><select id="d-fiche"></select></div>
+    <div class="field"><label>Délégataire</label><select id="d-delegataire"></select></div>
     ${statutField}
   </form>`;
 }
@@ -1379,12 +1379,11 @@ function renderDossiers(){
     const reg=`${d.commercial_regie||'—'}${velo?(d.regie_interne?` <span style="color:var(--muted);font-size:11px">(interne)</span>`:''):(d.regie_pct>0?` <span style="color:var(--muted);font-size:11px">(${num(d.regie_pct)}%)</span>`:'')}`;
     const manager=`${eur(d.cout_david)} <span style="color:var(--muted);font-size:11px">${num(d.david_pct)}%</span>`;
     const detailBtn=velo?'':`<button class="btn ghost small" onclick="openDossierDetail('${d.id}')" title="Détail du dossier & frais liés">📄</button> `;
-    const tail=`<td class="num">${eur(d.marge_brute)}</td><td class="num">${manager}</td><td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num">${detailBtn}<button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
+    const tail=`<td class="num">${eur(d.marge_brute)}</td>${velo?`<td class="num">${manager}</td>`:''}<td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num">${detailBtn}<button class="btn ghost small" onclick="editDossier('${d.id}')">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
     const delg=(window._delegataires||[]).find(x=>x.id===d.delegataire_id);
-    const fiche=(window._fiches||[]).find(x=>x.id===d.fiche_id);
-    const delgCell=delg?`${escH(delg.nom)}${fiche?` <span class="pill" title="Fiche CEE — taux ${eur(d.fiche_taux)}">${escH(fiche.nom)} · ${eur(d.fiche_taux)}</span>`:''}`:'<span style="color:var(--muted)">—</span>';
-    return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td>${delgCell}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
+    const delgCell=delg?escH(delg.nom):'<span style="color:var(--muted)">—</span>';
+    return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td>${delgCell}</td><td class="num">${num(d.cumac||0)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
   }).join('');
   if(rows.length>shown.length) html+=`<tr><td colspan="13" class="empty">${shown.length} dossiers affichés sur ${rows.length}. Affine ta recherche (client, ville, ID…) pour voir les autres.</td></tr>`;
   body.innerHTML=html;
@@ -1396,7 +1395,7 @@ function openDossierDetail(id){
   const linked=(window._frais||[]).filter(f=>cid && (f.dossier_crm_id||'').toString().trim()===cid);
   const totalFrais=linked.reduce((s,f)=>s+Number(f.montant||0),0);
   const prime=Number(d.montant_prime||0), net=prime-totalFrais;
-  const couts=[['Matériel',d.cout_materiel],['Installation',d.cout_installation],['Nacelle',d.cout_nacelle],['Audit',d.cout_audit],['Livraison',d.cout_livraison],['Frais supp.',d.frais_supp],['Coût manager',d.cout_david]].filter(x=>Number(x[1]||0)!==0);
+  const couts=[['Matériel',d.cout_materiel],['Installation',d.cout_installation],['Nacelle',d.cout_nacelle],['Audit',d.cout_audit],['Livraison',d.cout_livraison],['Frais supp.',d.frais_supp]].filter(x=>Number(x[1]||0)!==0);
   document.getElementById('dd-title').innerHTML=`📄 ${escH(d.nom_client||'Dossier')}${cid?` — <a href="${crmLink(cid)||'#'}" target="_blank" rel="noopener">${escH(cid)} ↗</a>`:''}`;
   let h=`<div class="hint" style="margin-bottom:10px">${fdate(d.date)}${d.numero_depot?(' · Dépôt '+escH(d.numero_depot)):''} · ${statutBadge(d.statut)}</div>`;
   h+=`<div class="row" style="gap:10px;margin-bottom:12px">
@@ -1827,7 +1826,8 @@ function dossierPreview(){
   }
   const nette=brute-david-(interne?0:regie);
   const per=nette/A().length;
-  document.getElementById('d-preview').innerHTML=`${extra}Marge brute : <b>${eur(brute)}</b> &nbsp; − manager ${num(dv)}% : <b>${eur(david)}</b> &nbsp; − ${regieLabel} : <b>${eur(regie)}</b>${interne?' <span style="color:var(--muted)">(non déduite)</span>':''}`+
+  const mgrTxt = PROJ.dossierType==='velo' ? `− manager ${num(dv)}% : <b>${eur(david)}</b> &nbsp; ` : '';
+  document.getElementById('d-preview').innerHTML=`${extra}Marge brute : <b>${eur(brute)}</b> &nbsp; ${mgrTxt}− ${regieLabel} : <b>${eur(regie)}</b>${interne?' <span style="color:var(--muted)">(non déduite)</span>':''}`+
     `<br>Marge nette : <b class="${nette>=0?'val-good':'val-bad'}" style="font-size:18px">${eur(nette)}</b> <span style="color:var(--muted)">(${A().map(a=>a.label+' '+eur(per)).join(' / ')})</span>`;
 }
 let editingDossierId=null;
@@ -1842,7 +1842,7 @@ function editDossier(id){
   csel.value=d.commercial_regie||'';
   if(PROJ.dossierType==='velo'){ S('d-region',d.region||'France'); S('d-nbvelos',d.nb_velos); S('d-tarif',d.tarif_unitaire); S('d-autrescouts',d.autres_couts); S('d-regie-montant',d.regie_montant_unitaire); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=!!d.regie_interne; }
   else { S('d-prime',d.montant_prime); S('d-install',d.cout_installation); S('d-materiel',d.cout_materiel); S('d-nacelle',d.cout_nacelle); S('d-hamid',d.cout_hamid); S('d-livraison',d.cout_livraison); S('d-fraissupp',d.frais_supp); S('d-audit',d.cout_audit);
-    S('d-delegataire',d.delegataire_id); onDelegataireChange(); S('d-fiche',d.fiche_id); }
+    S('d-cumac',d.cumac); S('d-delegataire',d.delegataire_id); }
   editingDossierId=id;
   document.getElementById('d-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('d-cancelbtn').style.display='';
@@ -1856,8 +1856,8 @@ function cancelEditDossier(){
   const st=document.getElementById('d-statut'); if(st) st.value=(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours');
   const rp=document.getElementById('d-regiepct'); if(rp) rp.value='0';
   if(PROJ.dossierType==='velo'){ ['d-nbvelos','d-autrescouts','d-regie-montant'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';}); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=false; }
-  else { ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';});
-    const dg=document.getElementById('d-delegataire'); if(dg) dg.value=''; onDelegataireChange(); }
+  else { ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit','d-cumac'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';});
+    const dg=document.getElementById('d-delegataire'); if(dg) dg.value=''; }
   document.getElementById('d-savebtn').textContent='+ Enregistrer le dossier';
   document.getElementById('d-cancelbtn').style.display='none';
   dossierPreview();
@@ -1871,8 +1871,7 @@ async function addDossier(e){
     statut:v('d-statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours'), david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
   if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); row.regie_montant_unitaire=g('d-regie-montant'); row.regie_interne=!!(document.getElementById('d-regie-interne')||{}).checked; row.regie_pct=0; }
   else { row.montant_prime=g('d-prime'); row.cout_installation=g('d-install'); row.cout_materiel=g('d-materiel'); row.cout_nacelle=g('d-nacelle'); row.cout_hamid=g('d-hamid'); row.cout_livraison=g('d-livraison'); row.frais_supp=g('d-fraissupp'); row.cout_audit=g('d-audit');
-    row.delegataire_id=v('d-delegataire'); row.fiche_id=v('d-fiche');
-    const fiche=(window._fiches||[]).find(f=>f.id===row.fiche_id); row.fiche_taux=fiche?Number(fiche.taux):null; }
+    row.cumac=g('d-cumac'); row.delegataire_id=v('d-delegataire'); }
   if(!editingDossierId){
     const nid=(row.crm_id||'').trim(), ndep=(row.numero_depot||'').trim();
     const dup=(window._dossiers||[]).find(d=> (nid && (d.crm_id||'').trim()===nid) || (ndep && (d.numero_depot||'').trim()===ndep) );
