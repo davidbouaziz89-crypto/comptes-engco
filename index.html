@@ -113,6 +113,17 @@
   .projbtn:hover{border-color:var(--accent)} .projbtn .ic{font-size:38px;display:block;margin-bottom:8px}
   .chk{display:flex;align-items:center;gap:8px;font-size:14px}
   .chk input{width:auto}
+  /* Paramètres : menu latéral */
+  .params-layout{display:flex;gap:18px;align-items:flex-start;margin-top:18px;flex-wrap:wrap}
+  .params-menu{flex:0 0 220px;display:flex;flex-direction:column;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px}
+  .params-menu button{background:transparent;border:1px solid transparent;color:var(--muted);text-align:left;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600}
+  .params-menu button:hover{color:var(--txt)}
+  .params-menu button.active{background:var(--panel2);color:var(--txt);border-color:var(--line)}
+  .params-content{flex:1;min-width:280px}
+  .params-content>.params-sec{display:none}
+  .params-content>.params-sec.active{display:block}
+  .params-content .params-sec>section.panel:first-child{margin-top:0}
+  @media(max-width:760px){.params-menu{flex-basis:100%;flex-direction:row;flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -158,13 +169,9 @@
   <button data-tab="dossiers" onclick="showTab('dossiers')">📁 Dossiers</button>
   <button data-tab="apports" onclick="showTab('apports')">💶 Apports</button>
   <button data-tab="frais" onclick="showTab('frais')">🧾 Frais / Dépenses</button>
+  <button data-tab="documents" id="nav-documents" onclick="showTab('documents')" style="display:none">📎 Documents</button>
   <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
   <button data-tab="monespace" onclick="showTab('monespace')">🤝 Mon espace</button>
-</nav>
-<nav id="subnav" style="display:none">
-  <button data-sub="statuts" onclick="showTab('statuts')">🏷️ Statuts</button>
-  <button data-sub="regies" onclick="showTab('regies')">🤝 Régies</button>
-  <button data-sub="sources" onclick="showTab('sources')">🏢 Sources</button>
 </nav>
 <nav id="adminnav" style="display:none">
   <button data-admtab="users" onclick="showAdminTab('users')">👥 Utilisateurs</button>
@@ -343,7 +350,7 @@
       <input type="file" id="imp-frais" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('frais',this.files[0]);this.value='';">
     </section>
     <div id="recur-alert" class="banner"></div>
-    <section class="panel">
+    <section class="panel" id="recur-section">
       <h2>⚙️ Frais récurrents (à saisir chaque mois)</h2>
       <div class="hint">Frais mensuels (ex. Loyer). L'appli te prévient s'il manque un mois.</div>
       <form class="row" onsubmit="addRecurrent(event)">
@@ -374,6 +381,7 @@
         <div class="field"><label>Montant (€)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00" required oninput="fraisPreview()"></div>
         <div class="field"><label>Régie concernée</label><input type="text" id="f-regie" placeholder="ex. JO, ADN…"></div>
         <div class="field"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
+        <div class="field" id="f-doc-field" style="display:none"><label>Justificatif (facture, document)</label><input type="file" id="f-doc" accept="image/*,.pdf"><div class="hint" id="f-doc-current" style="display:none;margin-top:4px"></div></div>
       </form>
       <div class="preview" id="f-preview"></div>
       <div style="margin-top:14px"><button class="btn" id="f-savebtn" onclick="addFrais(event)">+ Enregistrer le frais</button> <button class="btn ghost" type="button" id="f-cancelbtn" onclick="cancelEditFrais()" style="display:none">Annuler</button></div>
@@ -396,6 +404,48 @@
         <button class="btn ghost small" onclick="closeDossierDetail()">✕ Fermer</button>
       </div>
       <div id="dd-body"></div>
+    </div>
+  </div>
+
+  <!-- DOCUMENTS (LED) -->
+  <div id="tab-documents" class="hidden">
+    <section class="panel">
+      <h2>📎 Documents / justificatifs</h2>
+      <div class="hint" style="margin-bottom:10px">Tous les justificatifs joints aux frais. Filtre par catégorie.</div>
+      <div class="row" style="margin-bottom:10px">
+        <div class="field"><label>Catégorie</label><select id="doc-fcat" onchange="renderDocuments()"><option value="">Toutes</option></select></div>
+        <div class="field"><label>Recherche</label><input type="text" id="doc-search" placeholder="libellé, fournisseur…" oninput="renderDocuments()"></div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th class="num">Montant</th><th>Document</th></tr></thead>
+        <tbody id="documents-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- PARAMÈTRES (menu latéral) -->
+  <div id="tab-parametres" class="hidden">
+    <div class="params-layout">
+      <div class="params-menu" id="params-menu">
+        <button data-psec="statuts" onclick="showParam('statuts')">🏷️ Statuts</button>
+        <button data-psec="regies" onclick="showParam('regies')">🤝 Régies</button>
+        <button data-psec="sources" onclick="showParam('sources')">🏢 Sources</button>
+        <button data-psec="recurrents" onclick="showParam('recurrents')">🔁 Frais récurrents</button>
+        <button data-psec="categories" onclick="showParam('categories')">🏷️ Catégories de frais</button>
+      </div>
+      <div class="params-content" id="params-content">
+        <!-- ps-statuts / ps-regies / ps-sources / ps-recurrents : injectés par buildParamsLayout() -->
+        <div class="params-sec" id="ps-categories">
+          <section class="panel"><h2>🏷️ Catégories de frais / dépenses</h2>
+            <div class="hint" style="margin-bottom:8px">Ces catégories apparaissent dans le menu « Catégorie » à l'ajout d'un frais. Les frais récurrents s'ajoutent aussi automatiquement à la liste.</div>
+            <form class="row" onsubmit="addFraisCat(event)">
+              <div class="field"><input type="text" id="fc-nom" placeholder="ex. Carburant / déplacement" required></div>
+              <div class="field"><button class="btn" type="submit">+ Ajouter</button></div>
+            </form>
+            <div class="table-wrap"><table><tbody id="fraiscats-body"></tbody></table></div>
+          </section>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -619,14 +669,35 @@ function searchNorm(s){ return (s==null?'':s.toString()).toLowerCase().normalize
 function matchSearch(term,text){ const t=searchNorm(term).trim(); if(!t) return true; const hay=searchNorm(text); return t.split(/\s+/).every(w=>hay.includes(w)); }
 function toast(msg){ const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(window._tt);window._tt=setTimeout(()=>el.style.display='none',2600); }
 function showError(e){ const b=document.getElementById('loaderr');b.style.display='block';b.textContent="⚠️ Souci de connexion : "+(e.message||e); }
-const PARAM_SUBS=['statuts','regies','sources'];
+const PARAM_SECS=['statuts','regies','sources','recurrents','categories'];
+// Déplace (une seule fois) les sections Statuts/Régies/Sources + Frais récurrents dans le menu latéral Paramètres
+function buildParamsLayout(){
+  const content=document.getElementById('params-content'); if(!content||content._built) return;
+  [['statuts','tab-statuts'],['regies','tab-regies'],['sources','tab-sources'],['recurrents','recur-section']].forEach(([sec,srcId])=>{
+    const el=document.getElementById(srcId); if(!el) return;
+    const wrap=document.createElement('div'); wrap.className='params-sec'; wrap.id='ps-'+sec;
+    if(srcId==='recur-section'){ wrap.appendChild(el); }           // déplace la section entière
+    else { while(el.firstChild) wrap.appendChild(el.firstChild); el.remove(); } // déplace le contenu, retire l'ancien onglet vide
+    content.insertBefore(wrap, document.getElementById('ps-categories'));
+  });
+  content._built=true;
+}
+function showParam(sec){
+  window._curParam=sec;
+  document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.psec===sec));
+  document.querySelectorAll('#params-content > .params-sec').forEach(s=>s.classList.toggle('active', s.id==='ps-'+sec));
+}
 function showTab(t){
-  if(t==='parametres') t='statuts';
-  const inParam=PARAM_SUBS.includes(t);
-  document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t || (inParam && b.dataset.tab==='parametres')));
-  ['dashboard','dossiers','apports','frais','statuts','regies','sources','users','monespace','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
-  const sn=document.getElementById('subnav'); if(sn) sn.style.display=inParam?'flex':'none';
-  document.querySelectorAll('#subnav button').forEach(b=>b.classList.toggle('active',b.dataset.sub===t));
+  buildParamsLayout();
+  if(PARAM_SECS.includes(t)){ // raccourci legacy vers une section de Paramètres
+    document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab==='parametres'));
+    ['dashboard','dossiers','apports','frais','documents','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!=='parametres'); });
+    showParam(t); return;
+  }
+  document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
+  ['dashboard','dossiers','apports','frais','documents','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
+  if(t==='parametres') showParam(window._curParam||'statuts');
+  if(t==='documents') renderDocuments();
 }
 
 // ===== Connexion / projets / rôles =====
@@ -679,7 +750,6 @@ async function openAdminConsole(which){
   document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">Admin</span>';
   document.getElementById('btn-changeproj').style.display='';
   document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='none');
-  document.getElementById('subnav').style.display='none';
   document.getElementById('adminnav').style.display='flex';
   await loadRolesCfg();
   renderProjectRolesGrid();
@@ -902,7 +972,7 @@ async function loadAll(){
   await loadRegiesConfig();
   await loadStatuts();
   await Promise.all([loadApports(), loadDossiers(), loadRemboursements(), loadFrais()]);
-  renderRegies(); loadRecurrents();
+  renderRegies(); loadRecurrents(); loadFraisCats();
   if(CURRENT_ROLE==='admin') loadUsers();
 }
 async function loadSources(){
@@ -1115,6 +1185,8 @@ async function loadFrais(){
 function renderFrais(){
   const led=!!(PROJ&&PROJ.key==='led');
   const df=document.getElementById('f-dossier-field'); if(df) df.style.display=led?'':'none';
+  const ddf=document.getElementById('f-doc-field'); if(ddf) ddf.style.display=led?'':'none';
+  const nd=document.getElementById('nav-documents'); if(nd) nd.style.display=led?'':'none';
   const term=(document.getElementById('frais-search')||{}).value||'';
   const rows=(window._frais||[]).filter(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
@@ -1123,12 +1195,29 @@ function renderFrais(){
   document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
     const dtag=f.dossier_crm_id?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier lié (ID CRM)">🔗 ${escH(f.dossier_crm_id)}</span>`:'';
-    return `<tr><td>${fdate(f.date)}</td><td>${moisLabel(f.date)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}${dtag}</td><td>${f.fournisseur||''}</td>
+    const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
+    return `<tr><td>${fdate(f.date)}</td><td>${moisLabel(f.date)}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}${dtag}${doctag}</td><td>${f.fournisseur||''}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
       <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="11" class="empty">${term?'Aucun frais ne correspond à la recherche':'Aucun frais'}</td></tr>`;
+}
+// ===== Documents / justificatifs (LED) =====
+function renderDocuments(){
+  const catSel=document.getElementById('doc-fcat');
+  if(catSel){ const cats=[...new Set((window._frais||[]).filter(f=>f.doc_path).map(f=>f.categorie).filter(Boolean))].sort();
+    const prev=catSel.value; catSel.innerHTML='<option value="">Toutes</option>'+cats.map(c=>`<option>${escH(c)}</option>`).join(''); if(prev&&cats.includes(prev)) catSel.value=prev; }
+  const fcat=(document.getElementById('doc-fcat')||{}).value||'';
+  const term=(document.getElementById('doc-search')||{}).value||'';
+  const list=(window._frais||[]).filter(f=>f.doc_path && (!fcat||f.categorie===fcat) && matchSearch(term,[f.libelle,f.fournisseur,f.categorie,f.doc_name].join(' ')));
+  const b=document.getElementById('documents-body'); if(!b) return;
+  b.innerHTML=list.length? list.map(f=>`<tr><td>${fdate(f.date)}</td><td><span class="pill">${escH(f.categorie||'')}</span></td><td>${escH(f.libelle||'')}</td><td>${escH(f.fournisseur||'')}</td><td class="num">${eur(f.montant)}</td><td><a href="#" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎 ${escH(f.doc_name||'ouvrir')}</a></td></tr>`).join('') : `<tr><td colspan="6" class="empty">Aucun document</td></tr>`;
+}
+async function openFraisDoc(path){
+  const {data,error}=await db.storage.from('engco-docs').createSignedUrl(path,3600);
+  if(error){ toast('Erreur : '+error.message); return; }
+  window.open(data.signedUrl,'_blank','noopener');
 }
 
 // ===== Tableau de bord =====
@@ -1388,6 +1477,8 @@ function editFrais(id){
   document.getElementById('f-fournisseur').value=f.fournisseur||'';
   document.getElementById('f-source').value=f.source_id||'';
   { const dv=document.getElementById('f-dossier'); if(dv) dv.value=f.dossier_crm_id||''; }
+  { const fi=document.getElementById('f-doc'); if(fi) fi.value=''; const cur=document.getElementById('f-doc-current');
+    if(cur){ if(f.doc_path){ cur.style.display=''; cur.innerHTML=`📎 Justificatif actuel : <a href="#" onclick="openFraisDoc('${escH(f.doc_path)}');return false">${escH(f.doc_name||'document')}</a> — choisis un fichier pour le remplacer.`; } else { cur.style.display='none'; cur.innerHTML=''; } } }
   document.getElementById('f-montant').value=f.montant;
   document.getElementById('f-regie').value=f.regie_concernee||'';
   document.getElementById('f-pct').value=f.pct_decompte||0;
@@ -1399,7 +1490,8 @@ function editFrais(id){
 }
 function cancelEditFrais(){
   editingFraisId=null;
-  ['f-libelle','f-fournisseur','f-montant','f-regie','f-dossier'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  ['f-libelle','f-fournisseur','f-montant','f-regie','f-dossier','f-doc'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  { const cur=document.getElementById('f-doc-current'); if(cur){ cur.style.display='none'; cur.innerHTML=''; } }
   document.getElementById('f-pct').value='0'; document.getElementById('f-preview').innerHTML='';
   document.getElementById('f-savebtn').textContent='+ Enregistrer le frais';
   document.getElementById('f-cancelbtn').style.display='none';
@@ -1411,7 +1503,17 @@ async function addFrais(e){
     libelle:document.getElementById('f-libelle').value||null, fournisseur:document.getElementById('f-fournisseur').value||null, montant,
     source_id:document.getElementById('f-source').value||null, regie_concernee:document.getElementById('f-regie').value||null,
     pct_decompte:Number(document.getElementById('f-pct').value)||0 };
-  if(PROJ&&PROJ.key==='led'){ const dv=document.getElementById('f-dossier'); row.dossier_crm_id=(dv&&dv.value.trim())||null; }
+  if(PROJ&&PROJ.key==='led'){
+    const dv=document.getElementById('f-dossier'); row.dossier_crm_id=(dv&&dv.value.trim())||null;
+    const fi=document.getElementById('f-doc'), file=fi&&fi.files&&fi.files[0];
+    if(file){
+      const safe=file.name.replace(/[^\w.\-]+/g,'_').slice(-60);
+      const path='engco/'+Date.now()+'-'+safe;
+      const {error:upErr}=await db.storage.from('engco-docs').upload(path,file,{upsert:false});
+      if(upErr){ toast('Erreur envoi du justificatif : '+upErr.message); return; }
+      row.doc_path=path; row.doc_name=file.name;
+    }
+  }
   if(!editingFraisId){
     const ym=(row.date||'').slice(0,7);
     const dup=(window._frais||[]).find(f=>(f.date||'').slice(0,7)===ym && Number(f.montant)===Number(row.montant));
@@ -1442,9 +1544,32 @@ async function loadRecurrents(){
   fillCategorieOptions(); checkMissingRecurrents();
 }
 function fillCategorieOptions(){
-  const sel=document.getElementById('f-categorie'); const prev=sel.value;
-  const all=[...new Set([...(window._recurrents||[]).map(r=>r.libelle),'Audit client','Fournisseur','Autre'])];
-  sel.innerHTML=all.map(c=>`<option>${c}</option>`).join(''); if(prev&&all.includes(prev)) sel.value=prev;
+  const sel=document.getElementById('f-categorie'); if(!sel) return; const prev=sel.value;
+  const cats=(window._fraiscats||[]).map(c=>c.nom);
+  const base=cats.length?cats:['Audit client','Fournisseur','Autre'];
+  const all=[...new Set([...(window._recurrents||[]).map(r=>r.libelle),...base])];
+  sel.innerHTML=all.map(c=>`<option>${escH(c)}</option>`).join(''); if(prev&&all.includes(prev)) sel.value=prev;
+}
+// ===== Catégories de frais / dépenses (configurables) =====
+async function loadFraisCats(){
+  const {data,error}=await db.from(T('frais_cats')).select('*').order('nom');
+  if(error){ window._fraiscats=window._fraiscats||[]; renderFraisCats(); fillCategorieOptions(); return; }
+  window._fraiscats=data||[]; renderFraisCats(); fillCategorieOptions();
+}
+function renderFraisCats(){
+  const b=document.getElementById('fraiscats-body'); if(!b) return;
+  const list=window._fraiscats||[];
+  b.innerHTML=list.length? list.map(c=>`<tr><td>${escH(c.nom)}</td><td class="num"><button class="btn danger small" onclick="delFraisCat('${c.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td class="empty">Aucune catégorie personnalisée — par défaut : Audit client, Fournisseur, Autre.</td></tr>`;
+}
+async function addFraisCat(e){
+  e.preventDefault(); const nom=document.getElementById('fc-nom').value.trim(); if(!nom) return;
+  const {error}=await db.from(T('frais_cats')).insert({nom}); if(error){ toast('Erreur : '+error.message); return; }
+  document.getElementById('fc-nom').value=''; loadFraisCats(); toast('Catégorie ajoutée ✅');
+}
+async function delFraisCat(id){
+  if(!confirm('Supprimer cette catégorie ?')) return;
+  const {error}=await db.from(T('frais_cats')).delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; }
+  loadFraisCats();
 }
 let editingRecurId=null;
 function editRecurrent(id){
