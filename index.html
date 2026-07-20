@@ -1154,7 +1154,7 @@ function managerRegieRow(){
   return `<form class="row" onsubmit="addDossier(event)">
     <input type="hidden" id="d-davidpct" value="5">
     <div class="field"><label>Régie</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
-    <div class="field"><label>% commission régie</label><input type="number" step="0.01" id="d-regiepct" value="0" oninput="dossierPreview()"></div>
+    <input type="hidden" id="d-regiepct" value="0">
     <div class="field"><label>Délégataire</label><select id="d-delegataire"></select></div>
     ${statutField}
   </form>`;
@@ -1988,7 +1988,7 @@ function dossierPreview(){
     interne=!!(document.getElementById('d-regie-interne')||{}).checked;
     regieLabel=`régie ${eur(mu)}/vélo${interne?' <span style="color:var(--muted)">(interne, gardée)</span>':''}`;
   } else {
-    const rg=g('d-regiepct'); regie=brute*rg/100; regieLabel=`régie ${num(rg)}%`;
+    const rg=g('d-regiepct'); regie=brute*rg/100; regieLabel='régie';
   }
   const nette=brute-david-(interne?0:regie);
   const per=nette/A().length;
