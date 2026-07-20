@@ -51,6 +51,8 @@
   .field label{font-size:12px;color:var(--muted)}
   input,select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:10px;border-radius:9px;font-size:14px;width:100%}
   input:focus,select:focus{outline:2px solid var(--accent);border-color:transparent}
+  tr.rowedit>td{background:rgba(99,102,241,.08);vertical-align:top}
+  tr.rowedit input,tr.rowedit select{padding:6px 8px;font-size:13px;border-radius:7px}
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -1196,6 +1198,7 @@ async function loadFrais(){
 }
 function fraisMonth(f){ return (f&&f.mois_concerne)||((f&&f.date||'').slice(0,7)); } // 'YYYY-MM' concerné
 function moisConcerneLabel(f){ const m=fraisMonth(f); return m?moisLabel(m+'-01'):''; }
+let inlineFraisId=null;
 function renderFrais(){
   const led=!!(PROJ&&PROJ.key==='led');
   const df=document.getElementById('f-dossier-field'); if(df) df.style.display=led?'':'none';
@@ -1208,6 +1211,7 @@ function renderFrais(){
     return matchSearch(term,[fdate(f.date),moisConcerneLabel(f),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,f.dossier_crm_id].join(' '));
   });
   document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
+    if(f.id===inlineFraisId) return fraisEditRow(f);
     const src=SOURCES.find(s=>s.id===f.source_id);
     const dtag=f.dossier_crm_id?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier lié (ID CRM)">🔗 ${escH(f.dossier_crm_id)}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
@@ -1219,6 +1223,70 @@ function renderFrais(){
       <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="11" class="empty">${term?'Aucun frais ne correspond à la recherche':'Aucun frais'}</td></tr>`;
 }
+// ----- Édition d'un frais directement sur sa ligne -----
+function fraisCatOptions(cur){
+  const cats=(window._fraiscats||[]).map(c=>c.nom);
+  const base=cats.length?cats:['Audit client','Fournisseur','Autre'];
+  let all=[...new Set([...(window._recurrents||[]).map(r=>r.libelle),...base])];
+  if(cur && !all.includes(cur)) all=[cur,...all];
+  return all.map(c=>`<option${c===cur?' selected':''}>${escH(c)}</option>`).join('');
+}
+function fraisSrcOptions(cur){
+  return '<option value="">— société —</option>'+SOURCES.map(s=>`<option value="${escH(s.id)}"${s.id===cur?' selected':''}>${escH(s.nom)}</option>`).join('');
+}
+function fraisEditRow(f){
+  const led=!!(PROJ&&PROJ.key==='led');
+  const mois=f.mois_concerne||((f.date||'').slice(0,7));
+  let ledCell='';
+  if(led){
+    const cur=f.doc_path?`<div class="hint" style="margin-top:4px">📎 <a href="#" onclick="openFraisDoc('${escH(f.doc_path)}');return false">${escH(f.doc_name||'justificatif')}</a> — choisis un fichier pour le remplacer.</div>`:'';
+    ledCell=`<input type="text" id="if-dossier" placeholder="ID dossier CRM" value="${escH(f.dossier_crm_id||'')}" style="margin-top:5px">
+      <input type="file" id="if-doc" accept="image/*,.pdf" style="margin-top:5px">${cur}`;
+  }
+  return `<tr class="rowedit">
+    <td><input type="date" id="if-date" value="${escH(f.date||today())}"></td>
+    <td><input type="month" id="if-mois" value="${escH(mois)}"></td>
+    <td>${f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️</span>'}</td>
+    <td><select id="if-categorie">${fraisCatOptions(f.categorie)}</select></td>
+    <td><input type="text" id="if-fournisseur" placeholder="Fournisseur" value="${escH(f.fournisseur||'')}">${ledCell}</td>
+    <td><select id="if-source">${fraisSrcOptions(f.source_id)}</select></td>
+    <td class="num"><input type="number" step="0.01" id="if-montant" value="${f.montant}" oninput="inlineFraisPreview()"></td>
+    <td><input type="text" id="if-regie" value="${escH(f.regie_concernee||'')}"></td>
+    <td class="num"><input type="number" step="0.01" id="if-pct" value="${f.pct_decompte||0}" oninput="inlineFraisPreview()" style="width:72px"> %</td>
+    <td class="num val-bad" id="if-societe">${eur(f.montant_societe)}</td>
+    <td class="num"><button class="btn small" onclick="saveFraisInline('${f.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelFraisInline()">Annuler</button></td>
+  </tr>`;
+}
+function inlineFraisPreview(){
+  const m=Number((document.getElementById('if-montant')||{}).value)||0;
+  const pct=Number((document.getElementById('if-pct')||{}).value)||0;
+  const el=document.getElementById('if-societe'); if(el) el.textContent=eur(m-m*pct/100);
+}
+function cancelFraisInline(){ inlineFraisId=null; renderFrais(); }
+async function saveFraisInline(id){
+  const g=x=>document.getElementById(x);
+  const montant=Number(g('if-montant').value); if(!montant){ toast('⚠️ Indique un montant'); g('if-montant').focus(); return; }
+  const row={ date:g('if-date').value||today(), categorie:g('if-categorie').value,
+    mois_concerne:g('if-mois').value||null,
+    fournisseur:g('if-fournisseur').value||null, montant,
+    source_id:g('if-source').value||null, regie_concernee:g('if-regie').value||null,
+    pct_decompte:Number(g('if-pct').value)||0 };
+  if(PROJ&&PROJ.key==='led'){
+    const dv=g('if-dossier'); if(dv) row.dossier_crm_id=dv.value.trim()||null;
+    const fi=g('if-doc'), file=fi&&fi.files&&fi.files[0];
+    if(file){
+      const safe=file.name.replace(/[^\w.\-]+/g,'_').slice(-60);
+      const path='engco/'+Date.now()+'-'+safe;
+      const {error:upErr}=await db.storage.from('engco-docs').upload(path,file,{upsert:false});
+      if(upErr){ toast('Erreur envoi du justificatif : '+upErr.message); return; }
+      row.doc_path=path; row.doc_name=file.name;
+    }
+  }
+  const {error}=await db.from(T('frais')).update(row).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  inlineFraisId=null; toast('Frais modifié ✅'); loadFrais();
+}
+
 // ===== Documents / justificatifs (LED) =====
 function renderDocuments(){
   const catSel=document.getElementById('doc-fcat');
@@ -1483,26 +1551,13 @@ function fraisPreview(){
   document.getElementById('f-preview').innerHTML=`Refacturé régie : <b>${eur(m*pct/100)}</b> / À charge société : <b class="val-bad">${eur(m-m*pct/100)}</b>`;
 }
 let editingFraisId=null;
+// Modification directement sur la ligne du tableau (plus besoin de remonter au formulaire du haut)
 function editFrais(id){
-  const f=(window._frais||[]).find(x=>x.id===id); if(!f) return;
-  document.getElementById('f-date').value=f.date||today();
-  document.getElementById('f-mois').value=f.mois_concerne||((f.date||'').slice(0,7));
-  const csel=document.getElementById('f-categorie');
-  if(f.categorie && ![...csel.options].some(o=>o.value===f.categorie)) csel.insertAdjacentHTML('afterbegin',`<option>${f.categorie}</option>`);
-  csel.value=f.categorie||'Autre';
-  document.getElementById('f-fournisseur').value=f.fournisseur||'';
-  document.getElementById('f-source').value=f.source_id||'';
-  { const dv=document.getElementById('f-dossier'); if(dv) dv.value=f.dossier_crm_id||''; }
-  { const fi=document.getElementById('f-doc'); if(fi) fi.value=''; const cur=document.getElementById('f-doc-current');
-    if(cur){ if(f.doc_path){ cur.style.display=''; cur.innerHTML=`📎 Justificatif actuel : <a href="#" onclick="openFraisDoc('${escH(f.doc_path)}');return false">${escH(f.doc_name||'document')}</a> — choisis un fichier pour le remplacer.`; } else { cur.style.display='none'; cur.innerHTML=''; } } }
-  document.getElementById('f-montant').value=f.montant;
-  document.getElementById('f-regie').value=f.regie_concernee||'';
-  document.getElementById('f-pct').value=f.pct_decompte||0;
-  editingFraisId=id;
-  document.getElementById('f-savebtn').textContent='💾 Enregistrer les modifications';
-  document.getElementById('f-cancelbtn').style.display='';
-  fraisPreview();
-  document.getElementById('f-montant').scrollIntoView({behavior:'smooth',block:'center'});
+  if(inlineFraisId===id) return;
+  inlineFraisId=id;
+  renderFrais();
+  const r=document.querySelector('tr.rowedit'); if(r) r.scrollIntoView({behavior:'smooth',block:'nearest'});
+  const m=document.getElementById('if-montant'); if(m) m.focus();
 }
 function cancelEditFrais(){
   editingFraisId=null;
