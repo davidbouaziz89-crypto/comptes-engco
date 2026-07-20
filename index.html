@@ -1533,9 +1533,9 @@ async function addFrais(e){
   }
   if(!editingFraisId){
     const ym=row.mois_concerne||(row.date||'').slice(0,7);
-    const dup=(window._frais||[]).find(f=>fraisMonth(f)===ym && Number(f.montant)===Number(row.montant));
+    const dup=(window._frais||[]).find(f=>fraisMonth(f)===ym && Number(f.montant)===Number(row.montant) && (f.categorie||'')===(row.categorie||''));
     if(dup){
-      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais du MÊME montant ('+eur(row.montant)+') existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+(dup.libelle||dup.categorie||'')+(dup.fournisseur?' — '+dup.fournisseur:'')+' le '+fdate(dup.date)+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
+      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais « '+(row.categorie||'')+' » du MÊME montant ('+eur(row.montant)+') existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+(dup.libelle||dup.categorie||'')+(dup.fournisseur?' — '+dup.fournisseur:'')+' le '+fdate(dup.date)+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
       if(!ok) return;
     }
   }
