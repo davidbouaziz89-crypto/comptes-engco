@@ -585,6 +585,30 @@
             </section>
           </div>
           <div class="params-sec" id="ps-users">
+            <section class="panel"><h2>➕ Créer un utilisateur</h2>
+              <div class="hint" style="margin-bottom:10px">Crée un accès au CRM. Un <b>email de connexion</b> (identifiants + lien) est envoyé automatiquement au nouvel utilisateur.</div>
+              <form onsubmit="createUserFn(event)">
+                <div class="row">
+                  <div class="field"><label>Nom</label><input id="cu-nom" placeholder="Prénom Nom"></div>
+                  <div class="field"><label>Email</label><input id="cu-email" type="email" required placeholder="email@exemple.fr"></div>
+                  <div class="field sm"><label>Mot de passe</label><input id="cu-pass" required placeholder="6 caractères min"></div>
+                </div>
+                <label style="margin-top:6px">Rôles</label>
+                <div class="row" style="gap:14px">
+                  <label class="chk" style="margin:0"><input type="checkbox" id="cu-role-telepro"> 📞 Télépro</label>
+                  <label class="chk" style="margin:0"><input type="checkbox" id="cu-role-confirmateur"> ✅ Confirmateur</label>
+                  <label class="chk" style="margin:0"><input type="checkbox" id="cu-role-commercial"> 🤝 Commercial</label>
+                  <label class="chk" style="margin:0"><input type="checkbox" id="cu-role-cq"> 🔍 CQ</label>
+                </div>
+                <label style="margin-top:8px">Adresse domicile <span class="hint">(si commercial — optionnel)</span></label>
+                <div class="row">
+                  <div class="field" style="flex:2"><input id="cu-adresse" placeholder="N° et rue"></div>
+                  <div class="field sm"><input id="cu-cp" placeholder="Code postal"></div>
+                  <div class="field"><input id="cu-ville" placeholder="Ville"></div>
+                </div>
+                <div style="margin-top:12px"><button class="btn" id="cu-btn" type="submit">➕ Créer l'utilisateur</button></div>
+              </form>
+            </section>
             <section class="panel"><h2>👥 Utilisateurs & rôles</h2>
               <div class="hint" style="margin-bottom:8px">Cochez les rôles de chaque utilisateur. Une même personne peut cumuler plusieurs rôles (ex : télépro <b>et</b> confirmateur). Le rôle principal (attribué à la connexion) est verrouillé ; ajoutez les rôles supplémentaires. Pour un <b>commercial</b>, renseignez l'adresse de son domicile (utilisée pour la distance du 1er RDV du jour).</div>
               <div id="users-list"></div>
@@ -2257,6 +2281,50 @@ function renderUsers(){
       ${avatar(p.nom||p.email,'')}<b>${esc(p.nom||p.email)}</b>${adm?' <span class="tag">admin</span>':''}
       <span style="flex:1"></span>${checks}</div>${addr}</div>`;
   }).join('');
+}
+function welcomeEmailHTML(o){
+  return `<div style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;color:#1a2230;line-height:1.5;max-width:520px">
+    <h2 style="margin:0 0 6px">Bienvenue${o.nom?' '+esc(o.nom):''} 👋</h2>
+    <p>Un accès au <b>CRM Photovoltaïque</b> vient d'être créé pour toi. Voici tes identifiants de connexion :</p>
+    <div style="background:#f4f6fb;border:1px solid #dde3ec;border-radius:10px;padding:14px 16px;margin:12px 0">
+      <div><b>Email :</b> ${esc(o.email)}</div>
+      <div><b>Mot de passe :</b> ${esc(o.password)}</div>
+    </div>
+    <p><a href="${o.url}" style="display:inline-block;background:#f5a623;color:#241500;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:9px">Se connecter au CRM</a></p>
+    <p style="color:#5b6675;font-size:13px">Lien direct : <a href="${o.url}">${o.url}</a><br>Garde ces identifiants en lieu sûr.</p>
+  </div>`;
+}
+async function createUserFn(e){
+  if(e) e.preventDefault();
+  const g=i=>document.getElementById(i).value;
+  const nom=g('cu-nom').trim(), email=g('cu-email').trim(), password=g('cu-pass');
+  if(!email||!password){ toast('Email et mot de passe requis'); return; }
+  if(password.length<6){ toast('Mot de passe : 6 caractères minimum'); return; }
+  const roles=['telepro','confirmateur','commercial','cq'].filter(k=>document.getElementById('cu-role-'+k).checked);
+  if(!roles.length){ toast('Choisis au moins un rôle'); return; }
+  const primary=['telepro','confirmateur','commercial'].find(r=>roles.includes(r))||'confirmateur';
+  const profile={adresse:g('cu-adresse').trim()||null,code_postal:g('cu-cp').trim()||null,ville:g('cu-ville').trim()||null};
+  const btn=document.getElementById('cu-btn'), old=btn.textContent; btn.disabled=true; btn.textContent='Création…';
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/admin-create-user',{method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email,password,memberships:[{project_key:'crmpv',role:primary}],nom:nom||null,roles,profile})});
+    let out={}; try{ out=await res.json(); }catch(_){}
+    if(!res.ok) throw new Error(out.error||('Création impossible ('+res.status+')'));
+    // Mail de bienvenue / connexion
+    let mailNote='';
+    try{
+      await sendEmail({to:email,subject:'Votre accès au CRM Photovoltaïque',html:welcomeEmailHTML({nom,email,password,url:'https://gestion.proformationplus.fr/photovoltaique.html'})});
+      mailNote=' · email de connexion envoyé ✓';
+    }catch(err){ mailNote=' · (email non envoyé : '+err.message+')'; }
+    toast('Utilisateur créé'+mailNote);
+    ['cu-nom','cu-email','cu-pass','cu-adresse','cu-cp','cu-ville'].forEach(i=>document.getElementById(i).value='');
+    ['telepro','confirmateur','commercial','cq'].forEach(k=>document.getElementById('cu-role-'+k).checked=false);
+    const {data}=await db.from('pv_profiles').select('*').eq('actif',true); if(data) PROFILES=data;
+    fillSelects(); renderUsers();
+  }catch(err){ toast('Erreur : '+err.message); }
+  btn.disabled=false; btn.textContent=old;
 }
 async function toggleRole(userId,role,on){
   const p=PROFILES.find(x=>x.id===userId); if(!p) return;
