@@ -1508,6 +1508,7 @@ const CRM_ROLES={
   crmpv:[['telepro','Télépro'],['confirmateur','Confirmateur'],['commercial','Commercial'],['cq','CQ'],['financement','Financement'],['paiement','Paiement']],
   crmformation:[['secretaire','Secrétaire'],['commercial','Commercial']],
   pointage:[['manager','Manager'],['comptable','Comptable'],['employe','Employé']],
+  docucrm:[['secretaire','Secrétaire']],
 };
 function rolesForProject(key){
   if(CRM_ROLES[key]) return CRM_ROLES[key].map(([k,l])=>({role_key:k,label:l}));

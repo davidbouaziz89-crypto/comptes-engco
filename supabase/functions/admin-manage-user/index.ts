@@ -16,6 +16,7 @@ const CRM_ROLES: Record<string, string[]> = {
   crmpv: ["telepro", "confirmateur", "commercial", "cq", "financement", "paiement"],
   crmformation: ["secretaire", "commercial"],
   pointage: ["manager", "comptable", "employe"],
+  docucrm: ["secretaire"],
 };
 
 Deno.serve(async (req: Request) => {
