@@ -1098,7 +1098,7 @@ function ensureCal(){ if(calY==null){ const d=new Date(); calY=d.getFullYear(); 
 function calShift(n){ ensureCal(); calM+=n; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} renderAgenda(); }
 function calToday(){ const d=new Date(); calY=d.getFullYear(); calM=d.getMonth(); calSel=todayStr(); renderAgenda(); }
 function rdvOwnerName(r){ const p=PROFILES.find(x=>(x.email||'').toLowerCase()===(r.owner_email||'').toLowerCase()); return p?(p.nom||p.email):(r.owner_email||'?'); }
-function visibleRdvs(){ let arr=RDVS.slice(); if(IS_ADMIN){ const f=(document.getElementById('cal-owner')||{}).value||''; if(f) arr=arr.filter(r=>r.owner_email===f); } return arr; }
+function visibleRdvs(){ let arr=RDVS.slice(); if(IS_ADMIN){ const f=(document.getElementById('cal-owner')||{}).value||''; if(f) arr=arr.filter(r=>r.owner_email===f); } else { arr=arr.filter(r=>SESSION && r.owner_id===SESSION.user.id); } return arr; }
 
 /* Notifications : mes rappels du jour + en retard */
 function myDueRdvs(){ const t=todayStr(); return RDVS.filter(r=>r.owner_id===SESSION.user.id && !r.done && r.date_rdv<=t); }
@@ -1242,10 +1242,12 @@ function periodStartISO(){ const now=new Date();
   if(DASH_PERIOD==='quarter') return isoDate(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);
   if(DASH_PERIOD==='year') return isoDate(now.getFullYear(),0,1);
   return null; }
+function leadMine(l){ return IS_ADMIN || (SESSION && l.owner_id===SESSION.user.id); }
 function periodLeads(){
+  const base=IS_ADMIN?LEADS:LEADS.filter(leadMine);
   if(DASH_PERIOD==='custom'){ const f=document.getElementById('dash-from').value, t=document.getElementById('dash-to').value;
-    return LEADS.filter(l=>{ const d=(l.created_at||'').slice(0,10); if(f&&d<f) return false; if(t&&d>t) return false; return true; }); }
-  const s=periodStartISO(); return s?LEADS.filter(l=>(l.created_at||'').slice(0,10)>=s):LEADS;
+    return base.filter(l=>{ const d=(l.created_at||'').slice(0,10); if(f&&d<f) return false; if(t&&d>t) return false; return true; }); }
+  const s=periodStartISO(); return s?base.filter(l=>(l.created_at||'').slice(0,10)>=s):base;
 }
 function renderDashboard(){
   const L=periodLeads();
@@ -1254,7 +1256,7 @@ function renderDashboard(){
   const toBill=L.filter(l=>l.etape==='a_facturer').length;
   const nbFormations=FORMATIONS.filter(f=>f.actif!==false).length;
   const kpi=[
-    {v:total,l:'Leads au total',i:'👥',c:'#4f7cff',filt:'all'},
+    {v:total,l:IS_ADMIN?'Leads au total':'Mes leads',i:'👥',c:'#4f7cff',filt:'all'},
     {v:open.length,l:'En cours',i:'⏳',c:'#8a5cff',filt:'open'},
     {v:won.length,l:'Gagnés',i:'🏆',c:'#16a34a',filt:'won'},
     {v:(total?Math.round(won.length/total*100):0)+' %',l:'Conversion',i:'📈',c:'#0ea5e9',filt:'won'},
