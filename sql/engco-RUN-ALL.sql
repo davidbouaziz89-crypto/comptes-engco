@@ -157,3 +157,10 @@ create policy engco_dossier_materiels_all on public.engco_dossier_materiels for 
 grant select, insert, update, delete on public.engco_materiels to authenticated;
 grant select, insert, update, delete on public.engco_fournisseurs to authenticated;
 grant select, insert, update, delete on public.engco_dossier_materiels to authenticated;
+
+-- ===== engco-materiel-champs.sql =====
+-- Champs additionnels sur les matériels (prix HT, puissance, marque)
+alter table public.engco_materiels
+  add column if not exists prix_ht numeric,
+  add column if not exists puissance text,
+  add column if not exists marque text;
