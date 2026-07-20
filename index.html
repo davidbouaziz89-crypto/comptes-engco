@@ -490,8 +490,8 @@
         <div class="field"><label>Fournisseur</label><input type="text" id="f-fournisseur" placeholder="nom du fournisseur"></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source"></select></div>
         <div class="field"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" required oninput="fraisPreview()"></div>
-        <div class="field"><label>Régie concernée</label><input type="text" id="f-regie" placeholder="ex. JO, ADN…"></div>
-        <div class="field"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
+        <div class="field"><label>Régie concernée</label><select id="f-regie" onchange="onFraisRegie()"></select></div>
+        <div class="field" id="f-pct-field" style="display:none"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
         <div class="field" id="f-doc-field" style="display:none"><label>Justificatif (facture, document)</label><input type="file" id="f-doc" accept="image/*,.pdf" onchange="onFraisDocPick()"><div class="hint" id="f-doc-current" style="display:none;margin-top:4px"></div></div>
       </form>
       <div class="preview" id="f-preview"></div>
@@ -581,7 +581,7 @@
               <div class="field fc-rec" style="display:none"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fc-montant" placeholder="ex. 1000"></div>
               <div class="field fc-rec" style="display:none"><label>Payé par (société)</label><select id="fc-source"></select></div>
               <div class="field fc-rec" style="display:none"><label>À partir du mois</label><input type="month" id="fc-mois"></div>
-              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="fc-savebtn">+ Ajouter</button> <button class="btn ghost" type="button" id="fc-cancelbtn" onclick="cancelEditCat()" style="display:none">Annuler</button></div>
             </form>
             <div class="table-wrap"><table>
               <thead><tr><th>Catégorie</th><th>Type</th><th class="num">Montant récurrent</th><th>Société</th><th>Depuis</th><th></th></tr></thead>
@@ -843,6 +843,13 @@ function showTab(t){
   ['dashboard','dossiers','apports','frais','documents','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
   if(t==='parametres') showParam(window._curParam||'statuts');
   if(t==='documents') renderDocuments();
+  if(t==='dashboard') replayDashboard();
+}
+// Rejoue l'animation des chiffres + graphes à chaque retour sur le dashboard
+function replayDashboard(){
+  if(!PROJ) return;
+  document.querySelectorAll('.k-value[data-kpi]').forEach(el=>el.setAttribute('data-cur','0'));
+  refreshDashboard();
 }
 
 // ===== Connexion / projets / rôles =====
@@ -1226,6 +1233,9 @@ async function loadRegiesConfig(){
   const sel=document.getElementById('d-commercial'); const prev=sel.value;
   sel.innerHTML='<option value="">— aucune —</option>'+REGIES_CFG.map(r=>`<option value="${r.nom}">${r.nom}${velo?(r.interne?' — interne':''):` (${num(r.pct_defaut)}%)`}</option>`).join('');
   if(prev) sel.value=prev;
+  // Régie du formulaire « Frais » : liste déroulante (le % vient de la régie)
+  const fr=document.getElementById('f-regie');
+  if(fr){ const p=fr.value; fr.innerHTML='<option value="">— aucune —</option>'+REGIES_CFG.map(r=>`<option value="${escH(r.nom)}">${escH(r.nom)}${velo?'':` (${num(r.pct_defaut)}%)`}</option>`).join(''); if(p&&[...fr.options].some(o=>o.value===p)) fr.value=p; }
   const body=document.getElementById('regiecfg-body');
   if(!REGIES_CFG.length){ body.innerHTML=`<tr><td colspan="${velo?6:3}" class="empty">Aucune régie configurée</td></tr>`; return; }
   body.innerHTML=REGIES_CFG.map(r=> velo
@@ -1234,6 +1244,18 @@ async function loadRegiesConfig(){
     : `<tr><td><b>${r.nom}</b></td><td class="num">${num(r.pct_defaut)} %</td>
         <td class="num"><button class="btn ghost small" onclick="editRegieCfg('${r.id}')">✏️</button> <button class="btn danger small" onclick="delRow('app_regies','${r.id}')">Suppr.</button></td></tr>`
   ).join('');
+}
+// Frais : quand on choisit une régie, le % refacturé vient de la régie (paramètres)
+function onFraisRegie(){
+  const sel=document.getElementById('f-regie'); if(!sel) return;
+  const r=REGIES_CFG.find(x=>x.nom===sel.value);
+  const pct=document.getElementById('f-pct'); if(pct) pct.value=(r&&r.pct_defaut!=null)?r.pct_defaut:0;
+  fraisPreview();
+}
+function fraisRegieOptions(cur){
+  let opts='<option value="">— aucune —</option>'+(REGIES_CFG||[]).map(r=>`<option value="${escH(r.nom)}"${r.nom===cur?' selected':''}>${escH(r.nom)}${(PROJ&&PROJ.dossierType==='velo')?'':` (${num(r.pct_defaut)}%)`}</option>`).join('');
+  if(cur && !(REGIES_CFG||[]).some(r=>r.nom===cur)) opts+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`;
+  return opts;
 }
 function onDossierRegie(){
   const r=REGIES_CFG.find(x=>x.nom===document.getElementById('d-commercial').value);
@@ -1519,7 +1541,7 @@ function fraisEditRow(f){
     <td><input type="text" id="if-fournisseur" placeholder="Fournisseur" value="${escH(f.fournisseur||'')}">${ledCell}</td>
     <td><select id="if-source">${fraisSrcOptions(f.source_id)}</select></td>
     <td class="num"><input type="number" step="0.01" id="if-montant" value="${f.montant}" oninput="inlineFraisPreview()"></td>
-    <td><input type="text" id="if-regie" value="${escH(f.regie_concernee||'')}"></td>
+    <td><select id="if-regie" onchange="onInlineRegie()">${fraisRegieOptions(f.regie_concernee||'')}</select></td>
     <td class="num"><input type="number" step="0.01" id="if-pct" value="${f.pct_decompte||0}" oninput="inlineFraisPreview()" style="display:inline-block;width:64px"> %</td>
     <td class="num val-bad" id="if-societe">${eur(f.montant_societe)}</td>
     <td class="num"><button class="btn small" onclick="saveFraisInline('${f.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelFraisInline()">Annuler</button></td>
@@ -1529,6 +1551,12 @@ function inlineFraisPreview(){
   const m=Number((document.getElementById('if-montant')||{}).value)||0;
   const pct=Number((document.getElementById('if-pct')||{}).value)||0;
   const el=document.getElementById('if-societe'); if(el) el.textContent=eur(m-m*pct/100);
+}
+function onInlineRegie(){
+  const sel=document.getElementById('if-regie'); if(!sel) return;
+  const r=(REGIES_CFG||[]).find(x=>x.nom===sel.value);
+  const pct=document.getElementById('if-pct'); if(pct&&r&&r.pct_defaut!=null) pct.value=r.pct_defaut;
+  inlineFraisPreview();
 }
 function cancelFraisInline(){ inlineFraisId=null; renderFrais(); }
 async function saveFraisInline(id){
@@ -1993,29 +2021,63 @@ function renderCats(){
     <td class="num">${c.type==='recurrent'&&c.montant!=null?eur(c.montant):'—'}</td>
     <td>${c.type==='recurrent'?(escH(srcNom(c.source_id))||'—'):'—'}</td>
     <td>${c.type==='recurrent'?(moisLabel(c.mois)||'—'):'—'}</td>
-    <td class="num"><button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="6" class="empty">Aucune catégorie</td></tr>`;
+    <td class="num"><button class="btn ghost small" onclick="editCat('${c.type}','${c.id}')">✏️</button> <button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="6" class="empty">Aucune catégorie</td></tr>`;
 }
 function onCatType(){
   const rec=document.getElementById('fc-type').value==='recurrent';
   document.querySelectorAll('.fc-rec').forEach(el=>el.style.display=rec?'':'none');
   if(rec){ const m=document.getElementById('fc-mois'); if(m&&!m.value) m.value=today().slice(0,7); }
 }
+let editingCat={id:null,type:null};
+function editCat(type,id){
+  const item = type==='recurrent'
+    ? (window._recurrents||[]).find(x=>x.id===id)
+    : (window._fraiscats||[]).find(x=>x.id===id);
+  if(!item) return;
+  const ts=document.getElementById('fc-type'); ts.value=type; ts.disabled=true; // le type ne change pas en édition
+  document.getElementById('fc-nom').value = type==='recurrent' ? (item.libelle||'') : (item.nom||'');
+  onCatType();
+  if(type==='recurrent'){
+    document.getElementById('fc-montant').value = item.montant_defaut!=null?item.montant_defaut:'';
+    const fcs=document.getElementById('fc-source'); if(fcs) fcs.value=item.source_id||'';
+    document.getElementById('fc-mois').value = (item.mois_debut||'').slice(0,7)||today().slice(0,7);
+  }
+  editingCat={id,type};
+  document.getElementById('fc-savebtn').textContent='💾 Enregistrer';
+  document.getElementById('fc-cancelbtn').style.display='';
+  document.getElementById('fc-nom').scrollIntoView({behavior:'smooth',block:'center'});
+  document.getElementById('fc-nom').focus();
+}
+function cancelEditCat(){
+  editingCat={id:null,type:null};
+  ['fc-nom','fc-montant','fc-mois'].forEach(i=>{const el=document.getElementById(i); if(el) el.value='';});
+  const fcs=document.getElementById('fc-source'); if(fcs) fcs.value='';
+  const ts=document.getElementById('fc-type'); ts.disabled=false; ts.value='depense'; onCatType();
+  document.getElementById('fc-savebtn').textContent='+ Ajouter';
+  document.getElementById('fc-cancelbtn').style.display='none';
+}
 async function addCat(e){
   e.preventDefault();
   const nom=document.getElementById('fc-nom').value.trim(); if(!nom) return;
   const type=document.getElementById('fc-type').value; let error;
-  if(type==='recurrent'){
-    const montant=document.getElementById('fc-montant').value;
-    const mois=document.getElementById('fc-mois').value||today().slice(0,7);
-    const source_id=(document.getElementById('fc-source')||{}).value||null;
+  const montant=document.getElementById('fc-montant').value;
+  const mois=document.getElementById('fc-mois').value||today().slice(0,7);
+  const source_id=(document.getElementById('fc-source')||{}).value||null;
+  if(editingCat.id){
+    if(editingCat.type==='recurrent'){
+      ({error}=await db.from(T('recurrents')).update({libelle:nom, montant_defaut:montant===''?null:Number(montant), source_id, mois_debut:mois+'-01'}).eq('id',editingCat.id));
+    } else {
+      ({error}=await db.from(T('frais_cats')).update({nom}).eq('id',editingCat.id));
+    }
+  } else if(type==='recurrent'){
     ({error}=await db.from(T('recurrents')).insert({libelle:nom, montant_defaut:montant===''?null:Number(montant), source_id, mois_debut:mois+'-01', pct_defaut:0}));
   } else {
     ({error}=await db.from(T('frais_cats')).insert({nom}));
   }
   if(error){ toast('Erreur : '+error.message); return; }
-  ['fc-nom','fc-montant','fc-mois'].forEach(i=>document.getElementById(i).value='');
-  { const fcs=document.getElementById('fc-source'); if(fcs) fcs.value=''; }
-  await loadFraisCats(); await loadRecurrents(); toast('Catégorie ajoutée ✅');
+  const wasEdit=!!editingCat.id;
+  cancelEditCat();
+  await loadFraisCats(); await loadRecurrents(); toast(wasEdit?'Catégorie modifiée ✅':'Catégorie ajoutée ✅');
 }
 async function delCat(type,id){
   if(!confirm('Supprimer cette catégorie ?')) return;
