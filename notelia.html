@@ -97,6 +97,8 @@
   tr.totals-row td{border-top:2px solid var(--accent);font-weight:700;background:rgba(99,102,241,.06)}
   tr.inline-edit-row>td{padding:0;background:transparent}
   tr.inline-edit-row .panel,tr.inline-edit-row section.panel{margin:6px 0;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow);white-space:normal}
+  .dossier-modal-card{width:min(1040px,100%);max-height:88vh;overflow:auto}
+  .dossier-modal-card>.panel{margin:0}
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -373,13 +375,16 @@
   <!-- DOSSIERS -->
   <div id="tab-dossiers" class="hidden">
     <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <b style="margin-right:auto">📥 Import Excel des dossiers</b>
+      <button class="btn" onclick="openDossierModal()">➕ Ajouter un dossier</button>
+      <b style="margin-left:auto;margin-right:6px;color:var(--muted)">📥 Import Excel</b>
       <button class="btn ghost small" onclick="downloadTemplate('dossiers')">⬇️ Modèle</button>
       <button class="btn small" onclick="document.getElementById('imp-dossiers').click()">⬆️ Importer</button>
       <input type="file" id="imp-dossiers" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('dossiers',this.files[0]);this.value='';">
     </section>
+    <div id="dossier-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeDossierForm()">
+     <div class="dossier-modal-card">
     <section class="panel" id="dossier-form-panel">
-      <h2>Ajouter un dossier</h2>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><h2 id="dossier-form-h2" style="margin:0">➕ Ajouter un dossier</h2><button class="btn ghost small" type="button" onclick="closeDossierForm()">✕</button></div>
       <div class="hint" id="dossier-hint"></div>
       <div id="dossier-fields"></div>
       <div class="hint" style="margin:16px 0 8px">Manager &amp; régie (prélevés sur la marge) :</div>
@@ -387,6 +392,8 @@
       <div class="preview" id="d-preview"></div>
       <div style="margin-top:14px"><button class="btn" id="d-savebtn" onclick="addDossier(event)">+ Enregistrer le dossier</button> <button class="btn ghost" type="button" id="d-cancelbtn" onclick="cancelEditDossier()" style="display:none">Annuler</button></div>
     </section>
+     </div>
+    </div>
     <section class="panel">
       <h2>Liste des dossiers</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, n° dépôt, régie, région…" oninput="onDossierSearch()"></div>
@@ -441,13 +448,16 @@
   <!-- APPORTS -->
   <div id="tab-apports" class="hidden">
     <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <b style="margin-right:auto">📥 Import Excel des apports</b>
+      <button class="btn" onclick="openApportModal()">➕ Ajouter un apport</button>
+      <b style="margin-left:auto;margin-right:6px;color:var(--muted)">📥 Import Excel</b>
       <button class="btn ghost small" onclick="downloadTemplate('apports')">⬇️ Modèle</button>
       <button class="btn small" onclick="document.getElementById('imp-apports').click()">⬆️ Importer</button>
       <input type="file" id="imp-apports" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('apports',this.files[0]);this.value='';">
     </section>
+    <div id="apport-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeApportForm()">
+     <div class="dossier-modal-card">
     <section class="panel" id="apport-form-panel">
-      <h2>Ajouter un apport</h2>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><h2 id="apport-form-h2" style="margin:0">➕ Ajouter un apport</h2><button class="btn ghost small" type="button" onclick="closeApportForm()">✕</button></div>
       <div class="hint">L'argent entré, ou une dépense payée par une société (comptée comme un investissement).</div>
       <form class="row" onsubmit="addApport(event)">
         <div class="field"><label>Date</label><input type="date" id="a-date" required></div>
@@ -461,6 +471,8 @@
       <div class="preview" id="a-preview"></div>
       <div style="margin-top:14px"><button class="btn" id="a-savebtn" onclick="addApport(event)">+ Enregistrer l'apport</button> <button class="btn ghost" type="button" id="a-cancelbtn" onclick="cancelEditApport()" style="display:none">Annuler</button></div>
     </section>
+     </div>
+    </div>
     <section class="panel">
       <h2>Historique des apports</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="apports-search" placeholder="Rechercher une source, libellé, mois, montant…" oninput="renderApports()"></div>
@@ -474,7 +486,8 @@
   <!-- FRAIS -->
   <div id="tab-frais" class="hidden">
     <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <b style="margin-right:auto">📥 Import Excel des frais</b>
+      <button class="btn" onclick="openFraisModal()">➕ Ajouter un frais</button>
+      <b style="margin-left:auto;margin-right:6px;color:var(--muted)">📥 Import Excel</b>
       <button class="btn ghost small" onclick="downloadTemplate('frais')">⬇️ Modèle</button>
       <button class="btn small" onclick="document.getElementById('imp-frais').click()">⬆️ Importer</button>
       <input type="file" id="imp-frais" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('frais',this.files[0]);this.value='';">
@@ -498,8 +511,10 @@
         <tbody id="recur-body"></tbody>
       </table></div>
     </section>
+    <div id="frais-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeFraisModal()">
+     <div class="dossier-modal-card">
     <section class="panel">
-      <h2>Ajouter un frais / une dépense</h2>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><h2 style="margin:0">Ajouter un frais / une dépense</h2><button class="btn ghost small" type="button" onclick="closeFraisModal()">✕</button></div>
       <div class="hint">Dépenses hors dossier. Si ça concerne une régie, indique le % refacturé.</div>
       <form class="row" onsubmit="addFrais(event)">
         <div class="field"><label>Date d'ajout</label><input type="date" id="f-date" required></div>
@@ -516,6 +531,8 @@
       <div class="preview" id="f-preview"></div>
       <div style="margin-top:14px"><button class="btn" id="f-savebtn" onclick="addFrais(event)">+ Enregistrer le frais</button> <button class="btn ghost" type="button" id="f-cancelbtn" onclick="cancelEditFrais()" style="display:none">Annuler</button></div>
     </section>
+     </div>
+    </div>
     <section class="panel panel-wide">
       <h2>Historique des frais</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="frais-search" placeholder="Rechercher : payé par (ex. DB Telecom), fournisseur, catégorie, mois…" oninput="renderFrais()"></div>
@@ -1934,6 +1951,14 @@ function restoreInlineForm(panel){
   if(panel&&panel._slot){ panel._slot.parentNode.insertBefore(panel,panel._slot); panel._slot.remove(); panel._slot=null; }
   if(window._inlineHolder){ try{window._inlineHolder.remove();}catch(e){} window._inlineHolder=null; }
 }
+function openDossierModal(){ cancelEditDossier(); const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='➕ Ajouter un dossier'; const dd=document.getElementById('d-date'); if(dd&&!dd.value) dd.value=today(); const m=document.getElementById('dossier-modal'); if(m) m.classList.remove('hidden'); }
+function closeDossierModal(){ const m=document.getElementById('dossier-modal'); if(m) m.classList.add('hidden'); }
+function closeDossierForm(){ cancelEditDossier(); closeDossierModal(); }
+function openApportModal(){ cancelEditApport(); const h=document.getElementById('apport-form-h2'); if(h) h.textContent='➕ Ajouter un apport'; const dd=document.getElementById('a-date'); if(dd&&!dd.value) dd.value=today(); const m=document.getElementById('apport-modal'); if(m) m.classList.remove('hidden'); }
+function closeApportModal(){ const m=document.getElementById('apport-modal'); if(m) m.classList.add('hidden'); }
+function closeApportForm(){ cancelEditApport(); closeApportModal(); }
+function openFraisModal(){ if(typeof cancelEditFrais==='function') cancelEditFrais(); const fm=document.getElementById('f-mois'); if(fm&&!fm.value) fm.value=today().slice(0,7); const fd=document.getElementById('f-date'); if(fd&&!fd.value) fd.value=today(); const m=document.getElementById('frais-modal'); if(m) m.classList.remove('hidden'); }
+function closeFraisModal(){ const m=document.getElementById('frais-modal'); if(m) m.classList.add('hidden'); }
 function editApport(id,btn){
   const ap=(window._apports||[]).find(x=>x.id===id); if(!ap) return;
   document.getElementById('a-date').value=ap.date||today();
@@ -1947,6 +1972,7 @@ function editApport(id,btn){
   document.getElementById('a-pct').value=ap.pourcentage_compte;
   A().forEach(a=>{ const el=document.getElementById('a-part-'+a.k); if(el) el.value=ap['part_'+a.k+'_pct']||0; });
   editingApportId=id;
+  { const h=document.getElementById('apport-form-h2'); if(h) h.textContent="✏️ Modifier l'apport"; }
   document.getElementById('a-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('a-cancelbtn').style.display='';
   apportPreview();
@@ -1955,6 +1981,7 @@ function editApport(id,btn){
 }
 function cancelEditApport(){
   editingApportId=null;
+  { const h=document.getElementById('apport-form-h2'); if(h) h.textContent='➕ Ajouter un apport'; }
   restoreInlineForm(document.getElementById('apport-form-panel'));
   document.getElementById('a-montant').value=''; document.getElementById('a-libelle').value='';
   document.getElementById('a-savebtn').textContent="+ Enregistrer l'apport";
@@ -1975,7 +2002,7 @@ async function addApport(e){
   const wasEdit=!!editingApportId;
   const res = wasEdit ? await db.from(T('apports')).update(row).eq('id',editingApportId) : await db.from(T('apports')).insert(row);
   if(res.error){toast('Erreur : '+res.error.message);return;}
-  cancelEditApport();
+  cancelEditApport(); closeApportModal();
   toast(wasEdit?'Apport modifié ✅':'Apport enregistré ✅');loadApports();
 }
 
@@ -2017,6 +2044,7 @@ function editDossier(id,btn){
   else { S('d-prime',d.montant_prime); S('d-install',d.cout_installation); S('d-materiel',d.cout_materiel); S('d-nacelle',d.cout_nacelle); S('d-hamid',d.cout_hamid); S('d-livraison',d.cout_livraison); S('d-fraissupp',d.frais_supp); S('d-audit',d.cout_audit);
     S('d-cumac',d.cumac); S('d-delegataire',d.delegataire_id); }
   editingDossierId=id;
+  { const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='✏️ Modifier le dossier'; }
   document.getElementById('d-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('d-cancelbtn').style.display='';
   dossierPreview();
@@ -2025,6 +2053,7 @@ function editDossier(id,btn){
 }
 function cancelEditDossier(){
   editingDossierId=null;
+  { const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='➕ Ajouter un dossier'; }
   restoreInlineForm(document.getElementById('dossier-form-panel'));
   ['d-client','d-depot','d-crmid','d-adresse','d-cp','d-ville','d-tel','d-email'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
   document.getElementById('d-commercial').value=''; document.getElementById('d-davidpct').value='5';
@@ -2061,7 +2090,7 @@ async function addDossier(e){
   const wasEdit=!!editingDossierId;
   const res = wasEdit ? await db.from(T('dossiers')).update(row).eq('id',editingDossierId) : await db.from(T('dossiers')).insert(row);
   if(res.error){toast('Erreur : '+res.error.message);return;}
-  cancelEditDossier();
+  cancelEditDossier(); closeDossierModal();
   toast(wasEdit?'Dossier modifié ✅':'Dossier enregistré ✅'); loadDossiers();
 }
 
@@ -2161,7 +2190,7 @@ async function addFrais(e){
   const wasEdit=!!editingFraisId;
   const res = wasEdit ? await db.from(T('frais')).update(row).eq('id',editingFraisId) : await db.from(T('frais')).insert(row);
   if(res.error){toast('Erreur : '+res.error.message);return;}
-  cancelEditFrais();
+  cancelEditFrais(); closeFraisModal();
   toast(wasEdit?'Frais modifié ✅':'Frais enregistré ✅'); loadFrais();
 }
 

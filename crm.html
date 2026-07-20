@@ -352,6 +352,10 @@
   header h1,header>*{position:relative}
   tr.inline-edit-row>td{padding:0;background:transparent}
   tr.inline-edit-row .panel{margin:6px 0;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow)}
+  .modal-overlay{position:fixed;inset:0;background:rgba(4,8,20,.62);display:flex;align-items:flex-start;justify-content:center;z-index:120;padding:24px;overflow:auto}
+  .modal-overlay.hidden{display:none!important}
+  .form-modal-card{width:min(1000px,100%);margin:auto}
+  .form-modal-card>.panel{margin:0}
 </style>
 </head>
 <body>
@@ -431,8 +435,11 @@
       </section>
     </div>
     <div id="tab-formations" class="hidden">
+      <div style="margin-bottom:14px"><button class="btn" onclick="openFormationModal()">➕ Ajouter une formation</button></div>
+      <div id="formation-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeFormationForm()">
+       <div class="form-modal-card">
       <section class="panel" id="formation-form-panel">
-        <h2 id="formation-form-title">Ajouter une formation</h2>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><h2 id="formation-form-title" style="margin:0">Ajouter une formation</h2><button class="btn ghost small" type="button" onclick="closeFormationForm()">✕</button></div>
         <form onsubmit="saveFormation(event)">
           <div class="row">
             <div class="field"><label>Intitulé *</label><input id="f-nom" required></div>
@@ -458,6 +465,8 @@
           </div>
         </form>
       </section>
+       </div>
+      </div>
       <section class="panel">
         <h2>Catalogue <span class="hint" id="formations-count"></span></h2>
         <div class="row" style="margin-bottom:12px">
@@ -1362,7 +1371,7 @@ async function saveFormation(e){
   if(editingFormationId){ ({error}=await db.from('crm_formations').update(payload).eq('id',editingFormationId)); }
   else { ({error}=await db.from('crm_formations').insert(payload)); }
   if(error){ toast('Erreur : '+error.message); return; }
-  toast(editingFormationId?'Formation modifiée':'Formation ajoutée'); resetFormationForm();
+  toast(editingFormationId?'Formation modifiée':'Formation ajoutée'); resetFormationForm(); closeFormationModal();
   const {data}=await db.from('crm_formations').select('*').order('categorie').order('nom'); FORMATIONS=data||[]; renderFormations();
 }
 // ===== Édition inline générique : déplace le formulaire juste sous la ligne cliquée =====
@@ -1381,6 +1390,9 @@ function restoreInlineForm(panel){
   if(panel&&panel._slot){ panel._slot.parentNode.insertBefore(panel,panel._slot); panel._slot.remove(); panel._slot=null; }
   if(window._inlineHolder){ try{window._inlineHolder.remove();}catch(e){} window._inlineHolder=null; }
 }
+function openFormationModal(){ if(typeof resetFormationForm==='function') resetFormationForm(); const m=document.getElementById('formation-modal'); if(m) m.classList.remove('hidden'); }
+function closeFormationModal(){ const m=document.getElementById('formation-modal'); if(m) m.classList.add('hidden'); }
+function closeFormationForm(){ if(typeof resetFormationForm==='function') resetFormationForm(); closeFormationModal(); }
 function editFormation(id,btn){
   const f=FORMATIONS.find(x=>x.id===id); if(!f) return; editingFormationId=id;
   document.getElementById('formation-form-title').textContent='Modifier la formation';

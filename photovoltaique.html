@@ -427,6 +427,10 @@
   /* Édition inline : formulaire déplacé sous la ligne cliquée */
   tr.inline-edit-row>td{padding:0;background:transparent}
   tr.inline-edit-row .panel{margin:6px 0;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow)}
+  .modal-overlay{position:fixed;inset:0;background:rgba(4,8,20,.62);display:flex;align-items:flex-start;justify-content:center;z-index:120;padding:24px;overflow:auto}
+  .modal-overlay.hidden{display:none!important}
+  .pv-modal-card{width:min(1000px,100%);max-height:none;margin:auto}
+  .pv-modal-card>.panel{margin:0}
 </style>
 </head>
 <body>
@@ -542,7 +546,10 @@
         <div class="bcard"><div class="b-lab">Frais ce mois-ci</div><div class="b-val" id="fr-mois">—</div></div>
         <div class="bcard"><div class="b-lab">Nombre de frais</div><div class="b-val" id="fr-count">—</div></div>
       </div>
-      <section class="panel" id="fr-form-panel"><h2 id="fr-formtitle">➕ Ajouter un frais</h2>
+      <div style="margin-bottom:14px"><button class="btn" onclick="openFraisModal()">➕ Ajouter un frais</button></div>
+      <div id="frais-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeFraisForm()">
+       <div class="pv-modal-card">
+      <section class="panel" id="fr-form-panel"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><h2 id="fr-formtitle" style="margin:0">➕ Ajouter un frais</h2><button class="btn ghost small" type="button" onclick="closeFraisForm()">✕</button></div>
         <div class="hint" style="margin-bottom:10px">Une dépense de l'activité photovoltaïque. Le client est <b>optionnel</b> : renseigne-le seulement si le frais concerne un dossier précis.</div>
         <form class="row" onsubmit="saveFrais(event)">
           <div class="field sm"><label>Date</label><input type="date" id="fr-date" required></div>
@@ -558,6 +565,8 @@
           <button class="btn ghost" type="button" id="fr-cancelbtn" onclick="cancelEditFrais()" style="display:none">Annuler</button>
         </div>
       </section>
+       </div>
+      </div>
       <section class="panel"><h2 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">Historique des frais<span style="flex:1"></span><button class="btn ghost small" onclick="exportFrais()">⬇️ Exporter Excel</button></h2>
         <div class="search-box"><span class="ic">🔎</span><input type="text" id="fr-search" placeholder="Rechercher : catégorie, libellé, fournisseur, client, mois…" oninput="renderFrais()"></div>
         <div class="table-wrap"><table id="fr-table"></table></div>
@@ -2547,7 +2556,7 @@ async function saveFrais(e){
   const res=wasEdit ? await db.from('pv_frais').update(row).eq('id',editingFraisId)
                     : await db.from('pv_frais').insert(row);
   if(res.error){ toast('Erreur : '+res.error.message); return; }
-  cancelEditFrais();
+  cancelEditFrais(); closeFraisModal();
   const {data}=await db.from('pv_frais').select('*').order('date',{ascending:false}); FRAIS=data||[];
   renderFrais(); toast(wasEdit?'Frais modifié ✓':'Frais ajouté ✓');
 }
@@ -2567,6 +2576,9 @@ function restoreInlineForm(panel){
   if(panel&&panel._slot){ panel._slot.parentNode.insertBefore(panel,panel._slot); panel._slot.remove(); panel._slot=null; }
   if(window._inlineHolder){ try{window._inlineHolder.remove();}catch(e){} window._inlineHolder=null; }
 }
+function openFraisModal(){ if(typeof cancelEditFrais==='function') cancelEditFrais(); const fd=document.getElementById('fr-date'); if(fd&&!fd.value){ try{fd.value=new Date().toISOString().slice(0,10);}catch(e){} } const m=document.getElementById('frais-modal'); if(m) m.classList.remove('hidden'); }
+function closeFraisModal(){ const m=document.getElementById('frais-modal'); if(m) m.classList.add('hidden'); }
+function closeFraisForm(){ if(typeof cancelEditFrais==='function') cancelEditFrais(); closeFraisModal(); }
 function editFrais(id,btn){
   const f=FRAIS.find(x=>x.id===id); if(!f) return;
   editingFraisId=id;
