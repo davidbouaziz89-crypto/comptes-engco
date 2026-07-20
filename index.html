@@ -187,6 +187,8 @@
   .kpi .k-value{font-family:var(--font-mono);font-size:30px;font-weight:700;letter-spacing:-1px;line-height:1;color:var(--txt)}
   .kpi.hi .k-value{color:var(--good)} .kpi.lo .k-value{color:var(--bad)} .kpi.ac .k-value{color:var(--accent)}
   .kpi .k-sub{color:var(--muted);font-size:11.5px;margin-top:7px;font-family:var(--font-mono)}
+  .kpi-spark-wrap{position:relative;height:38px;margin-top:8px}
+  .kpi-spark-wrap canvas{position:absolute;inset:0}
   .chart-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:18px}
   .chart-card{background:linear-gradient(165deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);min-height:250px;display:flex;flex-direction:column}
   .chart-card h3{margin:0 0 4px;font-size:14px;font-family:var(--font-display);font-weight:600}
@@ -282,17 +284,24 @@
     <section class="dash-hero">
       <div class="eyebrow" id="hero-eyebrow">Vue d'ensemble</div>
       <div class="hero-kpis">
-        <div class="kpi hi"><div class="k-label">Résultat net société</div><div class="k-value" data-kpi="resultat">—</div><div class="k-sub" id="hero-resultat-sub"></div></div>
-        <div class="kpi ac"><div class="k-label">Marge nette validée</div><div class="k-value" data-kpi="marge">—</div><div class="k-sub" id="hero-marge-sub"></div></div>
-        <div class="kpi lo"><div class="k-label">Frais à charge société</div><div class="k-value" data-kpi="frais">—</div><div class="k-sub">dépenses cumulées</div></div>
-        <div class="kpi"><div class="k-label">Bénéfice à partager</div><div class="k-value" data-kpi="benef">—</div><div class="k-sub" id="hero-benef-sub"></div></div>
+        <div class="kpi hi"><div class="k-label">Résultat net société</div><div class="k-value" data-kpi="resultat">—</div><div class="kpi-spark-wrap"><canvas id="spark-resultat"></canvas></div><div class="k-sub" id="hero-resultat-sub"></div></div>
+        <div class="kpi ac"><div class="k-label">Marge nette validée</div><div class="k-value" data-kpi="marge">—</div><div class="kpi-spark-wrap"><canvas id="spark-marge"></canvas></div><div class="k-sub" id="hero-marge-sub"></div></div>
+        <div class="kpi lo"><div class="k-label">Frais à charge société</div><div class="k-value" data-kpi="frais">—</div><div class="kpi-spark-wrap"><canvas id="spark-frais"></canvas></div><div class="k-sub">dépenses cumulées</div></div>
+        <div class="kpi"><div class="k-label">Bénéfice à partager</div><div class="k-value" data-kpi="benef">—</div><div class="kpi-spark-wrap"><canvas id="spark-benef"></canvas></div><div class="k-sub" id="hero-benef-sub"></div></div>
       </div>
       <div class="chart-grid">
         <div class="chart-card"><h3>🎯 Statut des dossiers</h3><div class="c-hint">Répartition du chiffre d'affaires</div><div class="chart-holder"><canvas id="ch-statut"></canvas></div></div>
         <div class="chart-card"><h3>🧾 Frais par catégorie</h3><div class="c-hint">Part à charge de la société</div><div class="chart-holder"><canvas id="ch-frais"></canvas></div></div>
+        <div class="chart-card"><h3>🏛️ CA par délégataire</h3><div class="c-hint">Dossiers validés</div><div class="chart-holder"><canvas id="ch-deleg"></canvas></div></div>
         <div class="chart-card"><h3>🤝 Investi par associé</h3><div class="c-hint">Apports + quote-part des frais</div><div class="chart-holder"><canvas id="ch-assoc"></canvas></div></div>
         <div class="chart-card"><h3>📊 Où part l'argent ?</h3><div class="c-hint">Marge, régie, frais, résultat</div><div class="chart-holder"><canvas id="ch-flux"></canvas></div></div>
       </div>
+    </section>
+
+    <section class="panel">
+      <h2>📅 Évolution mensuelle</h2>
+      <div class="hint">Chiffre d'affaires (dossiers validés), marge nette et frais à charge société, mois par mois.</div>
+      <div class="chart-holder" style="height:320px;margin-top:6px"><canvas id="ch-mensuel"></canvas></div>
     </section>
 
     <section class="panel">
@@ -1669,7 +1678,7 @@ function refreshDashboard(){
   } else el.textContent='—';
   // ---- Refonte « Cockpit LED » : KPI héros animés + graphiques ----
   updateHeroKpis({resultat:marge,marge:margeNette,frais:fraisSociete,benef:benef,valides:cat.realise.n,total:dossiers.length,partAssoc:partAssoc,nb:as.length});
-  renderDashboardCharts({cat:cat,frais:frais,as:as,inv:inv,flux:{margeNette:margeNette,regie:regieTot,frais:fraisSociete,resultat:marge}});
+  renderDashboardCharts({cat:cat,frais:frais,as:as,inv:inv,dossiers:dossiers,flux:{margeNette:margeNette,regie:regieTot,frais:fraisSociete,resultat:marge}});
 }
 
 // ===== Refonte dashboard : chiffres animés + graphiques Chart.js =====
@@ -1742,6 +1751,49 @@ function renderDashboardCharts(d){
       scales:{x:{grid:{display:false},ticks:{color:t.muted,font:{family:t.font,size:11}}},
         y:{grid:{color:hexA(t.line,.6)},ticks:{color:t.muted,font:{family:t.font,size:11},callback:v=>eur(v)}}}}},
     flux.some(x=>Math.abs(x)>0));
+  // 5) CA par délégataire (dossiers validés)
+  const dgMap={}; (d.dossiers||[]).forEach(x=>{ if(statutCat(x.statut||'')!=='realise') return;
+    const dg=(window._delegataires||[]).find(g=>g.id===x.delegataire_id); const nom=dg?dg.nom:'Sans délégataire';
+    dgMap[nom]=(dgMap[nom]||0)+Number(x.montant_prime||0); });
+  let dgArr=Object.entries(dgMap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  drawChart('ch-deleg',doughnutCfg(dgArr.map(x=>x[0]),dgArr.map(x=>x[1]),[t.accent,t.accent3,t.accent2,t.warm,t.danger,t.muted],t),dgArr.length>0);
+  // 6) Évolution mensuelle + sparklines
+  const ms=new Set();
+  (d.dossiers||[]).forEach(x=>{ if(x.date) ms.add(x.date.slice(0,7)); });
+  (d.frais||[]).forEach(f=>{ const m=fraisMonth(f); if(m) ms.add(m); });
+  const months=[...ms].sort().slice(-8);
+  const caM={},mnM={},frM={}; months.forEach(m=>{caM[m]=0;mnM[m]=0;frM[m]=0;});
+  (d.dossiers||[]).forEach(x=>{ if(statutCat(x.statut||'')!=='realise') return; const m=(x.date||'').slice(0,7); if(m in caM){ caM[m]+=Number(x.montant_prime||0); mnM[m]+=Number(x.marge_nette||0);} });
+  (d.frais||[]).forEach(f=>{ const m=fraisMonth(f); if(m in frM) frM[m]+=Number(f.montant_societe||0); });
+  const shortM=m=>{ const dt=new Date(m+'-01T00:00:00'); return dt.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}); };
+  const labels=months.map(shortM), caArr=months.map(m=>caM[m]), mnArr=months.map(m=>mnM[m]), frArr=months.map(m=>frM[m]);
+  drawChart('ch-mensuel',{data:{labels,datasets:[
+      {type:'bar',label:'CA validé',data:caArr,backgroundColor:hexA(t.accent,.32),borderColor:t.accent,borderWidth:1,borderRadius:6,order:3},
+      {type:'line',label:'Marge nette',data:mnArr,borderColor:t.accent2,backgroundColor:hexA(t.accent2,.14),tension:.35,borderWidth:2,pointRadius:3,pointBackgroundColor:t.accent2,fill:true,order:1},
+      {type:'line',label:'Frais société',data:frArr,borderColor:t.danger,backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:3,pointBackgroundColor:t.danger,borderDash:[5,4],order:2}]},
+    options:{maintainAspectRatio:false,animation:{duration:700},interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{color:t.muted,font:{family:t.font,size:12},usePointStyle:true,pointStyle:'circle',boxWidth:10,padding:14}},
+        tooltip:{callbacks:{label:c=>' '+c.dataset.label+' : '+eur(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{color:t.muted,font:{family:t.font,size:11}}},
+        y:{grid:{color:hexA(t.line,.55)},ticks:{color:t.muted,font:{family:t.font,size:11},callback:v=>eur(v)}}}}},
+    months.length>0);
+  // Sparklines des KPI
+  const resArr=months.map(m=>mnM[m]-frM[m]); let acc=0; const cumBenef=resArr.map(v=>acc+=Math.max(0,v));
+  const enough=months.length>1;
+  drawSpark('spark-resultat',sparkCfg(resArr,t.accent2,t),enough);
+  drawSpark('spark-marge',sparkCfg(mnArr,t.accent,t),enough);
+  drawSpark('spark-frais',sparkCfg(frArr,t.danger,t),enough);
+  drawSpark('spark-benef',sparkCfg(cumBenef,t.accent3,t),enough);
+}
+function sparkCfg(data,color,t){
+  return {type:'line',data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:color,backgroundColor:hexA(color,.16),borderWidth:2,pointRadius:0,tension:.4,fill:true}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:500},plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}},elements:{line:{borderCapStyle:'round'}}}};
+}
+function drawSpark(id,cfg,hasData){
+  const cv=document.getElementById(id); if(!cv||typeof Chart==='undefined') return;
+  if(_charts[id]){ _charts[id].destroy(); delete _charts[id]; }
+  if(!hasData){ cv.style.display='none'; return; }
+  cv.style.display=''; _charts[id]=new Chart(cv.getContext('2d'),cfg);
 }
 
 // ===== Apports =====
