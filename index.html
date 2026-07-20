@@ -119,6 +119,7 @@
   .nd-del button.danger{display:none!important}
   .nd-status select.statut-sel{pointer-events:none;opacity:.55}
   .nd-add-dossiers form[onsubmit^="addDossier"]{display:none!important}
+  .nd-add-dossiers #dossier-add-btn{display:none!important}
   .nd-edit-dossiers button[onclick^="editDossier"]{display:none!important}
   .nd-add-apports form[onsubmit^="addApport"],.nd-add-apports form[onsubmit^="addRemboursement"]{display:none!important}
   .nd-edit-apports button[onclick^="editApport"],.nd-edit-apports button[onclick^="editRemboursement"]{display:none!important}
@@ -235,6 +236,8 @@
   .d-mat-line{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap}
   .d-mat-line .dm-mat{flex:2;min-width:170px}
   .d-mat-line .dm-ql,.d-mat-line .dm-qv{flex:1;min-width:120px}
+  .dossier-modal-card{width:min(1040px,100%);max-height:88vh;overflow:auto}
+  .dossier-modal-card>.panel{margin:0}
   /* Édition inline : formulaire déplacé sous la ligne cliquée */
   tr.inline-edit-row>td{padding:0;background:transparent}
   tr.inline-edit-row .panel{margin:6px 0;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow);white-space:normal}
@@ -381,20 +384,28 @@
   <!-- DOSSIERS -->
   <div id="tab-dossiers" class="hidden">
     <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <b style="margin-right:auto">📥 Import Excel des dossiers</b>
+      <button class="btn" id="dossier-add-btn" onclick="openDossierModal()">➕ Ajouter un dossier</button>
+      <b style="margin-left:auto;margin-right:6px;color:var(--muted)">📥 Import Excel</b>
       <button class="btn ghost small" onclick="downloadTemplate('dossiers')">⬇️ Modèle</button>
       <button class="btn small" onclick="document.getElementById('imp-dossiers').click()">⬆️ Importer</button>
       <input type="file" id="imp-dossiers" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('dossiers',this.files[0]);this.value='';">
     </section>
-    <section class="panel" id="dossier-form-panel">
-      <h2>Ajouter un dossier</h2>
-      <div class="hint" id="dossier-hint"></div>
-      <div id="dossier-fields"></div>
-      <div class="hint" style="margin:16px 0 8px">Manager &amp; régie (prélevés sur la marge) :</div>
-      <div id="dossier-managerrow"></div>
-      <div class="preview" id="d-preview"></div>
-      <div style="margin-top:14px"><button class="btn" id="d-savebtn" onclick="addDossier(event)">+ Enregistrer le dossier</button> <button class="btn ghost" type="button" id="d-cancelbtn" onclick="cancelEditDossier()" style="display:none">Annuler</button></div>
-    </section>
+    <div id="dossier-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeDossierForm()">
+      <div class="dossier-modal-card">
+        <section class="panel" id="dossier-form-panel">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+            <h2 id="dossier-form-h2" style="margin:0">➕ Ajouter un dossier</h2>
+            <button class="btn ghost small" type="button" onclick="closeDossierForm()">✕</button>
+          </div>
+          <div class="hint" id="dossier-hint"></div>
+          <div id="dossier-fields"></div>
+          <div class="hint" style="margin:16px 0 8px">Manager &amp; régie (prélevés sur la marge) :</div>
+          <div id="dossier-managerrow"></div>
+          <div class="preview" id="d-preview"></div>
+          <div style="margin-top:14px"><button class="btn" id="d-savebtn" onclick="addDossier(event)">+ Enregistrer le dossier</button> <button class="btn ghost" type="button" id="d-cancelbtn" onclick="cancelEditDossier()" style="display:none">Annuler</button></div>
+        </section>
+      </div>
+    </div>
     <section class="panel">
       <h2>Liste des dossiers</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, n° dépôt, régie, région…" oninput="onDossierSearch()"></div>
@@ -2176,14 +2187,24 @@ function editDossier(id,btn){
     S('d-cumac',d.cumac); S('d-delegataire',d.delegataire_id);
     renderDMaterielLines((window._dossierMat||[]).filter(x=>x.dossier_id===d.id)); }
   editingDossierId=id;
+  { const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='✏️ Modifier le dossier'; }
   document.getElementById('d-savebtn').textContent='💾 Enregistrer les modifications';
   document.getElementById('d-cancelbtn').style.display='';
   dossierPreview();
   if(!inlineEditAtRow(document.getElementById('dossier-form-panel'),btn))
     document.getElementById('d-preview').scrollIntoView({behavior:'smooth',block:'center'});
 }
+function openDossierModal(){
+  cancelEditDossier();
+  const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='➕ Ajouter un dossier';
+  const dd=document.getElementById('d-date'); if(dd&&!dd.value) dd.value=today();
+  const m=document.getElementById('dossier-modal'); if(m) m.classList.remove('hidden');
+}
+function closeDossierModal(){ const m=document.getElementById('dossier-modal'); if(m) m.classList.add('hidden'); }
+function closeDossierForm(){ cancelEditDossier(); closeDossierModal(); }
 function cancelEditDossier(){
   editingDossierId=null;
+  { const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='➕ Ajouter un dossier'; }
   restoreInlineForm(document.getElementById('dossier-form-panel'));
   ['d-client','d-depot','d-crmid','d-adresse','d-cp','d-ville','d-tel','d-email'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
   document.getElementById('d-commercial').value=''; document.getElementById('d-davidpct').value='5';
@@ -2227,7 +2248,7 @@ async function addDossier(e){
       if(mats.length) await db.from('engco_dossier_materiels').insert(mats.map(m=>({...m,dossier_id:dossId})));
     }
   }
-  cancelEditDossier();
+  cancelEditDossier(); closeDossierModal();
   toast(wasEdit?'Dossier modifié ✅':'Dossier enregistré ✅'); loadDossiers();
 }
 
