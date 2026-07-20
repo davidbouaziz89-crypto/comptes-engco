@@ -228,6 +228,10 @@
   .chk-prog{display:inline-block;width:64px;height:7px;border-radius:6px;background:var(--panel2);overflow:hidden;vertical-align:middle;border:1px solid var(--line)}
   .chk-prog-bar{height:100%;background:var(--grad-lime);border-radius:6px;transition:width .4s ease}
   .chk-prog-txt{font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-left:8px}
+  .check-cols{display:flex;flex-wrap:wrap;gap:8px}
+  .col-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:13px;cursor:pointer;user-select:none;transition:all .15s ease}
+  .col-chip input{width:auto;accent-color:var(--accent)}
+  .col-chip.on{color:var(--txt);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));background:color-mix(in srgb,var(--accent) 12%,var(--panel2))}
 </style>
 </head>
 <body>
@@ -567,21 +571,13 @@
     </section>
   </div>
 
-  <!-- CHECK (LED) : check-list par dossier -->
+  <!-- CHECK (LED) : liste des dossiers + colonnes de check -->
   <div id="tab-check" class="hidden">
-    <section class="panel">
-      <h2>🧩 Éléments à checker</h2>
-      <div class="hint" style="margin-bottom:8px">Définis ce qu'il faut vérifier sur chaque dossier. Si tu relies un élément à une <b>catégorie de frais</b>, sa case se coche automatiquement dès qu'un frais de cette catégorie est rattaché au dossier (par son ID CRM).</div>
-      <form class="row" onsubmit="addCheckItem(event)">
-        <div class="field"><label>Élément à vérifier</label><input type="text" id="ci-nom" placeholder="ex. Facture matériel, Attestation sur l'honneur…" required></div>
-        <div class="field"><label>Coché auto. par la catégorie de frais</label><select id="ci-cat"><option value="">— aucune (coche manuelle) —</option></select></div>
-        <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
-      </form>
-      <div id="check-items-list" style="margin-top:6px"></div>
-    </section>
     <section class="panel panel-wide">
       <h2>✅ Check-list des dossiers</h2>
-      <div class="search-box"><span class="ic">🔎</span><input type="text" id="check-search" placeholder="Rechercher un dossier (client, ID, ville…)" oninput="renderCheck()"></div>
+      <div class="hint" style="margin-bottom:10px">Choisis les colonnes à afficher. Les colonnes de <b>check</b> (paramétrées dans ⚙️ Paramètres → Check) se cochent toutes seules quand un frais de la catégorie liée est rattaché au dossier (par son ID CRM).</div>
+      <div class="check-cols" id="check-cols"></div>
+      <div class="search-box" style="margin-top:12px"><span class="ic">🔎</span><input type="text" id="check-search" placeholder="Rechercher un dossier (client, ID, ville…)" oninput="renderCheck()"></div>
       <div class="table-wrap"><table id="check-table">
         <thead><tr id="check-head"></tr></thead>
         <tbody id="check-body"></tbody>
@@ -597,6 +593,7 @@
         <button data-psec="regies" onclick="showParam('regies')">🤝 Régies</button>
         <button data-psec="sources" onclick="showParam('sources')">🏢 Sources</button>
         <button data-psec="delegataires" id="pm-delegataires" onclick="showParam('delegataires')">🏛️ Délégataires CEE</button>
+        <button data-psec="check" id="pm-check" onclick="showParam('check')">🧩 Check</button>
         <button data-psec="categories" onclick="showParam('categories')">🏷️ Catégories de frais</button>
       </div>
       <div class="params-content" id="params-content">
@@ -609,6 +606,17 @@
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter le délégataire</button></div>
             </form>
             <div id="deleg-list" style="margin-top:8px"></div>
+          </section>
+        </div>
+        <div class="params-sec" id="ps-check">
+          <section class="panel"><h2>🧩 Éléments à checker</h2>
+            <div class="hint" style="margin-bottom:8px">Définis ce qu'il faut vérifier sur chaque dossier — ce sont les colonnes de check de l'onglet ✅ Check. Si tu relies un élément à une <b>catégorie de frais</b>, sa case se coche automatiquement dès qu'un frais de cette catégorie est rattaché au dossier (par son ID CRM).</div>
+            <form class="row" onsubmit="addCheckItem(event)">
+              <div class="field"><label>Élément à vérifier</label><input type="text" id="ci-nom" placeholder="ex. Facture matériel, Attestation sur l'honneur…" required></div>
+              <div class="field"><label>Coché auto. par la catégorie de frais</label><select id="ci-cat"><option value="">— aucune (coche manuelle) —</option></select></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+            </form>
+            <div id="check-items-list" style="margin-top:6px"></div>
           </section>
         </div>
         <div class="params-sec" id="ps-categories">
@@ -1646,6 +1654,7 @@ async function openFraisDoc(path){
 async function loadCheck(){
   const isLed=!!(PROJ&&PROJ.key==='led');
   const nc=document.getElementById('nav-check'); if(nc) nc.style.display=isLed?'':'none';
+  const pmc=document.getElementById('pm-check'); if(pmc) pmc.style.display=isLed?'':'none';
   if(!isLed){ window._checkItems=[]; window._checkState=[]; return; }
   const [it,st]=await Promise.all([
     db.from('engco_check_items').select('*').order('ordre').order('created_at'),
@@ -1654,6 +1663,7 @@ async function loadCheck(){
   window._checkItems=(it&&it.data)||[];
   window._checkState=(st&&st.data)||[];
   fillCheckCatSelect();
+  renderCheckItemsList();
   renderCheck();
 }
 function fillCheckCatSelect(){
@@ -1677,25 +1687,54 @@ function renderCheckItemsList(){
       <td class="num"><button class="btn danger small" onclick="delCheckItem('${i.id}')">Suppr.</button></td></tr>`).join('')+
     '</tbody></table></div>';
 }
+// Colonnes de dossier disponibles dans la liste Check (l'utilisateur choisit lesquelles afficher)
+const CHECK_COL_DEFS=[
+  {key:'date',label:'Date',cell:d=>`<td>${fdate(d.date)}</td>`},
+  {key:'crm_id',label:'ID',cell:d=>dossierIdCell(d)},
+  {key:'nom_client',label:'Client',cell:d=>`<td>${escH(d.nom_client||'')}</td>`},
+  {key:'numero_depot',label:'N° dépôt',cell:d=>`<td>${escH(d.numero_depot||'')}</td>`},
+  {key:'ville',label:'Ville',cell:d=>`<td>${escH(d.ville||'')}</td>`},
+  {key:'code_postal',label:'CP',cell:d=>`<td>${escH(d.code_postal||'')}</td>`},
+  {key:'adresse',label:'Adresse',cell:d=>`<td>${escH(d.adresse||'')}</td>`},
+  {key:'telephone',label:'Tél',cell:d=>`<td>${escH(d.telephone||'')}</td>`},
+  {key:'email',label:'Email',cell:d=>`<td>${escH(d.email||'')}</td>`},
+  {key:'delegataire',label:'Délégataire',cell:d=>{const g=(window._delegataires||[]).find(x=>x.id===d.delegataire_id);return `<td>${g?escH(g.nom):'—'}</td>`;}},
+  {key:'cumac',label:'Cumac',num:true,cell:d=>`<td class="num">${num(d.cumac||0)}</td>`},
+  {key:'montant_prime',label:'Prime',num:true,cell:d=>`<td class="num">${eur(d.montant_prime)}</td>`},
+  {key:'statut',label:'Statut',cell:d=>`<td>${statutBadge?statutBadge(d.statut):escH(d.statut||'')}</td>`},
+];
+const CHECK_COLS_DEFAULT=['crm_id','nom_client','date'];
+function checkColsKey(){ return 'pfp-check-cols-'+(PROJ?PROJ.key:''); }
+function getCheckCols(){ try{ const v=localStorage.getItem(checkColsKey()); if(v){ const a=JSON.parse(v); if(Array.isArray(a)) return a; } }catch(e){} return CHECK_COLS_DEFAULT.slice(); }
+function setCheckCols(a){ try{ localStorage.setItem(checkColsKey(),JSON.stringify(a)); }catch(e){} }
+function toggleCheckCol(key){ let cols=getCheckCols(); cols=cols.includes(key)?cols.filter(k=>k!==key):[...cols,key]; setCheckCols(cols); renderCheck(); }
+function renderCheckCols(){
+  const box=document.getElementById('check-cols'); if(!box) return; const sel=getCheckCols();
+  box.innerHTML=CHECK_COL_DEFS.map(c=>`<label class="col-chip${sel.includes(c.key)?' on':''}"><input type="checkbox" ${sel.includes(c.key)?'checked':''} onchange="toggleCheckCol('${c.key}')"> ${escH(c.label)}</label>`).join('');
+}
 function renderCheck(){
-  renderCheckItemsList();
+  renderCheckCols();
   const head=document.getElementById('check-head'), body=document.getElementById('check-body'); if(!head||!body) return;
   const items=window._checkItems||[];
-  head.innerHTML=`<th>Date</th><th>ID</th><th>Client</th>`+items.map(i=>`<th class="num" title="${escH(i.nom)}">${escH(i.nom)}</th>`).join('')+`<th class="num">Progression</th>`;
+  const cols=getCheckCols().map(k=>CHECK_COL_DEFS.find(c=>c.key===k)).filter(Boolean);
+  head.innerHTML=cols.map(c=>`<th${c.num?' class="num"':''}>${escH(c.label)}</th>`).join('')
+    + items.map(i=>`<th class="num" title="${escH(i.nom)}">${escH(i.nom)}</th>`).join('')
+    + (items.length?`<th class="num">Progression</th>`:'');
+  const totalCols=Math.max(1,cols.length+items.length+(items.length?1:0));
+  if(!cols.length && !items.length){ body.innerHTML=`<tr><td class="empty">Choisis des colonnes ci-dessus, et ajoute des éléments à vérifier dans ⚙️ Paramètres → Check.</td></tr>`; return; }
   const term=(document.getElementById('check-search')||{}).value||'';
   const rows=(window._dossiers||[]).filter(d=>matchSearch(term,[fdate(d.date),d.crm_id,d.nom_client,d.ville,d.numero_depot].join(' ')));
-  if(!items.length){ body.innerHTML=`<tr><td colspan="4" class="empty">Ajoute d'abord des éléments à vérifier ci-dessus.</td></tr>`; return; }
-  if(!rows.length){ body.innerHTML=`<tr><td colspan="${items.length+4}" class="empty">${term?'Aucun dossier trouvé':'Aucun dossier'}</td></tr>`; return; }
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="${totalCols}" class="empty">${term?'Aucun dossier trouvé':'Aucun dossier'}</td></tr>`; return; }
   body.innerHTML=rows.map(d=>{
     let done=0;
-    const cells=items.map(i=>{
+    const dcells=cols.map(c=>c.cell(d)).join('');
+    const icells=items.map(i=>{
       const auto=checkAuto(d,i), on=auto||checkManual(d,i); if(on) done++;
       if(auto) return `<td class="num"><span class="chk-auto" title="Coché automatiquement (frais ${escH(i.categorie)} rattaché)">✅ auto</span></td>`;
       return `<td class="num"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
     }).join('');
-    const pct=items.length?Math.round(done/items.length*100):0;
-    const prog=`<div class="chk-prog"><div class="chk-prog-bar" style="width:${pct}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span>`;
-    return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${escH(d.nom_client||'')}</td>${cells}<td class="num">${prog}</td></tr>`;
+    const prog=items.length?`<td class="num"><div class="chk-prog"><div class="chk-prog-bar" style="width:${Math.round(done/items.length*100)}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span></td>`:'';
+    return `<tr>${dcells}${icells}${prog}</tr>`;
   }).join('');
 }
 async function addCheckItem(e){
