@@ -12,6 +12,13 @@ function json(obj: unknown, status = 200) {
 
 // Cles de projet/outil valides : projets comptes (led, velo) + outils externes.
 const VALID_KEYS = ["led", "velo", "docucrm", "crmformation", "pointage", "crmpv"];
+// Rôles propres à chaque logiciel (hors 'admin', global). Les projets compta (led/velo/docucrm)
+// utilisent les rôles configurables d'app_roles.
+const CRM_ROLES: Record<string, string[]> = {
+  crmpv: ["telepro", "confirmateur", "commercial", "cq", "financement", "paiement"],
+  crmformation: ["secretaire", "commercial"],
+  pointage: ["manager", "comptable", "employe"],
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -38,10 +45,11 @@ Deno.serve(async (req: Request) => {
     if (!memberships.length) return json({ error: "Choisis au moins un projet" }, 400);
 
     const { data: roleRows } = await admin.from("app_roles").select("role_key");
-    const validRoles = new Set((roleRows || []).map((r: { role_key: string }) => r.role_key));
+    const comptaRoles = new Set((roleRows || []).map((r: { role_key: string }) => r.role_key));
     for (const m of memberships) {
       if (!VALID_KEYS.includes(m.project_key)) return json({ error: "Projet invalide" }, 400);
-      if (!validRoles.has(m.role)) return json({ error: "Rôle invalide" }, 400);
+      const allowed = CRM_ROLES[m.project_key] || [...comptaRoles];
+      if (m.role !== "admin" && !allowed.includes(m.role)) return json({ error: "Rôle invalide" }, 400);
     }
 
     // Le demandeur doit être administrateur (global : admin d'au moins un projet).

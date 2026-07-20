@@ -435,16 +435,13 @@
       <form class="row" onsubmit="saveUser(event)">
         <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
         <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères" required></div>
-        <div class="field"><label>Rôle</label>
-          <select id="u-role" onchange="onRoleChange()">
-            <option value="secretaire">Secrétaire</option><option value="regie">Régie</option><option value="admin">Admin</option>
-          </select>
+        <div class="field" style="grid-column:1/-1">
+          <label class="chk" style="margin:0"><input type="checkbox" id="u-admin" onchange="onAdminToggle()"> 👑 Administrateur — accès global à <b>tous</b> les logiciels</label>
         </div>
-        <div class="field" id="u-projects-field" style="grid-column:1/-1"><label>Projets</label>
-          <div style="display:flex;gap:14px 18px;padding-top:8px;flex-wrap:wrap" id="u-projects"></div>
+        <div class="field" id="u-projects-field" style="grid-column:1/-1"><label>Accès &amp; rôle par logiciel</label>
+          <div class="hint" style="margin-bottom:4px">Coche les logiciels auxquels la personne a accès et choisis son rôle <b>pour chacun</b> (le rôle peut être différent d'un logiciel à l'autre).</div>
+          <div id="u-projects" style="display:flex;flex-direction:column;gap:6px;padding-top:4px"></div>
         </div>
-        <div class="field" id="u-regie-field" style="display:none"><label>Nom de la régie</label><input type="text" id="u-regie" placeholder="ex. JO, ADN"></div>
-        <div class="field" id="u-admin-note" style="display:none;align-self:flex-end"><div class="hint">👑 Un administrateur a automatiquement accès à <b>tous</b> les projets.</div></div>
         <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="u-submit">+ Créer</button> <button class="btn ghost" type="button" id="u-cancel" style="display:none" onclick="cancelEditUser()">Annuler</button></div>
       </form>
       <div class="preview" id="u-msg"></div>
@@ -672,9 +669,8 @@ async function openAdminConsole(which){
   document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='none');
   document.getElementById('subnav').style.display='none';
   document.getElementById('adminnav').style.display='flex';
-  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('') + Object.values(EXTERNAL_TOOLS).map(t=>`<label class="chk"><input type="checkbox" class="u-proj" value="${t.key}"> ${t.icon} ${t.nom}</label>`).join('');
   await loadRolesCfg();
-  fillRoleSelect();
+  renderProjectRolesGrid();
   showAdminTab(which||'users');
 }
 function showAdminTab(which){
@@ -786,8 +782,8 @@ function buildAssocUI(){
   document.getElementById('regiecfg-head').innerHTML = velo
     ? `<th>Régie / Campagne</th><th class="num">€/vélo France</th><th class="num">€/vélo Corse</th><th class="num">€/vélo DOM-TOM</th><th>Interne</th><th></th>`
     : `<th>Régie</th><th class="num">% par défaut</th><th></th>`;
-  // users projects checkboxes
-  document.getElementById('u-projects').innerHTML = Object.values(PROJECTS).map(p=>`<label class="chk"><input type="checkbox" class="u-proj" value="${p.key}"> ${p.icon} ${p.nom}</label>`).join('') + Object.values(EXTERNAL_TOOLS).map(t=>`<label class="chk"><input type="checkbox" class="u-proj" value="${t.key}"> ${t.icon} ${t.nom}</label>`).join('');
+  // users : grille accès & rôle par logiciel
+  renderProjectRolesGrid();
   buildImportSpecs();
   document.getElementById('rc-mois').value=today().slice(0,7);
   const dd=document.getElementById('d-date'); if(dd) dd.value=today();
@@ -1506,26 +1502,66 @@ async function svcErr(data,error){
   if(data&&data.error) return data.error;
   return null;
 }
-function currentRoleCfg(){ const v=document.getElementById('u-role').value; return ROLES_CFG.find(r=>r.role_key===v)||{role_key:v}; }
-function onRoleChange(){
-  const r=currentRoleCfg();
-  document.getElementById('u-regie-field').style.display=r.is_regie?'flex':'none';
-  document.getElementById('u-projects-field').style.display=(r.role_key==='admin')?'none':'';
-  document.getElementById('u-admin-note').style.display=(r.role_key==='admin')?'flex':'none';
+// ---- Rôles par logiciel ----
+function escH(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const CRM_ROLES={
+  crmpv:[['telepro','Télépro'],['confirmateur','Confirmateur'],['commercial','Commercial'],['cq','CQ'],['financement','Financement'],['paiement','Paiement']],
+  crmformation:[['secretaire','Secrétaire'],['commercial','Commercial']],
+  pointage:[['manager','Manager'],['comptable','Comptable'],['employe','Employé']],
+};
+function rolesForProject(key){
+  if(CRM_ROLES[key]) return CRM_ROLES[key].map(([k,l])=>({role_key:k,label:l}));
+  return (ROLES_CFG||[]).filter(r=>r.role_key!=='admin'); // compta : rôles configurables (hors admin, global)
+}
+function isRegieRoleFor(projKey,roleKey){
+  if(CRM_ROLES[projKey]) return false;
+  const r=(ROLES_CFG||[]).find(x=>x.role_key===roleKey); return !!(r&&r.is_regie);
+}
+function projRow(key){ return document.querySelector('.urow[data-proj="'+key+'"]'); }
+function renderProjectRolesGrid(){
+  const box=document.getElementById('u-projects'); if(!box) return;
+  const all=Object.assign({},PROJECTS,EXTERNAL_TOOLS);
+  box.innerHTML=Object.values(all).map(p=>{
+    const opts=rolesForProject(p.key).map(r=>`<option value="${escH(r.role_key)}">${escH(r.label)}</option>`).join('');
+    return `<div class="urow" data-proj="${p.key}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <label class="chk" style="margin:0;min-width:240px"><input type="checkbox" class="u-proj" value="${p.key}" onchange="onProjToggle('${p.key}')"> ${p.icon} ${escH(p.nom)}</label>
+      <select class="u-projrole" data-proj="${p.key}" disabled onchange="onProjRoleChange('${p.key}')" style="max-width:220px;opacity:.5">${opts}</select>
+      <input class="u-projregie" data-proj="${p.key}" placeholder="Nom de la régie" style="display:none;max-width:170px">
+    </div>`;
+  }).join('');
+}
+function onProjToggle(key){
+  const row=projRow(key), on=row.querySelector('.u-proj').checked, sel=row.querySelector('.u-projrole');
+  sel.disabled=!on; sel.style.opacity=on?'1':'.5'; onProjRoleChange(key);
+}
+function onProjRoleChange(key){
+  const row=projRow(key), on=row.querySelector('.u-proj').checked, role=row.querySelector('.u-projrole').value;
+  row.querySelector('.u-projregie').style.display=(on&&isRegieRoleFor(key,role))?'':'none';
+}
+function onAdminToggle(){
+  const adm=document.getElementById('u-admin').checked, f=document.getElementById('u-projects-field');
+  f.style.opacity=adm?'.4':'1'; f.style.pointerEvents=adm?'none':'';
 }
 async function saveUser(e){
   e.preventDefault();
   const email=document.getElementById('u-email').value.trim();
   const password=document.getElementById('u-pass').value;
-  const roleCfg=currentRoleCfg(); const role=roleCfg.role_key;
-  const regie_name=roleCfg.is_regie?(document.getElementById('u-regie').value.trim()||null):null;
-  const projs = role==='admin' ? Object.keys(PROJECTS) : [...document.querySelectorAll('.u-proj:checked')].map(c=>c.value);
   const msg=document.getElementById('u-msg');
-  if(!role){ msg.innerHTML='<span class="val-bad">Choisis un rôle.</span>'; return; }
-  if(!projs.length){ msg.innerHTML='<span class="val-bad">Coche au moins un projet.</span>'; return; }
-  if(roleCfg.is_regie && !regie_name){ msg.innerHTML='<span class="val-bad">Indique le nom de la régie.</span>'; return; }
-  const memberships=projs.map(p=>({project_key:p, role, regie_name}));
-
+  const isAdmin=document.getElementById('u-admin').checked;
+  let memberships;
+  if(isAdmin){
+    memberships=Object.keys(PROJECTS).map(p=>({project_key:p,role:'admin',regie_name:null}));
+  } else {
+    memberships=[];
+    document.querySelectorAll('.urow').forEach(row=>{
+      const cb=row.querySelector('.u-proj'); if(!cb.checked) return;
+      const key=cb.value, role=row.querySelector('.u-projrole').value;
+      const regie_name=isRegieRoleFor(key,role)?(row.querySelector('.u-projregie').value.trim()||null):null;
+      memberships.push({project_key:key,role,regie_name});
+    });
+    if(!memberships.length){ msg.innerHTML='<span class="val-bad">Coche au moins un logiciel (ou Administrateur).</span>'; return; }
+    for(const m of memberships){ if(isRegieRoleFor(m.project_key,m.role)&&!m.regie_name){ msg.innerHTML='<span class="val-bad">Indique le nom de la régie.</span>'; return; } }
+  }
   if(editingUserId){
     msg.innerHTML='Enregistrement…';
     const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'update',user_id:editingUserId,memberships,email,password:password||undefined}});
@@ -1534,6 +1570,7 @@ async function saveUser(e){
     msg.innerHTML='<span class="val-good">Utilisateur modifié ✅</span>';
     cancelEditUser(); loadUsers(); return;
   }
+  if(!password||password.length<6){ msg.innerHTML='<span class="val-bad">Mot de passe : 6 caractères minimum.</span>'; return; }
   msg.innerHTML='Création en cours…';
   const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,memberships}});
   const errText=await svcErr(data,error);
@@ -1544,16 +1581,22 @@ async function saveUser(e){
 function editUser(uid){
   const u=USERS_CACHE.find(x=>x.user_id===uid); if(!u) return;
   editingUserId=uid;
-  const isAdmin=u.mems.some(m=>m.role==='admin');
-  const role=isAdmin?'admin':(u.mems[0]?u.mems[0].role:'secretaire');
-  document.getElementById('u-email').value=u.email||'';
-  document.getElementById('u-email').readOnly=true;
+  document.getElementById('u-email').value=u.email||''; document.getElementById('u-email').readOnly=true;
   const pass=document.getElementById('u-pass'); pass.value=''; pass.required=false; pass.placeholder='laisser vide = mot de passe inchangé';
-  document.getElementById('u-role').value=role;
-  onRoleChange();
-  const projSet=new Set(u.mems.map(m=>m.project_key));
-  document.querySelectorAll('.u-proj').forEach(c=>c.checked=projSet.has(c.value));
-  const rg=u.mems.find(m=>m.regie_name); document.getElementById('u-regie').value=rg?rg.regie_name:'';
+  renderProjectRolesGrid();
+  const isAdmin=u.mems.some(m=>m.role==='admin');
+  document.getElementById('u-admin').checked=isAdmin; onAdminToggle();
+  if(!isAdmin){
+    u.mems.forEach(m=>{
+      const row=projRow(m.project_key); if(!row) return;
+      row.querySelector('.u-proj').checked=true; onProjToggle(m.project_key);
+      const sel=row.querySelector('.u-projrole');
+      if(![...sel.options].some(o=>o.value===m.role)) sel.insertAdjacentHTML('beforeend',`<option value="${escH(m.role)}">${escH(m.role)}</option>`);
+      sel.value=m.role;
+      if(m.regie_name) row.querySelector('.u-projregie').value=m.regie_name;
+      onProjRoleChange(m.project_key);
+    });
+  }
   document.getElementById('u-title').textContent="Modifier l'utilisateur";
   document.getElementById('u-submit').textContent='💾 Enregistrer';
   document.getElementById('u-cancel').style.display='';
@@ -1564,9 +1607,8 @@ function cancelEditUser(){
   editingUserId=null;
   const em=document.getElementById('u-email'); em.value=''; em.readOnly=false;
   const pass=document.getElementById('u-pass'); pass.value=''; pass.required=true; pass.placeholder='min. 6 caractères';
-  document.getElementById('u-regie').value='';
-  document.getElementById('u-role').value='secretaire'; onRoleChange();
-  document.querySelectorAll('.u-proj').forEach(c=>c.checked=false);
+  const adm=document.getElementById('u-admin'); if(adm){ adm.checked=false; onAdminToggle(); }
+  renderProjectRolesGrid();
   document.getElementById('u-title').textContent='Créer un utilisateur';
   document.getElementById('u-submit').textContent='+ Créer';
   document.getElementById('u-cancel').style.display='none';
