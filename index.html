@@ -54,6 +54,11 @@
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  /* Panneau qui déborde du cadre 1150px pour afficher une large table sans scroll */
+  .panel-wide{width:min(1600px,calc(100vw - 32px));position:relative;left:50%;transform:translateX(-50%)}
+  @media(max-width:1150px){.panel-wide{width:auto;left:auto;transform:none}}
+  /* Colonne d'action toujours visible à droite */
+  #frais-table th:last-child,#frais-table td:last-child{position:sticky;right:0;background:var(--panel)}
   th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
   td.num,th.num{text-align:right}
   td a{color:var(--accent);text-decoration:none;font-weight:600} td a:hover{text-decoration:underline}
@@ -386,11 +391,11 @@
       <div class="preview" id="f-preview"></div>
       <div style="margin-top:14px"><button class="btn" id="f-savebtn" onclick="addFrais(event)">+ Enregistrer le frais</button> <button class="btn ghost" type="button" id="f-cancelbtn" onclick="cancelEditFrais()" style="display:none">Annuler</button></div>
     </section>
-    <section class="panel">
+    <section class="panel panel-wide">
       <h2>Historique des frais</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="frais-search" placeholder="Rechercher : payé par (ex. DB Telecom), fournisseur, catégorie, mois…" oninput="renderFrais()"></div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Mois</th><th>Ajout</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
+      <div class="table-wrap"><table id="frais-table">
+        <thead><tr><th>Date</th><th>Mois</th><th>Ajout</th><th>Catégorie</th><th>Fournisseur</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr></thead>
         <tbody id="frais-body"></tbody>
       </table></div>
     </section>
@@ -441,11 +446,12 @@
               <div class="field"><label>Nom de la catégorie</label><input type="text" id="fc-nom" placeholder="ex. Loyer, Carburant…" required></div>
               <div class="field"><label>Type</label><select id="fc-type" onchange="onCatType()"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent mensuel</option></select></div>
               <div class="field fc-rec" style="display:none"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fc-montant" placeholder="ex. 1000"></div>
+              <div class="field fc-rec" style="display:none"><label>Payé par (société)</label><select id="fc-source"></select></div>
               <div class="field fc-rec" style="display:none"><label>À partir du mois</label><input type="month" id="fc-mois"></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
             <div class="table-wrap"><table>
-              <thead><tr><th>Catégorie</th><th>Type</th><th class="num">Montant récurrent</th><th>Depuis</th><th></th></tr></thead>
+              <thead><tr><th>Catégorie</th><th>Type</th><th class="num">Montant récurrent</th><th>Société</th><th>Depuis</th><th></th></tr></thead>
               <tbody id="cats-body"></tbody>
             </table></div>
           </section>
@@ -989,6 +995,7 @@ async function loadSources(){
   const optsBlank='<option value="">— société —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join('');
   document.getElementById('f-source').innerHTML=optsBlank;
   document.getElementById('rc-source').innerHTML='<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join('');
+  { const fcs=document.getElementById('fc-source'); if(fcs) fcs.innerHTML='<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join(''); }
   onSourceChange();
   const as=A();
   document.getElementById('sources-body').innerHTML = SOURCES.length? SOURCES.map(s=>`<tr>
@@ -1205,12 +1212,12 @@ function renderFrais(){
     const dtag=f.dossier_crm_id?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier lié (ID CRM)">🔗 ${escH(f.dossier_crm_id)}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
     const autotag=f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)" title="Généré automatiquement (frais récurrent)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️ Manuel</span>';
-    return `<tr><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.libelle||''}${dtag}${doctag}</td><td>${f.fournisseur||''}</td>
+    return `<tr><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.fournisseur||''}${dtag}${doctag}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
       <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="12" class="empty">${term?'Aucun frais ne correspond à la recherche':'Aucun frais'}</td></tr>`;
+  }).join('') : `<tr><td colspan="11" class="empty">${term?'Aucun frais ne correspond à la recherche':'Aucun frais'}</td></tr>`;
 }
 // ===== Documents / justificatifs (LED) =====
 function renderDocuments(){
@@ -1576,13 +1583,15 @@ async function loadFraisCats(){
 function renderCats(){
   const b=document.getElementById('cats-body'); if(!b) return;
   const deps=(window._fraiscats||[]).map(c=>({nom:c.nom,type:'depense',id:c.id}));
-  const recs=(window._recurrents||[]).map(r=>({nom:r.libelle,type:'recurrent',id:r.id,montant:r.montant_defaut,mois:r.mois_debut}));
+  const recs=(window._recurrents||[]).map(r=>({nom:r.libelle,type:'recurrent',id:r.id,montant:r.montant_defaut,mois:r.mois_debut,source_id:r.source_id}));
   const all=[...recs,...deps].sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
+  const srcNom=id=>{ const s=SOURCES.find(x=>x.id===id); return s?s.nom:''; };
   b.innerHTML=all.length? all.map(c=>`<tr><td>${escH(c.nom)}</td>
     <td>${c.type==='recurrent'?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'}</td>
     <td class="num">${c.type==='recurrent'&&c.montant!=null?eur(c.montant):'—'}</td>
+    <td>${c.type==='recurrent'?(escH(srcNom(c.source_id))||'—'):'—'}</td>
     <td>${c.type==='recurrent'?(moisLabel(c.mois)||'—'):'—'}</td>
-    <td class="num"><button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="5" class="empty">Aucune catégorie</td></tr>`;
+    <td class="num"><button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="6" class="empty">Aucune catégorie</td></tr>`;
 }
 function onCatType(){
   const rec=document.getElementById('fc-type').value==='recurrent';
@@ -1596,12 +1605,14 @@ async function addCat(e){
   if(type==='recurrent'){
     const montant=document.getElementById('fc-montant').value;
     const mois=document.getElementById('fc-mois').value||today().slice(0,7);
-    ({error}=await db.from(T('recurrents')).insert({libelle:nom, montant_defaut:montant===''?null:Number(montant), mois_debut:mois+'-01', pct_defaut:0}));
+    const source_id=(document.getElementById('fc-source')||{}).value||null;
+    ({error}=await db.from(T('recurrents')).insert({libelle:nom, montant_defaut:montant===''?null:Number(montant), source_id, mois_debut:mois+'-01', pct_defaut:0}));
   } else {
     ({error}=await db.from(T('frais_cats')).insert({nom}));
   }
   if(error){ toast('Erreur : '+error.message); return; }
   ['fc-nom','fc-montant','fc-mois'].forEach(i=>document.getElementById(i).value='');
+  { const fcs=document.getElementById('fc-source'); if(fcs) fcs.value=''; }
   await loadFraisCats(); await loadRecurrents(); toast('Catégorie ajoutée ✅');
 }
 async function delCat(type,id){
