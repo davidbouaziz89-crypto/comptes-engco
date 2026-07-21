@@ -2700,11 +2700,11 @@ async function addDossier(e){
     row.cumac=g('d-cumac'); row.delegataire_id=v('d-delegataire'); row.campagne=v('d-campagne'); row.contact_client=v('d-contact');
     delete row.adresse; delete row.code_postal; delete row.ville; }
   if(!editingDossierId){
-    const nid=(row.crm_id||'').trim(), ndep=(row.numero_depot||'').trim();
-    const dup=(window._dossiers||[]).find(d=> (nid && (d.crm_id||'').trim()===nid) || (ndep && (d.numero_depot||'').trim()===ndep) );
+    const nid=(row.crm_id||'').trim();
+    // Doublon uniquement sur l'ID CRM (un même Dépôt Emmy peut avoir plusieurs dossiers).
+    const dup=nid?(window._dossiers||[]).find(d=>(d.crm_id||'').trim()===nid):null;
     if(dup){
-      const par = (nid && (dup.crm_id||'').trim()===nid) ? ("l'ID CRM "+nid) : ("le n° de dépôt "+ndep);
-      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn dossier existe déjà avec '+par+' :\n• '+(dup.nom_client||'(sans nom)')+' du '+fdate(dup.date)+'\n\nVeux-tu quand même enregistrer ce dossier ?');
+      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn dossier existe déjà avec l\'ID CRM '+nid+' :\n• '+(dup.nom_client||'(sans nom)')+' du '+fdate(dup.date)+'\n\nVeux-tu quand même enregistrer ce dossier ?');
       if(!ok) return;
     }
   }
@@ -3407,9 +3407,9 @@ function _impLabel(type,o){
   return (o.libelle||'ligne')+' · '+fdate(o.date);
 }
 function _impDupReason(type,o,list){
-  if(type==='dossiers'){ const nid=(o.crm_id||'').toString().trim(), ndep=(o.numero_depot||'').toString().trim();
+  if(type==='dossiers'){ const nid=(o.crm_id||'').toString().trim();
+    // Doublon uniquement sur l'ID CRM (plusieurs dossiers peuvent partager un même Dépôt Emmy).
     if(nid && list.some(d=>(d.crm_id||'').toString().trim()===nid)) return 'même ID CRM ('+nid+')';
-    if(ndep && list.some(d=>(d.numero_depot||'').toString().trim()===ndep)) return 'même n° de dépôt ('+ndep+')';
     return null; }
   if(type==='frais'){ const ym=(o.date||'').slice(0,7);
     if(list.some(f=>(f.date||'').slice(0,7)===ym && Number(f.montant)===Number(o.montant))) return 'même montant + mois';
