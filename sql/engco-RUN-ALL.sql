@@ -208,3 +208,6 @@ alter table public.engco_fournisseurs
 -- ===== engco-fournisseur-moisdebut.sql =====
 -- Date de début (mois) pour les fournisseurs récurrents
 alter table public.engco_fournisseurs add column if not exists mois_debut text;
+
+-- ===== engco-contact-client.sql =====
+alter table if exists engco_dossiers add column if not exists contact_client text;

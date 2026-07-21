@@ -1278,7 +1278,8 @@ function buildAssocUI(){
 function ledDossierForm(){ return `
   <form class="row" onsubmit="addDossier(event)">
     <div class="field"><label>Date</label><input type="date" id="d-date" required></div>
-    <div class="field"><label>Nom du client</label><input type="text" id="d-client"></div>
+    <div class="field"><label>Raison sociale</label><input type="text" id="d-client"></div>
+    <div class="field"><label>Contact client</label><input type="text" id="d-contact" placeholder="nom du contact"></div>
     <div class="field"><label>ID (fiche CRM)</label><input type="text" id="d-crmid" placeholder="identifiant du client"></div>
     <div class="field"><label>Téléphone</label><input type="text" id="d-tel"></div>
     <div class="field"><label>Email</label><input type="email" id="d-email"></div>
@@ -1315,7 +1316,7 @@ function veloDossierForm(){ return `
     <div class="field"><label>Tarif / vélo (€)</label><input type="number" step="0.01" id="d-tarif" value="80" oninput="dossierPreview()"></div>
     <div class="field"><label>Autres coûts (€)</label><input type="number" step="0.01" id="d-autrescouts" value="0" oninput="dossierPreview()"></div>
   </form>`; }
-function ledDossierHead(){ return `<th class="sortable" onclick="sortDossiers('date')">Date<span class="sort-arrow" data-dsort="date"></span></th><th class="sortable" onclick="sortDossiers('crm_id')">ID<span class="sort-arrow" data-dsort="crm_id"></span></th><th class="sortable" onclick="sortDossiers('client')">Client<span class="sort-arrow" data-dsort="client"></span></th><th class="sortable" onclick="sortDossiers('depot')">Dépôt Emmy<span class="sort-arrow" data-dsort="depot"></span></th><th class="sortable" onclick="sortDossiers('delegataire')">Délégataire<span class="sort-arrow" data-dsort="delegataire"></span></th><th class="num sortable" onclick="sortDossiers('cumac')">Cumac<span class="sort-arrow" data-dsort="cumac"></span></th><th class="num sortable" onclick="sortDossiers('prime')">Prime<span class="sort-arrow" data-dsort="prime"></span></th><th class="num sortable" onclick="sortDossiers('brute')">Marge brute<span class="sort-arrow" data-dsort="brute"></span></th><th class="sortable" onclick="sortDossiers('regie')">Régie<span class="sort-arrow" data-dsort="regie"></span></th><th class="num sortable" onclick="sortDossiers('commission')">Commission<span class="sort-arrow" data-dsort="commission"></span></th><th class="num sortable" onclick="sortDossiers('nette')">Marge nette<span class="sort-arrow" data-dsort="nette"></span></th><th class="sortable" onclick="sortDossiers('statut')">Statut<span class="sort-arrow" data-dsort="statut"></span></th><th></th>`; }
+function ledDossierHead(){ return `<th class="sortable" onclick="sortDossiers('date')">Date<span class="sort-arrow" data-dsort="date"></span></th><th class="sortable" onclick="sortDossiers('crm_id')">ID<span class="sort-arrow" data-dsort="crm_id"></span></th><th class="sortable" onclick="sortDossiers('client')">Raison sociale<span class="sort-arrow" data-dsort="client"></span></th><th class="sortable" onclick="sortDossiers('depot')">Dépôt Emmy<span class="sort-arrow" data-dsort="depot"></span></th><th class="sortable" onclick="sortDossiers('delegataire')">Délégataire<span class="sort-arrow" data-dsort="delegataire"></span></th><th class="num sortable" onclick="sortDossiers('cumac')">Cumac<span class="sort-arrow" data-dsort="cumac"></span></th><th class="num sortable" onclick="sortDossiers('prime')">Prime<span class="sort-arrow" data-dsort="prime"></span></th><th class="num sortable" onclick="sortDossiers('brute')">Marge brute<span class="sort-arrow" data-dsort="brute"></span></th><th class="sortable" onclick="sortDossiers('regie')">Régie<span class="sort-arrow" data-dsort="regie"></span></th><th class="num sortable" onclick="sortDossiers('commission')">Commission<span class="sort-arrow" data-dsort="commission"></span></th><th class="num sortable" onclick="sortDossiers('nette')">Marge nette<span class="sort-arrow" data-dsort="nette"></span></th><th class="sortable" onclick="sortDossiers('statut')">Statut<span class="sort-arrow" data-dsort="statut"></span></th><th></th>`; }
 let dossierSort={col:'',dir:1};
 function sortDossiers(col){ if(dossierSort.col===col) dossierSort.dir=-dossierSort.dir; else { dossierSort.col=col; dossierSort.dir=1; } renderDossiers(); }
 function dossierSortVal(d,col){ const delg=(window._delegataires||[]).find(x=>x.id===d.delegataire_id); switch(col){ case 'date':return d.date||''; case 'crm_id':return (d.crm_id||'').toLowerCase(); case 'client':return (d.nom_client||'').toLowerCase(); case 'depot':return (d.numero_depot||'').toLowerCase(); case 'delegataire':return (delg?delg.nom:'').toLowerCase(); case 'cumac':return Number(d.cumac)||0; case 'prime':return Number(d.montant_prime)||0; case 'brute':return Number(d.marge_brute)||0; case 'regie':return (d.commercial_regie||'').toLowerCase(); case 'commission':return Number(d.commission_regie)||0; case 'nette':return Number(d.marge_nette)||0; case 'statut':return (d.statut||'').toLowerCase(); default:return ''; } }
@@ -1774,7 +1775,7 @@ async function loadDossiers(){
     from+=PAGE;
   }
   // texte de recherche pré-calculé (accents retirés) une seule fois par dossier → recherche rapide
-  list.forEach(d=>{ d._hay=searchNorm([fdate(d.date),moisLabel(d.date),d.crm_id,d.nom_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette,d.adresse,d.code_postal,d.ville,d.telephone,d.email].join(' ')); });
+  list.forEach(d=>{ d._hay=searchNorm([fdate(d.date),moisLabel(d.date),d.crm_id,d.nom_client,d.contact_client,d.numero_depot,d.region,d.commercial_regie,d.montant_prime,d.marge_nette,d.adresse,d.code_postal,d.ville,d.telephone,d.email].join(' ')); });
   window._dossiers=list; fillDossierRegieFilter(); renderDossiers(); refreshDashboard(); renderRegies();
   if(PROJ&&PROJ.key==='led'){ const {data:dm}=await db.from('engco_dossier_materiels').select('*'); window._dossierMat=dm||[]; }
 }
@@ -2176,7 +2177,8 @@ async function saveCheckItem(id){ const nom=(document.getElementById('cie-nom').
 const CHECK_COL_DEFS=[
   {key:'date',label:'Date',cell:d=>`<td>${fdate(d.date)}</td>`},
   {key:'crm_id',label:'ID',cell:d=>dossierIdCell(d)},
-  {key:'nom_client',label:'Client',cell:d=>`<td>${escH(d.nom_client||'')}</td>`},
+  {key:'nom_client',label:'Raison sociale',cell:d=>`<td>${escH(d.nom_client||'')}</td>`},
+  {key:'contact_client',label:'Contact client',cell:d=>`<td>${escH(d.contact_client||'')}</td>`},
   {key:'numero_depot',label:'Dépôt Emmy',cell:d=>`<td>${escH(d.numero_depot||'')}</td>`},
   {key:'ville',label:'Ville',cell:d=>`<td>${escH(d.ville||'')}</td>`},
   {key:'code_postal',label:'CP',cell:d=>`<td>${escH(d.code_postal||'')}</td>`},
@@ -2549,7 +2551,7 @@ let editingDossierId=null;
 function editDossier(id,btn){
   const d=(window._dossiers||[]).find(x=>x.id===id); if(!d) return;
   const S=(i,val)=>{const el=document.getElementById(i); if(el) el.value=(val==null?'':val);};
-  S('d-date',d.date||today()); S('d-client',d.nom_client); S('d-crmid',d.crm_id); S('d-statut',d.statut||'En cours');
+  S('d-date',d.date||today()); S('d-client',d.nom_client); S('d-contact',d.contact_client); S('d-crmid',d.crm_id); S('d-statut',d.statut||'En cours');
   { const ds=document.getElementById('d-depot'); if(ds){ if(d.numero_depot && ![...ds.options].some(o=>o.value===d.numero_depot)) ds.insertAdjacentHTML('beforeend',`<option value="${escH(d.numero_depot)}">${escH(d.numero_depot)}</option>`); ds.value=d.numero_depot||''; } }
   S('d-adresse',d.adresse); S('d-cp',d.code_postal); S('d-ville',d.ville); S('d-tel',d.telephone); S('d-email',d.email);
   S('d-davidpct',d.david_pct); S('d-regiepct',d.regie_pct);
@@ -2585,7 +2587,7 @@ function cancelEditDossier(){
   editingDossierId=null;
   { const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='➕ Ajouter un dossier'; }
   restoreInlineForm(document.getElementById('dossier-form-panel'));
-  ['d-client','d-depot','d-crmid','d-adresse','d-cp','d-ville','d-tel','d-email'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
+  ['d-client','d-contact','d-depot','d-crmid','d-adresse','d-cp','d-ville','d-tel','d-email'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='';});
   document.getElementById('d-commercial').value=''; document.getElementById('d-davidpct').value='5';
   const st=document.getElementById('d-statut'); if(st) st.value=(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours');
   const rp=document.getElementById('d-regiepct'); if(rp) rp.value='0';
@@ -2607,7 +2609,7 @@ async function addDossier(e){
     statut:v('d-statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours'), david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
   if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); row.regie_montant_unitaire=g('d-regie-montant'); row.regie_interne=!!(document.getElementById('d-regie-interne')||{}).checked; row.regie_pct=0; }
   else { row.montant_prime=g('d-prime'); row.cout_installation=g('d-install'); row.cout_materiel=g('d-materiel'); row.cout_nacelle=g('d-nacelle'); row.cout_hamid=g('d-hamid'); row.cout_livraison=g('d-livraison'); row.frais_supp=g('d-fraissupp'); row.cout_audit=g('d-audit');
-    row.cumac=g('d-cumac'); row.delegataire_id=v('d-delegataire'); row.campagne=v('d-campagne');
+    row.cumac=g('d-cumac'); row.delegataire_id=v('d-delegataire'); row.campagne=v('d-campagne'); row.contact_client=v('d-contact');
     delete row.adresse; delete row.code_postal; delete row.ville; }
   if(!editingDossierId){
     const nid=(row.crm_id||'').trim(), ndep=(row.numero_depot||'').trim();
@@ -3248,11 +3250,11 @@ function buildImportSpecs(){
       autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:regieName, regie_montant_unitaire:mu, regie_interne:interne, regie_pct:0, statut:_pick(m,'Statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours') }; }
   } : {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','ID CRM','Téléphone','Email','Dépôt Emmy','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut','Matériel 1','Qté livrée 1','Qté valorisée 1','Matériel 2','Qté livrée 2','Qté valorisée 2'],
-    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','0600000000','client@email.fr','14205','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours','Tube LED 120cm','50','48','Projecteur 100W','10','10'],
+    headers:['Date','Raison sociale','Contact client','ID CRM','Téléphone','Email','Dépôt Emmy','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut','Matériel 1','Qté livrée 1','Qté valorisée 1','Matériel 2','Qté livrée 2','Qté valorisée 2'],
+    example:['05/07/2026','EXEMPLE (supprimez)','M. Dupont','ID-001','0600000000','client@email.fr','14205','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours','Tube LED 120cm','50','48','Projecteur 100W','10','10'],
     build(m){ if(_isEx(m)||!_has(m)) return null; const rn=_pick(m,'Commercial régie','Régie'); const rc=(REGIES_CFG||[]).find(r=>r.nom===rn);
       const _materiels=[]; [1,2].forEach(n=>{ const mn=_pick(m,'Matériel '+n,'Materiel '+n); if(mn&&(''+mn).trim()){ _materiels.push({ nom:(''+mn).trim(), qte_livree:_pnum(_pick(m,'Qté livrée '+n,'Qte livree '+n,'Quantité livrée '+n)), qte_valorisee:_pnum(_pick(m,'Qté valorisée '+n,'Qte valorisee '+n,'Quantité valorisée '+n)) }); } });
-      return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'Dépôt Emmy','N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
+      return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Raison sociale','Client'), contact_client:_pick(m,'Contact client','Contact'), crm_id:_pick(m,'ID CRM','ID'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'Dépôt Emmy','N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
       montant_prime:_pnum(_pick(m,'Prime HT','Prime')), cout_installation:_pnum(_pick(m,'Coût installation')), cout_materiel:_pnum(_pick(m,'Coût matériel')), cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
       cout_hamid:_pnum(_pick(m,'Coût Hamid')), cout_livraison:_pnum(_pick(m,'Coût livraison')), frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp')), cout_audit:_pnum(_pick(m,'Coût audit')),
       david_pct:5, commercial_regie:rn, regie_pct:rc?Number(rc.pct_defaut)||0:0, campagne:_pick(m,'Campagne'), _materiels:_materiels }; }
