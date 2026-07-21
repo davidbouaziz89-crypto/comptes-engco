@@ -352,6 +352,7 @@
         <div class="chart-card"><h3>🏛️ CA par délégataire</h3><div class="c-hint">Dossiers validés</div><div class="chart-holder"><canvas id="ch-deleg"></canvas></div></div>
         <div class="chart-card"><h3>🤝 Investi par associé</h3><div class="c-hint">Apports + quote-part des frais</div><div class="chart-holder"><canvas id="ch-assoc"></canvas></div></div>
         <div class="chart-card"><h3>📊 Où part l'argent ?</h3><div class="c-hint">Marge, régie, frais, résultat</div><div class="chart-holder"><canvas id="ch-flux"></canvas></div></div>
+        <div class="chart-card"><h3>🚚 Frais par fournisseur</h3><div class="c-hint">Part à charge de la société (top 6)</div><div class="chart-holder"><canvas id="ch-fourn"></canvas></div></div>
       </div>
     </section>
 
@@ -359,6 +360,22 @@
       <h2>📅 Évolution mensuelle</h2>
       <div class="hint">Chiffre d'affaires (dossiers validés), marge nette et frais à charge société, mois par mois.</div>
       <div class="chart-holder" style="height:320px;margin-top:6px"><canvas id="ch-mensuel"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <h2>📊 Détail par fournisseur &amp; délégataire</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px">
+        <div>
+          <h3 style="font-family:var(--font-display);margin:4px 0 8px">🚚 Frais par fournisseur</h3>
+          <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th class="num">Nb</th><th class="num">Total</th><th class="num">Part société</th></tr></thead><tbody id="db-fourn-body"></tbody></table></div>
+        </div>
+        <div>
+          <h3 style="font-family:var(--font-display);margin:4px 0 8px">🏛️ Revenus par délégataire</h3>
+          <div class="table-wrap"><table><thead><tr><th>Délégataire</th><th class="num">Dossiers</th><th class="num">CA (prime)</th><th class="num">Marge brute</th><th class="num">Cumac</th></tr></thead><tbody id="db-deleg-body"></tbody></table></div>
+        </div>
+      </div>
+      <h3 style="font-family:var(--font-display);margin:18px 0 8px">🗓️ Frais par mois</h3>
+      <div class="table-wrap"><table><thead><tr><th>Mois</th><th class="num">Nb frais</th><th class="num">Total</th><th class="num">Part société</th></tr></thead><tbody id="db-mois-body"></tbody></table></div>
     </section>
 
     <section class="panel">
@@ -822,10 +839,11 @@
         </div>
         <div class="params-sec" id="ps-check">
           <section class="panel"><h2>🧩 Éléments à checker</h2>
-            <div class="hint" style="margin-bottom:8px">Définis ce qu'il faut vérifier sur chaque dossier — ce sont les colonnes de check de l'onglet ✅ Check. Si tu relies un élément à une <b>catégorie de frais</b>, sa case se coche automatiquement dès qu'un frais de cette catégorie est rattaché au dossier (par son ID CRM).</div>
+            <div class="hint" style="margin-bottom:8px">Définis ce qu'il faut vérifier sur chaque dossier — ce sont les colonnes de check de l'onglet ✅ Check. Coche auto possible de 2 façons : par une <b>catégorie de frais</b> (case cochée dès qu'un frais de cette catégorie est rattaché au dossier), ou par un <b>coût du dossier</b> (case cochée quand ce coût vaut <b>0</b> — ex. « Hamid » coché si Coût Hamid = 0, rien à faire).</div>
             <form class="row" onsubmit="addCheckItem(event)">
-              <div class="field"><label>Élément à vérifier</label><input type="text" id="ci-nom" placeholder="ex. Facture matériel, Attestation sur l'honneur…" required></div>
-              <div class="field"><label>Coché auto. par la catégorie de frais</label><select id="ci-cat"><option value="">— aucune (coche manuelle) —</option></select></div>
+              <div class="field"><label>Élément à vérifier</label><input type="text" id="ci-nom" placeholder="ex. Facture matériel, Hamid…" required></div>
+              <div class="field"><label>Coché auto. par la catégorie de frais</label><select id="ci-cat"><option value="">— aucune —</option></select></div>
+              <div class="field"><label>…ou coché si ce coût = 0</label><select id="ci-champ"><option value="">— aucun —</option><option value="cout_materiel">Coût matériel</option><option value="cout_installation">Coût installation</option><option value="cout_nacelle">Coût nacelle</option><option value="cout_hamid">Coût Hamid</option><option value="cout_livraison">Coût livraison</option><option value="frais_supp">Frais supp.</option><option value="cout_audit">Coût audit</option></select></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
             <div id="check-items-list" style="margin-top:6px"></div>
@@ -2388,7 +2406,18 @@ function fillCheckCatSelect(){
 // Un frais est-il rattaché à ce dossier ? (par ID CRM)
 function fraisOfDossier(d){ const cid=(d.crm_id||'').toString().trim(); if(!cid) return []; return (window._frais||[]).filter(f=>(f.dossier_crm_id||'').toString().trim()===cid); }
 // Élément auto-satisfait : au moins un frais lié de la catégorie de l'élément
-function checkAuto(d,item){ if(!item.categorie) return false; return fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie); }
+const DOSSIER_CHECK_FIELDS=[
+  {k:'cout_materiel',l:'Coût matériel'},{k:'cout_installation',l:'Coût installation'},
+  {k:'cout_nacelle',l:'Coût nacelle'},{k:'cout_hamid',l:'Coût Hamid'},
+  {k:'cout_livraison',l:'Coût livraison'},{k:'frais_supp',l:'Frais supp.'},{k:'cout_audit',l:'Coût audit'}
+];
+function checkChampOptions(cur){ return '<option value="">— aucun —</option>'+DOSSIER_CHECK_FIELDS.map(f=>`<option value="${f.k}"${f.k===cur?' selected':''}>${escH(f.l)}</option>`).join(''); }
+function checkChampLabel(k){ const f=DOSSIER_CHECK_FIELDS.find(x=>x.k===k); return f?f.l:k; }
+function checkAuto(d,item){
+  if(item.champ && Number(d[item.champ]||0)===0) return true; // coût = 0 → rien à faire → coché
+  if(item.categorie && fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie)) return true;
+  return false;
+}
 function checkManual(d,item){ const s=(window._checkState||[]).find(x=>x.dossier_id===d.id&&x.item_id===item.id); return !!(s&&s.checked); }
 function checkDone(d,item){ return checkAuto(d,item)||checkManual(d,item); }
 let editingCheckItemId=null;
@@ -2400,15 +2429,16 @@ function renderCheckItemsList(){
   box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Élément</th><th>Coché auto. par</th><th></th></tr></thead><tbody>'+
     items.map(i=>{
       if(i.id===editingCheckItemId) return `<tr class="rowedit"><td><input type="text" id="cie-nom" value="${escH(i.nom||'')}"></td>
-        <td><select id="cie-cat">${checkCatOptions(i.categorie||'')}</select></td>
+        <td><select id="cie-cat">${checkCatOptions(i.categorie||'')}</select> <select id="cie-champ">${checkChampOptions(i.champ||'')}</select></td>
         <td class="num"><button class="btn small" onclick="saveCheckItem('${i.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelCheckItemEdit()">Annuler</button></td></tr>`;
-      return `<tr><td><b>${escH(i.nom)}</b></td><td>${i.categorie?`<span class="pill">🧾 ${escH(i.categorie)}</span>`:'<span style="color:var(--muted)">coche manuelle</span>'}</td>
+      const auto=i.categorie?`<span class="pill">🧾 ${escH(i.categorie)}</span>`:(i.champ?`<span class="pill">💰 ${escH(checkChampLabel(i.champ))} = 0</span>`:'<span style="color:var(--muted)">coche manuelle</span>');
+      return `<tr><td><b>${escH(i.nom)}</b></td><td>${auto}</td>
         <td class="num"><button class="btn ghost small" onclick="editCheckItem('${i.id}')">✏️</button> <button class="btn danger small" onclick="delCheckItem('${i.id}')">Suppr.</button></td></tr>`;
     }).join('')+'</tbody></table></div>';
 }
 function editCheckItem(id){ editingCheckItemId=id; renderCheckItemsList(); }
 function cancelCheckItemEdit(){ editingCheckItemId=null; renderCheckItemsList(); }
-async function saveCheckItem(id){ const nom=(document.getElementById('cie-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=document.getElementById('cie-cat').value||null; const {error}=await db.from('engco_check_items').update({nom,categorie}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingCheckItemId=null; toast('Élément modifié ✅'); loadCheck(); }
+async function saveCheckItem(id){ const nom=(document.getElementById('cie-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=document.getElementById('cie-cat').value||null; const champ=(document.getElementById('cie-champ')||{}).value||null; const {error}=await db.from('engco_check_items').update({nom,categorie,champ}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingCheckItemId=null; toast('Élément modifié ✅'); loadCheck(); }
 // Colonnes de dossier disponibles dans la liste Check (l'utilisateur choisit lesquelles afficher)
 const CHECK_COL_DEFS=[
   {key:'date',label:'Date',cell:d=>`<td>${fdate(d.date)}</td>`},
@@ -2457,7 +2487,7 @@ function renderCheck(){
     const dcells=cols.map(c=>c.cell(d)).join('');
     const icells=items.map(i=>{
       const auto=checkAuto(d,i), on=auto||checkManual(d,i); if(on) done++;
-      if(auto) return `<td class="num"><span class="chk-auto" title="Coché automatiquement (frais ${escH(i.categorie)} rattaché)">✅ auto</span></td>`;
+      if(auto){ const why=(i.champ && Number(d[i.champ]||0)===0)?(checkChampLabel(i.champ)+' = 0 (rien à faire)'):('frais '+(i.categorie||'')+' rattaché'); return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
       return `<td class="num"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
     }).join('');
     const prog=items.length?`<td class="num"><div class="chk-prog"><div class="chk-prog-bar" style="width:${Math.round(done/items.length*100)}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span></td>`:'';
@@ -2468,10 +2498,11 @@ async function addCheckItem(e){
   e.preventDefault();
   const nom=(document.getElementById('ci-nom').value||'').trim(); if(!nom){ toast('Indique un nom'); return; }
   const categorie=(document.getElementById('ci-cat').value||'')||null;
+  const champ=(document.getElementById('ci-champ')||{}).value||null;
   const ordre=(window._checkItems||[]).length;
-  const {error}=await db.from('engco_check_items').insert({nom,categorie,ordre});
+  const {error}=await db.from('engco_check_items').insert({nom,categorie,champ,ordre});
   if(error){ const m=/relation|does not exist|schema cache|not find/i.test(error.message||'')?'Les tables Check ne sont pas encore créées — exécute sql/engco-check.sql dans Supabase.':error.message; toast('Erreur : '+m); return; }
-  document.getElementById('ci-nom').value=''; document.getElementById('ci-cat').value='';
+  document.getElementById('ci-nom').value=''; document.getElementById('ci-cat').value=''; { const ch=document.getElementById('ci-champ'); if(ch) ch.value=''; }
   toast('Élément ajouté ✅'); loadCheck();
 }
 async function delCheckItem(id){
@@ -2589,6 +2620,7 @@ function refreshDashboard(){
   // ---- Refonte « Cockpit LED » : KPI héros animés + graphiques ----
   updateHeroKpis({recup:recup,primes:primesRealisees,fraisReels:fraisReels,regie:regieTot,recupPart:partReal,valides:cat.realise.n,total:dossiers.length,nb:as.length});
   renderDashboardCharts({cat:cat,frais:frais,as:as,inv:inv,dossiers:dossiers,flux:{margeNette:margeNette,regie:regieTot,frais:fraisSociete,resultat:marge}});
+  renderDashboardTables({frais:frais,dossiers:dossiers,valid:valid});
 }
 
 // ===== Refonte dashboard : chiffres animés + graphiques Chart.js =====
@@ -2656,6 +2688,32 @@ function doughnutCfg(labels,data,colors,t){
       tooltip:{callbacks:{label:(c)=>' '+c.label+' : '+eur(c.parsed)}}}}};
 }
 function hexA(hex,a){ const c=hex.replace('#',''); const n=c.length===3?c.split('').map(x=>x+x).join(''):c; const r=parseInt(n.slice(0,2),16),g=parseInt(n.slice(2,4),16),b=parseInt(n.slice(4,6),16); return `rgba(${r},${g},${b},${a})`; }
+function renderDashboardTables(d){
+  const frais=d.frais||[], valid=d.valid||[];
+  // Par fournisseur
+  const fMap={};
+  frais.forEach(f=>{ const k=(f.fournisseur||'(sans fournisseur)'); (fMap[k]=fMap[k]||{nb:0,tot:0,soc:0}); fMap[k].nb++; fMap[k].tot+=Number(f.montant||0); fMap[k].soc+=Number(f.montant_societe!=null?f.montant_societe:f.montant||0); });
+  const fRows=Object.entries(fMap).sort((a,b)=>b[1].tot-a[1].tot);
+  const fb=document.getElementById('db-fourn-body');
+  if(fb) fb.innerHTML=fRows.length?fRows.map(([nom,o])=>`<tr><td>${escH(nom)}</td><td class="num">${o.nb}</td><td class="num">${eur(o.tot)}</td><td class="num val-bad">${eur(o.soc)}</td></tr>`).join('')
+    +`<tr style="border-top:2px solid var(--accent);font-weight:700"><td>Σ TOTAL</td><td class="num">${fRows.reduce((s,[,o])=>s+o.nb,0)}</td><td class="num">${eur(fRows.reduce((s,[,o])=>s+o.tot,0))}</td><td class="num">${eur(fRows.reduce((s,[,o])=>s+o.soc,0))}</td></tr>`
+    :`<tr><td colspan="4" class="empty">Aucun frais</td></tr>`;
+  // Par délégataire (dossiers validés)
+  const dMap={};
+  valid.forEach(x=>{ const nom=delegNameOf(dossierDelegId(x))||'Sans délégataire'; (dMap[nom]=dMap[nom]||{nb:0,ca:0,mb:0,cumac:0}); dMap[nom].nb++; dMap[nom].ca+=Number(x.montant_prime||0); dMap[nom].mb+=Number(x.marge_brute||0); dMap[nom].cumac+=Number(x.cumac||0); });
+  const dRows=Object.entries(dMap).sort((a,b)=>b[1].ca-a[1].ca);
+  const db=document.getElementById('db-deleg-body');
+  if(db) db.innerHTML=dRows.length?dRows.map(([nom,o])=>`<tr><td>${escH(nom)}</td><td class="num">${o.nb}</td><td class="num">${eur(o.ca)}</td><td class="num">${eur(o.mb)}</td><td class="num">${num(o.cumac)}</td></tr>`).join('')
+    +`<tr style="border-top:2px solid var(--accent);font-weight:700"><td>Σ TOTAL</td><td class="num">${dRows.reduce((s,[,o])=>s+o.nb,0)}</td><td class="num">${eur(dRows.reduce((s,[,o])=>s+o.ca,0))}</td><td class="num">${eur(dRows.reduce((s,[,o])=>s+o.mb,0))}</td><td class="num">${num(dRows.reduce((s,[,o])=>s+o.cumac,0))}</td></tr>`
+    :`<tr><td colspan="5" class="empty">Aucun dossier validé</td></tr>`;
+  // Par mois (frais)
+  const mMap={};
+  frais.forEach(f=>{ const m=fraisMonth(f); if(!m) return; (mMap[m]=mMap[m]||{nb:0,tot:0,soc:0}); mMap[m].nb++; mMap[m].tot+=Number(f.montant||0); mMap[m].soc+=Number(f.montant_societe!=null?f.montant_societe:f.montant||0); });
+  const mRows=Object.entries(mMap).sort((a,b)=>b[0].localeCompare(a[0]));
+  const mb=document.getElementById('db-mois-body');
+  if(mb) mb.innerHTML=mRows.length?mRows.map(([m,o])=>`<tr><td>${escH(moisLabel(m+'-01'))}</td><td class="num">${o.nb}</td><td class="num">${eur(o.tot)}</td><td class="num val-bad">${eur(o.soc)}</td></tr>`).join('')
+    :`<tr><td colspan="4" class="empty">Aucun frais</td></tr>`;
+}
 function renderDashboardCharts(d){
   if(typeof Chart==='undefined') return;
   const t=chartTheme();
@@ -2680,6 +2738,11 @@ function renderDashboardCharts(d){
       scales:{x:{grid:{display:false},ticks:{color:t.muted,font:{family:t.font,size:11}}},
         y:{grid:{color:hexA(t.line,.6)},ticks:{color:t.muted,font:{family:t.font,size:11},callback:v=>eur(v)}}}}},
     flux.some(x=>Math.abs(x)>0));
+  // 4b) Frais par fournisseur (part société, top 6)
+  const byFour={}; (d.frais||[]).forEach(f=>{ const k=f.fournisseur||'(sans fournisseur)'; byFour[k]=(byFour[k]||0)+Number(f.montant_societe!=null?f.montant_societe:f.montant||0); });
+  let fours=Object.entries(byFour).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  if(fours.length>6){ const top=fours.slice(0,5); const rest=fours.slice(5).reduce((s,[,v])=>s+v,0); top.push(['Autres',rest]); fours=top; }
+  drawChart('ch-fourn',doughnutCfg(fours.map(c=>c[0]),fours.map(c=>c[1]),[t.accent,t.accent3,t.warm,t.accent2,t.danger,t.muted],t),fours.length>0);
   // 5) CA par délégataire (dossiers validés)
   const dgMap={}; (d.dossiers||[]).forEach(x=>{ if(statutCat(x.statut||'')!=='realise') return;
     const dg=(window._delegataires||[]).find(g=>g.id===x.delegataire_id); const nom=dg?dg.nom:'Sans délégataire';

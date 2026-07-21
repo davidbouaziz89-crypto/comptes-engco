@@ -215,3 +215,6 @@ alter table if exists engco_dossiers add column if not exists contact_client tex
 -- ===== engco-fournisseur-categories.sql =====
 alter table if exists engco_fournisseurs add column if not exists categories text[];
 update engco_fournisseurs set categories = array[categorie] where categorie is not null and categorie <> '' and (categories is null or array_length(categories,1) is null);
+
+-- ===== engco-check-champ.sql =====
+alter table if exists engco_check_items add column if not exists champ text;
