@@ -745,6 +745,12 @@
               <div class="field fo-rec" style="display:none;max-width:150px"><label>À partir du mois</label><input type="month" id="fo-mois"></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
+            <div class="row" style="align-items:flex-end;gap:10px;margin:4px 0 10px">
+              <div class="field" style="max-width:240px"><label>Filtrer par catégorie</label><select id="fo-filter-cat" onchange="renderFournisseurs()"></select></div>
+              <div class="field" style="max-width:220px"><label>Recherche</label><input type="text" id="fo-filter-q" placeholder="nom, société…" oninput="renderFournisseurs()"></div>
+              <div class="field" style="align-self:flex-end"><button class="btn ghost small" type="button" onclick="document.getElementById('fo-filter-cat').value='';document.getElementById('fo-filter-q').value='';renderFournisseurs()">Réinitialiser</button></div>
+              <div class="field" style="align-self:center"><span class="hint" id="fo-count"></span></div>
+            </div>
             <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th>Type</th><th>Catégorie</th><th class="num">Montant</th><th>Payé par</th><th>Depuis</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
           </section>
         </div>
@@ -1451,8 +1457,17 @@ function foSourceOptions(cur){ return '<option value="">— (facultatif) —</op
 function fourSrcNom(id){ const s=(SOURCES||[]).find(y=>y.id===id); return s?s.nom:''; }
 function onFoType(){ const rec=(document.getElementById('fo-type')||{}).value==='recurrent'; document.querySelectorAll('.fo-rec').forEach(el=>el.style.display=rec?'':'none'); }
 function fillFoSourceSelect(){ const sel=document.getElementById('fo-source'); if(sel){ const p=sel.value; sel.innerHTML=foSourceOptions(p); sel.value=p; } }
+function fournFilterCatOptions(){ const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle),...(window._fournisseurs||[]).map(f=>f.categorie)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fr')); return '<option value="">— Toutes les catégories —</option>'+cats.map(c=>`<option value="${escH(c)}">${escH(c)}</option>`).join(''); }
 function renderFournisseurs(){
-  const b=document.getElementById('fournisseurs-body'); if(!b) return; const f=window._fournisseurs||[];
+  const b=document.getElementById('fournisseurs-body'); if(!b) return;
+  { const fs=document.getElementById('fo-filter-cat'); if(fs){ const p=fs.value; fs.innerHTML=fournFilterCatOptions(); fs.value=p; } }
+  const all=(window._fournisseurs||[]).slice().sort((a,b)=>(a.nom||'').localeCompare(b.nom||'','fr'));
+  const fc=(document.getElementById('fo-filter-cat')||{}).value||'';
+  const fq=(typeof searchNorm==='function'?searchNorm:(s=>(''+s).toLowerCase()))((document.getElementById('fo-filter-q')||{}).value||'');
+  let f=all;
+  if(fc) f=f.filter(x=>(x.categorie||'')===fc);
+  if(fq) f=f.filter(x=>(typeof searchNorm==='function'?searchNorm:(s=>(''+s).toLowerCase()))([x.nom,x.categorie,fourSrcNom(x.source_id)].join(' ')).includes(fq));
+  { const cnt=document.getElementById('fo-count'); if(cnt) cnt.textContent=(fc||fq)?`${f.length} / ${all.length} fournisseur${all.length>1?'s':''}`:`${all.length} fournisseur${all.length>1?'s':''}`; }
   b.innerHTML=f.length?f.map(x=>{
     const rec=x.type==='recurrent';
     if(x.id===editingFournisseurId) return `<tr class="rowedit"><td><input type="text" id="foe-nom" value="${escH(x.nom||'')}"></td>
@@ -1465,7 +1480,7 @@ function renderFournisseurs(){
     return `<tr><td>${escH(x.nom)}</td><td>${fourTypePill(x.type)}</td><td>${x.categorie?`<span class="pill">${escH(x.categorie)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
       <td class="num">${x.montant!=null?eur(x.montant):'—'}</td><td>${x.source_id?(escH(fourSrcNom(x.source_id))||'—'):'—'}</td><td>${x.mois_debut?moisLabel(x.mois_debut.slice(0,7)+'-01'):'—'}</td>
       <td class="num"><button class="btn ghost small" onclick="editFournisseur('${x.id}')">✏️</button> <button class="btn danger small" onclick="delFournisseur('${x.id}')">Suppr.</button></td></tr>`;
-  }).join(''):`<tr><td colspan="7" class="empty">Aucun fournisseur</td></tr>`;
+  }).join(''):`<tr><td colspan="7" class="empty">${(fc||fq)?'Aucun fournisseur pour ce filtre':'Aucun fournisseur'}</td></tr>`;
 }
 function editFournisseur(id){ editingFournisseurId=id; renderFournisseurs(); }
 function cancelFournisseurEdit(){ editingFournisseurId=null; renderFournisseurs(); }
