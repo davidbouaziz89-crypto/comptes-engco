@@ -168,6 +168,9 @@
   .dd-item .v a{color:var(--accent)}
   .dd-sec{margin:18px 0 8px;font-family:var(--font-display);font-size:15px;display:flex;align-items:center;gap:8px}
   .dd-sec::after{content:"";flex:1;height:1px;background:var(--line)}
+  .cat-checks{display:flex;flex-wrap:wrap;gap:4px 12px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;max-height:120px;overflow:auto;background:var(--panel2)}
+  .cat-chk{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;white-space:nowrap}
+  .cat-chk input{margin:0}
   .auth-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
   .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px;max-width:390px;width:100%}
   .auth-card h2{margin:0 0 6px;font-size:22px} .auth-card .p{color:var(--muted);margin:0 0 20px;font-size:14px}
@@ -757,7 +760,7 @@
             <form class="row" onsubmit="addFournisseur(event)">
               <div class="field"><label>Nom du fournisseur</label><input type="text" id="fo-nom" placeholder="ex. Rexel, Sonepar…" required></div>
               <div class="field" style="max-width:170px"><label>Type</label><select id="fo-type" onchange="onFoType()"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent</option></select></div>
-              <div class="field"><label>Catégorie liée</label><select id="fo-cat"></select></div>
+              <div class="field" style="min-width:240px;flex:1"><label>Catégories liées <span style="color:var(--muted);font-weight:400">(une ou plusieurs)</span></label><div id="fo-cats" class="cat-checks"></div></div>
               <div class="field fo-rec" style="display:none;max-width:150px"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fo-montant" placeholder="laisse vide si variable"></div>
               <div class="field"><label>Payé par (société)</label><select id="fo-source"></select></div>
               <div class="field fo-rec" style="display:none;max-width:150px"><label>À partir du mois</label><input type="month" id="fo-mois"></div>
@@ -1504,8 +1507,14 @@ async function loadFournisseurs(){
 }
 let editingFournisseurId=null;
 function fournisseurCatOptions(cur){ const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle)])].filter(Boolean).sort(); let o='<option value="">— aucune —</option>'+cats.map(c=>`<option value="${escH(c)}"${c===cur?' selected':''}>${escH(c)}</option>`).join(''); if(cur&&!cats.includes(cur)) o+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`; return o; }
-function fillFournisseurCatSelect(){ const sel=document.getElementById('fo-cat'); if(sel){ const p=sel.value; sel.innerHTML=fournisseurCatOptions(p); sel.value=p; } }
-function fournisseurCatOf(nom){ const f=(window._fournisseurs||[]).find(x=>(x.nom||'')===nom); return f?(f.categorie||''):''; }
+// ===== Catégories multiples par fournisseur =====
+function allCatNames(){ return [...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fr')); }
+function fournCats(f){ if(f&&Array.isArray(f.categories)&&f.categories.filter(Boolean).length) return f.categories.filter(Boolean); if(f&&f.categorie) return [f.categorie]; return []; }
+function catChecksHTML(groupClass,selected){ const sel=(selected||[]).map(s=>(''+s).toLowerCase()); const cats=allCatNames(); if(!cats.length) return '<span style="color:var(--muted);font-size:12px">Aucune catégorie — crée-en dans Paramètres → Catégories.</span>'; return cats.map(c=>`<label class="cat-chk"><input type="checkbox" class="${groupClass}" value="${escH(c)}"${sel.includes(c.toLowerCase())?' checked':''}> ${escH(c)}</label>`).join(''); }
+function readCatChecks(groupClass,root){ return [...(root||document).querySelectorAll('input.'+groupClass+':checked')].map(x=>x.value); }
+function fillFournisseurCatSelect(){ const box=document.getElementById('fo-cats'); if(box){ const checked=readCatChecks('fo-cat-chk',box); box.innerHTML=catChecksHTML('fo-cat-chk',checked); } }
+function fournisseurCatsOf(nom){ const f=(window._fournisseurs||[]).find(x=>(x.nom||'')===nom); return f?fournCats(f):[]; }
+function fournisseurCatOf(nom){ const c=fournisseurCatsOf(nom); return c[0]||''; }
 function setCategorieValue(selId,cat){ const sel=document.getElementById(selId); if(!sel||!cat) return; if(![...sel.options].some(o=>o.value===cat)) sel.insertAdjacentHTML('afterbegin',`<option>${escH(cat)}</option>`); sel.value=cat; }
 function fourTypePill(t){ return t==='recurrent'?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'; }
 function fourTypeOptions(cur){ return `<option value="depense"${cur!=='recurrent'?' selected':''}>Dépense</option><option value="recurrent"${cur==='recurrent'?' selected':''}>🔁 Récurrent</option>`; }
@@ -1515,7 +1524,7 @@ function onFoType(){ const rec=(document.getElementById('fo-type')||{}).value===
 function fillFoSourceSelect(){ const sel=document.getElementById('fo-source'); if(sel){ const p=sel.value; sel.innerHTML=foSourceOptions(p); sel.value=p; } }
 function _fnorm(s){ return (typeof searchNorm==='function'?searchNorm:(x=>(''+x).toLowerCase()))(s); }
 function populateFournFilters(){
-  const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle),...(window._fournisseurs||[]).map(f=>f.categorie)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fr'));
+  const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle),...(window._fournisseurs||[]).flatMap(f=>fournCats(f))])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fr'));
   const cs=document.getElementById('fof-cat'); if(cs){ const p=cs.value; cs.innerHTML='<option value="">Toutes</option>'+cats.map(c=>`<option value="${escH(c)}"${c===p?' selected':''}>${escH(c)}</option>`).join(''); }
   const srcIds=[...new Set((window._fournisseurs||[]).map(f=>f.source_id).filter(Boolean))];
   const ss=document.getElementById('fof-source'); if(ss){ const p=ss.value; const opts=srcIds.map(id=>({id,nom:fourSrcNom(id)||'—'})).sort((a,b)=>a.nom.localeCompare(b.nom,'fr')); ss.innerHTML='<option value="">Toutes</option>'+opts.map(o=>`<option value="${escH(o.id)}"${o.id===p?' selected':''}>${escH(o.nom)}</option>`).join(''); }
@@ -1532,7 +1541,7 @@ function renderFournisseurs(){
   let f=all;
   if(q) f=f.filter(x=>_fnorm(x.nom||'').includes(q));
   if(ft) f=f.filter(x=>(x.type||'depense')===ft);
-  if(fc) f=f.filter(x=>(x.categorie||'')===fc);
+  if(fc) f=f.filter(x=>fournCats(x).includes(fc));
   if(fs) f=f.filter(x=>(x.source_id||'')===fs);
   const active=!!(q||ft||fc||fs);
   { const cnt=document.getElementById('fo-count'); if(cnt) cnt.textContent=active?`${f.length} / ${all.length} fournisseur${all.length>1?'s':''} (filtré)`:`${all.length} fournisseur${all.length>1?'s':''}`; }
@@ -1540,19 +1549,20 @@ function renderFournisseurs(){
     const rec=x.type==='recurrent';
     if(x.id===editingFournisseurId) return `<tr class="rowedit"><td><input type="text" id="foe-nom" value="${escH(x.nom||'')}"></td>
       <td><select id="foe-type">${fourTypeOptions(x.type||'depense')}</select></td>
-      <td><select id="foe-cat">${fournisseurCatOptions(x.categorie||'')}</select></td>
+      <td><div id="foe-cats" class="cat-checks" style="max-height:96px;min-width:180px">${catChecksHTML('foe-cat-chk',fournCats(x))}</div></td>
       <td class="num"><input type="number" step="0.01" id="foe-montant" placeholder="montant" value="${x.montant!=null?x.montant:''}"></td>
       <td><select id="foe-source">${foSourceOptions(x.source_id||'')}</select></td>
       <td><input type="month" id="foe-mois" value="${escH((x.mois_debut||'').slice(0,7))}"></td>
       <td class="num"><button class="btn small" onclick="saveFournisseur('${x.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelFournisseurEdit()">Annuler</button></td></tr>`;
-    return `<tr><td>${escH(x.nom)}</td><td>${fourTypePill(x.type)}</td><td>${x.categorie?`<span class="pill">${escH(x.categorie)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+    const _cats=fournCats(x);
+    return `<tr><td>${escH(x.nom)}</td><td>${fourTypePill(x.type)}</td><td>${_cats.length?_cats.map(c=>`<span class="pill">${escH(c)}</span>`).join(' '):'<span style="color:var(--muted)">—</span>'}</td>
       <td class="num">${x.montant!=null?eur(x.montant):'—'}</td><td>${x.source_id?(escH(fourSrcNom(x.source_id))||'—'):'—'}</td><td>${x.mois_debut?moisLabel(x.mois_debut.slice(0,7)+'-01'):'—'}</td>
       <td class="num"><button class="btn ghost small" onclick="editFournisseur('${x.id}')">✏️</button> <button class="btn danger small" onclick="delFournisseur('${x.id}')">Suppr.</button></td></tr>`;
   }).join(''):`<tr><td colspan="7" class="empty">${active?'Aucun fournisseur pour ce filtre':'Aucun fournisseur'}</td></tr>`;
 }
 function editFournisseur(id){ editingFournisseurId=id; renderFournisseurs(); }
 function cancelFournisseurEdit(){ editingFournisseurId=null; renderFournisseurs(); }
-async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const type=(document.getElementById('foe-type')||{}).value||'depense'; const mv=(document.getElementById('foe-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('foe-source')||{}).value||null; const mois_debut=(document.getElementById('foe-mois')||{}).value||null; const old=(window._fournisseurs||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,type,montant,source_id,mois_debut}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('frais'),'fournisseur',oldNom,nom); editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); if(typeof loadFrais==='function') loadFrais(); }
+async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categories=readCatChecks('foe-cat-chk'); if(!categories.length){ toast('Choisis au moins une catégorie'); return; } const categorie=categories[0]; const type=(document.getElementById('foe-type')||{}).value||'depense'; const mv=(document.getElementById('foe-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('foe-source')||{}).value||null; const mois_debut=(document.getElementById('foe-mois')||{}).value||null; const old=(window._fournisseurs||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,categories,type,montant,source_id,mois_debut}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('frais'),'fournisseur',oldNom,nom); editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); if(typeof loadFrais==='function') loadFrais(); }
 function fournisseurOptions(cur){
   const list=(window._fournisseurs||[]).map(f=>f.nom);
   let opts='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join('');
@@ -1563,22 +1573,26 @@ function fillFournisseurSelect(){ const sel=document.getElementById('f-fournisse
 async function createFournisseurPrompt(catSelId){
   const nom=(prompt('Nom du nouveau fournisseur :')||'').trim(); if(!nom) return null;
   const cat=(document.getElementById(catSelId)||{}).value||null;
-  const {error}=await db.from('engco_fournisseurs').insert({nom,categorie:cat,type:'depense'}); if(error){ toast('Erreur : '+error.message); return null; }
+  const {error}=await db.from('engco_fournisseurs').insert({nom,categorie:cat,categories:cat?[cat]:null,type:'depense'}); if(error){ toast('Erreur : '+error.message); return null; }
   await loadFournisseurs(); toast('Fournisseur créé ✅'+(cat?(' — catégorie '+cat):' (sans catégorie)')); return nom;
 }
 async function onFraisFournisseur(){
   const sel=document.getElementById('f-fournisseur'); if(!sel) return;
   if(sel.value==='__new__'){ sel.value=''; const nom=await createFournisseurPrompt('f-categorie'); if(!nom) return;
     const s2=document.getElementById('f-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } return; }
-  const cat=fournisseurCatOf(sel.value); if(cat){ setCategorieValue('f-categorie',cat); if(typeof onFraisCategorie==='function') onFraisCategorie(); }
+  const cats=fournisseurCatsOf(sel.value);
+  if(cats.length===1){ setCategorieValue('f-categorie',cats[0]); if(typeof onFraisCategorie==='function') onFraisCategorie(); }
+  else if(cats.length>1){ toast('Ce fournisseur a plusieurs catégories — choisis-la dans la liste'); }
 }
 async function onInlineFournisseur(){
   const sel=document.getElementById('if-fournisseur'); if(!sel) return;
   if(sel.value==='__new__'){ sel.value=''; const nom=await createFournisseurPrompt('if-categorie'); if(!nom) return;
     const s2=document.getElementById('if-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } return; }
-  const cat=fournisseurCatOf(sel.value); if(cat) setCategorieValue('if-categorie',cat);
+  const cats=fournisseurCatsOf(sel.value);
+  if(cats.length===1) setCategorieValue('if-categorie',cats[0]);
+  else if(cats.length>1) toast('Ce fournisseur a plusieurs catégories — choisis-la dans la liste');
 }
-async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; const type=(document.getElementById('fo-type')||{}).value||'depense'; const mv=(document.getElementById('fo-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('fo-source')||{}).value||null; const mois_debut=(document.getElementById('fo-mois')||{}).value||null; if(!categorie){ toast('Choisis la catégorie liée'); return; } if(type==='recurrent'&&!mois_debut){ toast('Indique le mois de début du récurrent'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie,type,montant,source_id,mois_debut}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; { const m=document.getElementById('fo-montant'); if(m) m.value=''; } { const mo=document.getElementById('fo-mois'); if(mo) mo.value=''; } toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
+async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categories=readCatChecks('fo-cat-chk'); const type=(document.getElementById('fo-type')||{}).value||'depense'; const mv=(document.getElementById('fo-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('fo-source')||{}).value||null; const mois_debut=(document.getElementById('fo-mois')||{}).value||null; if(!categories.length){ toast('Choisis au moins une catégorie liée'); return; } if(type==='recurrent'&&!mois_debut){ toast('Indique le mois de début du récurrent'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie:categories[0],categories,type,montant,source_id,mois_debut}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; { const m=document.getElementById('fo-montant'); if(m) m.value=''; } { const mo=document.getElementById('fo-mois'); if(mo) mo.value=''; } readCatChecks('fo-cat-chk').length&&document.querySelectorAll('input.fo-cat-chk:checked').forEach(x=>x.checked=false); toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
 async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
 // ===== Campagnes (LED) =====
 let editingCampagneId=null;
