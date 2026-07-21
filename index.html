@@ -557,7 +557,7 @@
           <th><select id="frf-mois" onchange="renderFrais()"><option value="">Tous</option></select></th>
           <th><select id="frf-type" onchange="renderFrais()"><option value="">Tous</option><option value="auto">🤖 Auto</option><option value="manuel">✍️ Manuel</option></select></th>
           <th><select id="frf-cat" onchange="renderFrais()"><option value="">Toutes</option></select></th>
-          <th><input type="text" id="frf-fourn" placeholder="filtrer…" oninput="renderFrais()"></th>
+          <th><select id="frf-fourn" onchange="renderFrais()"><option value="">Tous</option></select></th>
           <th><select id="frf-ftype" onchange="renderFrais()"><option value="">Tous</option><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent</option></select></th>
           <th><select id="frf-source" onchange="renderFrais()"><option value="">Tous</option></select></th>
           <th class="num"></th>
@@ -1860,7 +1860,7 @@ function renderFrais(){
 function fraisFilterState(){
   const g=id=>((document.getElementById(id)||{}).value||'');
   return { term:g('frais-search'), date:g('frf-date').toLowerCase().trim(), mois:g('frf-mois'),
-    type:g('frf-type'), cat:g('frf-cat'), fourn:g('frf-fourn').toLowerCase().trim(), ftype:g('frf-ftype'),
+    type:g('frf-type'), cat:g('frf-cat'), fourn:g('frf-fourn'), ftype:g('frf-ftype'),
     source:g('frf-source'), regie:g('frf-regie') };
 }
 function fraisFiltersActive(){ const q=fraisFilterState(); return !!(q.term||q.date||q.mois||q.type||q.cat||q.fourn||q.ftype||q.source||q.regie); }
@@ -1874,7 +1874,7 @@ function filterFraisRows(){
     if(q.type==='auto' && !f.auto) return false;
     if(q.type==='manuel' && f.auto) return false;
     if(q.cat && (f.categorie||'')!==q.cat) return false;
-    if(q.fourn && !((f.fournisseur||'').toLowerCase().includes(q.fourn))) return false;
+    if(q.fourn && (f.fournisseur||'')!==q.fourn) return false;
     if(q.ftype && (fraisTypeOf(f)||'')!==q.ftype) return false;
     if(q.source && (f.source_id||'')!==q.source) return false;
     if(q.regie && (f.regie_concernee||'')!==q.regie) return false;
@@ -1895,6 +1895,8 @@ function populateFraisFilters(){
   fill('frf-source',srcIds.map(id=>{ const s=SOURCES.find(x=>x.id===id); return {v:id,l:s?s.nom:id}; }));
   const regies=[...new Set(frais.map(f=>f.regie_concernee).filter(Boolean))].sort();
   fill('frf-regie',regies.map(r=>({v:r,l:r})));
+  const fourns=[...new Set(frais.map(f=>f.fournisseur).filter(Boolean))].sort();
+  fill('frf-fourn',fourns.map(x=>({v:x,l:x})));
 }
 function renderFraisTotals(rows){
   const tr=document.getElementById('frais-totals'); if(!tr) return;
