@@ -691,10 +691,11 @@
             <div class="hint" style="margin-bottom:8px">Tes fournisseurs, chacun relié à une <b>catégorie</b>. Quand tu choisis un fournisseur à la saisie d'un frais, la catégorie se remplit toute seule.</div>
             <form class="row" onsubmit="addFournisseur(event)">
               <div class="field"><label>Nom du fournisseur</label><input type="text" id="fo-nom" placeholder="ex. Rexel, Sonepar…" required></div>
+              <div class="field" style="max-width:170px"><label>Type</label><select id="fo-type"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent</option></select></div>
               <div class="field"><label>Catégorie liée</label><select id="fo-cat"></select></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
-            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th>Catégorie</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th>Type</th><th>Catégorie</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
           </section>
         </div>
         <div class="params-sec" id="ps-liencrm">
@@ -730,17 +731,13 @@
         </div>
         <div class="params-sec" id="ps-categories">
           <section class="panel"><h2>🏷️ Catégories de frais</h2>
-            <div class="hint" style="margin-bottom:8px">Ajoute tes catégories (elles apparaissent dans le menu « Catégorie » à l'ajout d'un frais). Choisis <b>Dépense</b> (catégorie simple) ou <b>Récurrent mensuel</b> — dans ce cas l'appli te rappellera chaque mois de le saisir.</div>
+            <div class="hint" style="margin-bottom:8px">Ajoute tes catégories (elles apparaissent dans le menu « Catégorie » à l'ajout d'un frais). Le caractère <b>Dépense / Récurrent</b> se règle désormais au niveau du <b>fournisseur</b>.</div>
             <form class="row" onsubmit="addCat(event)">
-              <div class="field"><label>Nom de la catégorie</label><input type="text" id="fc-nom" placeholder="ex. Loyer, Carburant…" required></div>
-              <div class="field"><label>Type</label><select id="fc-type" onchange="onCatType()"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent mensuel</option></select></div>
-              <div class="field fc-rec" style="display:none"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fc-montant" placeholder="ex. 1000"></div>
-              <div class="field fc-rec" style="display:none"><label>Payé par (société)</label><select id="fc-source"></select></div>
-              <div class="field fc-rec" style="display:none"><label>À partir du mois</label><input type="month" id="fc-mois"></div>
-              <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="fc-savebtn">+ Ajouter</button> <button class="btn ghost" type="button" id="fc-cancelbtn" onclick="cancelEditCat()" style="display:none">Annuler</button></div>
+              <div class="field"><label>Nom de la catégorie</label><input type="text" id="fc-nom" placeholder="ex. Matériel, Carburant…" required></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="fc-savebtn">+ Ajouter</button></div>
             </form>
             <div class="table-wrap"><table>
-              <thead><tr><th>Catégorie</th><th>Type</th><th class="num">Montant récurrent</th><th>Société</th><th>Depuis</th><th></th></tr></thead>
+              <thead><tr><th>Catégorie</th><th></th></tr></thead>
               <tbody id="cats-body"></tbody>
             </table></div>
           </section>
@@ -1392,19 +1389,22 @@ function fournisseurCatOptions(cur){ const cats=[...new Set([...(window._fraisca
 function fillFournisseurCatSelect(){ const sel=document.getElementById('fo-cat'); if(sel){ const p=sel.value; sel.innerHTML=fournisseurCatOptions(p); sel.value=p; } }
 function fournisseurCatOf(nom){ const f=(window._fournisseurs||[]).find(x=>(x.nom||'')===nom); return f?(f.categorie||''):''; }
 function setCategorieValue(selId,cat){ const sel=document.getElementById(selId); if(!sel||!cat) return; if(![...sel.options].some(o=>o.value===cat)) sel.insertAdjacentHTML('afterbegin',`<option>${escH(cat)}</option>`); sel.value=cat; }
+function fourTypePill(t){ return t==='recurrent'?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'; }
+function fourTypeOptions(cur){ return `<option value="depense"${cur!=='recurrent'?' selected':''}>Dépense</option><option value="recurrent"${cur==='recurrent'?' selected':''}>🔁 Récurrent</option>`; }
 function renderFournisseurs(){
   const b=document.getElementById('fournisseurs-body'); if(!b) return; const f=window._fournisseurs||[];
   b.innerHTML=f.length?f.map(x=>{
     if(x.id===editingFournisseurId) return `<tr class="rowedit"><td><input type="text" id="foe-nom" value="${escH(x.nom||'')}"></td>
+      <td><select id="foe-type">${fourTypeOptions(x.type||'depense')}</select></td>
       <td><select id="foe-cat">${fournisseurCatOptions(x.categorie||'')}</select></td>
       <td class="num"><button class="btn small" onclick="saveFournisseur('${x.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelFournisseurEdit()">Annuler</button></td></tr>`;
-    return `<tr><td>${escH(x.nom)}</td><td>${x.categorie?`<span class="pill">${escH(x.categorie)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+    return `<tr><td>${escH(x.nom)}</td><td>${fourTypePill(x.type)}</td><td>${x.categorie?`<span class="pill">${escH(x.categorie)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
       <td class="num"><button class="btn ghost small" onclick="editFournisseur('${x.id}')">✏️</button> <button class="btn danger small" onclick="delFournisseur('${x.id}')">Suppr.</button></td></tr>`;
-  }).join(''):`<tr><td colspan="3" class="empty">Aucun fournisseur</td></tr>`;
+  }).join(''):`<tr><td colspan="4" class="empty">Aucun fournisseur</td></tr>`;
 }
 function editFournisseur(id){ editingFournisseurId=id; renderFournisseurs(); }
 function cancelFournisseurEdit(){ editingFournisseurId=null; renderFournisseurs(); }
-async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); }
+async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const type=(document.getElementById('foe-type')||{}).value||'depense'; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,type}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); }
 function fournisseurOptions(cur){
   const list=(window._fournisseurs||[]).map(f=>f.nom);
   let opts='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join('');
@@ -1415,7 +1415,7 @@ function fillFournisseurSelect(){ const sel=document.getElementById('f-fournisse
 async function createFournisseurPrompt(catSelId){
   const nom=(prompt('Nom du nouveau fournisseur :')||'').trim(); if(!nom) return null;
   const cat=(document.getElementById(catSelId)||{}).value||null;
-  const {error}=await db.from('engco_fournisseurs').insert({nom,categorie:cat}); if(error){ toast('Erreur : '+error.message); return null; }
+  const {error}=await db.from('engco_fournisseurs').insert({nom,categorie:cat,type:'depense'}); if(error){ toast('Erreur : '+error.message); return null; }
   await loadFournisseurs(); toast('Fournisseur créé ✅'+(cat?(' — catégorie '+cat):' (sans catégorie)')); return nom;
 }
 async function onFraisFournisseur(){
@@ -1430,7 +1430,7 @@ async function onInlineFournisseur(){
     const s2=document.getElementById('if-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } return; }
   const cat=fournisseurCatOf(sel.value); if(cat) setCategorieValue('if-categorie',cat);
 }
-async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; if(!categorie){ toast('Choisis la catégorie liée'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
+async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; const type=(document.getElementById('fo-type')||{}).value||'depense'; if(!categorie){ toast('Choisis la catégorie liée'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie,type}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
 async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
 // ===== Campagnes (LED) =====
 let editingCampagneId=null;
@@ -2571,77 +2571,32 @@ async function loadFraisCats(){
 }
 function renderCats(){
   const b=document.getElementById('cats-body'); if(!b) return;
-  const deps=(window._fraiscats||[]).map(c=>({nom:c.nom,type:'depense',id:c.id}));
-  const recs=(window._recurrents||[]).map(r=>({nom:r.libelle,type:'recurrent',id:r.id,montant:r.montant_defaut,mois:r.mois_debut,source_id:r.source_id}));
-  const all=[...recs,...deps].sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
-  const srcNom=id=>{ const s=SOURCES.find(x=>x.id===id); return s?s.nom:''; };
+  const all=(window._fraiscats||[]).slice().sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
   b.innerHTML=all.length? all.map(c=>{
-    const rec=c.type==='recurrent';
-    if(editingCatInline.id===c.id) return `<tr class="rowedit">
-      <td><input type="text" id="cate-nom" value="${escH(c.nom||'')}"></td>
-      <td>${rec?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'}</td>
-      <td class="num">${rec?`<input type="number" step="0.01" id="cate-montant" value="${c.montant!=null?c.montant:''}">`:'—'}</td>
-      <td>${rec?`<select id="cate-source">${catSourceOptions(c.source_id||'')}</select>`:'—'}</td>
-      <td>${rec?`<input type="month" id="cate-mois" value="${(c.mois||'').slice(0,7)}">`:'—'}</td>
-      <td class="num"><button class="btn small" onclick="saveCatInline('${c.type}','${c.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelCatInline()">Annuler</button></td></tr>`;
-    return `<tr><td>${escH(c.nom)}</td>
-    <td>${rec?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'}</td>
-    <td class="num">${rec&&c.montant!=null?eur(c.montant):'—'}</td>
-    <td>${rec?(escH(srcNom(c.source_id))||'—'):'—'}</td>
-    <td>${rec?(moisLabel(c.mois)||'—'):'—'}</td>
-    <td class="num"><button class="btn ghost small" onclick="editCat('${c.type}','${c.id}')">✏️</button> <button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="6" class="empty">Aucune catégorie</td></tr>`;
+    if(editingCatInline.id===c.id) return `<tr class="rowedit"><td><input type="text" id="cate-nom" value="${escH(c.nom||'')}"></td>
+      <td class="num"><button class="btn small" onclick="saveCatInline('depense','${c.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelCatInline()">Annuler</button></td></tr>`;
+    return `<tr><td>${escH(c.nom)}</td><td class="num"><button class="btn ghost small" onclick="editCat('depense','${c.id}')">✏️</button> <button class="btn danger small" onclick="delCat('depense','${c.id}')">Suppr.</button></td></tr>`;
+  }).join('') : `<tr><td colspan="2" class="empty">Aucune catégorie</td></tr>`;
 }
 let editingCatInline={id:null,type:null};
 function catSourceOptions(cur){ return '<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${escH(s.id)}"${s.id===cur?' selected':''}>${escH(s.nom)}</option>`).join(''); }
 function cancelCatInline(){ editingCatInline={id:null,type:null}; renderCats(); }
 async function saveCatInline(type,id){
-  const g=x=>document.getElementById(x); const nom=(g('cate-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; }
-  let error;
-  if(type==='recurrent'){ const montant=g('cate-montant').value; const mois=(g('cate-mois').value||today().slice(0,7)); const source_id=(g('cate-source')||{}).value||null;
-    ({error}=await db.from(T('recurrents')).update({libelle:nom, montant_defaut:montant===''?null:Number(montant), source_id, mois_debut:mois+'-01'}).eq('id',id));
-  } else { ({error}=await db.from(T('frais_cats')).update({nom}).eq('id',id)); }
+  const nom=(document.getElementById('cate-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; }
+  const {error}=await db.from(T('frais_cats')).update({nom}).eq('id',id);
   if(error){ toast('Erreur : '+error.message); return; }
-  editingCatInline={id:null,type:null}; toast('Catégorie modifiée ✅'); await loadFraisCats(); await loadRecurrents();
+  editingCatInline={id:null,type:null}; toast('Catégorie modifiée ✅'); await loadFraisCats();
 }
-function onCatType(){
-  const rec=document.getElementById('fc-type').value==='recurrent';
-  document.querySelectorAll('.fc-rec').forEach(el=>el.style.display=rec?'':'none');
-  if(rec){ const m=document.getElementById('fc-mois'); if(m&&!m.value) m.value=today().slice(0,7); }
-}
-let editingCat={id:null,type:null};
+function onCatType(){}
+function cancelEditCat(){}
 // Édition d'une catégorie directement sur sa ligne (le formulaire du haut ne sert qu'à l'ajout)
 function editCat(type,id){ editingCatInline={id,type}; renderCats(); const el=document.getElementById('cate-nom'); if(el){ el.scrollIntoView({behavior:'smooth',block:'nearest'}); el.focus(); } }
-function cancelEditCat(){
-  editingCat={id:null,type:null};
-  ['fc-nom','fc-montant','fc-mois'].forEach(i=>{const el=document.getElementById(i); if(el) el.value='';});
-  const fcs=document.getElementById('fc-source'); if(fcs) fcs.value='';
-  const ts=document.getElementById('fc-type'); ts.disabled=false; ts.value='depense'; onCatType();
-  document.getElementById('fc-savebtn').textContent='+ Ajouter';
-  document.getElementById('fc-cancelbtn').style.display='none';
-}
 async function addCat(e){
   e.preventDefault();
   const nom=document.getElementById('fc-nom').value.trim(); if(!nom) return;
-  const type=document.getElementById('fc-type').value; let error;
-  const montant=document.getElementById('fc-montant').value;
-  const mois=document.getElementById('fc-mois').value||today().slice(0,7);
-  const source_id=(document.getElementById('fc-source')||{}).value||null;
-  if(editingCat.id){
-    if(editingCat.type==='recurrent'){
-      ({error}=await db.from(T('recurrents')).update({libelle:nom, montant_defaut:montant===''?null:Number(montant), source_id, mois_debut:mois+'-01'}).eq('id',editingCat.id));
-    } else {
-      ({error}=await db.from(T('frais_cats')).update({nom}).eq('id',editingCat.id));
-    }
-  } else if(type==='recurrent'){
-    ({error}=await db.from(T('recurrents')).insert({libelle:nom, montant_defaut:montant===''?null:Number(montant), source_id, mois_debut:mois+'-01', pct_defaut:0}));
-  } else {
-    ({error}=await db.from(T('frais_cats')).insert({nom}));
-  }
+  const {error}=await db.from(T('frais_cats')).insert({nom});
   if(error){ toast('Erreur : '+error.message); return; }
-  const wasEdit=!!editingCat.id;
-  cancelEditCat();
-  await loadFraisCats(); await loadRecurrents(); toast(wasEdit?'Catégorie modifiée ✅':'Catégorie ajoutée ✅');
+  document.getElementById('fc-nom').value=''; await loadFraisCats(); toast('Catégorie ajoutée ✅');
 }
 async function delCat(type,id){
   if(!confirm('Supprimer cette catégorie ?')) return;

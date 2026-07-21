@@ -181,3 +181,7 @@ drop policy if exists engco_campagnes_all on public.engco_campagnes;
 create policy engco_campagnes_all on public.engco_campagnes for all to authenticated using (true) with check (true);
 grant select, insert, update, delete on public.engco_campagnes to authenticated;
 alter table public.engco_dossiers add column if not exists campagne text;
+
+-- ===== engco-fournisseur-type.sql =====
+-- Type du fournisseur : dépense ou récurrent (le choix récurrent/dépense passe au niveau du fournisseur)
+alter table public.engco_fournisseurs add column if not exists type text not null default 'depense';
