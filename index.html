@@ -2571,11 +2571,13 @@ async function loadFraisCats(){
 }
 function renderCats(){
   const b=document.getElementById('cats-body'); if(!b) return;
-  const all=(window._fraiscats||[]).slice().sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
+  const deps=(window._fraiscats||[]).map(c=>({nom:c.nom,id:c.id,type:'depense'}));
+  const recs=(window._recurrents||[]).map(r=>({nom:r.libelle,id:r.id,type:'recurrent'}));
+  const all=[...deps,...recs].sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
   b.innerHTML=all.length? all.map(c=>{
     if(editingCatInline.id===c.id) return `<tr class="rowedit"><td><input type="text" id="cate-nom" value="${escH(c.nom||'')}"></td>
-      <td class="num"><button class="btn small" onclick="saveCatInline('depense','${c.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelCatInline()">Annuler</button></td></tr>`;
-    return `<tr><td>${escH(c.nom)}</td><td class="num"><button class="btn ghost small" onclick="editCat('depense','${c.id}')">✏️</button> <button class="btn danger small" onclick="delCat('depense','${c.id}')">Suppr.</button></td></tr>`;
+      <td class="num"><button class="btn small" onclick="saveCatInline('${c.type}','${c.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelCatInline()">Annuler</button></td></tr>`;
+    return `<tr><td>${escH(c.nom)}</td><td class="num"><button class="btn ghost small" onclick="editCat('${c.type}','${c.id}')">✏️</button> <button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`;
   }).join('') : `<tr><td colspan="2" class="empty">Aucune catégorie</td></tr>`;
 }
 let editingCatInline={id:null,type:null};
@@ -2583,9 +2585,11 @@ function catSourceOptions(cur){ return '<option value="">— (facultatif) —</o
 function cancelCatInline(){ editingCatInline={id:null,type:null}; renderCats(); }
 async function saveCatInline(type,id){
   const nom=(document.getElementById('cate-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; }
-  const {error}=await db.from(T('frais_cats')).update({nom}).eq('id',id);
+  let error;
+  if(type==='recurrent'){ ({error}=await db.from(T('recurrents')).update({libelle:nom}).eq('id',id)); }
+  else { ({error}=await db.from(T('frais_cats')).update({nom}).eq('id',id)); }
   if(error){ toast('Erreur : '+error.message); return; }
-  editingCatInline={id:null,type:null}; toast('Catégorie modifiée ✅'); await loadFraisCats();
+  editingCatInline={id:null,type:null}; toast('Catégorie modifiée ✅'); await loadFraisCats(); await loadRecurrents();
 }
 function onCatType(){}
 function cancelEditCat(){}
