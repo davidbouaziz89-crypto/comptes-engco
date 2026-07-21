@@ -1082,16 +1082,16 @@ function openRegieDetail(nom){
   h+=`<div class="dd-sec">🧾 Frais refacturés / déduits (${refacs.length})</div>`;
   if(!refacs.length){ h+=`<div class="hint">Aucun frais refacturé à cette régie. Sur un frais, choisis la régie et un % → sa part refacturée se déduit ici.</div>`; }
   else{
-    h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Dossier (ID client)</th><th>Catégorie</th><th>Détail</th><th class="num">Montant</th><th class="num">%</th><th class="num">Refacturé</th></tr></thead><tbody>`
-      +refacs.map(f=>`<tr><td>${fdate(f.date)}</td><td>${regieCidCell(f)}</td><td><span class="pill">${escH(f.categorie||'')}</span></td><td>${escH(f.libelle||'')||'<span style="color:var(--muted)">—</span>'}</td><td class="num">${eur(f.montant)}</td><td class="num">${num(f.pct_decompte)} %</td><td class="num val-good">${eur(f.montant_regie)}</td></tr>`).join('')
+    h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Dossier (ID client)</th><th>Fournisseur</th><th>Détail</th><th class="num">Montant</th><th class="num">%</th><th class="num">Refacturé</th></tr></thead><tbody>`
+      +refacs.map(f=>`<tr><td>${fdate(f.date)}</td><td>${regieCidCell(f)}</td><td>${escH(f.fournisseur||'')||'<span style="color:var(--muted)">—</span>'}</td><td>${escH(f.libelle||'')||'<span style="color:var(--muted)">—</span>'}</td><td class="num">${eur(f.montant)}</td><td class="num">${num(f.pct_decompte)} %</td><td class="num val-good">${eur(f.montant_regie)}</td></tr>`).join('')
       +`<tr><td colspan="6" class="num"><b>Total refacturé</b></td><td class="num val-good"><b>${eur(refac)}</b></td></tr></tbody></table></div>`;
   }
   // Versements directs (paiements à son nom)
   h+=`<div class="dd-sec">💸 Versements directs (${payes.length})</div>`;
   if(!payes.length){ h+=`<div class="hint">Aucun paiement à son nom. Pour noter un virement, crée un frais dont la <b>catégorie</b> ou le <b>fournisseur</b> = « ${escH(nom)} ».</div>`; }
   else{
-    h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Dossier (ID client)</th><th>Catégorie</th><th>Détail</th><th class="num">Montant</th></tr></thead><tbody>`
-      +payes.map(f=>`<tr><td>${fdate(f.date)}</td><td>${regieCidCell(f)}</td><td><span class="pill">${escH(f.categorie||'')}</span></td><td>${escH(f.libelle||'')||'<span style="color:var(--muted)">—</span>'}</td><td class="num">${eur(f.montant)}</td></tr>`).join('')
+    h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Dossier (ID client)</th><th>Fournisseur</th><th>Détail</th><th class="num">Montant</th></tr></thead><tbody>`
+      +payes.map(f=>`<tr><td>${fdate(f.date)}</td><td>${regieCidCell(f)}</td><td>${escH(f.fournisseur||'')||'<span style="color:var(--muted)">—</span>'}</td><td>${escH(f.libelle||'')||'<span style="color:var(--muted)">—</span>'}</td><td class="num">${eur(f.montant)}</td></tr>`).join('')
       +`<tr><td colspan="4" class="num"><b>Total versé</b></td><td class="num"><b>${eur(paid)}</b></td></tr></tbody></table></div>`;
   }
   document.getElementById('dd-body').innerHTML=h;
