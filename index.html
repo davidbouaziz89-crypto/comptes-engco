@@ -161,6 +161,13 @@
   .imp-dup-n{flex:0 0 auto;width:22px;height:22px;border-radius:6px;background:var(--panel2);display:grid;place-items:center;font-size:12px;color:var(--muted)}
   .imp-dup-r{color:var(--muted);font-size:12px}
   .btn:disabled{opacity:.5;cursor:default}
+  .dd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:6px}
+  .dd-item{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
+  .dd-item .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:2px}
+  .dd-item .v{font-size:14px;font-weight:600;word-break:break-word}
+  .dd-item .v a{color:var(--accent)}
+  .dd-sec{margin:18px 0 8px;font-family:var(--font-display);font-size:15px;display:flex;align-items:center;gap:8px}
+  .dd-sec::after{content:"";flex:1;height:1px;background:var(--line)}
   .auth-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
   .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px;max-width:390px;width:100%}
   .auth-card h2{margin:0 0 6px;font-size:22px} .auth-card .p{color:var(--muted);margin:0 0 20px;font-size:14px}
@@ -608,7 +615,7 @@
   </div>
 
   <!-- DÉTAIL DOSSIER (LED) -->
-  <div id="dossier-detail" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;align-items:flex-start;justify-content:center;padding:24px;overflow:auto">
+  <div id="dossier-detail" onclick="if(event.target===this)closeDossierDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;align-items:flex-start;justify-content:center;padding:24px;overflow:auto">
     <div class="panel" style="max-width:760px;width:100%;margin:auto">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <h2 id="dd-title" style="margin:0;flex:1">Détail du dossier</h2>
@@ -1331,7 +1338,7 @@ function veloDossierForm(){ return `
 function ledDossierHead(){ return `<th class="sortable" onclick="sortDossiers('date')">Date<span class="sort-arrow" data-dsort="date"></span></th><th class="sortable" onclick="sortDossiers('crm_id')">ID<span class="sort-arrow" data-dsort="crm_id"></span></th><th class="sortable" onclick="sortDossiers('client')">Raison sociale<span class="sort-arrow" data-dsort="client"></span></th><th class="sortable" onclick="sortDossiers('depot')">Dépôt Emmy<span class="sort-arrow" data-dsort="depot"></span></th><th class="sortable" onclick="sortDossiers('delegataire')">Délégataire<span class="sort-arrow" data-dsort="delegataire"></span></th><th class="num sortable" onclick="sortDossiers('cumac')">Cumac<span class="sort-arrow" data-dsort="cumac"></span></th><th class="num sortable" onclick="sortDossiers('prime')">Prime<span class="sort-arrow" data-dsort="prime"></span></th><th class="num sortable" onclick="sortDossiers('brute')">Marge brute<span class="sort-arrow" data-dsort="brute"></span></th><th class="sortable" onclick="sortDossiers('regie')">Régie<span class="sort-arrow" data-dsort="regie"></span></th><th class="num sortable" onclick="sortDossiers('commission')">Commission<span class="sort-arrow" data-dsort="commission"></span></th><th class="num sortable" onclick="sortDossiers('nette')">Marge nette<span class="sort-arrow" data-dsort="nette"></span></th><th class="sortable" onclick="sortDossiers('statut')">Statut<span class="sort-arrow" data-dsort="statut"></span></th><th></th>`; }
 let dossierSort={col:'',dir:1};
 function sortDossiers(col){ if(dossierSort.col===col) dossierSort.dir=-dossierSort.dir; else { dossierSort.col=col; dossierSort.dir=1; } renderDossiers(); }
-function dossierSortVal(d,col){ const delg=(window._delegataires||[]).find(x=>x.id===d.delegataire_id); switch(col){ case 'date':return d.date||''; case 'crm_id':return (d.crm_id||'').toLowerCase(); case 'client':return (d.nom_client||'').toLowerCase(); case 'depot':return (d.numero_depot||'').toLowerCase(); case 'delegataire':return (delg?delg.nom:'').toLowerCase(); case 'cumac':return Number(d.cumac)||0; case 'prime':return Number(d.montant_prime)||0; case 'brute':return Number(d.marge_brute)||0; case 'regie':return (d.commercial_regie||'').toLowerCase(); case 'commission':return Number(d.commission_regie)||0; case 'nette':return Number(d.marge_nette)||0; case 'statut':return (d.statut||'').toLowerCase(); default:return ''; } }
+function dossierSortVal(d,col){ const delg=(window._delegataires||[]).find(x=>x.id===dossierDelegId(d)); switch(col){ case 'date':return d.date||''; case 'crm_id':return (d.crm_id||'').toLowerCase(); case 'client':return (d.nom_client||'').toLowerCase(); case 'depot':return (d.numero_depot||'').toLowerCase(); case 'delegataire':return (delg?delg.nom:'').toLowerCase(); case 'cumac':return Number(d.cumac)||0; case 'prime':return Number(d.montant_prime)||0; case 'brute':return Number(d.marge_brute)||0; case 'regie':return (d.commercial_regie||'').toLowerCase(); case 'commission':return Number(d.commission_regie)||0; case 'nette':return Number(d.marge_nette)||0; case 'statut':return (d.statut||'').toLowerCase(); default:return ''; } }
 function updateDossierSortArrows(){ document.querySelectorAll('#dossiers-head .sort-arrow').forEach(s=>{ s.textContent = s.getAttribute('data-dsort')===dossierSort.col ? (dossierSort.dir>0?' ▲':' ▼') : ''; }); }
 function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
@@ -1556,6 +1563,8 @@ async function delCampagne(id){ if(!confirm('Supprimer cette campagne ?')) retur
 // ===== Dépôts Emmy (LED) — reliés à un délégataire =====
 let editingDepotId=null;
 function delegNameOf(id){ const d=(window._delegataires||[]).find(x=>x.id===id); return d?d.nom:''; }
+// Délégataire d'un dossier : celui du dossier, sinon déduit du Dépôt Emmy (utile pour les dossiers importés).
+function dossierDelegId(d){ if(d&&d.delegataire_id) return d.delegataire_id; const dep=(window._depots||[]).find(x=>x.nom===((d&&d.numero_depot)||'')); return dep?dep.delegataire_id:null; }
 function depotDelegOptions(cur){ return '<option value="">— aucun —</option>'+(window._delegataires||[]).map(d=>`<option value="${escH(d.id)}"${d.id===cur?' selected':''}>${escH(d.nom)}</option>`).join(''); }
 function fillDepotDelegSelect(){ const sel=document.getElementById('dp-deleg'); if(sel){ const p=sel.value; sel.innerHTML=depotDelegOptions(p); sel.value=p; } }
 function depotOptions(cur){ const list=(window._depots||[]).map(d=>d.nom); let o='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join(''); if(cur&&!list.includes(cur)) o+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`; return o; }
@@ -1852,7 +1861,7 @@ function renderDossiers(){
     const detailBtn=velo?'':`<button class="btn ghost small" onclick="openDossierDetail('${d.id}')" title="Détail du dossier & frais liés">📄</button> `;
     const tail=`<td class="num">${eur(d.marge_brute)}</td>${velo?`<td class="num">${manager}</td>`:''}<td>${reg}</td><td class="num">${eur(d.commission_regie)}</td><td class="num ${d.marge_nette>=0?'val-good':'val-bad'}"><b>${eur(d.marge_nette)}</b></td><td>${statutSelect(d)}</td><td class="num">${detailBtn}<button class="btn ghost small" onclick="editDossier('${d.id}',this)">✏️</button> <button class="btn danger small" onclick="delRow('${T('dossiers')}','${d.id}')">Suppr.</button></td>`;
     if(velo) return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.region||''}</td><td class="num">${num(d.nb_velos)}</td><td class="num">${eur(d.tarif_unitaire)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
-    const delg=(window._delegataires||[]).find(x=>x.id===d.delegataire_id);
+    const delg=(window._delegataires||[]).find(x=>x.id===dossierDelegId(d));
     const delgCell=delg?escH(delg.nom):'<span style="color:var(--muted)">—</span>';
     return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td>${delgCell}</td><td class="num">${num(d.cumac||0)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
   }).join('');
@@ -1866,29 +1875,74 @@ function openDossierDetail(id){
   const linked=(window._frais||[]).filter(f=>cid && (f.dossier_crm_id||'').toString().trim()===cid);
   const totalFrais=linked.reduce((s,f)=>s+Number(f.montant||0),0);
   const prime=Number(d.montant_prime||0), net=prime-totalFrais;
-  const couts=[['Matériel',d.cout_materiel],['Installation',d.cout_installation],['Nacelle',d.cout_nacelle],['Audit',d.cout_audit],['Livraison',d.cout_livraison],['Frais supp.',d.frais_supp]].filter(x=>Number(x[1]||0)!==0);
-  document.getElementById('dd-title').innerHTML=`📄 ${escH(d.nom_client||'Dossier')}${cid?` — <a href="${crmLink(cid)||'#'}" target="_blank" rel="noopener">${escH(cid)} ↗</a>`:''}`;
-  let h=`<div class="hint" style="margin-bottom:10px">${fdate(d.date)}${d.numero_depot?(' · Dépôt '+escH(d.numero_depot)):''} · ${statutBadge(d.statut)}</div>`;
-  h+=`<div class="row" style="gap:10px;margin-bottom:12px">
-    <div class="card" style="flex:1"><div class="label">Montant (prime)</div><div class="value val-good">${eur(prime)}</div></div>
-    <div class="card" style="flex:1"><div class="label">Frais liés (${linked.length})</div><div class="value val-bad">${eur(totalFrais)}</div></div>
-    <div class="card" style="flex:1"><div class="label">Net (prime − frais liés)</div><div class="value ${net>=0?'val-good':'val-bad'}"><b>${eur(net)}</b></div></div>
-  </div>`;
-  h+=`<h3 style="margin:10px 0 6px">Frais / factures liés à ce dossier</h3>`;
+  const delgNom=delegNameOf(dossierDelegId(d));
+  const couts=[['Matériel',d.cout_materiel],['Installation',d.cout_installation],['Nacelle',d.cout_nacelle],['Coût Hamid',d.cout_hamid],['Audit',d.cout_audit],['Livraison',d.cout_livraison],['Frais supp.',d.frais_supp]].filter(x=>Number(x[1]||0)!==0);
+  const mats=(window._dossierMat||[]).filter(m=>m.dossier_id===d.id);
+
+  document.getElementById('dd-title').innerHTML=`📄 ${escH(d.nom_client||'Dossier')}${cid?` &nbsp;<a href="${crmLink(cid)||'#'}" target="_blank" rel="noopener" style="font-size:14px;font-weight:500">${escH(cid)} ↗</a>`:''}`;
+
+  const item=(k,v)=> v?`<div class="dd-item"><div class="k">${k}</div><div class="v">${v}</div></div>`:'';
+  // Fiche client
+  let h=`<div class="dd-sec">🧾 Fiche client</div><div class="dd-grid">`
+    +item('Raison sociale',escH(d.nom_client||'—'))
+    +item('Contact',escH(d.contact_client||''))
+    +item('Téléphone',d.telephone?`<a href="tel:${escH(d.telephone)}">${escH(d.telephone)}</a>`:'')
+    +item('Email',d.email?`<a href="mailto:${escH(d.email)}">${escH(d.email)}</a>`:'')
+    +item('ID CRM',cid?(crmLink(cid)?`<a href="${crmLink(cid)}" target="_blank" rel="noopener">${escH(cid)} ↗</a>`:escH(cid)):'')
+    +item('Date',fdate(d.date))
+    +item('Statut',statutBadge(d.statut))
+    +item('Dépôt Emmy',escH(d.numero_depot||''))
+    +item('Délégataire',delgNom?escH(delgNom):'<span style="color:var(--muted)">non défini</span>')
+    +item('Régie',escH(d.commercial_regie||''))
+    +item('Campagne',escH(d.campagne||''))
+    +`</div>`;
+
+  // Chiffres
+  h+=`<div class="dd-sec">📊 Chiffres</div><div class="dd-grid">`
+    +item('Cumac',num(d.cumac||0)+' kWhc')
+    +item('Prime (HT)',`<span class="val-good">${eur(prime)}</span>`)
+    +item('Marge brute',eur(d.marge_brute))
+    +item('Commission régie',eur(d.commission_regie))
+    +item('Marge nette',`<span class="${d.marge_nette>=0?'val-good':'val-bad'}">${eur(d.marge_nette)}</span>`)
+    +item(`Frais liés (${linked.length})`,`<span class="val-bad">${eur(totalFrais)}</span>`)
+    +`</div>`;
+
+  // Matériels
+  h+=`<div class="dd-sec">🔧 Matériels du dossier</div>`;
+  if(!mats.length){ h+=`<div class="hint">Aucun matériel enregistré sur ce dossier.</div>`; }
+  else{
+    h+=`<div class="table-wrap"><table><thead><tr><th>Matériel</th><th>Marque</th><th>Puissance</th><th class="num">Qté livrée</th><th class="num">Qté valorisée</th></tr></thead><tbody>`
+      +mats.map(mm=>{ const cfg=(window._materiels||[]).find(x=>x.id===mm.materiel_id)||{}; return `<tr><td>${escH(cfg.nom||'(matériel supprimé)')}</td><td>${escH(cfg.marque||'—')}</td><td>${escH(cfg.puissance||'—')}</td><td class="num">${num(mm.qte_livree||0)}</td><td class="num">${num(mm.qte_valorisee||0)}</td></tr>`; }).join('')
+      +`</tbody></table></div>`;
+  }
+
+  // Coûts déclarés
+  if(couts.length){
+    h+=`<div class="dd-sec">💸 Coûts déclarés</div><div class="table-wrap"><table><tbody>`
+      +couts.map(c=>`<tr><td>${c[0]}</td><td class="num">${eur(c[1])}</td></tr>`).join('')
+      +`<tr><td><b>Total coûts</b></td><td class="num"><b>${eur(couts.reduce((s,c)=>s+Number(c[1]||0),0))}</b></td></tr></tbody></table></div>`;
+  }
+
+  // Frais / factures liés
+  h+=`<div class="dd-sec">🧾 Frais / factures liés</div>`;
   if(!cid){ h+=`<div class="hint">Renseigne l'<b>ID CRM</b> de ce dossier (via ✏️) pour pouvoir y rattacher des frais.</div>`; }
-  else if(!linked.length){ h+=`<div class="hint">Aucun frais lié pour l'instant. À l'ajout d'un frais, indique l'ID CRM <b>${escH(cid)}</b> dans « Dossier lié ».</div>`; }
+  else if(!linked.length){ h+=`<div class="hint">Aucun frais lié. À l'ajout d'un frais, indique l'ID CRM <b>${escH(cid)}</b> dans « Dossier lié ».</div>`; }
   else{
     h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Catégorie</th><th>Libellé</th><th>Fournisseur</th><th class="num">Montant</th></tr></thead><tbody>`
       +linked.map(f=>`<tr><td>${fdate(f.date)}</td><td><span class="pill">${escH(f.categorie||'')}</span></td><td>${escH(f.libelle||'')}</td><td>${escH(f.fournisseur||'')}</td><td class="num">${eur(f.montant)}</td></tr>`).join('')
       +`<tr><td colspan="4" class="num"><b>Total frais liés</b></td><td class="num val-bad"><b>${eur(totalFrais)}</b></td></tr></tbody></table></div>`;
   }
-  if(couts.length){
-    h+=`<h3 style="margin:14px 0 6px">Coûts déclarés dans la fiche</h3><div class="table-wrap"><table><tbody>`
-      +couts.map(c=>`<tr><td>${c[0]}</td><td class="num">${eur(c[1])}</td></tr>`).join('')
-      +`</tbody></table></div><div class="hint" style="margin-top:6px">Marge nette calculée du dossier : <b class="${d.marge_nette>=0?'val-good':'val-bad'}">${eur(d.marge_nette)}</b></div>`;
-  }
+
+  h+=`<div style="margin-top:16px;text-align:right"><button class="btn ghost small" onclick="editDossierFromDetail('${d.id}')">✏️ Modifier ce dossier</button></div>`;
+
   document.getElementById('dd-body').innerHTML=h;
   document.getElementById('dossier-detail').style.display='flex';
+}
+function editDossierFromDetail(id){
+  closeDossierDetail();
+  const b=[...document.querySelectorAll('#dossiers-body button')].find(x=>((x.getAttribute('onclick')||'').includes("editDossier('"+id+"'")));
+  if(b){ b.click(); try{ b.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} }
+  else editDossier(id);
 }
 function closeDossierDetail(){ document.getElementById('dossier-detail').style.display='none'; }
 async function loadRemboursements(){
@@ -2219,7 +2273,7 @@ const CHECK_COL_DEFS=[
   {key:'adresse',label:'Adresse',cell:d=>`<td>${escH(d.adresse||'')}</td>`},
   {key:'telephone',label:'Tél',cell:d=>`<td>${escH(d.telephone||'')}</td>`},
   {key:'email',label:'Email',cell:d=>`<td>${escH(d.email||'')}</td>`},
-  {key:'delegataire',label:'Délégataire',cell:d=>{const g=(window._delegataires||[]).find(x=>x.id===d.delegataire_id);return `<td>${g?escH(g.nom):'—'}</td>`;}},
+  {key:'delegataire',label:'Délégataire',cell:d=>{const g=(window._delegataires||[]).find(x=>x.id===dossierDelegId(d));return `<td>${g?escH(g.nom):'—'}</td>`;}},
   {key:'cumac',label:'Cumac',num:true,cell:d=>`<td class="num">${num(d.cumac||0)}</td>`},
   {key:'montant_prime',label:'Prime',num:true,cell:d=>`<td class="num">${eur(d.montant_prime)}</td>`},
   {key:'statut',label:'Statut',cell:d=>`<td>${statutBadge?statutBadge(d.statut):escH(d.statut||'')}</td>`},
@@ -3287,11 +3341,12 @@ function buildImportSpecs(){
     headers:['Date','Raison sociale','Contact client','ID CRM','Téléphone','Email','Dépôt Emmy','Cumac','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut','Matériel 1','Qté livrée 1','Qté valorisée 1','Matériel 2','Qté livrée 2','Qté valorisée 2'],
     example:['05/07/2026','EXEMPLE (supprimez)','M. Dupont','ID-001','0600000000','client@email.fr','14205','1000000','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours','Tube LED 120cm','50','48','Projecteur 100W','10','10'],
     build(m){ if(_isEx(m)||!_has(m)) return null; const rn=_pick(m,'Commercial régie','Régie'); const rc=(REGIES_CFG||[]).find(r=>r.nom===rn);
+      const _dep=(window._depots||[]).find(x=>x.nom===_pick(m,'Dépôt Emmy','N° dépôt','Numéro de dépôt'));
       const _materiels=[]; [1,2].forEach(n=>{ const mn=_pick(m,'Matériel '+n,'Materiel '+n); if(mn&&(''+mn).trim()){ _materiels.push({ nom:(''+mn).trim(), qte_livree:_pnum(_pick(m,'Qté livrée '+n,'Qte livree '+n,'Quantité livrée '+n)), qte_valorisee:_pnum(_pick(m,'Qté valorisée '+n,'Qte valorisee '+n,'Quantité valorisée '+n)) }); } });
       return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Raison sociale','Client'), contact_client:_pick(m,'Contact client','Contact'), crm_id:_pick(m,'ID CRM','ID'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'Dépôt Emmy','N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
       montant_prime:_pnum(_pick(m,'Prime HT','Prime')), cout_installation:_pnum(_pick(m,'Coût installation')), cout_materiel:_pnum(_pick(m,'Coût matériel')), cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
       cout_hamid:_pnum(_pick(m,'Coût Hamid')), cout_livraison:_pnum(_pick(m,'Coût livraison')), frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp')), cout_audit:_pnum(_pick(m,'Coût audit')),
-      cumac:_pnum(_pick(m,'Cumac','kWh cumac')),
+      cumac:_pnum(_pick(m,'Cumac','kWh cumac')), delegataire_id:_dep?_dep.delegataire_id:null,
       david_pct:5, commercial_regie:rn, regie_pct:rc?Number(rc.pct_defaut)||0:0, campagne:_pick(m,'Campagne'), _materiels:_materiels }; }
   };
   const apports = {
