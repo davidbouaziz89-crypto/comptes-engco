@@ -538,7 +538,7 @@
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><h2 style="margin:0">Ajouter un frais / une dépense</h2><button class="btn ghost small" type="button" onclick="closeFraisModal()">✕</button></div>
       <div class="hint">Dépenses hors dossier. Si ça concerne une régie, indique le % refacturé.</div>
       <form class="row" onsubmit="addFrais(event)">
-        <div class="field"><label>Date d'ajout</label><input type="date" id="f-date" required></div>
+        <div class="field"><label>Date d'ajout</label><input type="date" id="f-date" required onchange="onFraisDateChange()"></div>
         <div class="field"><label>Mois concerné</label><input type="month" id="f-mois"></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
         <div class="field" id="f-dossier-field" style="display:none"><label>Dossier lié (ID CRM)</label><input type="text" id="f-dossier" placeholder="ex. 12345 — laisser vide si hors dossier"></div>
@@ -546,7 +546,7 @@
         <div class="field"><label>Payé par (société)</label><select id="f-source" onchange="onFraisSource()"></select></div>
         <div class="field f-eur"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" oninput="fraisPreview()"></div>
         <div class="field f-ils" style="display:none"><label>Montant (₪ shekels)</label><input type="number" step="0.01" id="f-shekels" placeholder="0.00" oninput="fraisPreview()"></div>
-        <div class="field f-ils" style="display:none"><label>Taux 1 ₪ = ? € (+20 % auto)</label><input type="number" step="0.0001" id="f-taux-ils" placeholder="ex. 0.25" oninput="fraisPreview()"></div>
+        <div class="field f-ils" style="display:none"><label>Taux 1 ₪ = ? € <span id="f-taux-note" style="color:var(--muted);font-weight:400"></span></label><input type="number" step="0.0001" id="f-taux-ils" placeholder="auto selon la date" oninput="fraisPreview()"></div>
         <div class="field"><label>Régie concernée</label><select id="f-regie" onchange="onFraisRegie()"></select></div>
         <div class="field" id="f-pct-field" style="display:none"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
         <div class="field" id="f-doc-field" style="display:none"><label>Justificatif (facture, document)</label><input type="file" id="f-doc" accept="image/*,.pdf" onchange="onFraisDocPick()"><div class="hint" id="f-doc-current" style="display:none;margin-top:4px"></div></div>
@@ -2669,7 +2669,21 @@ async function addSource(e){
 // ===== Frais =====
 function fraisSourceIsILS(){ const s=SOURCES.find(x=>x.id===(document.getElementById('f-source')||{}).value); return !!(s&&s.devise==='ILS'); }
 function fraisMontantEur(){ if(fraisSourceIsILS()){ const shk=Number((document.getElementById('f-shekels')||{}).value)||0; const taux=Number((document.getElementById('f-taux-ils')||{}).value)||0; return shk*taux*1.20; } return Number((document.getElementById('f-montant')||{}).value)||0; }
-function onFraisSource(){ const ils=fraisSourceIsILS(); document.querySelectorAll('.f-ils').forEach(el=>el.style.display=ils?'':'none'); document.querySelectorAll('.f-eur').forEach(el=>el.style.display=ils?'none':''); fraisPreview(); }
+function onFraisSource(){ const ils=fraisSourceIsILS(); document.querySelectorAll('.f-ils').forEach(el=>el.style.display=ils?'':'none'); document.querySelectorAll('.f-eur').forEach(el=>el.style.display=ils?'none':''); fraisPreview(); if(ils) updateIlsRate(); }
+function onFraisDateChange(){ if(fraisSourceIsILS()) updateIlsRate(); }
+let _ilsRateCache={};
+async function fetchIlsRate(dateStr){ dateStr=(dateStr||'').slice(0,10)||today(); if(_ilsRateCache[dateStr]!=null) return _ilsRateCache[dateStr]; try{ const r=await fetch('https://api.frankfurter.dev/v1/'+dateStr+'?base=ILS&symbols=EUR'); const j=await r.json(); const v=j&&j.rates&&j.rates.EUR; if(v){ _ilsRateCache[dateStr]=v; return v; } }catch(e){} return null; }
+async function updateIlsRate(){
+  if(!fraisSourceIsILS()) return;
+  const note=document.getElementById('f-taux-note'); if(note) note.textContent='(récupération…)';
+  const d=(document.getElementById('f-date')||{}).value||today();
+  const v=await fetchIlsRate(d);
+  if(!fraisSourceIsILS()) return;
+  const t=document.getElementById('f-taux-ils');
+  if(v!=null){ if(t) t.value=Number(v).toFixed(4); if(note){ let dj=d; try{ dj=new Date(d+'T00:00:00').toLocaleDateString('fr-FR'); }catch(e){} note.textContent='(taux BCE du '+dj+', +20 %)'; } }
+  else { if(note) note.textContent='(taux auto indisponible — saisis-le à la main)'; }
+  fraisPreview();
+}
 function fraisPreview(){
   const m=fraisMontantEur(), pct=Number(document.getElementById('f-pct').value)||0;
   const ilsNote=fraisSourceIsILS()?`Converti : <b>${eur(m)}</b> <span style="color:var(--muted)">(shekels × taux × 1,20)</span><br>`:'';
@@ -2847,7 +2861,9 @@ function onFraisCategorie(){
   fraisPreview();
 }
 function checkMissingRecurrents(){
-  const el=document.getElementById('recur-alert'); if(!el) return;
+  // Legacy (basé sur les catégories) — remplacé par generateFournRecurrents (piloté par les fournisseurs).
+  const el=document.getElementById('recur-alert'); if(el){ el.style.display='none'; el.innerHTML=''; }
+  return;
   const recs=(window._recurrents||[]).filter(r=>r.actif!==false), frais=window._frais||[];
   const now=new Date(), curY=now.getFullYear(), curM=now.getMonth(); const missing=[];
   recs.forEach(r=>{ if(!r.mois_debut) return; const st=new Date(r.mois_debut+'T00:00:00'); let y=st.getFullYear(),m=st.getMonth(); const mm=[]; let g=0;
@@ -2860,6 +2876,7 @@ function checkMissingRecurrents(){
 // de leur mois de début jusqu'au mois courant, s'ils n'existent pas déjà. Marqués "auto".
 let _genRecurLock=false;
 async function generateRecurrents(){
+  return; // Legacy (par catégorie) — désactivé au profit de generateFournRecurrents (par fournisseur).
   if(!PROJ || _genRecurLock) return;
   if(!Array.isArray(window._frais)) return; // frais pas encore chargés
   const recs=(window._recurrents||[]).filter(r=>r.actif!==false && r.mois_debut && r.montant_defaut!=null);
