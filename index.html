@@ -951,6 +951,7 @@ const EXTERNAL_TOOLS = {
   pointage:{ key:'pointage', nom:'TimeGuard Pro (Pointage)', icon:'⏱️', url:'./pointage.html', internal:true },
   crmpv:{ key:'crmpv', nom:'CRM Photovoltaïque', icon:'☀️', url:'./photovoltaique.html', internal:true },
   notelia:{ key:'notelia', nom:'Notelia (CRM Télécom)', icon:'📡', url:'./notelia.html', internal:true },
+  compta:{ key:'compta', nom:'Compta multi-sociétés', icon:'🧾', url:'./compta.html', internal:true },
 };
 let PROJ=null, CURRENT_ROLE=null, CURRENT_REGIE=null, SESSION=null, MY_MEMBERSHIPS=[], ADMIN_MODE=false;
 let SOURCES=[], REGIES_CFG=[];
@@ -2950,6 +2951,7 @@ const CRM_ROLES={
   crmformation:[['secretaire','Secrétaire'],['commercial','Commercial']],
   pointage:[['manager','Manager'],['comptable','Comptable'],['employe','Employé']],
   docucrm:[['secretaire','Secrétaire']],
+  compta:[['comptable','Comptable'],['secretaire','Secrétaire']],
 };
 function rolesForProject(key){
   if(CRM_ROLES[key]) return CRM_ROLES[key].map(([k,l])=>({role_key:k,label:l}));

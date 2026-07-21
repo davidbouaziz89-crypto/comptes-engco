@@ -10,13 +10,14 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
-const VALID_KEYS = ["led", "velo", "docucrm", "crmformation", "pointage", "crmpv"];
+const VALID_KEYS = ["led", "velo", "docucrm", "crmformation", "pointage", "crmpv", "compta"];
 // Rôles propres à chaque logiciel (hors 'admin', global). Compta (led/velo/docucrm) = app_roles.
 const CRM_ROLES: Record<string, string[]> = {
   crmpv: ["telepro", "confirmateur", "commercial", "cq", "financement", "paiement"],
   crmformation: ["secretaire", "commercial"],
   pointage: ["manager", "comptable", "employe"],
   docucrm: ["secretaire"],
+  compta: ["secretaire", "comptable"],
 };
 
 Deno.serve(async (req: Request) => {

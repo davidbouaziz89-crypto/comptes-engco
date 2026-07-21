@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Compta — Multi-sociétés</title>
+<script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#111c33; --panel2:#16233f; --line:#25324f;
+    --txt:#e8eefc; --muted:#93a1c0; --accent:#3b82f6; --accent2:#22c55e;
+    --danger:#ef4444; --radius:14px;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f6fb; --panel:#ffffff; --panel2:#eef1f7; --line:#dde3ec;
+    --txt:#1a2230; --muted:#5b6675; --accent:#3b82f6; --accent2:#16a34a; --danger:#dc2626;
+  }
+  :root[data-theme="light"] header{background:linear-gradient(120deg,#eef2fb,#e3e9f6)}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);}
+  header{padding:16px 22px;background:linear-gradient(120deg,#0b1224,#16233f);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  header h1{font-size:19px;margin:0}
+  .btn{background:var(--accent);color:#fff;border:0;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
+  .btn.small{padding:6px 10px;font-size:12px}
+  .btn.danger{background:transparent;border:1px solid var(--danger);color:#fca5a5}
+  .btn:disabled{opacity:.5;cursor:default}
+  nav{display:flex;gap:6px;padding:12px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:40;box-shadow:0 6px 16px rgba(0,0,0,.28)}
+  nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600}
+  nav button.active{background:var(--panel2);color:var(--txt)}
+  #adminnav{display:flex;gap:6px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel2);position:static;box-shadow:none}
+  #adminnav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  #adminnav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
+  main{padding:22px;max-width:1200px;margin:0 auto}
+  .grid{display:grid;gap:16px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .card .label{color:var(--muted);font-size:13px;margin-bottom:6px}
+  .card .value{font-size:24px;font-weight:700}
+  .card.good{border-left:4px solid var(--accent2)}
+  .card.bad{border-left:4px solid var(--danger)}
+  .val-good{color:#86efac}.val-bad{color:#fca5a5}
+  section.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:18px}
+  section.panel h2{margin:0 0 4px;font-size:17px}
+  section.panel .hint{color:var(--muted);font-size:13px;margin-bottom:16px}
+  form.row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:12px;color:var(--muted)}
+  input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:10px;border-radius:9px;font-size:14px;width:100%;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);border-color:transparent}
+  .table-wrap{overflow-x:auto;margin-top:16px}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  td.num,th.num{text-align:right}
+  td a{color:var(--accent);text-decoration:none;font-weight:600} td a:hover{text-decoration:underline}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;background:var(--panel2);border:1px solid var(--line)}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+  .b-ok{background:#12351f;color:#86efac;border:1px solid #2f6b43}
+  .b-wip{background:#3a2f0b;color:#fdba74;border:1px solid #7a5a12}
+  .b-lost{background:#3a1414;color:#fca5a5;border:1px solid #7a2a2a}
+  .search-box{position:relative;max-width:380px;margin-bottom:6px}
+  .search-box input{padding-left:34px}
+  .search-box .ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+  .preview{background:var(--panel2);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--muted);margin-top:6px}
+  .preview b{color:var(--txt)}
+  .banner{background:#3b2f0b;border:1px solid #b4830f;color:#fde68a;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;display:none}
+  .empty{color:var(--muted);padding:22px;text-align:center;font-style:italic}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16233f;border:1px solid var(--line);
+    padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.4);display:none;z-index:200}
+  .hidden{display:none!important}
+  .modal-overlay{position:fixed;inset:0;background:rgba(4,8,20,.62);display:flex;align-items:center;justify-content:center;z-index:120;padding:20px}
+  .modal-overlay.hidden{display:none!important}
+  .modal-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:560px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .modal-head h3{margin:0;font-size:18px}
+  .auth-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px;max-width:400px;width:100%}
+  .auth-card h2{margin:0 0 6px;font-size:22px} .auth-card .p{color:var(--muted);margin:0 0 20px;font-size:14px}
+  .auth-card .field{margin-bottom:14px}
+  .auth-err{color:#fca5a5;font-size:13px;margin-top:12px;min-height:18px}
+  .userbox{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+  .rolebadge{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;color:var(--txt)}
+  .cobtn{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:22px;cursor:pointer;color:var(--txt);
+    font-size:16px;font-weight:600;flex:1;min-width:160px;text-align:left}
+  .cobtn:hover{border-color:var(--accent)} .cobtn .ic{font-size:30px;display:block;margin-bottom:8px}
+  .cobtn .sub{font-size:12px;color:var(--muted);font-weight:400;margin-top:4px}
+  .chk{display:flex;align-items:center;gap:8px;font-size:14px}.chk input{width:auto}
+  .tick{font-weight:800}.tick.ok{color:#86efac}.tick.no{color:#fca5a5}
+  .filterbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;align-items:end}
+  .filterbar .field{max-width:200px}
+</style>
+</head>
+<body>
+
+<!-- CONNEXION -->
+<div id="auth" class="auth-overlay">
+  <form class="auth-card" onsubmit="doLogin(event)">
+    <h2>🧾 Compta</h2>
+    <div class="p">Connecte-toi pour accéder à la comptabilité.</div>
+    <div class="field"><label>Email</label><input type="email" id="login-email" required autocomplete="username"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="login-pass" required autocomplete="current-password"></div>
+    <button class="btn" type="submit" style="width:100%">Se connecter</button>
+    <div class="auth-err" id="login-err"></div>
+  </form>
+</div>
+
+<!-- CHOIX DE LA SOCIÉTÉ -->
+<div id="copick" class="auth-overlay" style="display:none">
+  <div class="auth-card" style="max-width:560px">
+    <h2>Choisis une société</h2>
+    <div class="p">Sur quelle société veux-tu travailler ?</div>
+    <div id="copick-list" style="display:flex;gap:14px;flex-wrap:wrap"></div>
+    <div class="auth-err" id="copick-msg"></div>
+  </div>
+</div>
+
+<header>
+  <div><h1 id="co-label">🧾 Compta</h1></div>
+  <div class="userbox">
+    <a class="btn ghost small" href="./index.html" title="Retour au portail">← Portail</a>
+    <span id="user-email"></span>
+    <span class="rolebadge" id="role-badge" style="display:none"></span>
+    <button class="btn ghost small" id="btn-switch" onclick="showCompanyPicker()" style="display:none">🔀 Changer de société</button>
+    <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
+    <button class="btn ghost small" onclick="reloadData()">🔄 Rafraîchir</button>
+    <button class="btn ghost small" onclick="changePassword()">🔑 Mot de passe</button>
+    <button class="btn ghost small" onclick="doLogout()">Se déconnecter</button>
+  </div>
+</header>
+
+<nav id="mainnav" style="display:none">
+  <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">📊 Tableau de bord</button>
+  <button data-tab="releves" onclick="showTab('releves')">🏦 Relevés</button>
+  <button data-tab="factures" onclick="showTab('factures')">📁 Factures</button>
+  <button data-tab="tva" onclick="showTab('tva')">🧮 TVA</button>
+  <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Catégories</button>
+</nav>
+<nav id="adminnav" style="display:none">
+  <button data-admtab="societes" onclick="showAdminTab('societes')">🏢 Sociétés</button>
+  <button data-admtab="users" onclick="showAdminTab('users')">👥 Utilisateurs & accès</button>
+</nav>
+
+<main id="app" style="display:none">
+  <div id="loaderr" class="banner"></div>
+
+  <!-- DASHBOARD -->
+  <div id="tab-dashboard">
+    <div class="grid cards" id="db-cards"></div>
+    <section class="panel">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <h2 style="margin:0;flex:1">📊 Rapprochement du mois</h2>
+        <div class="field" style="max-width:180px;margin:0"><input type="month" id="db-month" onchange="renderDashboard()"></div>
+      </div>
+      <div class="hint">Pour chaque paiement du mois : sa catégorie, le client/fournisseur, si la facture est déposée et si le paiement est vérifié (rapproché).</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Tiers</th><th class="num">Montant</th><th>Facture</th><th>Vérifié</th></tr></thead>
+        <tbody id="db-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- RELEVÉS -->
+  <div id="tab-releves" class="hidden">
+    <section class="panel canedit" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <b style="margin-right:auto">📥 Importer un relevé bancaire (CSV / Excel)</b>
+      <button class="btn ghost small" onclick="downloadReleveTemplate()">⬇️ Modèle</button>
+      <button class="btn small" onclick="document.getElementById('imp-releve').click()">⬆️ Importer un fichier</button>
+      <input type="file" id="imp-releve" accept=".xlsx,.xls,.csv" class="hidden" onchange="importReleve(this.files[0]);this.value='';">
+    </section>
+
+    <section class="panel canedit">
+      <h2>Ajouter une ligne manuellement</h2>
+      <form class="row" onsubmit="addTx(event)">
+        <div class="field"><label>Date</label><input type="date" id="t-date" required></div>
+        <div class="field" style="min-width:200px"><label>Libellé</label><input type="text" id="t-label" placeholder="ex. PRLV PHONE GS" required></div>
+        <div class="field"><label>Sens</label><select id="t-sens" onchange="txPreview()"><option value="-1">Débit (sortie)</option><option value="1">Crédit (entrée)</option></select></div>
+        <div class="field"><label>Montant (€ TTC)</label><input type="number" step="0.01" id="t-montant" placeholder="0.00" required oninput="txPreview()"></div>
+        <div class="field"><label>Catégorie</label><select id="t-cat" onchange="txPreview()"></select></div>
+        <div class="field"><label>Tiers (client / fournisseur)</label><input type="text" id="t-tiers" placeholder="ex. Phone GS"></div>
+        <div class="field"><label>TVA %</label><input type="number" step="0.01" id="t-tva" placeholder="20" oninput="txPreview()"></div>
+        <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+      </form>
+      <div class="preview" id="t-preview"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Lignes du relevé</h2>
+      <div class="filterbar">
+        <div class="field"><label>Mois</label><input type="month" id="tx-fmonth" onchange="renderTx()"></div>
+        <div class="field"><label>Statut</label><select id="tx-fstatus" onchange="renderTx()"><option value="">Tous</option><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
+        <div class="field" style="max-width:320px"><label>Recherche</label><input type="text" id="tx-search" placeholder="libellé, tiers…" oninput="renderTx()"></div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Tiers</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="tx-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- FACTURES -->
+  <div id="tab-factures" class="hidden">
+    <section class="panel canedit">
+      <h2>📎 Déposer une facture</h2>
+      <div class="hint">Dépose le PDF ou la photo, saisis les infos, et rapproche-la d'une ligne du relevé (le paiement correspondant).</div>
+      <form class="row" onsubmit="addInvoice(event)">
+        <div class="field"><label>Sens</label><select id="i-dir"><option value="achat">Achat (fournisseur)</option><option value="vente">Vente (client)</option></select></div>
+        <div class="field" style="min-width:180px"><label>Tiers</label><input type="text" id="i-tiers" placeholder="ex. Phone GS" required></div>
+        <div class="field"><label>N° facture</label><input type="text" id="i-num" placeholder="facultatif"></div>
+        <div class="field"><label>Date</label><input type="date" id="i-date"></div>
+        <div class="field"><label>Montant HT (€)</label><input type="number" step="0.01" id="i-ht" oninput="invPreview()"></div>
+        <div class="field"><label>TVA %</label><input type="number" step="0.01" id="i-tva" value="20" oninput="invPreview()"></div>
+        <div class="field"><label>Montant TTC (€)</label><input type="number" step="0.01" id="i-ttc" placeholder="auto si vide" oninput="invPreview()"></div>
+        <div class="field"><label>Rapprocher d'un paiement</label><select id="i-tx"><option value="">— plus tard —</option></select></div>
+        <div class="field"><label>Fichier (PDF / image)</label><input type="file" id="i-file" accept="image/*,.pdf"></div>
+      </form>
+      <div class="preview" id="i-preview"></div>
+      <div style="margin-top:14px"><button class="btn" onclick="addInvoice(event)">+ Enregistrer la facture</button></div>
+    </section>
+
+    <section class="panel">
+      <h2>Factures</h2>
+      <div class="filterbar">
+        <div class="field"><label>Sens</label><select id="inv-fdir" onchange="renderInvoices()"><option value="">Tous</option><option value="achat">Achats</option><option value="vente">Ventes</option></select></div>
+        <div class="field"><label>Rapprochement</label><select id="inv-fmatch" onchange="renderInvoices()"><option value="">Tous</option><option value="rapproche">Rapprochées</option><option value="a_rapprocher">À rapprocher</option></select></div>
+        <div class="field" style="max-width:320px"><label>Recherche</label><input type="text" id="inv-search" placeholder="tiers, n°…" oninput="renderInvoices()"></div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Sens</th><th>Tiers</th><th>N°</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th>Paiement lié</th><th>Fichier</th><th></th></tr></thead>
+        <tbody id="inv-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- TVA -->
+  <div id="tab-tva" class="hidden">
+    <section class="panel">
+      <h2>🧮 TVA mensuelle</h2>
+      <div class="hint" id="tva-regime"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Mois</th><th class="num">TVA collectée (ventes)</th><th class="num">TVA déductible (achats)</th><th class="num">TVA nette</th><th>Position</th></tr></thead>
+        <tbody id="tva-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- CATÉGORIES -->
+  <div id="tab-parametres" class="hidden">
+    <section class="panel canedit">
+      <h2>⚙️ Catégories de la société</h2>
+      <div class="hint">Elles apparaissent dans le menu « Catégorie ». Coche « TVA récupérable » si la TVA de cette catégorie est déductible.</div>
+      <form class="row" onsubmit="addCat(event)">
+        <div class="field"><label>Nom</label><input type="text" id="c-nom" placeholder="ex. Téléphonie" required></div>
+        <div class="field"><label>Type de flux</label><select id="c-flow"><option value="achat">Achat</option><option value="vente">Vente</option><option value="both">Les deux</option></select></div>
+        <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="c-tva" placeholder="20"></div>
+        <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-recup" checked> TVA récupérable</label></div>
+        <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+      </form>
+      <div style="margin-top:6px"><button class="btn ghost small" onclick="importDefaultCats()">📋 Importer les catégories par défaut</button></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Catégorie</th><th>Flux</th><th class="num">TVA %</th><th>Récupérable</th><th></th></tr></thead>
+        <tbody id="cats-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- ADMIN : SOCIÉTÉS -->
+  <div id="tab-societes" class="hidden">
+    <section class="panel">
+      <h2 id="soc-title">Créer une société</h2>
+      <form class="row" onsubmit="saveCompany(event)">
+        <div class="field" style="min-width:200px"><label>Nom</label><input type="text" id="soc-nom" required></div>
+        <div class="field"><label>Logo (marque)</label><select id="soc-logo" onchange="onSocLogo()"><option value="">— aucun —</option></select></div>
+        <div class="field"><label>Couleur</label><input type="color" id="soc-color" value="#3b82f6" style="height:42px;padding:4px"></div>
+        <div class="field"><label>SIREN</label><input type="text" id="soc-siren" placeholder="facultatif"></div>
+        <div class="field"><label>Régime TVA</label><select id="soc-regime"><option value="reel_mensuel">Réel mensuel</option><option value="reel_trimestriel">Réel trimestriel</option><option value="franchise">Franchise en base (pas de TVA)</option></select></div>
+        <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="soc-tva" value="20"></div>
+        <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="soc-savebtn">+ Créer</button> <button class="btn ghost" type="button" id="soc-cancel" style="display:none" onclick="cancelEditCompany()">Annuler</button></div>
+      </form>
+      <div class="preview" id="soc-msg"></div>
+    </section>
+    <section class="panel">
+      <h2>Sociétés</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Nom</th><th>SIREN</th><th>Régime TVA</th><th class="num">TVA %</th><th>Comptables / secrétaires</th><th></th></tr></thead>
+        <tbody id="soc-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- ADMIN : UTILISATEURS -->
+  <div id="tab-users" class="hidden">
+    <section class="panel">
+      <h2 id="u-title">Créer un utilisateur</h2>
+      <div class="hint">La personne se connecte avec cet email + mot de passe. Choisis son rôle et les sociétés auxquelles elle a accès.</div>
+      <form class="row" onsubmit="saveUser(event)">
+        <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
+        <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères"></div>
+        <div class="field"><label>Rôle</label><select id="u-role"><option value="comptable">Comptable (lecture + téléchargement)</option><option value="secretaire">Secrétaire (saisie)</option></select></div>
+        <div class="field" id="u-companies-field" style="grid-column:1/-1"><label>Sociétés accessibles</label>
+          <div id="u-companies" style="display:flex;flex-wrap:wrap;gap:10px;padding-top:4px"></div>
+        </div>
+        <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="u-submit">+ Créer</button></div>
+      </form>
+      <div class="preview" id="u-msg"></div>
+    </section>
+    <section class="panel">
+      <h2>Utilisateurs & accès</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Email</th><th>Rôle</th><th>Accès sociétés</th><th></th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+</main>
+
+<!-- MODALE IMPORT RELEVÉ (mapping colonnes) -->
+<div id="map-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-head"><h3>Import du relevé — vérifie les colonnes</h3><button class="btn ghost small" onclick="closeMap()">✕</button></div>
+    <div class="hint">On a lu <b id="map-count">0</b> lignes. Indique quelle colonne correspond à quoi.</div>
+    <form class="row" style="grid-template-columns:1fr 1fr">
+      <div class="field"><label>Date</label><select id="map-date"></select></div>
+      <div class="field"><label>Libellé</label><select id="map-label"></select></div>
+      <div class="field"><label>Montant (signé)</label><select id="map-amount"></select></div>
+      <div class="field"><label>— ou — Débit</label><select id="map-debit"></select></div>
+      <div class="field"><label>— ou — Crédit</label><select id="map-credit"></select></div>
+    </form>
+    <div class="preview" id="map-preview" style="margin-top:12px"></div>
+    <div style="margin-top:16px;text-align:right"><button class="btn" onclick="runReleveImport()">Importer les lignes</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const SUPABASE_URL = "https://lrslisyydbiejqzpsoxc.supabase.co";
+const SUPABASE_KEY = "sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ---------- Thème ---------- */
+function toggleTheme(){ const light=document.documentElement.getAttribute('data-theme')!=='light'; if(light) document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme'); try{ localStorage.setItem('pfp-theme',light?'light':'dark'); }catch(e){} updateThemeBtn(); }
+function updateThemeBtn(){ const b=document.getElementById('theme-btn'); if(b) b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙'; }
+updateThemeBtn();
+
+/* ---------- État global ---------- */
+let SESSION=null, IS_ADMIN=false, MY_ACCESS=[], COMPANIES=[], CO=null, MY_ROLE=null;
+let CATS=[], TX=[], INVOICES=[];
+// Logos des sociétés (fichiers dans assets/logos/<key>.png) + couleur de marque.
+const LOGO_DIR='assets/logos/';
+const LOGOS=[
+  {key:'notelia',        label:'Notelia',              color:'#12305b', file:'notelia.png'},
+  {key:'db-communication',label:'DB Communication L.T.D',color:'#4a4a4a', file:'db-communication.jpg'},
+  {key:'db-telecom',     label:'DB Telecom',           color:'#1877b5', file:'db-telecom.png'},
+  {key:'mb-formation',   label:'MB Formation',         color:'#1a1aff', file:'mb-formation.jpg'},
+  {key:'vos-formateurs', label:'Vos Formateurs',       color:'#0f1b3d', file:'vos-formateurs.png'},
+  {key:'engco',          label:'ENGCO',                color:'#3aa54a', file:'engco.png'},
+];
+function logoUrl(k){ if(!k) return ''; const m=LOGOS.find(x=>x.key===k); return LOGO_DIR+((m&&m.file)||k+'.png'); }
+function logoMeta(k){ return LOGOS.find(x=>x.key===k)||null; }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(window._tt); window._tt=setTimeout(()=>t.style.display='none',3000); }
+function euro(n){ return (Number(n)||0).toLocaleString('fr-FR',{style:'currency',currency:CO&&CO.currency||'EUR'}); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function canEdit(){ return IS_ADMIN || MY_ROLE==='secretaire'; }
+function ymNow(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+/* ---------- Auth ---------- */
+async function doLogin(e){ e.preventDefault();
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  const {data,error}=await db.auth.signInWithPassword({email,password:pass});
+  if(error){ document.getElementById('login-err').textContent='Connexion refusée : '+error.message; return; }
+  SESSION=data.session; await boot();
+}
+async function doLogout(){ await db.auth.signOut(); location.reload(); }
+async function changePassword(){
+  const np=prompt('Nouveau mot de passe (min. 6 caractères) :'); if(!np) return;
+  const {error}=await db.auth.updateUser({password:np});
+  toast(error?('Erreur : '+error.message):'Mot de passe mis à jour.');
+}
+
+async function boot(){
+  const {data:{session}}=await db.auth.getSession(); SESSION=session;
+  if(!SESSION){ document.getElementById('auth').style.display='flex'; return; }
+  document.getElementById('auth').style.display='none';
+  document.getElementById('user-email').textContent=SESSION.user.email;
+  // Qui suis-je ? Admin = rôle 'admin' dans le portail (app_memberships).
+  const {data:mems}=await db.from('app_memberships').select('role').eq('user_id',SESSION.user.id);
+  IS_ADMIN = (mems||[]).some(m=>m.role==='admin');
+  const {data:acc}=await db.from('compta_company_access').select('company_id,role').eq('user_id',SESSION.user.id);
+  MY_ACCESS = acc||[];
+  const {data:cos}=await db.from('compta_companies').select('*').order('name');
+  COMPANIES = cos||[];
+  if(IS_ADMIN){ document.getElementById('adminnav').style.display='flex'; }
+  if(!COMPANIES.length && IS_ADMIN){
+    // Aucune société : va direct dans l'admin pour en créer une.
+    startApp(); showAdminTab('societes');
+    document.getElementById('loaderr').style.display='block';
+    document.getElementById('loaderr').textContent='Bienvenue ! Commence par créer ta première société ci-dessous.';
+    return;
+  }
+  if(!COMPANIES.length){ document.getElementById('auth').style.display='none'; alert('Aucune société ne t’est attribuée. Contacte l’administrateur.'); return; }
+  showCompanyPicker();
+}
+
+function myRoleFor(cid){ if(IS_ADMIN) return 'admin'; const a=MY_ACCESS.find(x=>x.company_id===cid); return a?a.role:null; }
+
+function showCompanyPicker(){
+  document.documentElement.style.removeProperty('--accent');
+  document.getElementById('app').style.display='none';
+  document.getElementById('mainnav').style.display='none';
+  const wrap=document.getElementById('copick'); wrap.style.display='flex';
+  const list=document.getElementById('copick-list'); list.innerHTML='';
+  COMPANIES.forEach(c=>{
+    const role=myRoleFor(c.id); if(!role) return;
+    const b=document.createElement('button'); b.className='cobtn';
+    b.style.borderLeft='5px solid '+(c.color||'var(--accent)');
+    const logo=c.logo_key?`<img src="${logoUrl(c.logo_key)}" alt="" style="max-height:48px;max-width:160px;margin-bottom:10px;display:block" onerror="this.style.display='none'">`:'<span class="ic">🏢</span>';
+    b.innerHTML=`${logo}${esc(c.name)}<div class="sub">${esc(c.siren||'')} · ${role}</div>`;
+    b.onclick=()=>selectCompany(c.id); list.appendChild(b);
+  });
+}
+async function selectCompany(cid){
+  CO=COMPANIES.find(c=>c.id===cid); MY_ROLE=myRoleFor(cid);
+  document.getElementById('copick').style.display='none';
+  const lab=document.getElementById('co-label');
+  lab.innerHTML=(CO.logo_key?`<img src="${logoUrl(CO.logo_key)}" alt="" style="height:32px;vertical-align:middle;margin-right:10px;background:#fff;border-radius:6px;padding:2px" onerror="this.style.display='none'">`:'🧾 ')+esc(CO.name);
+  if(CO.color) document.documentElement.style.setProperty('--accent', CO.color);
+  else document.documentElement.style.removeProperty('--accent');
+  document.getElementById('btn-switch').style.display=(IS_ADMIN||COMPANIES.filter(c=>myRoleFor(c.id)).length>1)?'inline-block':'none';
+  const rb=document.getElementById('role-badge'); rb.style.display='inline-block'; rb.textContent=MY_ROLE;
+  startApp();
+  document.body.classList.toggle('readonly', !canEdit());
+  document.querySelectorAll('.canedit').forEach(el=>el.style.display=canEdit()?'':'none');
+  await reloadData();
+}
+function startApp(){
+  document.getElementById('app').style.display='block';
+  document.getElementById('mainnav').style.display='flex';
+  document.getElementById('db-month').value=ymNow();
+  document.getElementById('tx-fmonth').value='';
+  showTab('dashboard');
+}
+
+/* ---------- Navigation ---------- */
+function showTab(t){
+  document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.querySelectorAll('#adminnav button').forEach(b=>b.classList.remove('active'));
+  ['dashboard','releves','factures','tva','parametres','societes','users'].forEach(x=>{
+    const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
+  });
+  if(t==='dashboard') renderDashboard();
+  if(t==='tva') renderTva();
+}
+function showAdminTab(t){
+  if(!IS_ADMIN) return;
+  document.querySelectorAll('#adminnav button').forEach(b=>b.classList.toggle('active',b.dataset.admtab===t));
+  document.querySelectorAll('#mainnav button').forEach(b=>b.classList.remove('active'));
+  ['dashboard','releves','factures','tva','parametres','societes','users'].forEach(x=>{
+    const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
+  });
+  document.getElementById('app').style.display='block';
+  if(t==='societes') renderCompanies();
+  if(t==='users') renderUsers();
+}
+
+/* ---------- Chargement des données de la société ---------- */
+async function reloadData(){
+  if(!CO){ if(IS_ADMIN){ renderCompanies(); } return; }
+  document.getElementById('loaderr').style.display='none';
+  const [cats,tx,inv]=await Promise.all([
+    db.from('compta_categories').select('*').or('company_id.eq.'+CO.id+',company_id.is.null').order('name'),
+    db.from('compta_transactions').select('*').eq('company_id',CO.id).order('op_date',{ascending:false}),
+    db.from('compta_invoices').select('*').eq('company_id',CO.id).order('created_at',{ascending:false}),
+  ]);
+  CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[];
+  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva();
+}
+
+function fillCatSelects(){
+  const opts='<option value="">— catégorie —</option>'+CATS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  ['t-cat'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=opts; });
+  // select des paiements à rapprocher (factures)
+  const unmatched=TX.filter(t=>!INVOICES.some(i=>i.transaction_id===t.id));
+  document.getElementById('i-tx').innerHTML='<option value="">— plus tard —</option>'+
+    TX.map(t=>`<option value="${t.id}">${t.op_date} · ${esc(t.label).slice(0,28)} · ${euro(t.amount)}</option>`).join('');
+}
+
+/* ---------- Catégorie helpers ---------- */
+function catById(id){ return CATS.find(c=>c.id===id); }
+function catName(id){ const c=catById(id); return c?c.name:'—'; }
+
+/* ================= DASHBOARD ================= */
+function renderDashboard(){
+  const m=document.getElementById('db-month').value;
+  const rows=TX.filter(t=>!m||(t.op_date||'').slice(0,7)===m);
+  const body=document.getElementById('db-body'); body.innerHTML='';
+  let entrees=0,sorties=0,manque=0;
+  rows.forEach(t=>{
+    const inv=INVOICES.find(i=>i.transaction_id===t.id);
+    const hasInv=!!inv; const verified=hasInv && t.status==='classe';
+    if(t.amount>0) entrees+=Number(t.amount); else sorties+=Math.abs(Number(t.amount));
+    if(t.amount<0 && !hasInv) manque++;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${t.op_date||''}</td><td>${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td>
+      <td>${esc(t.counterparty||'—')}</td><td class="num">${euro(t.amount)}</td>
+      <td>${hasInv?'<span class="tick ok">✔</span>':'<span class="tick no">✗</span>'}</td>
+      <td>${verified?'<span class="badge b-ok">Vérifié</span>':(hasInv?'<span class="badge b-wip">À classer</span>':'<span class="badge b-lost">Non</span>')}</td>`;
+    body.appendChild(tr);
+  });
+  if(!rows.length) body.innerHTML='<tr><td colspan="7" class="empty">Aucun mouvement sur ce mois.</td></tr>';
+  const cards=document.getElementById('db-cards');
+  cards.innerHTML=`
+    <div class="card good"><div class="label">Entrées du mois</div><div class="value val-good">${euro(entrees)}</div></div>
+    <div class="card bad"><div class="label">Sorties du mois</div><div class="value val-bad">${euro(sorties)}</div></div>
+    <div class="card"><div class="label">Solde du mois</div><div class="value">${euro(entrees-sorties)}</div></div>
+    <div class="card ${manque?'bad':'good'}"><div class="label">Paiements sans facture</div><div class="value ${manque?'val-bad':'val-good'}">${manque}</div></div>`;
+}
+
+/* ================= RELEVÉS / TRANSACTIONS ================= */
+function txPreview(){
+  const ttc=Math.abs(parseFloat(document.getElementById('t-montant').value)||0);
+  const rate=parseFloat(document.getElementById('t-tva').value)||0;
+  const tva=rate?ttc*rate/(100+rate):0;
+  document.getElementById('t-preview').innerHTML=ttc?`TTC <b>${euro(ttc)}</b> · dont TVA <b>${euro(tva)}</b> · HT <b>${euro(ttc-tva)}</b>`:'—';
+}
+async function addTx(e){ e.preventDefault(); if(!canEdit()) return;
+  const sens=parseInt(document.getElementById('t-sens').value,10);
+  const ttc=Math.abs(parseFloat(document.getElementById('t-montant').value)||0);
+  const rate=parseFloat(document.getElementById('t-tva').value);
+  const catId=document.getElementById('t-cat').value||null;
+  const tva=rate?ttc*rate/(100+rate):null;
+  const rec={ company_id:CO.id, op_date:document.getElementById('t-date').value, label:document.getElementById('t-label').value.trim(),
+    amount:sens*ttc, category_id:catId, counterparty:document.getElementById('t-tiers').value.trim()||null,
+    vat_rate:isNaN(rate)?null:rate, vat_amount:tva?Math.round(tva*100)/100:null,
+    status:catId?'classe':'a_classer', created_by:SESSION.user.id };
+  const {error}=await db.from('compta_transactions').insert(rec);
+  if(error){ toast('Erreur : '+error.message); return; }
+  e.target.reset(); document.getElementById('t-preview').innerHTML='—'; toast('Ligne ajoutée.'); reloadData();
+}
+function renderTx(){
+  const m=document.getElementById('tx-fmonth').value, st=document.getElementById('tx-fstatus').value;
+  const q=(document.getElementById('tx-search').value||'').toLowerCase();
+  let rows=TX.filter(t=>(!m||(t.op_date||'').slice(0,7)===m)&&(!st||t.status===st)&&
+    (!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)));
+  const body=document.getElementById('tx-body'); body.innerHTML='';
+  rows.forEach(t=>{
+    const tr=document.createElement('tr');
+    const catSel=canEdit()?`<select onchange="setTxCat('${t.id}',this.value)"><option value="">—</option>`+
+      CATS.map(c=>`<option value="${c.id}"${c.id===t.category_id?' selected':''}>${esc(c.name)}</option>`).join('')+`</select>`
+      :esc(catName(t.category_id));
+    const tiers=canEdit()?`<input value="${esc(t.counterparty||'')}" style="min-width:120px" onchange="setTxField('${t.id}','counterparty',this.value)">`:esc(t.counterparty||'—');
+    tr.innerHTML=`<td>${t.op_date||''}</td><td>${esc(t.label)}</td><td>${catSel}</td><td>${tiers}</td>
+      <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
+      <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
+      <td>${canEdit()?`<button class="btn ghost small" onclick="delTx('${t.id}')">🗑</button>`:''}</td>`;
+    body.appendChild(tr);
+  });
+  if(!rows.length) body.innerHTML='<tr><td colspan="8" class="empty">Aucune ligne.</td></tr>';
+}
+async function setTxCat(id,cid){
+  const c=catById(cid);
+  const upd={ category_id:cid||null, status:cid?'classe':'a_classer' };
+  const t=TX.find(x=>x.id===id);
+  if(c && c.default_vat_rate!=null && t){ const ttc=Math.abs(t.amount); const rate=Number(c.default_vat_rate);
+    upd.vat_rate=rate; upd.vat_amount=rate?Math.round(ttc*rate/(100+rate)*100)/100:0; }
+  const {error}=await db.from('compta_transactions').update(upd).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; } toast('Catégorie enregistrée.'); reloadData();
+}
+async function setTxField(id,field,val){
+  const {error}=await db.from('compta_transactions').update({[field]:val||null}).eq('id',id);
+  if(error) toast('Erreur : '+error.message); else { const t=TX.find(x=>x.id===id); if(t) t[field]=val; }
+}
+async function delTx(id){ if(!confirm('Supprimer cette ligne ?')) return;
+  const {error}=await db.from('compta_transactions').delete().eq('id',id);
+  toast(error?('Erreur : '+error.message):'Supprimé.'); reloadData();
+}
+
+/* ---------- Import relevé CSV/Excel ---------- */
+let IMPORT_ROWS=[], IMPORT_COLS=[];
+function downloadReleveTemplate(){
+  const ws=XLSX.utils.aoa_to_sheet([['Date','Libellé','Débit','Crédit'],['2026-07-05','PRLV PHONE GS','100.00',''],['2026-07-08','VIREMENT CLIENT X','','1500.00']]);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Relevé'); XLSX.writeFile(wb,'modele_releve.xlsx');
+}
+function importReleve(file){ if(!file||!canEdit()) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const wb=XLSX.read(ev.target.result,{type:'binary',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+    if(rows.length<2){ toast('Fichier vide.'); return; }
+    IMPORT_COLS=rows[0].map((h,i)=>({i,name:String(h||('Col '+(i+1)))}));
+    IMPORT_ROWS=rows.slice(1).filter(rw=>rw.some(c=>String(c).trim()!==''));
+    openMap();
+  };
+  r.readAsBinaryString(file);
+}
+function openMap(){
+  document.getElementById('map-count').textContent=IMPORT_ROWS.length;
+  const opt='<option value="">—</option>'+IMPORT_COLS.map(c=>`<option value="${c.i}">${esc(c.name)}</option>`).join('');
+  ['map-date','map-label','map-amount','map-debit','map-credit'].forEach(id=>document.getElementById(id).innerHTML=opt);
+  // auto-détection simple
+  const guess=(kw)=>{ const c=IMPORT_COLS.find(c=>kw.some(k=>c.name.toLowerCase().includes(k))); return c?c.i:''; };
+  document.getElementById('map-date').value=guess(['date']);
+  document.getElementById('map-label').value=guess(['libell','label','nature','détail','detail','description']);
+  document.getElementById('map-debit').value=guess(['débit','debit']);
+  document.getElementById('map-credit').value=guess(['crédit','credit']);
+  document.getElementById('map-amount').value=guess(['montant','amount']);
+  document.getElementById('map-modal').classList.remove('hidden');
+}
+function closeMap(){ document.getElementById('map-modal').classList.add('hidden'); }
+function parseNum(v){ if(v==null) return NaN; let s=String(v).replace(/\s/g,'').replace(/ /g,'').replace(',','.').replace(/[^0-9.\-]/g,''); return parseFloat(s); }
+function parseDate(v){ if(v instanceof Date) return v.toISOString().slice(0,10);
+  const s=String(v).trim();
+  let m=s.match(/^(\d{2})[\/\-.](\d{2})[\/\-.](\d{2,4})$/); if(m){ let y=m[3].length===2?'20'+m[3]:m[3]; return `${y}-${m[2]}-${m[1]}`; }
+  m=s.match(/^(\d{4})[\/\-.](\d{2})[\/\-.](\d{2})$/); if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return s.slice(0,10); }
+async function runReleveImport(){
+  const ci=id=>{ const v=document.getElementById(id).value; return v===''?null:parseInt(v,10); };
+  const cDate=ci('map-date'),cLabel=ci('map-label'),cAmt=ci('map-amount'),cDeb=ci('map-debit'),cCred=ci('map-credit');
+  if(cDate==null||cLabel==null){ toast('Indique au moins Date et Libellé.'); return; }
+  const recs=IMPORT_ROWS.map(rw=>{
+    let amount=NaN;
+    if(cAmt!=null) amount=parseNum(rw[cAmt]);
+    else { const d=parseNum(rw[cDeb]), c=parseNum(rw[cCred]); if(!isNaN(c)&&c) amount=Math.abs(c); else if(!isNaN(d)&&d) amount=-Math.abs(d); }
+    return { company_id:CO.id, op_date:parseDate(rw[cDate]), label:String(rw[cLabel]||'').trim()||'(sans libellé)',
+      amount:isNaN(amount)?0:amount, status:'a_classer', created_by:SESSION.user.id };
+  }).filter(r=>r.amount!==0||r.label);
+  const {error}=await db.from('compta_transactions').insert(recs);
+  if(error){ toast('Erreur import : '+error.message); return; }
+  closeMap(); toast(recs.length+' lignes importées.'); reloadData();
+}
+
+/* ================= FACTURES ================= */
+function invPreview(){
+  let ht=parseFloat(document.getElementById('i-ht').value)||0;
+  let rate=parseFloat(document.getElementById('i-tva').value)||0;
+  let ttc=parseFloat(document.getElementById('i-ttc').value);
+  if(isNaN(ttc)||!ttc){ ttc=ht*(1+rate/100); }
+  const tva=ttc-ht;
+  document.getElementById('i-preview').innerHTML=ht?`HT <b>${euro(ht)}</b> · TVA <b>${euro(tva)}</b> · TTC <b>${euro(ttc)}</b>`:'—';
+}
+async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
+  const tiers=document.getElementById('i-tiers').value.trim(); if(!tiers){ toast('Indique le tiers.'); return; }
+  let ht=parseFloat(document.getElementById('i-ht').value); let rate=parseFloat(document.getElementById('i-tva').value);
+  let ttc=parseFloat(document.getElementById('i-ttc').value);
+  if((isNaN(ttc)||!ttc)&&!isNaN(ht)) ttc=ht*(1+(rate||0)/100);
+  if(isNaN(ht)&&!isNaN(ttc)&&rate) ht=ttc/(1+rate/100);
+  const tva=(!isNaN(ttc)&&!isNaN(ht))?(ttc-ht):null;
+  const txId=document.getElementById('i-tx').value||null;
+  const file=document.getElementById('i-file').files[0];
+  let storage_path=null, original_filename=null;
+  if(file){
+    const ext=file.name.split('.').pop();
+    storage_path=`${CO.id}/invoices/${crypto.randomUUID()}.${ext}`; original_filename=file.name;
+    const up=await db.storage.from('compta-documents').upload(storage_path,file,{upsert:false});
+    if(up.error){ toast('Upload échoué : '+up.error.message); return; }
+  }
+  const rec={ company_id:CO.id, direction:document.getElementById('i-dir').value, counterparty:tiers,
+    invoice_number:document.getElementById('i-num').value.trim()||null, invoice_date:document.getElementById('i-date').value||null,
+    amount_ht:isNaN(ht)?null:Math.round(ht*100)/100, vat_rate:isNaN(rate)?null:rate,
+    vat_amount:tva!=null?Math.round(tva*100)/100:null, amount_ttc:isNaN(ttc)?null:Math.round(ttc*100)/100,
+    storage_path, original_filename, transaction_id:txId, status:txId?'rapproche':'a_rapprocher', uploaded_by:SESSION.user.id };
+  const {error}=await db.from('compta_invoices').insert(rec);
+  if(error){ toast('Erreur : '+error.message); return; }
+  // Si rapprochée, marque la ligne comme vérifiée/classée.
+  if(txId){ await db.from('compta_transactions').update({status:'classe'}).eq('id',txId); }
+  e.target && e.target.reset && e.target.reset();
+  document.getElementById('i-preview').innerHTML='—'; toast('Facture enregistrée.'); reloadData();
+}
+function renderInvoices(){
+  const dir=document.getElementById('inv-fdir').value, mt=document.getElementById('inv-fmatch').value;
+  const q=(document.getElementById('inv-search').value||'').toLowerCase();
+  let rows=INVOICES.filter(i=>(!dir||i.direction===dir)&&(!mt||i.status===mt)&&
+    (!q||(i.counterparty||'').toLowerCase().includes(q)||(i.invoice_number||'').toLowerCase().includes(q)));
+  const body=document.getElementById('inv-body'); body.innerHTML='';
+  rows.forEach(i=>{
+    const tx=TX.find(t=>t.id===i.transaction_id);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
+      <td>${esc(i.counterparty||'')}</td><td>${esc(i.invoice_number||'—')}</td>
+      <td class="num">${i.amount_ht!=null?euro(i.amount_ht):'—'}</td><td class="num">${i.vat_amount!=null?euro(i.vat_amount):'—'}</td>
+      <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td>
+      <td>${tx?`${tx.op_date} · ${euro(tx.amount)}`:(canEdit()?matchSelect(i):'<span class="badge b-lost">Non</span>')}</td>
+      <td>${i.storage_path?`<a href="#" onclick="openDoc('${esc(i.storage_path)}');return false">📄 Ouvrir</a>`:'—'}</td>
+      <td>${canEdit()?`<button class="btn ghost small" onclick="delInvoice('${i.id}')">🗑</button>`:''}</td>`;
+    body.appendChild(tr);
+  });
+  if(!rows.length) body.innerHTML='<tr><td colspan="10" class="empty">Aucune facture.</td></tr>';
+}
+function matchSelect(i){
+  return `<select onchange="matchInvoice('${i.id}',this.value)"><option value="">— rapprocher —</option>`+
+    TX.map(t=>`<option value="${t.id}">${t.op_date} · ${esc(t.label).slice(0,22)} · ${euro(t.amount)}</option>`).join('')+`</select>`;
+}
+async function matchInvoice(id,txId){
+  if(!txId) return;
+  const {error}=await db.from('compta_invoices').update({transaction_id:txId,status:'rapproche'}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  await db.from('compta_transactions').update({status:'classe'}).eq('id',txId);
+  toast('Facture rapprochée.'); reloadData();
+}
+async function delInvoice(id){ if(!confirm('Supprimer cette facture ?')) return;
+  const inv=INVOICES.find(x=>x.id===id);
+  if(inv&&inv.storage_path) await db.storage.from('compta-documents').remove([inv.storage_path]);
+  const {error}=await db.from('compta_invoices').delete().eq('id',id);
+  toast(error?('Erreur : '+error.message):'Supprimé.'); reloadData();
+}
+async function openDoc(path){
+  const {data,error}=await db.storage.from('compta-documents').createSignedUrl(path,120);
+  if(error){ toast('Erreur : '+error.message); return; } window.open(data.signedUrl,'_blank');
+}
+
+/* ================= TVA ================= */
+function renderTva(){
+  document.getElementById('tva-regime').textContent='Régime : '+({reel_mensuel:'Réel mensuel',reel_trimestriel:'Réel trimestriel',franchise:'Franchise en base (pas de TVA à déclarer)'}[CO.vat_regime]||CO.vat_regime);
+  const map={};
+  TX.forEach(t=>{ const m=(t.op_date||'').slice(0,7); if(!m) return; map[m]=map[m]||{coll:0,ded:0};
+    const v=Number(t.vat_amount)||0;
+    if(t.amount>0) map[m].coll+=v;
+    else { const c=catById(t.category_id); if(!c||c.vat_recoverable!==false) map[m].ded+=v; }
+  });
+  const body=document.getElementById('tva-body'); body.innerHTML='';
+  Object.keys(map).sort().reverse().forEach(m=>{
+    const {coll,ded}=map[m]; const net=coll-ded;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${m}</td><td class="num">${euro(coll)}</td><td class="num">${euro(ded)}</td>
+      <td class="num">${euro(net)}</td><td>${net>=0?'<span class="badge b-lost">À payer</span>':'<span class="badge b-ok">Crédit de TVA</span>'}</td>`;
+    body.appendChild(tr);
+  });
+  if(!Object.keys(map).length) body.innerHTML='<tr><td colspan="5" class="empty">Pas encore de TVA calculée.</td></tr>';
+}
+
+/* ================= CATÉGORIES ================= */
+async function addCat(e){ e.preventDefault(); if(!canEdit()) return;
+  const rec={ company_id:CO.id, name:document.getElementById('c-nom').value.trim(),
+    flow:document.getElementById('c-flow').value, vat_recoverable:document.getElementById('c-recup').checked,
+    default_vat_rate:parseFloat(document.getElementById('c-tva').value)||null };
+  const {error}=await db.from('compta_categories').insert(rec);
+  if(error){ toast('Erreur : '+error.message); return; } e.target.reset(); toast('Catégorie ajoutée.'); reloadData();
+}
+async function importDefaultCats(){ if(!canEdit()) return;
+  const globals=CATS.filter(c=>c.company_id==null);
+  const recs=globals.map(c=>({company_id:CO.id,name:c.name,flow:c.flow,vat_recoverable:c.vat_recoverable,default_vat_rate:c.default_vat_rate}));
+  if(!recs.length){ toast('Aucun modèle.'); return; }
+  const {error}=await db.from('compta_categories').insert(recs);
+  toast(error?('Erreur : '+error.message):recs.length+' catégories importées.'); reloadData();
+}
+function renderCats(){
+  const own=CATS.filter(c=>c.company_id===CO.id);
+  const body=document.getElementById('cats-body'); body.innerHTML='';
+  own.forEach(c=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${esc(c.name)}</td><td><span class="pill">${c.flow}</span></td><td class="num">${c.default_vat_rate!=null?c.default_vat_rate+' %':'—'}</td>
+      <td>${c.vat_recoverable?'<span class="tick ok">✔</span>':'<span class="tick no">✗</span>'}</td>
+      <td>${canEdit()?`<button class="btn ghost small" onclick="delCat('${c.id}')">🗑</button>`:''}</td>`;
+    body.appendChild(tr);
+  });
+  if(!own.length) body.innerHTML='<tr><td colspan="5" class="empty">Aucune catégorie propre. Importe les modèles par défaut.</td></tr>';
+}
+async function delCat(id){ if(!confirm('Supprimer cette catégorie ?')) return;
+  const {error}=await db.from('compta_categories').delete().eq('id',id);
+  toast(error?('Erreur : '+error.message):'Supprimé.'); reloadData();
+}
+
+/* ================= ADMIN : SOCIÉTÉS ================= */
+let editingCompany=null;
+async function saveCompany(e){ e.preventDefault(); if(!IS_ADMIN) return;
+  const rec={ name:document.getElementById('soc-nom').value.trim(), siren:document.getElementById('soc-siren').value.trim()||null,
+    logo_key:document.getElementById('soc-logo').value||null, color:document.getElementById('soc-color').value||null,
+    vat_regime:document.getElementById('soc-regime').value, default_vat_rate:parseFloat(document.getElementById('soc-tva').value)||20 };
+  let error;
+  if(editingCompany){ ({error}=await db.from('compta_companies').update(rec).eq('id',editingCompany)); }
+  else { ({error}=await db.from('compta_companies').insert(rec)); }
+  if(error){ document.getElementById('soc-msg').textContent='Erreur : '+error.message; return; }
+  document.getElementById('soc-msg').textContent=''; cancelEditCompany();
+  const {data:cos}=await db.from('compta_companies').select('*').order('name'); COMPANIES=cos||[];
+  toast('Société enregistrée.'); document.getElementById('loaderr').style.display='none'; renderCompanies();
+}
+function fillLogoSelect(){ const s=document.getElementById('soc-logo'); if(!s||s.dataset.filled) return;
+  s.innerHTML='<option value="">— aucun —</option>'+LOGOS.map(l=>`<option value="${l.key}">${esc(l.label)}</option>`).join(''); s.dataset.filled='1'; }
+function onSocLogo(){ const k=document.getElementById('soc-logo').value; const m=logoMeta(k);
+  if(m){ document.getElementById('soc-color').value=m.color; if(!document.getElementById('soc-nom').value.trim()) document.getElementById('soc-nom').value=m.label; } }
+function cancelEditCompany(){ editingCompany=null; document.getElementById('soc-title').textContent='Créer une société';
+  document.getElementById('soc-savebtn').textContent='+ Créer'; document.getElementById('soc-cancel').style.display='none';
+  ['soc-nom','soc-siren'].forEach(id=>document.getElementById(id).value=''); document.getElementById('soc-tva').value='20';
+  document.getElementById('soc-logo').value=''; document.getElementById('soc-color').value='#3b82f6';
+  document.getElementById('soc-regime').value='reel_mensuel'; }
+function editCompany(id){ const c=COMPANIES.find(x=>x.id===id); if(!c) return; editingCompany=id;
+  document.getElementById('soc-nom').value=c.name; document.getElementById('soc-siren').value=c.siren||'';
+  document.getElementById('soc-logo').value=c.logo_key||''; document.getElementById('soc-color').value=c.color||'#3b82f6';
+  document.getElementById('soc-regime').value=c.vat_regime; document.getElementById('soc-tva').value=c.default_vat_rate;
+  document.getElementById('soc-title').textContent='Modifier la société'; document.getElementById('soc-savebtn').textContent='Enregistrer';
+  document.getElementById('soc-cancel').style.display='inline-block'; window.scrollTo(0,0); }
+let ACCESS_ALL=[];
+async function renderCompanies(){
+  fillLogoSelect();
+  const {data:acc}=await db.from('compta_company_access').select('company_id,user_id,email,role'); ACCESS_ALL=acc||[];
+  const body=document.getElementById('soc-body'); body.innerHTML='';
+  COMPANIES.forEach(c=>{
+    const people=ACCESS_ALL.filter(a=>a.company_id===c.id).map(a=>`${esc(a.email||'?')} (${a.role})`).join(', ')||'—';
+    const logo=c.logo_key?`<img src="${logoUrl(c.logo_key)}" alt="" style="height:22px;vertical-align:middle;margin-right:8px" onerror="this.style.display='none'">`:'';
+    const dot=c.color?`<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:6px;vertical-align:middle"></span>`:'';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${logo}${dot}${esc(c.name)}</td><td>${esc(c.siren||'—')}</td><td>${c.vat_regime}</td><td class="num">${c.default_vat_rate} %</td>
+      <td style="white-space:normal;max-width:280px">${people}</td>
+      <td><button class="btn ghost small" onclick="editCompany('${c.id}')">✏️</button></td>`;
+    body.appendChild(tr);
+  });
+  if(!COMPANIES.length) body.innerHTML='<tr><td colspan="6" class="empty">Aucune société. Crée la première ci-dessus.</td></tr>';
+}
+
+/* ================= ADMIN : UTILISATEURS ================= */
+function renderUserCompanyChecks(){
+  const wrap=document.getElementById('u-companies'); wrap.innerHTML='';
+  COMPANIES.forEach(c=>{ const l=document.createElement('label'); l.className='chk';
+    l.innerHTML=`<input type="checkbox" value="${c.id}"> ${esc(c.name)}`; wrap.appendChild(l); });
+}
+async function saveUser(e){ e.preventDefault(); if(!IS_ADMIN) return;
+  const email=document.getElementById('u-email').value.trim(); const pass=document.getElementById('u-pass').value;
+  const role=document.getElementById('u-role').value;
+  const companies=[...document.querySelectorAll('#u-companies input:checked')].map(i=>i.value);
+  const msg=document.getElementById('u-msg');
+  if(!companies.length){ msg.textContent='Coche au moins une société.'; return; }
+  if(!pass||pass.length<6){ msg.textContent='Mot de passe : 6 caractères minimum.'; return; }
+  msg.textContent='Création en cours…';
+  try{
+    // Réutilise l'edge function du portail : crée le compte + l'accès à l'outil « compta ».
+    const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password:pass,
+      memberships:[{project_key:'compta',role,regie_name:null}]}});
+    if(error||(data&&data.error)){ msg.textContent='Erreur : '+((data&&data.error)||error.message)+' — (la MAJ de admin-create-user ajoutant « compta » a-t-elle été déployée ?)'; return; }
+    const uid=data.id;
+    const rows=companies.map(cid=>({company_id:cid,user_id:uid,email,role}));
+    const {error:aerr}=await db.from('compta_company_access').insert(rows);
+    if(aerr){ msg.textContent='Compte créé, mais accès non posés : '+aerr.message; return; }
+    msg.textContent='✔ Utilisateur créé et sociétés attribuées.'; e.target.reset(); renderUsers(); renderCompanies();
+  }catch(err){ msg.textContent='Erreur : '+err.message; }
+}
+async function renderUsers(){
+  renderUserCompanyChecks();
+  const {data:acc}=await db.from('compta_company_access').select('*');
+  const coName={}; COMPANIES.forEach(c=>coName[c.id]=c.name);
+  const byUser={};
+  (acc||[]).forEach(a=>{ const u=byUser[a.user_id]=byUser[a.user_id]||{email:a.email,role:a.role,items:[]}; u.items.push(`${esc(coName[a.company_id]||'?')} (${a.role})`); });
+  const body=document.getElementById('users-body'); body.innerHTML='';
+  Object.values(byUser).forEach(u=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${esc(u.email||'')}</td><td><span class="pill">${esc(u.role||'')}</span></td>
+      <td style="white-space:normal;max-width:340px">${u.items.join(', ')}</td><td></td>`;
+    body.appendChild(tr);
+  });
+  if(!Object.keys(byUser).length) body.innerHTML='<tr><td colspan="4" class="empty">Aucun comptable/secrétaire attribué. Crée-en un ci-dessus.</td></tr>';
+}
+
+/* ---------- Init ---------- */
+db.auth.onAuthStateChange((_e,s)=>{ SESSION=s; });
+boot();
+</script>
+</body>
+</html>
