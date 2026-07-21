@@ -353,8 +353,19 @@
     </section>
 
     <section class="panel">
-      <h2>🏦 Résultat de la société</h2>
-      <div class="hint">Sur la base des dossiers validés, moins les frais / dépenses à charge de la société.</div>
+      <h2>💰 Ce qu'on se récupère (réel)</h2>
+      <div class="hint">Primes HT réellement encaissées (dossiers validés), moins <b>tous les frais réels</b> que tu saisis, moins la <b>commission régie déduite automatiquement</b>. Quand tu paies la régie, enregistre-le dans « Manager &amp; régies » : le virement n'est <b>pas recompté ici</b> (la déduction est déjà faite).</div>
+      <div class="grid cards">
+        <div class="card good"><div class="label">Primes HT encaissées (validés)</div><div class="value val-good" id="db-primes">—</div></div>
+        <div class="card"><div class="label">− Frais réels saisis (hors régie)</div><div class="value val-bad" id="db-fraisreels">—</div></div>
+        <div class="card"><div class="label">− Commission régie (auto)</div><div class="value val-bad" id="db-regieauto">—</div></div>
+        <div class="card good"><div class="label">= Ce qu'on se récupère</div><div class="value val-good" id="db-recup" style="font-size:24px">—</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>🏦 Résultat de la société (estimation via marges)</h2>
+      <div class="hint">Estimation basée sur la <b>marge des dossiers</b> validés (prime − coûts déclarés), moins les frais à charge de la société. Sert d'indicateur ; le chiffre réel est ci-dessus.</div>
       <div class="grid cards">
         <div class="card good"><div class="label">Marge nette validée</div><div class="value val-good" id="db-marge">—</div></div>
         <div class="card"><div class="label">Commissions de régie versées</div><div class="value" id="db-regie">—</div></div>
@@ -2356,6 +2367,12 @@ function refreshDashboard(){
   const davidTot=valid.reduce((s,d)=>s+Number(d.cout_david||0),0);
   const fraisSociete=frais.reduce((s,f)=>s+Number(f.montant_societe||0),0);
   const marge=margeNette-fraisSociete;
+  // ===== Ce qu'on se récupère (réel) : primes encaissées − frais réels (hors reversements régie) − commission régie auto =====
+  const primesRealisees=valid.reduce((s,d)=>s+Number(d.montant_prime||0),0);
+  const regieNames=[...new Set([...(REGIES_CFG||[]).map(r=>r.nom),...dossiers.map(d=>(d.commercial_regie||'').trim())].filter(Boolean))];
+  const isRegieReversement=f=>regieNames.some(n=>payMatch(f,n));
+  const fraisReels=frais.filter(f=>!isRegieReversement(f)).reduce((s,f)=>s+Number(f.montant||0),0);
+  const recup=primesRealisees-fraisReels-regieTot;
   const fairShare=invTot/as.length;
   as.forEach(a=>{
     document.getElementById('db-inv-'+a.k).textContent=eur(inv[a.k]);
@@ -2396,6 +2413,11 @@ function refreshDashboard(){
   document.getElementById('db-david').textContent=eur(davidTot);
   document.getElementById('db-frais').textContent=eur(fraisSociete);
   document.getElementById('db-resultat').textContent=eur(marge);
+  { const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent=v;};
+    set('db-primes',eur(primesRealisees));
+    set('db-fraisreels',eur(fraisReels));
+    set('db-regieauto',eur(regieTot));
+    const rc=document.getElementById('db-recup'); if(rc){ rc.textContent=eur(recup); rc.className='value '+(recup>=0?'val-good':'val-bad'); rc.style.fontSize='24px'; } }
   const benef=Math.max(0,marge-invTot);
   document.getElementById('db-benef').textContent=eur(benef);
   as.forEach(a=>document.getElementById('db-benef-'+a.k).textContent=eur(benef/as.length));
