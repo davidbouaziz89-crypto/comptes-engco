@@ -3412,9 +3412,14 @@ async function importFile(type,file){
     // Anti-doublons (contre l'existant ET à l'intérieur du fichier)
     impProgress('🔎 Vérification des doublons…');
     await new Promise(r=>setTimeout(r,80));
-    const existing = type==='dossiers' ? (window._dossiers||[]) : type==='frais' ? (window._frais||[]) : [];
+    let existing = [];
+    if(type==='dossiers'){ const r=await db.from(spec.table).select('crm_id,numero_depot'); existing = r.error?(window._dossiers||[]):(r.data||[]); }
+    else if(type==='frais'){ const r=await db.from(spec.table).select('date,montant,categorie'); existing = r.error?(window._frais||[]):(r.data||[]); }
     const toInsert=[]; const dups=[];
-    built.forEach(o=>{ const reason=_impDupReason(type,o,existing.concat(toInsert)); if(reason){ dups.push({label:_impLabel(type,o),reason}); } else toInsert.push(o); });
+    built.forEach(o=>{ const inDb=_impDupReason(type,o,existing); const inFile=_impDupReason(type,o,toInsert);
+      if(inDb){ dups.push({label:_impLabel(type,o),reason:inDb+' — déjà en base'}); }
+      else if(inFile){ dups.push({label:_impLabel(type,o),reason:inFile+' — répété dans le fichier'}); }
+      else toInsert.push(o); });
     // Enregistrement
     if(toInsert.length){
       impProgress('💾 Enregistrement de <b>'+toInsert.length+'</b> ligne(s)…');
