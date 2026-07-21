@@ -597,9 +597,9 @@
       <form class="row" onsubmit="addFrais(event)">
         <div class="field"><label>Date d'ajout</label><input type="date" id="f-date" required onchange="onFraisDateChange()"></div>
         <div class="field"><label>Mois concerné</label><input type="month" id="f-mois"></div>
+        <div class="field"><label>Fournisseur</label><select id="f-fournisseur" onchange="onFraisFournisseur()"></select></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
         <div class="field" id="f-dossier-field" style="display:none"><label>Dossier(s) lié(s) — ID CRM</label><input type="text" id="f-dossier" placeholder="ex. 12345, 16991 — virgules si plusieurs"></div>
-        <div class="field"><label>Fournisseur</label><select id="f-fournisseur" onchange="onFraisFournisseur()"></select></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source" onchange="onFraisSource()"></select></div>
         <div class="field f-eur"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" oninput="fraisPreview()"></div>
         <div class="field f-ils" style="display:none"><label>Montant (₪ shekels)</label><input type="number" step="0.01" id="f-shekels" placeholder="0.00" oninput="fraisPreview()"></div>
