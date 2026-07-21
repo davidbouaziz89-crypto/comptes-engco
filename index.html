@@ -3284,13 +3284,14 @@ function buildImportSpecs(){
       autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:regieName, regie_montant_unitaire:mu, regie_interne:interne, regie_pct:0, statut:_pick(m,'Statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours') }; }
   } : {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Raison sociale','Contact client','ID CRM','Téléphone','Email','Dépôt Emmy','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut','Matériel 1','Qté livrée 1','Qté valorisée 1','Matériel 2','Qté livrée 2','Qté valorisée 2'],
-    example:['05/07/2026','EXEMPLE (supprimez)','M. Dupont','ID-001','0600000000','client@email.fr','14205','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours','Tube LED 120cm','50','48','Projecteur 100W','10','10'],
+    headers:['Date','Raison sociale','Contact client','ID CRM','Téléphone','Email','Dépôt Emmy','Cumac','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut','Matériel 1','Qté livrée 1','Qté valorisée 1','Matériel 2','Qté livrée 2','Qté valorisée 2'],
+    example:['05/07/2026','EXEMPLE (supprimez)','M. Dupont','ID-001','0600000000','client@email.fr','14205','1000000','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours','Tube LED 120cm','50','48','Projecteur 100W','10','10'],
     build(m){ if(_isEx(m)||!_has(m)) return null; const rn=_pick(m,'Commercial régie','Régie'); const rc=(REGIES_CFG||[]).find(r=>r.nom===rn);
       const _materiels=[]; [1,2].forEach(n=>{ const mn=_pick(m,'Matériel '+n,'Materiel '+n); if(mn&&(''+mn).trim()){ _materiels.push({ nom:(''+mn).trim(), qte_livree:_pnum(_pick(m,'Qté livrée '+n,'Qte livree '+n,'Quantité livrée '+n)), qte_valorisee:_pnum(_pick(m,'Qté valorisée '+n,'Qte valorisee '+n,'Quantité valorisée '+n)) }); } });
       return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Raison sociale','Client'), contact_client:_pick(m,'Contact client','Contact'), crm_id:_pick(m,'ID CRM','ID'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'Dépôt Emmy','N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
       montant_prime:_pnum(_pick(m,'Prime HT','Prime')), cout_installation:_pnum(_pick(m,'Coût installation')), cout_materiel:_pnum(_pick(m,'Coût matériel')), cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
       cout_hamid:_pnum(_pick(m,'Coût Hamid')), cout_livraison:_pnum(_pick(m,'Coût livraison')), frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp')), cout_audit:_pnum(_pick(m,'Coût audit')),
+      cumac:_pnum(_pick(m,'Cumac','kWh cumac')),
       david_pct:5, commercial_regie:rn, regie_pct:rc?Number(rc.pct_defaut)||0:0, campagne:_pick(m,'Campagne'), _materiels:_materiels }; }
   };
   const apports = {
