@@ -534,7 +534,7 @@
         <div class="field"><label>Mois concerné</label><input type="month" id="f-mois"></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
         <div class="field" id="f-dossier-field" style="display:none"><label>Dossier lié (ID CRM)</label><input type="text" id="f-dossier" placeholder="ex. 12345 — laisser vide si hors dossier"></div>
-        <div class="field"><label>Fournisseur</label><input type="text" id="f-fournisseur" list="fournisseurs-list" placeholder="choisis ou laisse vide"><datalist id="fournisseurs-list"></datalist></div>
+        <div class="field"><label>Fournisseur</label><select id="f-fournisseur" onchange="onFraisFournisseur()"></select></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source"></select></div>
         <div class="field"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" required oninput="fraisPreview()"></div>
         <div class="field"><label>Régie concernée</label><select id="f-regie" onchange="onFraisRegie()"></select></div>
@@ -1366,9 +1366,9 @@ function collectDMateriels(){ const box=document.getElementById('d-materiels'); 
 async function loadFournisseurs(){
   const isLed=!!(PROJ&&PROJ.key==='led');
   const pm=document.getElementById('pm-fournisseurs'); if(pm) pm.style.display=isLed?'':'none';
-  if(!isLed){ window._fournisseurs=[]; fillFournisseurDatalist(); return; }
+  if(!isLed){ window._fournisseurs=[]; fillFournisseurSelect(); return; }
   const {data}=await db.from('engco_fournisseurs').select('*').order('nom');
-  window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurDatalist();
+  window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurSelect();
 }
 let editingFournisseurId=null;
 function renderFournisseurs(){
@@ -1382,7 +1382,25 @@ function renderFournisseurs(){
 function editFournisseur(id){ editingFournisseurId=id; renderFournisseurs(); }
 function cancelFournisseurEdit(){ editingFournisseurId=null; renderFournisseurs(); }
 async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const {error}=await db.from('engco_fournisseurs').update({nom}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); }
-function fillFournisseurDatalist(){ const dl=document.getElementById('fournisseurs-list'); if(!dl) return; dl.innerHTML=(window._fournisseurs||[]).map(f=>`<option value="${escH(f.nom)}"></option>`).join(''); }
+function fournisseurOptions(cur){
+  const list=(window._fournisseurs||[]).map(f=>f.nom);
+  let opts='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join('');
+  if(cur && !list.includes(cur)) opts+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`;
+  return opts+'<option value="__new__">➕ Nouveau fournisseur…</option>';
+}
+function fillFournisseurSelect(){ const sel=document.getElementById('f-fournisseur'); if(!sel) return; const prev=sel.value; sel.innerHTML=fournisseurOptions(prev==='__new__'?'':prev); if(prev&&prev!=='__new__'&&[...sel.options].some(o=>o.value===prev)) sel.value=prev; }
+async function onFraisFournisseur(){
+  const sel=document.getElementById('f-fournisseur'); if(!sel||sel.value!=='__new__') return; sel.value='';
+  const nom=(prompt('Nom du nouveau fournisseur :')||'').trim(); if(!nom) return;
+  const {error}=await db.from('engco_fournisseurs').insert({nom}); if(error){ toast('Erreur : '+error.message); return; }
+  await loadFournisseurs(); const s2=document.getElementById('f-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } toast('Fournisseur créé ✅');
+}
+async function onInlineFournisseur(){
+  const sel=document.getElementById('if-fournisseur'); if(!sel||sel.value!=='__new__') return; sel.value='';
+  const nom=(prompt('Nom du nouveau fournisseur :')||'').trim(); if(!nom) return;
+  const {error}=await db.from('engco_fournisseurs').insert({nom}); if(error){ toast('Erreur : '+error.message); return; }
+  await loadFournisseurs(); const s2=document.getElementById('if-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } toast('Fournisseur créé ✅');
+}
 async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const {error}=await db.from('engco_fournisseurs').insert({nom}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
 async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
 async function loadDelegataires(){
@@ -1807,7 +1825,7 @@ function fraisEditRow(f){
     <td><input type="month" id="if-mois" value="${escH(mois)}"></td>
     <td>${f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️</span>'}</td>
     <td><select id="if-categorie">${fraisCatOptions(f.categorie)}</select></td>
-    <td><input type="text" id="if-fournisseur" placeholder="Fournisseur" value="${escH(f.fournisseur||'')}">${ledCell}</td>
+    <td><select id="if-fournisseur" onchange="onInlineFournisseur()">${fournisseurOptions(f.fournisseur||'')}</select>${ledCell}</td>
     <td><select id="if-source">${fraisSrcOptions(f.source_id)}</select></td>
     <td class="num"><input type="number" step="0.01" id="if-montant" value="${f.montant}" oninput="inlineFraisPreview()"></td>
     <td><select id="if-regie" onchange="onInlineRegie()">${fraisRegieOptions(f.regie_concernee||'')}</select></td>
@@ -1834,7 +1852,7 @@ async function saveFraisInline(id){
   const _cat=g('if-categorie').value;
   const row={ date:g('if-date').value||today(), categorie:_cat,
     mois_concerne:g('if-mois').value||null,
-    fournisseur:(g("if-fournisseur").value.trim())||null, montant,
+    fournisseur:(function(v){return (v&&v!=='__new__')?v:null;})(g("if-fournisseur").value), montant,
     source_id:g('if-source').value||null, regie_concernee:g('if-regie').value||null,
     pct_decompte:Number(g('if-pct').value)||0 };
   if(PROJ&&PROJ.key==='led'){
@@ -2442,7 +2460,7 @@ async function addFrais(e){
   const _cat=document.getElementById('f-categorie').value;
   const row={ date:document.getElementById('f-date').value||today(), categorie:_cat,
     mois_concerne:document.getElementById('f-mois').value||null,
-    fournisseur:(document.getElementById('f-fournisseur').value.trim())||null, montant,
+    fournisseur:(function(v){return (v&&v!=='__new__')?v:null;})(document.getElementById('f-fournisseur').value), montant,
     source_id:document.getElementById('f-source').value||null, regie_concernee:document.getElementById('f-regie').value||null,
     pct_decompte:Number(document.getElementById('f-pct').value)||0 };
   if(PROJ&&PROJ.key==='led'){
