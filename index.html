@@ -409,7 +409,7 @@
     </div>
     <section class="panel">
       <h2>Liste des dossiers</h2>
-      <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, n° dépôt, régie, région…" oninput="onDossierSearch()"></div>
+      <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, dépôt Emmy, régie, région…" oninput="onDossierSearch()"></div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
         <div class="field" style="max-width:230px"><label>Filtrer par régie / campagne</label><select id="dossiers-fregie" onchange="renderDossiers()"></select></div>
         <div class="field" id="dossiers-fregion-wrap" style="max-width:200px"><label>Filtrer par région</label><select id="dossiers-fregion" onchange="renderDossiers()"><option value="">Toutes les régions</option><option>France</option><option>Corse</option><option>DOM-TOM</option></select></div>
@@ -654,6 +654,7 @@
         <button data-psec="regies" onclick="showParam('regies')">🤝 Régies</button>
         <button data-psec="sources" onclick="showParam('sources')">🏢 Sources</button>
         <button data-psec="delegataires" id="pm-delegataires" onclick="showParam('delegataires')">🏛️ Délégataires CEE</button>
+        <button data-psec="depots" id="pm-depots" onclick="showParam('depots')">🏬 Dépôts Emmy</button>
         <button data-psec="materiels" id="pm-materiels" onclick="showParam('materiels')">🔧 Matériels</button>
         <button data-psec="fournisseurs" id="pm-fournisseurs" onclick="showParam('fournisseurs')">🚚 Fournisseurs</button>
         <button data-psec="campagnes" id="pm-campagnes" onclick="showParam('campagnes')">📣 Campagnes</button>
@@ -671,6 +672,17 @@
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter le délégataire</button></div>
             </form>
             <div id="deleg-list" style="margin-top:8px"></div>
+          </section>
+        </div>
+        <div class="params-sec" id="ps-depots">
+          <section class="panel"><h2>🏬 Dépôts Emmy</h2>
+            <div class="hint" style="margin-bottom:8px">Tes dépôts Emmy, chacun relié à un <b>délégataire</b>. Sur un dossier tu choisis le dépôt → le délégataire se remplit tout seul.</div>
+            <form class="row" onsubmit="addDepot(event)">
+              <div class="field"><label>Nom du dépôt Emmy</label><input type="text" id="dp-nom" placeholder="ex. Dépôt Lyon Sud…" required></div>
+              <div class="field"><label>Délégataire</label><select id="dp-deleg"></select></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+            </form>
+            <div class="table-wrap"><table><thead><tr><th>Dépôt Emmy</th><th>Délégataire</th><th></th></tr></thead><tbody id="depots-body"></tbody></table></div>
           </section>
         </div>
         <div class="params-sec" id="ps-materiels">
@@ -993,11 +1005,13 @@ async function addStatut(e){
   const nom=document.getElementById('st-nom').value.trim(); if(!nom){toast('Indique un nom');return;}
   const categorie=document.getElementById('st-cat').value;
   const wasEdit=!!editingStatutId;
+  const oldNom = wasEdit ? ((STATUTS_CFG||[]).find(s=>s.id===editingStatutId)||{}).nom : null;
   const res= wasEdit ? await db.from('app_statuts').update({nom,categorie}).eq('id',editingStatutId)
                      : await db.from('app_statuts').insert({project_key:PROJ.key,nom,categorie,ordre:STATUTS_CFG.length+1});
   if(res.error){toast('Erreur : '+res.error.message);return;}
+  if(oldNom&&oldNom!==nom) await cascadeRename(T('dossiers'),'statut',oldNom,nom);
   cancelEditStatut(); toast(wasEdit?'Statut modifié ✅':'Statut ajouté ✅');
-  await loadStatuts(); renderDossiers(); refreshDashboard();
+  await loadStatuts(); if(oldNom&&oldNom!==nom) await loadDossiers(); renderDossiers(); refreshDashboard();
 }
 
 const eur = n => new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(Number(n)||0);
@@ -1232,7 +1246,7 @@ function ledDossierForm(){ return `
     <div class="field"><label>Ville</label><input type="text" id="d-ville"></div>
     <div class="field"><label>Téléphone</label><input type="text" id="d-tel"></div>
     <div class="field"><label>Email</label><input type="email" id="d-email"></div>
-    <div class="field"><label>N° de dépôt</label><input type="text" id="d-depot"></div>
+    <div class="field"><label>Dépôt Emmy</label><select id="d-depot" onchange="onDepotChange()"></select></div>
     <div class="field"><label>Cumac (kWh cumac)</label><input type="number" step="1" id="d-cumac" value="0"></div>
     <div class="field"><label>Prime (HT)</label><input type="number" step="0.01" id="d-prime" value="0" oninput="dossierPreview()"></div>
     <div class="field"><label>Coût installation</label><input type="number" step="0.01" id="d-install" value="0" oninput="dossierPreview()"></div>
@@ -1265,7 +1279,7 @@ function veloDossierForm(){ return `
     <div class="field"><label>Tarif / vélo (€)</label><input type="number" step="0.01" id="d-tarif" value="80" oninput="dossierPreview()"></div>
     <div class="field"><label>Autres coûts (€)</label><input type="number" step="0.01" id="d-autrescouts" value="0" oninput="dossierPreview()"></div>
   </form>`; }
-function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>N° dépôt</th><th>Délégataire</th><th class="num">Cumac</th><th class="num">Prime</th><th class="num">Marge brute</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
+function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Dépôt Emmy</th><th>Délégataire</th><th class="num">Cumac</th><th class="num">Prime</th><th class="num">Marge brute</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
 function regionFromCP(cp){ cp=(cp||'').toString(); if(/^20/.test(cp)) return 'Corse'; if(/^9[78]/.test(cp)) return 'DOM-TOM'; return 'France'; }
@@ -1329,7 +1343,7 @@ async function loadAll(){
   await loadRegiesConfig();
   await loadStatuts();
   await Promise.all([loadApports(), loadDossiers(), loadRemboursements(), loadFrais()]);
-  renderRegies(); loadRecurrents(); loadFraisCats(); loadDelegataires(); loadCheck(); loadMateriels(); loadFournisseurs(); loadCampagnes(); renderCrmUrl();
+  renderRegies(); loadRecurrents(); loadFraisCats(); loadDelegataires(); loadCheck(); loadMateriels(); loadFournisseurs(); loadCampagnes(); loadDepots(); renderCrmUrl();
   if(CURRENT_ROLE==='admin') loadUsers();
 }
 
@@ -1404,7 +1418,7 @@ function renderFournisseurs(){
 }
 function editFournisseur(id){ editingFournisseurId=id; renderFournisseurs(); }
 function cancelFournisseurEdit(){ editingFournisseurId=null; renderFournisseurs(); }
-async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const type=(document.getElementById('foe-type')||{}).value||'depense'; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,type}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); }
+async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const type=(document.getElementById('foe-type')||{}).value||'depense'; const old=(window._fournisseurs||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,type}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('frais'),'fournisseur',oldNom,nom); editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); if(typeof loadFrais==='function') loadFrais(); }
 function fournisseurOptions(cur){
   const list=(window._fournisseurs||[]).map(f=>f.nom);
   let opts='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join('');
@@ -1452,9 +1466,36 @@ function renderCampagnes(){
 }
 function editCampagne(id){ editingCampagneId=id; renderCampagnes(); }
 function cancelCampagneEdit(){ editingCampagneId=null; renderCampagnes(); }
-async function saveCampagne(id){ const nom=(document.getElementById('cpe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const {error}=await db.from('engco_campagnes').update({nom}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingCampagneId=null; toast('Campagne modifiée ✅'); loadCampagnes(); }
+async function saveCampagne(id){ const nom=(document.getElementById('cpe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const old=(window._campagnes||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_campagnes').update({nom}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('dossiers'),'campagne',oldNom,nom); editingCampagneId=null; toast('Campagne modifiée ✅'); loadCampagnes(); if(typeof loadDossiers==='function') loadDossiers(); }
 async function addCampagne(e){ e.preventDefault(); const nom=(document.getElementById('cp-nom').value||'').trim(); if(!nom) return; const {error}=await db.from('engco_campagnes').insert({nom}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('cp-nom').value=''; toast('Campagne ajoutée ✅'); loadCampagnes(); }
 async function delCampagne(id){ if(!confirm('Supprimer cette campagne ?')) return; const {error}=await db.from('engco_campagnes').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadCampagnes(); }
+// ===== Dépôts Emmy (LED) — reliés à un délégataire =====
+let editingDepotId=null;
+function delegNameOf(id){ const d=(window._delegataires||[]).find(x=>x.id===id); return d?d.nom:''; }
+function depotDelegOptions(cur){ return '<option value="">— aucun —</option>'+(window._delegataires||[]).map(d=>`<option value="${escH(d.id)}"${d.id===cur?' selected':''}>${escH(d.nom)}</option>`).join(''); }
+function fillDepotDelegSelect(){ const sel=document.getElementById('dp-deleg'); if(sel){ const p=sel.value; sel.innerHTML=depotDelegOptions(p); sel.value=p; } }
+function depotOptions(cur){ const list=(window._depots||[]).map(d=>d.nom); let o='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join(''); if(cur&&!list.includes(cur)) o+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`; return o; }
+function fillDepotSelect(){ const sel=document.getElementById('d-depot'); if(!sel) return; const prev=sel.value; sel.innerHTML=depotOptions(prev); if(prev&&[...sel.options].some(o=>o.value===prev)) sel.value=prev; }
+function onDepotChange(){ const sel=document.getElementById('d-depot'); if(!sel) return; const dep=(window._depots||[]).find(x=>x.nom===sel.value); if(dep&&dep.delegataire_id){ const dg=document.getElementById('d-delegataire'); if(dg){ if(![...dg.options].some(o=>o.value===dep.delegataire_id)) fillDelegataireSelect(); dg.value=dep.delegataire_id; } } }
+async function loadDepots(){
+  const isLed=!!(PROJ&&PROJ.key==='led');
+  const pm=document.getElementById('pm-depots'); if(pm) pm.style.display=isLed?'':'none';
+  if(!isLed){ window._depots=[]; fillDepotSelect(); return; }
+  const {data}=await db.from('engco_depots').select('*').order('nom');
+  window._depots=data||[]; renderDepots(); fillDepotSelect(); fillDepotDelegSelect();
+}
+function renderDepots(){
+  const b=document.getElementById('depots-body'); if(!b) return; const list=window._depots||[];
+  b.innerHTML=list.length?list.map(x=>{
+    if(x.id===editingDepotId) return `<tr class="rowedit"><td><input type="text" id="dpe-nom" value="${escH(x.nom||'')}"></td><td><select id="dpe-deleg">${depotDelegOptions(x.delegataire_id||'')}</select></td><td class="num"><button class="btn small" onclick="saveDepot('${x.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelDepotEdit()">Annuler</button></td></tr>`;
+    return `<tr><td>${escH(x.nom)}</td><td>${x.delegataire_id?`<span class="pill">${escH(delegNameOf(x.delegataire_id))}</span>`:'<span style="color:var(--muted)">—</span>'}</td><td class="num"><button class="btn ghost small" onclick="editDepot('${x.id}')">✏️</button> <button class="btn danger small" onclick="delDepot('${x.id}')">Suppr.</button></td></tr>`;
+  }).join(''):`<tr><td colspan="3" class="empty">Aucun dépôt</td></tr>`;
+}
+function editDepot(id){ editingDepotId=id; renderDepots(); }
+function cancelDepotEdit(){ editingDepotId=null; renderDepots(); }
+async function saveDepot(id){ const nom=(document.getElementById('dpe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const delegataire_id=(document.getElementById('dpe-deleg')||{}).value||null; const old=(window._depots||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_depots').update({nom,delegataire_id}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('dossiers'),'numero_depot',oldNom,nom); editingDepotId=null; toast('Dépôt modifié ✅'); loadDepots(); if(typeof loadDossiers==='function') loadDossiers(); }
+async function addDepot(e){ e.preventDefault(); const nom=(document.getElementById('dp-nom').value||'').trim(); if(!nom) return; const delegataire_id=(document.getElementById('dp-deleg')||{}).value||null; const {error}=await db.from('engco_depots').insert({nom,delegataire_id}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('dp-nom').value=''; toast('Dépôt ajouté ✅'); loadDepots(); }
+async function delDepot(id){ if(!confirm('Supprimer ce dépôt ?')) return; const {error}=await db.from('engco_depots').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadDepots(); }
 async function loadDelegataires(){
   const isLed=!!(PROJ&&PROJ.key==='led');
   const pm=document.getElementById('pm-delegataires'); if(pm) pm.style.display=isLed?'':'none';
@@ -1467,6 +1508,8 @@ async function loadDelegataires(){
   window._fiches=(fi&&fi.data)||[];
   fillDelegataireSelect();
   renderDelegatairesParams();
+  if(typeof renderDepots==='function') renderDepots();
+  if(typeof fillDepotDelegSelect==='function') fillDepotDelegSelect();
 }
 function fillDelegataireSelect(){
   const sel=document.getElementById('d-delegataire'); if(!sel) return;
@@ -1643,10 +1686,12 @@ async function addRegieConfig(e){
     data.pct_defaut=Number(document.getElementById('rg-pct').value)||0;
   }
   const wasEdit=!!editingRegieCfgId;
+  const oldNom = wasEdit ? ((REGIES_CFG||[]).find(r=>r.id===editingRegieCfgId)||{}).nom : null;
   const res = wasEdit ? await db.from('app_regies').update(data).eq('id',editingRegieCfgId) : await db.from('app_regies').insert(data);
   if(res.error){toast('Erreur : '+res.error.message);return;}
+  if(oldNom&&oldNom!==nom){ await cascadeRename(T('dossiers'),'commercial_regie',oldNom,nom); await cascadeRename(T('frais'),'regie_concernee',oldNom,nom); }
   cancelEditRegieCfg();
-  toast(wasEdit?'Régie modifiée ✅':'Régie ajoutée ✅'); loadRegiesConfig();
+  toast(wasEdit?'Régie modifiée ✅':'Régie ajoutée ✅'); loadRegiesConfig(); if(oldNom&&oldNom!==nom){ loadDossiers(); loadFrais(); }
 }
 async function loadApports(){
   const {data,error}=await db.from(T('apports')).select('*').order('date',{ascending:false});
@@ -1991,7 +2036,7 @@ const CHECK_COL_DEFS=[
   {key:'date',label:'Date',cell:d=>`<td>${fdate(d.date)}</td>`},
   {key:'crm_id',label:'ID',cell:d=>dossierIdCell(d)},
   {key:'nom_client',label:'Client',cell:d=>`<td>${escH(d.nom_client||'')}</td>`},
-  {key:'numero_depot',label:'N° dépôt',cell:d=>`<td>${escH(d.numero_depot||'')}</td>`},
+  {key:'numero_depot',label:'Dépôt Emmy',cell:d=>`<td>${escH(d.numero_depot||'')}</td>`},
   {key:'ville',label:'Ville',cell:d=>`<td>${escH(d.ville||'')}</td>`},
   {key:'code_postal',label:'CP',cell:d=>`<td>${escH(d.code_postal||'')}</td>`},
   {key:'adresse',label:'Adresse',cell:d=>`<td>${escH(d.adresse||'')}</td>`},
@@ -2363,7 +2408,8 @@ let editingDossierId=null;
 function editDossier(id,btn){
   const d=(window._dossiers||[]).find(x=>x.id===id); if(!d) return;
   const S=(i,val)=>{const el=document.getElementById(i); if(el) el.value=(val==null?'':val);};
-  S('d-date',d.date||today()); S('d-client',d.nom_client); S('d-depot',d.numero_depot); S('d-crmid',d.crm_id); S('d-statut',d.statut||'En cours');
+  S('d-date',d.date||today()); S('d-client',d.nom_client); S('d-crmid',d.crm_id); S('d-statut',d.statut||'En cours');
+  { const ds=document.getElementById('d-depot'); if(ds){ if(d.numero_depot && ![...ds.options].some(o=>o.value===d.numero_depot)) ds.insertAdjacentHTML('beforeend',`<option value="${escH(d.numero_depot)}">${escH(d.numero_depot)}</option>`); ds.value=d.numero_depot||''; } }
   S('d-adresse',d.adresse); S('d-cp',d.code_postal); S('d-ville',d.ville); S('d-tel',d.telephone); S('d-email',d.email);
   S('d-davidpct',d.david_pct); S('d-regiepct',d.regie_pct);
   const csel=document.getElementById('d-commercial');
@@ -2583,13 +2629,17 @@ function renderCats(){
 let editingCatInline={id:null,type:null};
 function catSourceOptions(cur){ return '<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${escH(s.id)}"${s.id===cur?' selected':''}>${escH(s.nom)}</option>`).join(''); }
 function cancelCatInline(){ editingCatInline={id:null,type:null}; renderCats(); }
+async function cascadeRename(table,col,oldVal,newVal){ if(oldVal&&newVal&&oldVal!==newVal){ try{ await db.from(table).update({[col]:newVal}).eq(col,oldVal); }catch(e){} } }
 async function saveCatInline(type,id){
   const nom=(document.getElementById('cate-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; }
+  const old = type==='recurrent' ? (window._recurrents||[]).find(x=>x.id===id) : (window._fraiscats||[]).find(x=>x.id===id);
+  const oldNom = old ? (type==='recurrent'?old.libelle:old.nom) : null;
   let error;
   if(type==='recurrent'){ ({error}=await db.from(T('recurrents')).update({libelle:nom}).eq('id',id)); }
   else { ({error}=await db.from(T('frais_cats')).update({nom}).eq('id',id)); }
   if(error){ toast('Erreur : '+error.message); return; }
-  editingCatInline={id:null,type:null}; toast('Catégorie modifiée ✅'); await loadFraisCats(); await loadRecurrents();
+  if(oldNom&&oldNom!==nom){ await cascadeRename(T('frais'),'categorie',oldNom,nom); if(PROJ&&PROJ.key==='led'){ await cascadeRename('engco_fournisseurs','categorie',oldNom,nom); await cascadeRename('engco_check_items','categorie',oldNom,nom); } }
+  editingCatInline={id:null,type:null}; toast('Catégorie modifiée ✅'); await loadFraisCats(); await loadRecurrents(); if(typeof loadFrais==='function') loadFrais(); if(typeof loadFournisseurs==='function') loadFournisseurs();
 }
 function onCatType(){}
 function cancelEditCat(){}
@@ -3033,9 +3083,9 @@ function buildImportSpecs(){
       autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:regieName, regie_montant_unitaire:mu, regie_interne:interne, regie_pct:0, statut:_pick(m,'Statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours') }; }
   } : {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','ID CRM','Adresse','Code postal','Ville','Téléphone','Email','N° dépôt','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut'],
+    headers:['Date','Client','ID CRM','Adresse','Code postal','Ville','Téléphone','Email','Dépôt Emmy','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut'],
     example:['05/07/2026','EXEMPLE (supprimez)','ID-001','12 rue des Fleurs','30000','Nîmes','0600000000','client@email.fr','14205','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours'],
-    build(m){ if(_isEx(m)||!_has(m)) return null; const rn=_pick(m,'Commercial régie','Régie'); const rc=(REGIES_CFG||[]).find(r=>r.nom===rn); return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), adresse:_pick(m,'Adresse'), code_postal:_pick(m,'Code postal','CP'), ville:_pick(m,'Ville'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
+    build(m){ if(_isEx(m)||!_has(m)) return null; const rn=_pick(m,'Commercial régie','Régie'); const rc=(REGIES_CFG||[]).find(r=>r.nom===rn); return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), adresse:_pick(m,'Adresse'), code_postal:_pick(m,'Code postal','CP'), ville:_pick(m,'Ville'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'Dépôt Emmy','N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
       montant_prime:_pnum(_pick(m,'Prime HT','Prime')), cout_installation:_pnum(_pick(m,'Coût installation')), cout_materiel:_pnum(_pick(m,'Coût matériel')), cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
       cout_hamid:_pnum(_pick(m,'Coût Hamid')), cout_livraison:_pnum(_pick(m,'Coût livraison')), frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp')), cout_audit:_pnum(_pick(m,'Coût audit')),
       david_pct:5, commercial_regie:rn, regie_pct:rc?Number(rc.pct_defaut)||0:0, campagne:_pick(m,'Campagne') }; }
