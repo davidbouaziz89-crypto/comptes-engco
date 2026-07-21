@@ -3211,11 +3211,9 @@ async function addRecurrent(e){
   toast(wasEdit?'Frais récurrent modifié ✅':'Frais récurrent ajouté ✅'); loadRecurrents();
 }
 function onFraisCategorie(){
-  const r=(window._recurrents||[]).find(x=>x.libelle===document.getElementById('f-categorie').value); if(!r) return;
-  if(r.montant_defaut!=null) document.getElementById('f-montant').value=r.montant_defaut;
-  if(r.source_id) document.getElementById('f-source').value=r.source_id;
-  document.getElementById('f-regie').value=r.regie_defaut||''; document.getElementById('f-pct').value=r.pct_defaut||0;
-  fraisPreview();
+  // Ne pré-remplit plus le montant/source/régie depuis l'ancien système récurrent par catégorie
+  // (obsolète — le récurrent est désormais piloté par le fournisseur). Évite les montants surprises.
+  if(typeof fraisPreview==='function') fraisPreview();
 }
 function checkMissingRecurrents(){
   // Legacy (basé sur les catégories) — remplacé par generateFournRecurrents (piloté par les fournisseurs).
