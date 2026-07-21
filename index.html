@@ -95,6 +95,9 @@
   tr.filter-row th{padding-top:4px;padding-bottom:8px}
   tr.filter-row input,tr.filter-row select{padding:5px 7px;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
   tr.totals-row td{border-top:2px solid var(--accent);font-weight:700;background:rgba(99,102,241,.06)}
+  .bulk-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px 14px;border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--accent) 8%,var(--panel2))}
+  .bulk-bar select{width:auto;min-width:150px;padding:6px 8px;font-size:13px}
+  .frais-check,#frais-check-all{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -549,10 +552,21 @@
     <section class="panel panel-wide">
       <h2>Historique des frais</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="frais-search" placeholder="Rechercher : payé par (ex. DB Telecom), fournisseur, catégorie, mois…" oninput="renderFrais()"></div>
+      <div id="frais-bulk" class="hidden bulk-bar">
+        <b id="frais-bulk-count">0 sélectionné(s)</b>
+        <button class="btn danger small" type="button" onclick="bulkDeleteFrais()">🗑️ Supprimer</button>
+        <span style="color:var(--muted)">|</span>
+        <select id="frais-bulk-cat"><option value="">Changer catégorie…</option></select>
+        <button class="btn ghost small" type="button" onclick="bulkSetFrais('categorie','frais-bulk-cat')">Appliquer</button>
+        <select id="frais-bulk-four"><option value="">Changer fournisseur…</option></select>
+        <button class="btn ghost small" type="button" onclick="bulkSetFrais('fournisseur','frais-bulk-four')">Appliquer</button>
+        <button class="btn ghost small" type="button" onclick="clearFraisSel()" style="margin-left:auto">Désélectionner</button>
+      </div>
       <div class="table-wrap"><table id="frais-table">
         <thead>
-        <tr><th>Date</th><th>Mois</th><th>Ajout</th><th>Catégorie</th><th>Fournisseur</th><th>Type</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr>
+        <tr><th style="width:34px"><input type="checkbox" id="frais-check-all" onclick="toggleAllFrais(this)" title="Tout sélectionner"></th><th>Date</th><th>Mois</th><th>Ajout</th><th>Catégorie</th><th>Fournisseur</th><th>Type</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr>
         <tr class="filter-row">
+          <th></th>
           <th><input type="text" id="frf-date" placeholder="filtrer…" oninput="renderFrais()"></th>
           <th><select id="frf-mois" onchange="renderFrais()"><option value="">Tous</option></select></th>
           <th><select id="frf-type" onchange="renderFrais()"><option value="">Tous</option><option value="auto">🤖 Auto</option><option value="manuel">✍️ Manuel</option></select></th>
@@ -1848,13 +1862,14 @@ function renderFrais(){
     const dtag=f.dossier_crm_id?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier lié (ID CRM)">🔗 ${escH(f.dossier_crm_id)}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
     const autotag=f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)" title="Généré automatiquement (frais récurrent)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️ Manuel</span>';
-    return `<tr><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.fournisseur||''}${dtag}${doctag}</td><td>${fraisTypePill(f)}</td>
+    return `<tr><td><input type="checkbox" class="frais-check" data-id="${f.id}" onchange="onFraisCheck()"></td><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.fournisseur||''}${dtag}${doctag}</td><td>${fraisTypePill(f)}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
       <td class="num"><button class="btn ghost small" onclick="editFrais('${f.id}')">✏️ Modifier</button> <button class="btn danger small" onclick="delRow('${T('frais')}','${f.id}')">Suppr.</button></td></tr>`;
-  }).join('') : `<tr><td colspan="12" class="empty">${fraisFiltersActive()?'Aucun frais ne correspond aux filtres':'Aucun frais'}</td></tr>`;
+  }).join('') : `<tr><td colspan="13" class="empty">${fraisFiltersActive()?'Aucun frais ne correspond aux filtres':'Aucun frais'}</td></tr>`;
   renderFraisTotals(rows);
+  clearFraisSel();
 }
 // ----- Filtres par colonne + totaux de l'historique des frais -----
 function fraisFilterState(){
@@ -1903,10 +1918,38 @@ function renderFraisTotals(rows){
   const sMontant=rows.reduce((s,f)=>s+Number(f.montant||0),0);
   const sRefac=rows.reduce((s,f)=>s+Number(f.montant_regie||0),0);
   const sSociete=rows.reduce((s,f)=>s+Number(f.montant_societe||0),0);
-  tr.innerHTML=`<td colspan="7">Σ TOTAL — ${rows.length} frais${fraisFiltersActive()?' (filtré)':''}</td>`+
+  tr.innerHTML=`<td></td><td colspan="7">Σ TOTAL — ${rows.length} frais${fraisFiltersActive()?' (filtré)':''}</td>`+
     `<td class="num">${eur(sMontant)}</td><td></td>`+
     `<td class="num">${eur(sRefac)}</td>`+
     `<td class="num val-bad">${eur(sSociete)}</td><td></td>`;
+}
+// ----- Sélection multiple + actions groupées sur les frais -----
+function selectedFraisIds(){ return [...document.querySelectorAll('.frais-check:checked')].map(c=>c.getAttribute('data-id')); }
+function onFraisCheck(){ updateFraisBulk(); }
+function toggleAllFrais(cb){ document.querySelectorAll('.frais-check').forEach(c=>c.checked=cb.checked); updateFraisBulk(); }
+function clearFraisSel(){ const all=document.getElementById('frais-check-all'); if(all) all.checked=false; document.querySelectorAll('.frais-check').forEach(c=>c.checked=false); updateFraisBulk(); }
+function updateFraisBulk(){
+  const ids=selectedFraisIds(); const bar=document.getElementById('frais-bulk'); if(!bar) return;
+  bar.classList.toggle('hidden', ids.length===0);
+  const cnt=document.getElementById('frais-bulk-count'); if(cnt) cnt.textContent=ids.length+' sélectionné'+(ids.length>1?'s':'');
+  const catSel=document.getElementById('frais-bulk-cat'); if(catSel && catSel.options.length<=1){ const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle)])].filter(Boolean).sort(); catSel.innerHTML='<option value="">Changer catégorie…</option>'+cats.map(c=>`<option>${escH(c)}</option>`).join(''); }
+  const fourSel=document.getElementById('frais-bulk-four'); if(fourSel && fourSel.options.length<=1){ const fours=(window._fournisseurs||[]).map(f=>f.nom); fourSel.innerHTML='<option value="">Changer fournisseur…</option>'+fours.map(f=>`<option>${escH(f)}</option>`).join(''); }
+}
+async function bulkDeleteFrais(){
+  const ids=selectedFraisIds(); if(!ids.length) return;
+  if(!confirm('Supprimer les '+ids.length+' frais sélectionné(s) ? Action définitive.')) return;
+  const {error}=await db.from(T('frais')).delete().in('id',ids);
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast(ids.length+' frais supprimé(s) ✅'); loadFrais();
+}
+async function bulkSetFrais(field,selId){
+  const ids=selectedFraisIds(); if(!ids.length){ toast('Sélectionne au moins un frais'); return; }
+  const val=(document.getElementById(selId)||{}).value; if(!val){ toast('Choisis une valeur'); return; }
+  const upd={}; upd[field]=val;
+  if(field==='fournisseur'){ const f=(window._fournisseurs||[]).find(x=>x.nom===val); if(f&&f.categorie) upd.categorie=f.categorie; }
+  const {error}=await db.from(T('frais')).update(upd).in('id',ids);
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast(ids.length+' frais mis à jour ✅'); loadFrais();
 }
 function resetFraisFilters(){
   ['frais-search','frf-date','frf-fourn','frf-mois','frf-type','frf-cat','frf-ftype','frf-source','frf-regie']
@@ -1934,6 +1977,7 @@ function fraisEditRow(f){
       <input type="file" id="if-doc" accept="image/*,.pdf" style="margin-top:5px">${cur}`;
   }
   return `<tr class="rowedit">
+    <td></td>
     <td><input type="date" id="if-date" value="${escH(f.date||today())}"></td>
     <td><input type="month" id="if-mois" value="${escH(mois)}"></td>
     <td>${f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️</span>'}</td>
