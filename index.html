@@ -286,6 +286,7 @@
   <button data-tab="dossiers" onclick="showTab('dossiers')">📁 Dossiers</button>
   <button data-tab="apports" onclick="showTab('apports')">💶 Apports</button>
   <button data-tab="frais" onclick="showTab('frais')">🧾 Frais / Dépenses</button>
+  <button data-tab="manager" onclick="showTab('manager')">💼 Manager &amp; régies</button>
   <button data-tab="documents" id="nav-documents" onclick="showTab('documents')" style="display:none">📎 Documents</button>
   <button data-tab="check" id="nav-check" onclick="showTab('check')" style="display:none">✅ Check</button>
   <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
@@ -580,6 +581,28 @@
       </div>
       <div id="dd-body"></div>
     </div>
+  </div>
+
+  <!-- MANAGER & RÉGIES -->
+  <div id="tab-manager" class="hidden">
+    <section class="panel">
+      <h2>💼 Manager</h2>
+      <div class="hint" style="margin-bottom:12px">Commission manager = <b>5 % de la marge</b> des dossiers validés. « Versé » = tes frais dont la catégorie ou le fournisseur est « manager » (tes avances). Le solde indique l'avance (trop versé) ou ce qu'il reste à verser.</div>
+      <div class="grid cards" id="mgr-cards"></div>
+      <h3 style="margin:18px 0 8px;font-family:var(--font-display)">Versements au manager</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Catégorie</th><th>Fournisseur</th><th class="num">Montant</th></tr></thead>
+        <tbody id="mgr-paid-body"></tbody>
+      </table></div>
+    </section>
+    <section class="panel">
+      <h2>🤝 Régies — dû vs versé</h2>
+      <div class="hint" style="margin-bottom:12px">Pour chaque régie : commission due (dossiers validés) vs ce que tu as versé (frais dont la catégorie ou le fournisseur = nom de la régie).</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Régie</th><th class="num">Commission due</th><th class="num">Versé</th><th class="num">Solde</th></tr></thead>
+        <tbody id="mgr-regie-body"></tbody>
+      </table></div>
+    </section>
   </div>
 
   <!-- DOCUMENTS (LED) -->
@@ -880,6 +903,36 @@ function crmLink(id){ if(id==null||id===''||!PROJ) return null; const t=(getCrmU
 function renderCrmUrl(){ const i=document.getElementById('crmurl-input'); if(i) i.value=getCrmUrl(); const p=document.getElementById('crmurl-preview'); if(p){ const u=getCrmUrl(); p.innerHTML=u?('Aperçu : '+escH(u.replace(/\{id\}/g,'12345'))):'Lien désactivé (les ID ne seront pas cliquables).'; } }
 function saveCrmUrl(e){ e.preventDefault(); const v=(document.getElementById('crmurl-input').value||'').trim(); try{ localStorage.setItem(crmUrlKey(),v); }catch(err){} toast('Lien CRM enregistré ✅'); renderCrmUrl(); if(typeof renderDossiers==='function') renderDossiers(); if(typeof renderCheck==='function') renderCheck(); }
 function dossierIdCell(d){ const id=d.crm_id||''; if(!id) return '<td>—</td>'; const url=crmLink(id); return url?`<td><a href="${url}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${id} ↗</a></td>`:`<td>${id}</td>`; }
+// ===== Manager & régies : dû (commissions) vs versé (frais à leur nom) =====
+function payMatch(f,name){ const n=(name||'').toString().toLowerCase().trim(); if(!n) return false; return ((f.categorie||'').toLowerCase().trim()===n)||((f.fournisseur||'').toLowerCase().trim()===n); }
+function renderManagerRegie(){
+  if(!PROJ) return;
+  const dossiers=window._dossiers||[], frais=window._frais||[];
+  const valid=dossiers.filter(d=>statutCat(d.statut||'')==='realise');
+  // MANAGER
+  const mgrOwed=valid.reduce((s,d)=>s+Number(d.cout_david||0),0);
+  const mgrRows=frais.filter(f=>payMatch(f,'manager'));
+  const mgrPaid=mgrRows.reduce((s,f)=>s+Number(f.montant||0),0);
+  const solde=mgrPaid-mgrOwed;
+  const mc=document.getElementById('mgr-cards');
+  if(mc) mc.innerHTML=
+    `<div class="card"><div class="label">Commissions dues (5 % marge validée)</div><div class="value">${eur(mgrOwed)}</div></div>`+
+    `<div class="card"><div class="label">Déjà versé au manager</div><div class="value">${eur(mgrPaid)}</div></div>`+
+    `<div class="card${solde>=0?' good':''}"><div class="label">${solde>=0?'Avance (trop versé)':'Reste à verser'}</div><div class="value ${solde>=0?'val-good':'val-bad'}">${eur(Math.abs(solde))}</div></div>`;
+  const mb=document.getElementById('mgr-paid-body');
+  if(mb) mb.innerHTML=mgrRows.length?mgrRows.map(f=>`<tr><td>${fdate(f.date)}</td><td>${escH(f.categorie||'')}</td><td>${escH(f.fournisseur||'')}</td><td class="num">${eur(f.montant)}</td></tr>`).join('')
+    :`<tr><td colspan="4" class="empty">Aucun versement — crée un frais dont la catégorie est « Manager ».</td></tr>`;
+  // RÉGIES
+  const names=[...new Set([...(REGIES_CFG||[]).map(r=>r.nom),...valid.map(d=>(d.commercial_regie||'').trim())].filter(Boolean))];
+  const rows=names.map(nom=>{
+    const owed=valid.filter(d=>(d.commercial_regie||'').trim()===nom && !d.regie_interne).reduce((s,d)=>s+Number(d.commission_regie||0),0);
+    const paid=frais.filter(f=>payMatch(f,nom)).reduce((s,f)=>s+Number(f.montant||0),0);
+    return {nom,owed,paid,solde:paid-owed};
+  }).filter(r=>r.owed>0.005||r.paid>0.005).sort((a,b)=>b.owed-a.owed);
+  const rb=document.getElementById('mgr-regie-body');
+  if(rb) rb.innerHTML=rows.length?rows.map(r=>`<tr><td><b>${escH(r.nom)}</b></td><td class="num">${eur(r.owed)}</td><td class="num">${eur(r.paid)}</td><td class="num ${r.solde>=0?'val-good':'val-bad'}">${r.solde>=0?'avance ':'reste '}${eur(Math.abs(r.solde))}</td></tr>`).join('')
+    :`<tr><td colspan="4" class="empty">Aucune régie avec commission.</td></tr>`;
+}
 
 let STATUTS_CFG=[{nom:'En cours',categorie:'potentiel'},{nom:'Validé',categorie:'realise'},{nom:'Perdu',categorie:'perdu'}];
 function statutCat(nom){ const s=STATUTS_CFG.find(x=>x.nom===nom); return s?s.categorie:(nom==='Validé'?'realise':nom==='Perdu'?'perdu':'potentiel'); }
@@ -965,14 +1018,15 @@ function showTab(t){
   buildParamsLayout();
   if(PARAM_SECS.includes(t)){ // raccourci legacy vers une section de Paramètres
     document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab==='parametres'));
-    ['dashboard','dossiers','apports','frais','documents','check','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!=='parametres'); });
+    ['dashboard','dossiers','apports','frais','manager','documents','check','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!=='parametres'); });
     showParam(t); return;
   }
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
-  ['dashboard','dossiers','apports','frais','documents','check','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
+  ['dashboard','dossiers','apports','frais','manager','documents','check','parametres','monespace','users','roles'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t); });
   if(t==='parametres') showParam(window._curParam||'statuts');
   if(t==='documents') renderDocuments();
   if(t==='check') renderCheck();
+  if(t==='manager') renderManagerRegie();
   if(t==='dashboard') replayDashboard();
 }
 // Rejoue l'animation des chiffres + graphes à chaque retour sur le dashboard
