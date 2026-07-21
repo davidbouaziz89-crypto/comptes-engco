@@ -565,11 +565,24 @@
   <div id="tab-frais" class="hidden">
     <section class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <button class="btn" onclick="openFraisModal()">➕ Ajouter un frais</button>
+      <button class="btn" style="background:var(--grad-accent)" onclick="document.getElementById('scan-factures').click()">📸 Scanner des factures (IA)</button>
+      <input type="file" id="scan-factures" accept="image/*,.pdf" multiple class="hidden" onchange="scanFactures(this.files);this.value='';">
       <b style="margin-left:auto;margin-right:6px;color:var(--muted)">📥 Import Excel</b>
       <button class="btn ghost small" onclick="downloadTemplate('frais')">⬇️ Modèle</button>
       <button class="btn small" onclick="document.getElementById('imp-frais').click()">⬆️ Importer</button>
       <input type="file" id="imp-frais" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('frais',this.files[0]);this.value='';">
     </section>
+    <div id="scan-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeScanModal()">
+      <div class="dossier-modal-card" style="max-width:1100px">
+        <section class="panel">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><h2 style="margin:0">📸 Scan de factures (IA)</h2><button class="btn ghost small" type="button" onclick="closeScanModal()">✕</button></div>
+          <div class="hint" id="scan-hint" style="margin:6px 0 12px">Vérifie et ajuste les champs pré-remplis, puis enregistre.</div>
+          <div id="scan-progress" class="hint"></div>
+          <div class="table-wrap"><table><thead><tr><th>Facture</th><th>Date</th><th>Fournisseur</th><th>Catégorie</th><th>Payé par</th><th class="num">Montant € HT</th><th>Détail</th><th>IA</th><th></th></tr></thead><tbody id="scan-body"></tbody></table></div>
+          <div style="margin-top:14px;display:flex;gap:10px"><button class="btn" id="scan-savebtn" onclick="saveScannedFrais()" disabled>✅ Tout enregistrer</button> <button class="btn ghost" type="button" onclick="closeScanModal()">Annuler</button></div>
+        </section>
+      </div>
+    </div>
     <div id="recur-alert" class="banner"></div>
     <section class="panel" id="recur-section">
       <h2>⚙️ Frais récurrents (à saisir chaque mois)</h2>
@@ -2936,6 +2949,85 @@ function closeApportModal(){ const m=document.getElementById('apport-modal'); if
 function closeApportForm(){ cancelEditApport(); closeApportModal(); }
 function openFraisModal(){ cancelEditFrais(); const fm=document.getElementById('f-mois'); if(fm&&!fm.value) fm.value=today().slice(0,7); const fd=document.getElementById('f-date'); if(fd&&!fd.value) fd.value=today(); const m=document.getElementById('frais-modal'); if(m) m.classList.remove('hidden'); }
 function closeFraisModal(){ const m=document.getElementById('frais-modal'); if(m) m.classList.add('hidden'); }
+// ===== Scan de factures par IA (edge function scan-facture → Claude vision) =====
+const SCAN_FN_URL = SUPABASE_URL + '/functions/v1/scan-facture';
+let _scanRows=[];
+async function fileToB64(file){ const bytes=new Uint8Array(await file.arrayBuffer()); let bin=''; const chunk=0x8000; for(let i=0;i<bytes.length;i+=chunk){ bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk)); } return btoa(bin); }
+function closeScanModal(){ const m=document.getElementById('scan-modal'); if(m) m.classList.add('hidden'); _scanRows=[]; }
+function scanConf(c){ c=Number(c||0); const col=c>=0.85?'val-good':(c>=0.6?'':'val-bad'); return `<span class="${col}">${Math.round(c*100)}%</span>`; }
+async function scanFactures(fileList){
+  const files=[...(fileList||[])]; if(!files.length) return;
+  if(!(PROJ&&PROJ.key==='led')){ toast('Le scan IA est disponible sur le projet LED'); return; }
+  _scanRows=[];
+  const body=document.getElementById('scan-body'); if(body) body.innerHTML='';
+  const savebtn=document.getElementById('scan-savebtn'); if(savebtn) savebtn.disabled=true;
+  document.getElementById('scan-modal').classList.remove('hidden');
+  const prog=document.getElementById('scan-progress');
+  const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle)])].filter(Boolean);
+  const fours=(window._fournisseurs||[]).map(f=>f.nom);
+  let token=''; try{ const s=await db.auth.getSession(); token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
+  for(let idx=0;idx<files.length;idx++){
+    const file=files[idx];
+    if(prog) prog.textContent='🔎 Analyse '+(idx+1)+'/'+files.length+' : '+file.name+'…';
+    let extracted={};
+    try{
+      const b64=await fileToB64(file);
+      const r=await fetch(SCAN_FN_URL,{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+(token||SUPABASE_KEY),'apikey':SUPABASE_KEY},body:JSON.stringify({image_b64:b64,mime:file.type,categories:cats,fournisseurs:fours})});
+      const j=await r.json();
+      extracted=j.error?{_err:j.error}:(j.extracted||{});
+    }catch(e){ extracted={_err:String(e)}; }
+    _scanRows.push({file,extracted,doc_name:file.name});
+    renderScanRows();
+  }
+  if(prog) prog.textContent='';
+  if(savebtn) savebtn.disabled=_scanRows.length===0;
+}
+function renderScanRows(){
+  const b=document.getElementById('scan-body'); if(!b) return;
+  b.innerHTML=_scanRows.length?_scanRows.map((row,i)=>{
+    const x=row.extracted||{};
+    const mnt=(x.montant_ht!=null?x.montant_ht:(x.montant_ttc!=null?x.montant_ttc:''));
+    const err=x._err?` <span class="val-bad" title="${escH(x._err)}">⚠️ échec</span>`:'';
+    const dev=(x.devise&&x.devise!=='EUR')?` <span class="val-bad" title="Devise détectée ${escH(x.devise)} — vérifie le montant en €">${escH(x.devise)}</span>`:'';
+    return `<tr>
+      <td>${escH(row.doc_name)}${err}</td>
+      <td><input type="date" id="scr-date-${i}" value="${escH(((x.date||today())+'').slice(0,10))}"></td>
+      <td><input type="text" id="scr-four-${i}" value="${escH(x.fournisseur||'')}" style="min-width:120px"></td>
+      <td><select id="scr-cat-${i}">${fraisCatOptions(x.categorie||'')}</select></td>
+      <td><select id="scr-src-${i}">${fraisSrcOptions('')}</select></td>
+      <td class="num"><input type="number" step="0.01" id="scr-mnt-${i}" value="${mnt}" style="max-width:100px">${dev}</td>
+      <td><input type="text" id="scr-det-${i}" value="${escH(x.detail||'')}" style="min-width:120px"></td>
+      <td>${scanConf(x.confidence)}</td>
+      <td><button class="btn ghost small" type="button" onclick="removeScanRow(${i})" title="Retirer">✕</button></td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="9" class="empty">Aucune facture</td></tr>`;
+}
+function removeScanRow(i){ _scanRows.splice(i,1); renderScanRows(); const sb=document.getElementById('scan-savebtn'); if(sb) sb.disabled=_scanRows.length===0; }
+async function saveScannedFrais(){
+  if(!_scanRows.length) return;
+  const btn=document.getElementById('scan-savebtn'); if(btn) btn.disabled=true;
+  const prog=document.getElementById('scan-progress');
+  const g=id=>document.getElementById(id);
+  let ok=0,fail=0;
+  for(let i=0;i<_scanRows.length;i++){
+    const row=_scanRows[i];
+    const montant=Number((g('scr-mnt-'+i)||{}).value)||0;
+    if(!montant){ fail++; continue; }
+    if(prog) prog.textContent='💾 Enregistrement '+(i+1)+'/'+_scanRows.length+'…';
+    const date=(g('scr-date-'+i)||{}).value||today();
+    let doc_path=null,doc_name=null;
+    try{ const file=row.file; const safe=file.name.replace(/[^\w.\-]+/g,'_').slice(-60); const path='engco/'+Date.now()+'-'+i+'-'+safe; const {error:upErr}=await db.storage.from('engco-docs').upload(path,file,{upsert:false}); if(!upErr){ doc_path=path; doc_name=file.name; } }catch(e){}
+    const ins={ date, mois_concerne:date.slice(0,7), categorie:(g('scr-cat-'+i)||{}).value||null,
+      fournisseur:((g('scr-four-'+i)||{}).value||'').trim()||null, montant,
+      source_id:(g('scr-src-'+i)||{}).value||null, regie_concernee:null, pct_decompte:0,
+      libelle:((g('scr-det-'+i)||{}).value||'').trim()||null, doc_path, doc_name };
+    const {error}=await db.from(T('frais')).insert(ins);
+    if(error){ fail++; } else ok++;
+  }
+  if(prog) prog.textContent='';
+  toast(ok+' frais enregistré(s)'+(fail?(' · '+fail+' à vérifier'):'')+' ✅');
+  closeScanModal(); if(typeof loadFrais==='function') loadFrais();
+}
 function cancelEditDossier(){
   editingDossierId=null;
   { const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='➕ Ajouter un dossier'; }
