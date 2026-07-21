@@ -179,7 +179,8 @@
   /* Popover de calcul au survol (comme sur le CRM PV) */
   .calc-card{overflow:visible!important;cursor:help}
   .calc-pop{position:absolute;top:calc(100% + 8px);left:0;min-width:260px;max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.55);padding:12px 14px;z-index:30;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .16s ease,transform .16s ease;white-space:normal;text-align:left}
-  .card.calc-card:hover .calc-pop{opacity:1;transform:none;pointer-events:auto}
+  .calc-card:hover .calc-pop{opacity:1;transform:none;pointer-events:auto}
+  .kpi.calc-card{overflow:visible!important;cursor:help}
   .calc-pop .cp-title{font-weight:700;font-size:12.5px;margin-bottom:8px;font-family:var(--font-display)}
   .calc-pop .cp-row{display:flex;justify-content:space-between;gap:18px;padding:3px 0;font-size:12.5px}
   .calc-pop .cp-row.total{font-weight:800;font-size:13.5px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
@@ -338,10 +339,10 @@
     <section class="dash-hero">
       <div class="eyebrow" id="hero-eyebrow">Vue d'ensemble</div>
       <div class="hero-kpis">
-        <div class="kpi hi"><div class="k-label">Résultat net société</div><div class="k-value" data-kpi="resultat">—</div><div class="kpi-spark-wrap"><canvas id="spark-resultat"></canvas></div><div class="k-sub" id="hero-resultat-sub"></div></div>
-        <div class="kpi ac"><div class="k-label">Marge nette validée</div><div class="k-value" data-kpi="marge">—</div><div class="kpi-spark-wrap"><canvas id="spark-marge"></canvas></div><div class="k-sub" id="hero-marge-sub"></div></div>
-        <div class="kpi lo"><div class="k-label">Frais à charge société</div><div class="k-value" data-kpi="frais">—</div><div class="kpi-spark-wrap"><canvas id="spark-frais"></canvas></div><div class="k-sub">dépenses cumulées</div></div>
-        <div class="kpi"><div class="k-label">Bénéfice à partager</div><div class="k-value" data-kpi="benef">—</div><div class="kpi-spark-wrap"><canvas id="spark-benef"></canvas></div><div class="k-sub" id="hero-benef-sub"></div></div>
+        <div class="kpi hi" id="hero-recup-card"><div class="k-label">💰 Ce qu'on récupère (réel) <span style="opacity:.6">ⓘ</span></div><div class="k-value" data-kpi="resultat">—</div><div class="kpi-spark-wrap"><canvas id="spark-resultat"></canvas></div><div class="k-sub" id="hero-resultat-sub"></div></div>
+        <div class="kpi ac" id="hero-primes-card"><div class="k-label">Primes HT encaissées <span style="opacity:.6">ⓘ</span></div><div class="k-value" data-kpi="marge">—</div><div class="kpi-spark-wrap"><canvas id="spark-marge"></canvas></div><div class="k-sub" id="hero-marge-sub"></div></div>
+        <div class="kpi lo" id="hero-frais-card"><div class="k-label">Frais réels (part société) <span style="opacity:.6">ⓘ</span></div><div class="k-value" data-kpi="frais">—</div><div class="kpi-spark-wrap"><canvas id="spark-frais"></canvas></div><div class="k-sub" id="hero-frais-sub">hors reversements régie</div></div>
+        <div class="kpi" id="hero-part-card"><div class="k-label">Part par associé <span style="opacity:.6">ⓘ</span></div><div class="k-value" data-kpi="benef">—</div><div class="kpi-spark-wrap"><canvas id="spark-benef"></canvas></div><div class="k-sub" id="hero-benef-sub"></div></div>
       </div>
       <div class="chart-grid">
         <div class="chart-card"><h3>🎯 Statut des dossiers</h3><div class="c-hint">Répartition du chiffre d'affaires</div><div class="chart-holder"><canvas id="ch-statut"></canvas></div></div>
@@ -2580,7 +2581,7 @@ function refreshDashboard(){
     else { const cible=new Date(Date.now()+(nonCouvert/parMois)*30.44*24*60*60*1000); el.innerHTML='<span class="val-good">~ '+cible.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</span>'; }
   } else el.textContent='—';
   // ---- Refonte « Cockpit LED » : KPI héros animés + graphiques ----
-  updateHeroKpis({resultat:marge,marge:margeNette,frais:fraisSociete,benef:benef,valides:cat.realise.n,total:dossiers.length,partAssoc:partAssoc,nb:as.length});
+  updateHeroKpis({recup:recup,primes:primesRealisees,fraisReels:fraisReels,regie:regieTot,recupPart:partReal,valides:cat.realise.n,total:dossiers.length,nb:as.length});
   renderDashboardCharts({cat:cat,frais:frais,as:as,inv:inv,dossiers:dossiers,flux:{margeNette:margeNette,regie:regieTot,frais:fraisSociete,resultat:marge}});
 }
 
@@ -2601,11 +2602,30 @@ function animateNumber(el,to){
 }
 function updateHeroKpis(d){
   const set=(k,v)=>animateNumber(document.querySelector('.k-value[data-kpi="'+k+'"]'),v);
-  set('resultat',d.resultat); set('marge',d.marge); set('frais',d.frais); set('benef',d.benef);
+  // Modèle réel : Primes HT encaissées − frais réels (part société) − commission régie = ce qu'on récupère, ÷ associés
+  set('resultat',d.recup); set('marge',d.primes); set('frais',d.fraisReels); set('benef',d.recupPart);
+  { const rv=document.querySelector('.k-value[data-kpi="resultat"]'); if(rv) rv.style.color=d.recup>=0?'var(--good)':'var(--bad)';
+    const pv=document.querySelector('.k-value[data-kpi="benef"]'); if(pv) pv.style.color=d.recupPart>=0?'var(--txt)':'var(--bad)'; }
   const eb=document.getElementById('hero-eyebrow'); if(eb&&PROJ) eb.textContent=(PROJ.icon||'')+' '+(PROJ.nom||'')+' · Vue d’ensemble';
   const rs=document.getElementById('hero-resultat-sub'); if(rs) rs.textContent=d.valides+' / '+d.total+' dossiers validés';
-  const ms=document.getElementById('hero-marge-sub'); if(ms) ms.textContent='part/assoc. '+eur(d.partAssoc);
-  const bs=document.getElementById('hero-benef-sub'); if(bs) bs.textContent='soit '+eur(d.nb?d.benef/d.nb:0)+' / associé';
+  const ms=document.getElementById('hero-marge-sub'); if(ms) ms.textContent='dossiers validés';
+  const bs=document.getElementById('hero-benef-sub'); if(bs) bs.textContent='bénéfice total '+eur(d.recup)+' ÷ '+d.nb;
+  attachPop('hero-recup-card','Ce qu\'on récupère (réel)',[
+    {l:'Primes HT encaissées',v:eur(d.primes)},
+    {l:'− Frais réels (part société)',v:'−'+eur(d.fraisReels)},
+    {l:'− Commission régie',v:'−'+eur(d.regie)},
+    {l:'= Ce qu\'on récupère',v:eur(d.recup),t:1}]);
+  attachPop('hero-primes-card','Primes HT encaissées',[
+    {l:'Somme des primes HT',v:eur(d.primes)},
+    {l:'(dossiers validés uniquement)',v:''}]);
+  attachPop('hero-frais-card','Frais réels à charge société',[
+    {l:'Frais saisis (part société)',v:eur(d.fraisReels)},
+    {l:'part refacturée régie exclue',v:''},
+    {l:'reversements régie exclus',v:''}]);
+  attachPop('hero-part-card','Part par associé',[
+    {l:'Ce qu\'on récupère',v:eur(d.recup)},
+    {l:'÷ Associés',v:String(d.nb)},
+    {l:'= Part chacun',v:eur(d.recupPart),t:1}]);
 }
 let _charts={};
 function chartTheme(){
