@@ -2435,11 +2435,15 @@ function checkChampLabel(k){ const f=DOSSIER_CHECK_FIELDS.find(x=>x.k===k); retu
 function guessCheckChamp(item){
   if(item&&item.champ) return item.champ;
   const n=((item&&item.nom)||'').toLowerCase();
-  const map=[['hamid','cout_hamid'],['nacelle','cout_nacelle'],['installation','cout_installation'],['pose','cout_installation'],['livraison','cout_livraison'],['audit','cout_audit'],['materiel','cout_materiel'],['matériel','cout_materiel'],['frais supp','frais_supp']];
+  const map=[['hamid','cout_hamid'],['hamza','cout_installation'],['nacelle','cout_nacelle'],['installation','cout_installation'],['pose','cout_installation'],['livraison','cout_livraison'],['audit','cout_audit'],['materiel','cout_materiel'],['matériel','cout_materiel'],['frais supp','frais_supp']];
   for(const [kw,f] of map){ if(n.includes(kw)) return f; }
   return null;
 }
+function checkMaterielCount(d){ return (window._dossierMat||[]).filter(m=>m.dossier_id===d.id).length; }
+function checkMaterielNeed(item){ const m=((item&&item.nom)||'').toLowerCase().match(/mat[eé]riel\s*(\d+)/); return m?(Number(m[1])||1):null; }
 function checkAuto(d,item){
+  const need=checkMaterielNeed(item); // "Matériel N" → coché si le dossier a moins de N matériels
+  if(need!=null) return checkMaterielCount(d)<need;
   const champ=guessCheckChamp(item);
   if(champ && Number(d[champ]||0)===0) return true; // coût = 0 → rien à faire → coché
   if(item.categorie && fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie)) return true;
@@ -2458,7 +2462,7 @@ function renderCheckItemsList(){
       if(i.id===editingCheckItemId) return `<tr class="rowedit"><td><input type="text" id="cie-nom" value="${escH(i.nom||'')}"></td>
         <td><select id="cie-cat">${checkCatOptions(i.categorie||'')}</select> <select id="cie-champ">${checkChampOptions(i.champ||'')}</select></td>
         <td class="num"><button class="btn small" onclick="saveCheckItem('${i.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelCheckItemEdit()">Annuler</button></td></tr>`;
-      const _gc=guessCheckChamp(i); const auto=i.categorie?`<span class="pill">🧾 ${escH(i.categorie)}</span>`:(_gc?`<span class="pill">💰 ${escH(checkChampLabel(_gc))} = 0${i.champ?'':' (auto)'}</span>`:'<span style="color:var(--muted)">coche manuelle</span>');
+      const _need=checkMaterielNeed(i); const _gc=guessCheckChamp(i); const auto=i.categorie?`<span class="pill">🧾 ${escH(i.categorie)}</span>`:(_need!=null?`<span class="pill">🔧 &lt; ${_need} matériel(s) (auto)</span>`:(_gc?`<span class="pill">💰 ${escH(checkChampLabel(_gc))} = 0${i.champ?'':' (auto)'}</span>`:'<span style="color:var(--muted)">coche manuelle</span>'));
       return `<tr><td><b>${escH(i.nom)}</b></td><td>${auto}</td>
         <td class="num"><button class="btn ghost small" onclick="editCheckItem('${i.id}')">✏️</button> <button class="btn danger small" onclick="delCheckItem('${i.id}')">Suppr.</button></td></tr>`;
     }).join('')+'</tbody></table></div>';
@@ -2514,7 +2518,7 @@ function renderCheck(){
     const dcells=cols.map(c=>c.cell(d)).join('');
     const icells=items.map(i=>{
       const auto=checkAuto(d,i), on=auto||checkManual(d,i); if(on) done++;
-      if(auto){ const gc=guessCheckChamp(i); const why=(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('frais '+(i.categorie||'')+' rattaché'); return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
+      if(auto){ const need=checkMaterielNeed(i); const gc=guessCheckChamp(i); const why=(need!=null)?('moins de '+need+' matériel(s) sur le dossier'):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('frais '+(i.categorie||'')+' rattaché'); return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
       return `<td class="num"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
     }).join('');
     const prog=items.length?`<td class="num"><div class="chk-prog"><div class="chk-prog-bar" style="width:${Math.round(done/items.length*100)}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span></td>`:'';
