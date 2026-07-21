@@ -596,7 +596,7 @@
         <div class="field"><label>Date d'ajout</label><input type="date" id="f-date" required onchange="onFraisDateChange()"></div>
         <div class="field"><label>Mois concerné</label><input type="month" id="f-mois"></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
-        <div class="field" id="f-dossier-field" style="display:none"><label>Dossier lié (ID CRM)</label><input type="text" id="f-dossier" placeholder="ex. 12345 — laisser vide si hors dossier"></div>
+        <div class="field" id="f-dossier-field" style="display:none;flex:1;min-width:240px"><label>Dossier(s) lié(s) — ID CRM <span style="color:var(--muted);font-weight:400">(plusieurs possibles, séparés par des virgules)</span></label><input type="text" id="f-dossier" placeholder="ex. 12345, 16991, 17012 — vide si hors dossier"></div>
         <div class="field"><label>Fournisseur</label><select id="f-fournisseur" onchange="onFraisFournisseur()"></select></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source" onchange="onFraisSource()"></select></div>
         <div class="field f-eur"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" oninput="fraisPreview()"></div>
@@ -1069,7 +1069,7 @@ function renderManagerRegie(){
   if(rb) rb.innerHTML=rows.length?rows.map(r=>`<tr style="cursor:pointer" data-nom="${escH(r.nom)}" onclick="openRegieDetail(this.dataset.nom)" title="Voir le rapport détaillé"><td><b>${escH(r.nom)}</b> <span style="color:var(--muted);font-size:11px">📄</span></td><td class="num">${eur(r.owed)}</td><td class="num">${eur(r.refac)}</td><td class="num">${eur(r.paid)}</td><td class="num ${r.solde>=0?'val-good':'val-bad'}">${r.solde>=0?'avance ':'reste '}${eur(Math.abs(r.solde))}</td></tr>`).join('')
     :`<tr><td colspan="5" class="empty">Aucune régie avec commission.</td></tr>`;
 }
-function regieCidCell(f){ const cid=(f.dossier_crm_id||'').toString().trim(); if(!cid) return '<span style="color:var(--muted)">—</span>'; const url=(typeof crmLink==='function')?crmLink(cid):''; return url?`<a href="${url}" target="_blank" rel="noopener">${escH(cid)} ↗</a>`:escH(cid); }
+function regieCidCell(f){ const ids=fraisDossierIds(f); if(!ids.length) return '<span style="color:var(--muted)">—</span>'; return ids.map(cid=>{ const url=(typeof crmLink==='function')?crmLink(cid):''; return url?`<a href="${url}" target="_blank" rel="noopener">${escH(cid)} ↗</a>`:escH(cid); }).join(', '); }
 function openRegieDetail(nom){
   if(!nom) return;
   const dossiers=window._dossiers||[], frais=window._frais||[];
@@ -2035,7 +2035,7 @@ function renderDossiers(){
 function openDossierDetail(id){
   const d=(window._dossiers||[]).find(x=>x.id===id); if(!d) return;
   const cid=(d.crm_id||'').toString().trim();
-  const linked=(window._frais||[]).filter(f=>cid && (f.dossier_crm_id||'').toString().trim()===cid);
+  const linked=(window._frais||[]).filter(f=>cid && fraisDossierIds(f).includes(cid));
   const totalFrais=linked.reduce((s,f)=>s+Number(f.montant||0),0);
   const prime=Number(d.montant_prime||0), net=prime-totalFrais;
   const delgNom=delegNameOf(dossierDelegId(d));
@@ -2190,7 +2190,7 @@ function renderFrais(){
   document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
     if(f.id===inlineFraisId) return fraisEditRow(f);
     const src=SOURCES.find(s=>s.id===f.source_id);
-    const dtag=f.dossier_crm_id?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier lié (ID CRM)">🔗 ${escH(f.dossier_crm_id)}</span>`:'';
+    const _dids=fraisDossierIds(f); const dtag=_dids.length?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier(s) lié(s) — ID CRM">🔗 ${_dids.map(escH).join(', ')}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
     const autotag=f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)" title="Généré automatiquement (frais récurrent)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️ Manuel</span>';
     const catOk=catExists(f.categorie), fourOk=fournExists(f.fournisseur);
@@ -2216,7 +2216,7 @@ function filterFraisRows(){
   const q=fraisFilterState();
   return (window._frais||[]).filter(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
-    if(q.term && !matchSearch(q.term,[fdate(f.date),moisConcerneLabel(f),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,f.dossier_crm_id].join(' '))) return false;
+    if(q.term && !matchSearch(q.term,[fdate(f.date),moisConcerneLabel(f),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,fraisDossierIds(f).join(' ')].join(' '))) return false;
     if(q.date && !((fdate(f.date)+' '+moisConcerneLabel(f)).toLowerCase().includes(q.date))) return false;
     if(q.mois && fraisMonth(f)!==q.mois) return false;
     if(q.type==='auto' && !f.auto) return false;
@@ -2307,7 +2307,7 @@ function fraisEditRow(f){
   let ledCell='';
   if(led){
     const cur=f.doc_path?`<div class="hint" style="margin-top:4px">📎 <a href="#" onclick="openFraisDoc('${escH(f.doc_path)}');return false">${escH(f.doc_name||'justificatif')}</a> — choisis un fichier pour le remplacer.</div>`:'';
-    ledCell=`<input type="text" id="if-dossier" placeholder="ID dossier CRM" value="${escH(f.dossier_crm_id||'')}" style="margin-top:5px">
+    ledCell=`<input type="text" id="if-dossier" placeholder="ID(s) dossier — virgules" value="${escH(fraisDossierIds(f).join(', '))}" style="margin-top:5px" title="Un ou plusieurs ID CRM séparés par des virgules">
       <input type="file" id="if-doc" accept="image/*,.pdf" style="margin-top:5px">${cur}`;
   }
   return `<tr class="rowedit">
@@ -2349,7 +2349,7 @@ async function saveFraisInline(id){
     source_id:g('if-source').value||null, regie_concernee:g('if-regie').value||null,
     pct_decompte:Number(g('if-pct').value)||0, libelle:(g('if-detail')?g('if-detail').value.trim():'')||null };
   if(PROJ&&PROJ.key==='led'){
-    const dv=g('if-dossier'); if(dv) row.dossier_crm_id=dv.value.trim()||null;
+    const dv=g('if-dossier'); if(dv){ const ids=parseDossierIds(dv.value); row.dossier_crm_ids=ids.length?ids:null; row.dossier_crm_id=ids[0]||null; }
     const fi=g('if-doc'), file=fi&&fi.files&&fi.files[0];
     if(file){
       const safe=file.name.replace(/[^\w.\-]+/g,'_').slice(-60);
@@ -2404,7 +2404,10 @@ function fillCheckCatSelect(){
   if(prev) sel.value=prev;
 }
 // Un frais est-il rattaché à ce dossier ? (par ID CRM)
-function fraisOfDossier(d){ const cid=(d.crm_id||'').toString().trim(); if(!cid) return []; return (window._frais||[]).filter(f=>(f.dossier_crm_id||'').toString().trim()===cid); }
+// Un frais (facture) peut concerner PLUSIEURS dossiers → liste d'ID CRM.
+function fraisDossierIds(f){ if(f&&Array.isArray(f.dossier_crm_ids)&&f.dossier_crm_ids.filter(Boolean).length) return f.dossier_crm_ids.map(x=>(''+x).trim()).filter(Boolean); const s=((f&&f.dossier_crm_id)||'').toString().trim(); return s?[s]:[]; }
+function parseDossierIds(str){ return [...new Set(((str||'')+'').split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean))]; }
+function fraisOfDossier(d){ const cid=(d.crm_id||'').toString().trim(); if(!cid) return []; return (window._frais||[]).filter(f=>fraisDossierIds(f).includes(cid)); }
 // Élément auto-satisfait : au moins un frais lié de la catégorie de l'élément
 const DOSSIER_CHECK_FIELDS=[
   {k:'cout_materiel',l:'Coût matériel'},{k:'cout_installation',l:'Coût installation'},
@@ -3076,7 +3079,7 @@ async function addFrais(e){
     pct_decompte:Number(document.getElementById('f-pct').value)||0,
     libelle:((document.getElementById('f-detail')||{}).value||'').trim()||null };
   if(PROJ&&PROJ.key==='led'){
-    const dv=document.getElementById('f-dossier'); row.dossier_crm_id=(dv&&dv.value.trim())||null;
+    { const dv=document.getElementById('f-dossier'); const ids=parseDossierIds(dv&&dv.value); row.dossier_crm_ids=ids.length?ids:null; row.dossier_crm_id=ids[0]||null; }
     const fi=document.getElementById('f-doc'), file=fi&&fi.files&&fi.files[0];
     if(file){
       const safe=file.name.replace(/[^\w.\-]+/g,'_').slice(-60);
