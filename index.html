@@ -2137,7 +2137,7 @@ async function generateFournRecurrents(){
     if(f.montant!=null&&f.montant!==''){ toInsert.push({ date:m+'-01', mois_concerne:m, categorie:f.categorie||null, fournisseur:f.nom, montant:Number(f.montant), source_id:f.source_id||null, regie_concernee:null, pct_decompte:0 }); }
     else { missing.push({ fournisseur:f.nom, categorie:f.categorie||'', mois:m, source_id:f.source_id||null }); }
   }); });
-  window._fraisManquants=missing;
+  window._fraisManquants=missing.sort((a,b)=>(a.mois+a.fournisseur).localeCompare(b.mois+b.fournisseur));
   if(toInsert.length){ _genLock=true; const {error}=await db.from(T('frais')).insert(toInsert);
     if(!error){ const {data}=await db.from(T('frais')).select('*').order('date',{ascending:false}); window._frais=data||[]; renderFrais(); refreshDashboard();
       toast(toInsert.length+' frais récurrent(s) ajouté(s) automatiquement ✅'); }
@@ -2145,7 +2145,7 @@ async function generateFournRecurrents(){
   renderFraisManquants();
 }
 function renderFraisManquants(){
-  const missing=(window._fraisManquants||[]).slice().sort((a,b)=>(a.mois+a.fournisseur).localeCompare(b.mois+b.fournisseur));
+  const missing=(window._fraisManquants||[]); // déjà trié à la source → l'index i correspond bien
   const btn=document.getElementById('frais-tab-manquants'); if(btn) btn.innerHTML='⏳ Frais manquants'+(missing.length?` <span class="pill" style="background:rgba(239,68,68,.22)">${missing.length}</span>`:'');
   const b=document.getElementById('frais-manquants-body'); if(!b) return;
   b.innerHTML=missing.length? missing.map((m,i)=>`<tr><td>${moisLabel(m.mois+'-01')}</td><td>${m.categorie?`<span class="pill">${escH(m.categorie)}</span>`:'—'}</td><td><b>${escH(m.fournisseur)}</b></td>
