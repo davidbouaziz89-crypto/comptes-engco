@@ -198,3 +198,9 @@ alter table public.engco_depots enable row level security;
 drop policy if exists engco_depots_all on public.engco_depots;
 create policy engco_depots_all on public.engco_depots for all to authenticated using (true) with check (true);
 grant select, insert, update, delete on public.engco_depots to authenticated;
+
+-- ===== engco-fournisseur-recurrent.sql =====
+-- Infos récurrent sur le fournisseur : montant habituel + société qui paie
+alter table public.engco_fournisseurs
+  add column if not exists montant numeric,
+  add column if not exists source_id uuid;

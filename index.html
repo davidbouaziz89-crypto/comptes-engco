@@ -703,11 +703,13 @@
             <div class="hint" style="margin-bottom:8px">Tes fournisseurs, chacun relié à une <b>catégorie</b>. Quand tu choisis un fournisseur à la saisie d'un frais, la catégorie se remplit toute seule.</div>
             <form class="row" onsubmit="addFournisseur(event)">
               <div class="field"><label>Nom du fournisseur</label><input type="text" id="fo-nom" placeholder="ex. Rexel, Sonepar…" required></div>
-              <div class="field" style="max-width:170px"><label>Type</label><select id="fo-type"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent</option></select></div>
+              <div class="field" style="max-width:170px"><label>Type</label><select id="fo-type" onchange="onFoType()"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent</option></select></div>
               <div class="field"><label>Catégorie liée</label><select id="fo-cat"></select></div>
+              <div class="field fo-rec" style="display:none;max-width:150px"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fo-montant" placeholder="ex. 1000"></div>
+              <div class="field fo-rec" style="display:none"><label>Payé par (société)</label><select id="fo-source"></select></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
-            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th>Type</th><th>Catégorie</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th>Type</th><th>Catégorie</th><th class="num">Montant</th><th>Payé par</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
           </section>
         </div>
         <div class="params-sec" id="ps-liencrm">
@@ -1396,7 +1398,7 @@ async function loadFournisseurs(){
   const pm=document.getElementById('pm-fournisseurs'); if(pm) pm.style.display=isLed?'':'none';
   if(!isLed){ window._fournisseurs=[]; fillFournisseurSelect(); return; }
   const {data}=await db.from('engco_fournisseurs').select('*').order('nom');
-  window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurSelect(); fillFournisseurCatSelect();
+  window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurSelect(); fillFournisseurCatSelect(); fillFoSourceSelect();
 }
 let editingFournisseurId=null;
 function fournisseurCatOptions(cur){ const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle)])].filter(Boolean).sort(); let o='<option value="">— aucune —</option>'+cats.map(c=>`<option value="${escH(c)}"${c===cur?' selected':''}>${escH(c)}</option>`).join(''); if(cur&&!cats.includes(cur)) o+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`; return o; }
@@ -1405,20 +1407,28 @@ function fournisseurCatOf(nom){ const f=(window._fournisseurs||[]).find(x=>(x.no
 function setCategorieValue(selId,cat){ const sel=document.getElementById(selId); if(!sel||!cat) return; if(![...sel.options].some(o=>o.value===cat)) sel.insertAdjacentHTML('afterbegin',`<option>${escH(cat)}</option>`); sel.value=cat; }
 function fourTypePill(t){ return t==='recurrent'?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'; }
 function fourTypeOptions(cur){ return `<option value="depense"${cur!=='recurrent'?' selected':''}>Dépense</option><option value="recurrent"${cur==='recurrent'?' selected':''}>🔁 Récurrent</option>`; }
+function foSourceOptions(cur){ return '<option value="">— (facultatif) —</option>'+(SOURCES||[]).map(s=>`<option value="${escH(s.id)}"${s.id===cur?' selected':''}>${escH(s.nom)}</option>`).join(''); }
+function fourSrcNom(id){ const s=(SOURCES||[]).find(y=>y.id===id); return s?s.nom:''; }
+function onFoType(){ const rec=(document.getElementById('fo-type')||{}).value==='recurrent'; document.querySelectorAll('.fo-rec').forEach(el=>el.style.display=rec?'':'none'); }
+function fillFoSourceSelect(){ const sel=document.getElementById('fo-source'); if(sel){ const p=sel.value; sel.innerHTML=foSourceOptions(p); sel.value=p; } }
 function renderFournisseurs(){
   const b=document.getElementById('fournisseurs-body'); if(!b) return; const f=window._fournisseurs||[];
   b.innerHTML=f.length?f.map(x=>{
+    const rec=x.type==='recurrent';
     if(x.id===editingFournisseurId) return `<tr class="rowedit"><td><input type="text" id="foe-nom" value="${escH(x.nom||'')}"></td>
       <td><select id="foe-type">${fourTypeOptions(x.type||'depense')}</select></td>
       <td><select id="foe-cat">${fournisseurCatOptions(x.categorie||'')}</select></td>
+      <td class="num"><input type="number" step="0.01" id="foe-montant" placeholder="montant" value="${x.montant!=null?x.montant:''}"></td>
+      <td><select id="foe-source">${foSourceOptions(x.source_id||'')}</select></td>
       <td class="num"><button class="btn small" onclick="saveFournisseur('${x.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelFournisseurEdit()">Annuler</button></td></tr>`;
     return `<tr><td>${escH(x.nom)}</td><td>${fourTypePill(x.type)}</td><td>${x.categorie?`<span class="pill">${escH(x.categorie)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+      <td class="num">${rec&&x.montant!=null?eur(x.montant):'—'}</td><td>${rec?(escH(fourSrcNom(x.source_id))||'—'):'—'}</td>
       <td class="num"><button class="btn ghost small" onclick="editFournisseur('${x.id}')">✏️</button> <button class="btn danger small" onclick="delFournisseur('${x.id}')">Suppr.</button></td></tr>`;
-  }).join(''):`<tr><td colspan="4" class="empty">Aucun fournisseur</td></tr>`;
+  }).join(''):`<tr><td colspan="6" class="empty">Aucun fournisseur</td></tr>`;
 }
 function editFournisseur(id){ editingFournisseurId=id; renderFournisseurs(); }
 function cancelFournisseurEdit(){ editingFournisseurId=null; renderFournisseurs(); }
-async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const type=(document.getElementById('foe-type')||{}).value||'depense'; const old=(window._fournisseurs||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,type}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('frais'),'fournisseur',oldNom,nom); editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); if(typeof loadFrais==='function') loadFrais(); }
+async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const type=(document.getElementById('foe-type')||{}).value||'depense'; const mv=(document.getElementById('foe-montant')||{}).value; const montant=(type==='recurrent'&&mv!=='')?Number(mv):null; const source_id=type==='recurrent'?((document.getElementById('foe-source')||{}).value||null):null; const old=(window._fournisseurs||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,type,montant,source_id}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('frais'),'fournisseur',oldNom,nom); editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); if(typeof loadFrais==='function') loadFrais(); }
 function fournisseurOptions(cur){
   const list=(window._fournisseurs||[]).map(f=>f.nom);
   let opts='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join('');
@@ -1444,7 +1454,7 @@ async function onInlineFournisseur(){
     const s2=document.getElementById('if-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } return; }
   const cat=fournisseurCatOf(sel.value); if(cat) setCategorieValue('if-categorie',cat);
 }
-async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; const type=(document.getElementById('fo-type')||{}).value||'depense'; if(!categorie){ toast('Choisis la catégorie liée'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie,type}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
+async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; const type=(document.getElementById('fo-type')||{}).value||'depense'; const mv=(document.getElementById('fo-montant')||{}).value; const montant=(type==='recurrent'&&mv!=='')?Number(mv):null; const source_id=type==='recurrent'?((document.getElementById('fo-source')||{}).value||null):null; if(!categorie){ toast('Choisis la catégorie liée'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie,type,montant,source_id}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; { const m=document.getElementById('fo-montant'); if(m) m.value=''; } toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
 async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
 // ===== Campagnes (LED) =====
 let editingCampagneId=null;
