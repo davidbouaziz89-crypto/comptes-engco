@@ -102,6 +102,7 @@
   .sort-arrow{color:var(--accent);font-size:10px}
   .pill-warn{background:color-mix(in srgb,var(--danger) 16%,transparent)!important;border-color:color-mix(in srgb,var(--danger) 55%,transparent)!important;color:var(--bad)!important}
   td.orphan{color:var(--bad)!important;font-weight:700}
+  .frais-subtab.active{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--txt);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -555,6 +556,11 @@
     </div>
     <section class="panel panel-wide">
       <h2>Historique des frais</h2>
+      <div style="display:flex;gap:6px;margin:10px 0 14px;flex-wrap:wrap">
+        <button class="btn ghost small frais-subtab active" id="frais-tab-list" type="button" onclick="showFraisView('list')">🧾 Frais</button>
+        <button class="btn ghost small frais-subtab" id="frais-tab-manquants" type="button" onclick="showFraisView('manquants')">⏳ Frais manquants</button>
+      </div>
+      <div id="frais-view-list">
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="frais-search" placeholder="Rechercher : payé par (ex. DB Telecom), fournisseur, catégorie, mois…" oninput="renderFrais()"></div>
       <div id="frais-bulk" class="hidden bulk-bar">
         <b id="frais-bulk-count">0 sélectionné(s)</b>
@@ -588,6 +594,14 @@
         <tbody id="frais-body"></tbody>
         <tfoot><tr id="frais-totals" class="totals-row"></tr></tfoot>
       </table></div>
+      </div>
+      <div id="frais-view-manquants" class="hidden">
+        <div class="hint" style="margin-bottom:10px">Frais récurrents attendus mais sans montant (fournisseurs récurrents sans montant fixe). Renseigne le montant → ça bascule dans « 🧾 Frais ».</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Mois</th><th>Catégorie</th><th>Fournisseur</th><th class="num">Montant</th><th></th></tr></thead>
+          <tbody id="frais-manquants-body"></tbody>
+        </table></div>
+      </div>
     </section>
   </div>
 
@@ -724,11 +738,12 @@
               <div class="field"><label>Nom du fournisseur</label><input type="text" id="fo-nom" placeholder="ex. Rexel, Sonepar…" required></div>
               <div class="field" style="max-width:170px"><label>Type</label><select id="fo-type" onchange="onFoType()"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent</option></select></div>
               <div class="field"><label>Catégorie liée</label><select id="fo-cat"></select></div>
-              <div class="field fo-rec" style="display:none;max-width:150px"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fo-montant" placeholder="ex. 1000"></div>
+              <div class="field fo-rec" style="display:none;max-width:150px"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fo-montant" placeholder="laisse vide si variable"></div>
               <div class="field fo-rec" style="display:none"><label>Payé par (société)</label><select id="fo-source"></select></div>
+              <div class="field fo-rec" style="display:none;max-width:150px"><label>À partir du mois</label><input type="month" id="fo-mois"></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
-            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th>Type</th><th>Catégorie</th><th class="num">Montant</th><th>Payé par</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th>Type</th><th>Catégorie</th><th class="num">Montant</th><th>Payé par</th><th>Depuis</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
           </section>
         </div>
         <div class="params-sec" id="ps-liencrm">
@@ -1419,6 +1434,7 @@ async function loadFournisseurs(){
   if(!isLed){ window._fournisseurs=[]; fillFournisseurSelect(); return; }
   const {data}=await db.from('engco_fournisseurs').select('*').order('nom');
   window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurSelect(); fillFournisseurCatSelect(); fillFoSourceSelect();
+  if(typeof generateFournRecurrents==='function') generateFournRecurrents();
 }
 let editingFournisseurId=null;
 function fournisseurCatOptions(cur){ const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle)])].filter(Boolean).sort(); let o='<option value="">— aucune —</option>'+cats.map(c=>`<option value="${escH(c)}"${c===cur?' selected':''}>${escH(c)}</option>`).join(''); if(cur&&!cats.includes(cur)) o+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`; return o; }
@@ -1440,15 +1456,16 @@ function renderFournisseurs(){
       <td><select id="foe-cat">${fournisseurCatOptions(x.categorie||'')}</select></td>
       <td class="num"><input type="number" step="0.01" id="foe-montant" placeholder="montant" value="${x.montant!=null?x.montant:''}"></td>
       <td><select id="foe-source">${foSourceOptions(x.source_id||'')}</select></td>
+      <td><input type="month" id="foe-mois" value="${escH((x.mois_debut||'').slice(0,7))}"></td>
       <td class="num"><button class="btn small" onclick="saveFournisseur('${x.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelFournisseurEdit()">Annuler</button></td></tr>`;
     return `<tr><td>${escH(x.nom)}</td><td>${fourTypePill(x.type)}</td><td>${x.categorie?`<span class="pill">${escH(x.categorie)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
-      <td class="num">${x.montant!=null?eur(x.montant):'—'}</td><td>${x.source_id?(escH(fourSrcNom(x.source_id))||'—'):'—'}</td>
+      <td class="num">${x.montant!=null?eur(x.montant):'—'}</td><td>${x.source_id?(escH(fourSrcNom(x.source_id))||'—'):'—'}</td><td>${x.mois_debut?moisLabel(x.mois_debut.slice(0,7)+'-01'):'—'}</td>
       <td class="num"><button class="btn ghost small" onclick="editFournisseur('${x.id}')">✏️</button> <button class="btn danger small" onclick="delFournisseur('${x.id}')">Suppr.</button></td></tr>`;
-  }).join(''):`<tr><td colspan="6" class="empty">Aucun fournisseur</td></tr>`;
+  }).join(''):`<tr><td colspan="7" class="empty">Aucun fournisseur</td></tr>`;
 }
 function editFournisseur(id){ editingFournisseurId=id; renderFournisseurs(); }
 function cancelFournisseurEdit(){ editingFournisseurId=null; renderFournisseurs(); }
-async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const type=(document.getElementById('foe-type')||{}).value||'depense'; const mv=(document.getElementById('foe-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('foe-source')||{}).value||null; const old=(window._fournisseurs||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,type,montant,source_id}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('frais'),'fournisseur',oldNom,nom); editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); if(typeof loadFrais==='function') loadFrais(); }
+async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const type=(document.getElementById('foe-type')||{}).value||'depense'; const mv=(document.getElementById('foe-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('foe-source')||{}).value||null; const mois_debut=(document.getElementById('foe-mois')||{}).value||null; const old=(window._fournisseurs||[]).find(x=>x.id===id); const oldNom=old?old.nom:null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie,type,montant,source_id,mois_debut}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } if(oldNom&&oldNom!==nom) await cascadeRename(T('frais'),'fournisseur',oldNom,nom); editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); if(typeof loadFrais==='function') loadFrais(); }
 function fournisseurOptions(cur){
   const list=(window._fournisseurs||[]).map(f=>f.nom);
   let opts='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join('');
@@ -1474,7 +1491,7 @@ async function onInlineFournisseur(){
     const s2=document.getElementById('if-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } return; }
   const cat=fournisseurCatOf(sel.value); if(cat) setCategorieValue('if-categorie',cat);
 }
-async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; const type=(document.getElementById('fo-type')||{}).value||'depense'; const mv=(document.getElementById('fo-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('fo-source')||{}).value||null; if(!categorie){ toast('Choisis la catégorie liée'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie,type,montant,source_id}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; { const m=document.getElementById('fo-montant'); if(m) m.value=''; } toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
+async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; const type=(document.getElementById('fo-type')||{}).value||'depense'; const mv=(document.getElementById('fo-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('fo-source')||{}).value||null; const mois_debut=(document.getElementById('fo-mois')||{}).value||null; if(!categorie){ toast('Choisis la catégorie liée'); return; } if(type==='recurrent'&&!mois_debut){ toast('Indique le mois de début du récurrent'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie,type,montant,source_id,mois_debut}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; { const m=document.getElementById('fo-montant'); if(m) m.value=''; } { const mo=document.getElementById('fo-mois'); if(mo) mo.value=''; } toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
 async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
 // ===== Campagnes (LED) =====
 let editingCampagneId=null;
@@ -1848,6 +1865,50 @@ async function loadFrais(){
   const {data,error}=await db.from(T('frais')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
   window._frais=data||[]; renderFrais(); refreshDashboard(); renderRegies(); checkMissingRecurrents();
+  generateFournRecurrents();
+}
+// ===== Frais récurrents pilotés par le fournisseur (génération auto + manquants) =====
+function monthsBetween(a,b){ const out=[]; if(!a||!b) return out; a=(''+a).slice(0,7); b=(''+b).slice(0,7); let [y,mo]=a.split('-').map(Number); const [yb,mb]=b.split('-').map(Number); let g=0; while((y<yb||(y===yb&&mo<=mb))&&g<600){ out.push(y+'-'+String(mo).padStart(2,'0')); mo++; if(mo>12){mo=1;y++;} g++; } return out; }
+let _genLock=false;
+async function generateFournRecurrents(){
+  if(!PROJ||PROJ.key!=='led'||_genLock) return;
+  const fours=(window._fournisseurs||[]).filter(f=>f.type==='recurrent'&&f.mois_debut);
+  const cur=today().slice(0,7); const frais=window._frais||[];
+  const toInsert=[], missing=[];
+  fours.forEach(f=>{ monthsBetween(f.mois_debut,cur).forEach(m=>{
+    const exists=frais.some(x=>(x.fournisseur||'')===f.nom && fraisMonth(x)===m); if(exists) return;
+    if(f.montant!=null&&f.montant!==''){ toInsert.push({ date:m+'-01', mois_concerne:m, categorie:f.categorie||null, fournisseur:f.nom, montant:Number(f.montant), source_id:f.source_id||null, regie_concernee:null, pct_decompte:0 }); }
+    else { missing.push({ fournisseur:f.nom, categorie:f.categorie||'', mois:m, source_id:f.source_id||null }); }
+  }); });
+  window._fraisManquants=missing;
+  if(toInsert.length){ _genLock=true; const {error}=await db.from(T('frais')).insert(toInsert);
+    if(!error){ const {data}=await db.from(T('frais')).select('*').order('date',{ascending:false}); window._frais=data||[]; renderFrais(); refreshDashboard();
+      toast(toInsert.length+' frais récurrent(s) ajouté(s) automatiquement ✅'); }
+    _genLock=false; }
+  renderFraisManquants();
+}
+function renderFraisManquants(){
+  const missing=(window._fraisManquants||[]).slice().sort((a,b)=>(a.mois+a.fournisseur).localeCompare(b.mois+b.fournisseur));
+  const btn=document.getElementById('frais-tab-manquants'); if(btn) btn.innerHTML='⏳ Frais manquants'+(missing.length?` <span class="pill" style="background:rgba(239,68,68,.22)">${missing.length}</span>`:'');
+  const b=document.getElementById('frais-manquants-body'); if(!b) return;
+  b.innerHTML=missing.length? missing.map((m,i)=>`<tr><td>${moisLabel(m.mois+'-01')}</td><td>${m.categorie?`<span class="pill">${escH(m.categorie)}</span>`:'—'}</td><td><b>${escH(m.fournisseur)}</b></td>
+    <td class="num"><input type="number" step="0.01" id="fmq-${i}" placeholder="montant €" style="max-width:130px"></td>
+    <td class="num"><button class="btn small" onclick="completeFraisManquant(${i})">+ Ajouter au frais</button></td></tr>`).join('')
+    : `<tr><td colspan="5" class="empty">Aucun frais manquant 🎉 — tout est à jour.</td></tr>`;
+}
+async function completeFraisManquant(i){
+  const m=(window._fraisManquants||[])[i]; if(!m) return;
+  const val=Number((document.getElementById('fmq-'+i)||{}).value); if(!val){ toast('Indique le montant'); return; }
+  const {error}=await db.from(T('frais')).insert({ date:m.mois+'-01', mois_concerne:m.mois, categorie:m.categorie||null, fournisseur:m.fournisseur, montant:val, source_id:m.source_id||null, regie_concernee:null, pct_decompte:0 });
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('Frais ajouté ✅'); loadFrais();
+}
+function showFraisView(view){
+  const l=document.getElementById('frais-view-list'), m=document.getElementById('frais-view-manquants'); if(!l||!m) return;
+  l.classList.toggle('hidden', view!=='list'); m.classList.toggle('hidden', view!=='manquants');
+  document.getElementById('frais-tab-list').classList.toggle('active', view==='list');
+  document.getElementById('frais-tab-manquants').classList.toggle('active', view==='manquants');
+  if(view==='manquants') renderFraisManquants();
 }
 function fraisMonth(f){ return (f&&f.mois_concerne)||((f&&f.date||'').slice(0,7)); } // 'YYYY-MM' concerné
 function moisConcerneLabel(f){ const m=fraisMonth(f); return m?moisLabel(m+'-01'):''; }
