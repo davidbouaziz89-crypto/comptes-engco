@@ -66,7 +66,7 @@
   #subnav,#adminnav{display:flex;gap:6px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel2);position:static;box-shadow:none;z-index:auto}
   #subnav button,#adminnav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
   #subnav button.active,#adminnav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
-  main{padding:24px 22px 40px;max-width:1150px;margin:0 auto}
+  main{padding:24px 22px 40px;max-width:min(1480px,97vw);margin:0 auto}
   .grid{display:grid;gap:16px}
   .cards{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
   .card{background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 17px;position:relative;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
@@ -106,6 +106,11 @@
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  /* Tables larges (frais, dossiers) : compactes + colonne actions collée à droite pour toujours voir ✏️ */
+  .tbl-wide{font-size:13px;min-width:0}
+  .tbl-wide th,.tbl-wide td{padding:7px 9px}
+  .tbl-wide th:last-child,.tbl-wide td:last-child{position:sticky;right:0;z-index:2;background:var(--panel);box-shadow:-8px 0 10px -8px rgba(0,0,0,.45)}
+  .tbl-wide thead th:last-child{z-index:3}
   /* Panneau qui déborde du cadre 1150px pour afficher une large table sans scroll */
   .panel-wide{width:min(1600px,calc(100vw - 32px));position:relative;left:50%;transform:translateX(-50%)}
   @media(max-width:1150px){.panel-wide{width:auto;left:auto;transform:none}}
@@ -439,13 +444,13 @@
     <section class="panel">
       <h2>Liste des dossiers</h2>
       <div class="search-box"><span class="ic">🔎</span><input type="text" id="dossiers-search" placeholder="Rechercher un client, dépôt Emmy, régie, région…" oninput="onDossierSearch()"></div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
-        <div class="field" style="max-width:230px"><label>Filtrer par régie / campagne</label><select id="dossiers-fregie" onchange="renderDossiers()"></select></div>
-        <div class="field" id="dossiers-fregion-wrap" style="max-width:200px"><label>Filtrer par région</label><select id="dossiers-fregion" onchange="renderDossiers()"><option value="">Toutes les régions</option><option>France</option><option>Corse</option><option>DOM-TOM</option></select></div>
-        <div class="field" style="max-width:180px"><label>Filtrer par statut</label><select id="dossiers-fstatut" onchange="renderDossiers()"></select></div>
-      </div>
-      <div class="table-wrap"><table>
-        <thead><tr id="dossiers-head"></tr></thead>
+      <div class="hint" id="dossiers-count" style="margin:2px 0 8px"></div>
+      <div style="display:none"><select id="dossiers-fregie"></select><select id="dossiers-fregion"></select><select id="dossiers-fstatut"></select></div>
+      <div class="table-wrap"><table class="tbl-wide">
+        <thead>
+          <tr id="dossiers-head"></tr>
+          <tr id="dossiers-filter-row" class="filter-row"></tr>
+        </thead>
         <tbody id="dossiers-body"></tbody>
       </table></div>
     </section>
@@ -595,7 +600,7 @@
         <button class="btn ghost small" type="button" onclick="bulkSetFrais('fournisseur','frais-bulk-four')">Appliquer</button>
         <button class="btn ghost small" type="button" onclick="clearFraisSel()" style="margin-left:auto">Désélectionner</button>
       </div>
-      <div class="table-wrap"><table id="frais-table">
+      <div class="table-wrap"><table id="frais-table" class="tbl-wide">
         <thead>
         <tr><th style="width:34px"><input type="checkbox" id="frais-check-all" onclick="toggleAllFrais(this)" title="Tout sélectionner"></th><th class="sortable" onclick="sortFrais('date')">Date<span class="sort-arrow" data-fsort="date"></span></th><th class="sortable" onclick="sortFrais('mois')">Mois<span class="sort-arrow" data-fsort="mois"></span></th><th>Ajout</th><th class="sortable" onclick="sortFrais('categorie')">Catégorie<span class="sort-arrow" data-fsort="categorie"></span></th><th class="sortable" onclick="sortFrais('fournisseur')">Fournisseur<span class="sort-arrow" data-fsort="fournisseur"></span></th><th class="sortable" onclick="sortFrais('ftype')">Type<span class="sort-arrow" data-fsort="ftype"></span></th><th class="sortable" onclick="sortFrais('source')">Payé par<span class="sort-arrow" data-fsort="source"></span></th><th class="num sortable" onclick="sortFrais('montant')">Montant<span class="sort-arrow" data-fsort="montant"></span></th><th class="sortable" onclick="sortFrais('regie')">Régie<span class="sort-arrow" data-fsort="regie"></span></th><th class="num sortable" onclick="sortFrais('refac')">Refacturé<span class="sort-arrow" data-fsort="refac"></span></th><th class="num sortable" onclick="sortFrais('societe')">Part société<span class="sort-arrow" data-fsort="societe"></span></th><th></th></tr>
         <tr class="filter-row">
@@ -630,8 +635,8 @@
 
   <!-- DÉTAIL DOSSIER (LED) -->
   <div id="dossier-detail" onclick="if(event.target===this)closeDossierDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;align-items:flex-start;justify-content:center;padding:24px;overflow:auto">
-    <div class="panel" style="max-width:760px;width:100%;margin:auto">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <div class="panel" style="max-width:820px;width:100%;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;position:sticky;top:-24px;background:var(--panel);padding:6px 0;z-index:5">
         <h2 id="dd-title" style="margin:0;flex:1">Détail du dossier</h2>
         <button class="btn ghost small" onclick="closeDossierDetail()">✕ Fermer</button>
       </div>
@@ -653,9 +658,9 @@
     </section>
     <section class="panel">
       <h2>🤝 Régies — dû vs versé</h2>
-      <div class="hint" style="margin-bottom:12px">Pour chaque régie : commission due (dossiers validés) vs ce que tu as versé (frais dont la catégorie ou le fournisseur = nom de la régie). <b>Clique une régie</b> pour voir le détail des dossiers à lui payer et les versements.</div>
+      <div class="hint" style="margin-bottom:12px">Pour chaque régie : commission due (dossiers validés) − frais refacturés (part % refacturée à la régie) − déjà versé = reste à payer. <b>Clique une régie</b> pour ouvrir son rapport détaillé (dossiers avec %, frais déduits avec %, versements).</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Régie</th><th class="num">Commission due</th><th class="num">Versé</th><th class="num">Solde</th></tr></thead>
+        <thead><tr><th>Régie</th><th class="num">Commission due</th><th class="num">Refacturé (frais)</th><th class="num">Versé</th><th class="num">Reste à payer</th></tr></thead>
         <tbody id="mgr-regie-body"></tbody>
       </table></div>
     </section>
@@ -1023,12 +1028,14 @@ function renderManagerRegie(){
   const names=[...new Set([...(REGIES_CFG||[]).map(r=>r.nom),...valid.map(d=>(d.commercial_regie||'').trim())].filter(Boolean))];
   const rows=names.map(nom=>{
     const owed=valid.filter(d=>(d.commercial_regie||'').trim()===nom && !d.regie_interne).reduce((s,d)=>s+Number(d.commission_regie||0),0);
+    const refac=frais.filter(f=>(f.regie_concernee||'').trim()===nom).reduce((s,f)=>s+Number(f.montant_regie||0),0);
     const paid=frais.filter(f=>payMatch(f,nom)).reduce((s,f)=>s+Number(f.montant||0),0);
-    return {nom,owed,paid,solde:paid-owed};
-  }).filter(r=>r.owed>0.005||r.paid>0.005).sort((a,b)=>b.owed-a.owed);
+    // reste = ce qu'on lui doit encore = commission due − refacturé (frais déduits) − déjà versé
+    return {nom,owed,refac,paid,solde:(paid+refac)-owed};
+  }).filter(r=>r.owed>0.005||r.paid>0.005||r.refac>0.005).sort((a,b)=>b.owed-a.owed);
   const rb=document.getElementById('mgr-regie-body');
-  if(rb) rb.innerHTML=rows.length?rows.map(r=>`<tr style="cursor:pointer" data-nom="${escH(r.nom)}" onclick="openRegieDetail(this.dataset.nom)" title="Voir les dossiers à payer et les versements"><td><b>${escH(r.nom)}</b> <span style="color:var(--muted);font-size:11px">📄</span></td><td class="num">${eur(r.owed)}</td><td class="num">${eur(r.paid)}</td><td class="num ${r.solde>=0?'val-good':'val-bad'}">${r.solde>=0?'avance ':'reste '}${eur(Math.abs(r.solde))}</td></tr>`).join('')
-    :`<tr><td colspan="4" class="empty">Aucune régie avec commission.</td></tr>`;
+  if(rb) rb.innerHTML=rows.length?rows.map(r=>`<tr style="cursor:pointer" data-nom="${escH(r.nom)}" onclick="openRegieDetail(this.dataset.nom)" title="Voir le rapport détaillé"><td><b>${escH(r.nom)}</b> <span style="color:var(--muted);font-size:11px">📄</span></td><td class="num">${eur(r.owed)}</td><td class="num">${eur(r.refac)}</td><td class="num">${eur(r.paid)}</td><td class="num ${r.solde>=0?'val-good':'val-bad'}">${r.solde>=0?'avance ':'reste '}${eur(Math.abs(r.solde))}</td></tr>`).join('')
+    :`<tr><td colspan="5" class="empty">Aucune régie avec commission.</td></tr>`;
 }
 function openRegieDetail(nom){
   if(!nom) return;
@@ -1036,24 +1043,37 @@ function openRegieDetail(nom){
   const valid=dossiers.filter(d=>statutCat(d.statut||'')==='realise');
   const list=valid.filter(d=>(d.commercial_regie||'').trim()===nom && !d.regie_interne).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const owed=list.reduce((s,d)=>s+Number(d.commission_regie||0),0);
+  const refacs=frais.filter(f=>(f.regie_concernee||'').trim()===nom && Number(f.montant_regie||0)>0).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const refac=refacs.reduce((s,f)=>s+Number(f.montant_regie||0),0);
   const payes=frais.filter(f=>payMatch(f,nom)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const paid=payes.reduce((s,f)=>s+Number(f.montant||0),0);
-  const solde=paid-owed;
-  document.getElementById('dd-title').innerHTML=`🤝 ${escH(nom)}`;
-  let h=`<div class="dd-grid">
+  const reste=owed-refac-paid; // ce qu'on lui doit encore
+  document.getElementById('dd-title').innerHTML=`🤝 Rapport régie — ${escH(nom)}`;
+  let h=`<div class="dd-sec">🧮 Récapitulatif</div><div class="dd-grid">
     <div class="dd-item"><div class="k">Commission due</div><div class="v val-bad">${eur(owed)}</div></div>
-    <div class="dd-item"><div class="k">Déjà versé</div><div class="v">${eur(paid)}</div></div>
-    <div class="dd-item"><div class="k">${solde>=0?'Avance (trop versé)':'Reste à payer'}</div><div class="v ${solde>=0?'val-good':'val-bad'}">${eur(Math.abs(solde))}</div></div>
+    <div class="dd-item"><div class="k">− Frais refacturés</div><div class="v">${eur(refac)}</div></div>
+    <div class="dd-item"><div class="k">− Déjà versé</div><div class="v">${eur(paid)}</div></div>
+    <div class="dd-item"><div class="k">= ${reste>=0?'Reste à payer':'Avance (trop versé)'}</div><div class="v ${reste>=0?'val-bad':'val-good'}" style="font-size:17px">${eur(Math.abs(reste))}</div></div>
   </div>`;
-  h+=`<div class="dd-sec">📁 Dossiers à lui payer (${list.length})</div>`;
+  // Dossiers → commission due, avec le %
+  h+=`<div class="dd-sec">📁 Dossiers — commission due (${list.length})</div>`;
   if(!list.length){ h+=`<div class="hint">Aucun dossier validé pour cette régie.</div>`; }
   else{
-    h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Dossier</th><th class="num">Marge brute</th><th class="num">%</th><th class="num">Commission due</th></tr></thead><tbody>`
+    h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Dossier</th><th class="num">Marge brute</th><th class="num">%</th><th class="num">Commission</th></tr></thead><tbody>`
       +list.map(d=>`<tr><td>${fdate(d.date)}</td><td>${escH(d.nom_client||'—')}${d.crm_id?` <span style="color:var(--muted);font-size:11px">(${escH(d.crm_id)})</span>`:''}</td><td class="num">${eur(d.marge_brute)}</td><td class="num">${num(d.regie_pct)} %</td><td class="num val-bad">${eur(d.commission_regie)}</td></tr>`).join('')
       +`<tr><td colspan="4" class="num"><b>Total dû</b></td><td class="num val-bad"><b>${eur(owed)}</b></td></tr></tbody></table></div>`;
   }
-  h+=`<div class="dd-sec">💸 Versements / déductions dans les frais (${payes.length})</div>`;
-  if(!payes.length){ h+=`<div class="hint">Aucun frais à son nom. Pour noter un paiement, crée un frais dont la <b>catégorie</b> ou le <b>fournisseur</b> = « ${escH(nom)} ».</div>`; }
+  // Frais refacturés à la régie (déduits de ce qu'on lui doit), avec le %
+  h+=`<div class="dd-sec">🧾 Frais refacturés / déduits (${refacs.length})</div>`;
+  if(!refacs.length){ h+=`<div class="hint">Aucun frais refacturé à cette régie. Sur un frais, choisis la régie et un % → sa part refacturée se déduit ici.</div>`; }
+  else{
+    h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Catégorie</th><th>Fournisseur</th><th class="num">Montant</th><th class="num">%</th><th class="num">Refacturé</th></tr></thead><tbody>`
+      +refacs.map(f=>`<tr><td>${fdate(f.date)}</td><td><span class="pill">${escH(f.categorie||'')}</span></td><td>${escH(f.fournisseur||'')}</td><td class="num">${eur(f.montant)}</td><td class="num">${num(f.pct_decompte)} %</td><td class="num val-good">${eur(f.montant_regie)}</td></tr>`).join('')
+      +`<tr><td colspan="5" class="num"><b>Total refacturé</b></td><td class="num val-good"><b>${eur(refac)}</b></td></tr></tbody></table></div>`;
+  }
+  // Versements directs (paiements à son nom)
+  h+=`<div class="dd-sec">💸 Versements directs (${payes.length})</div>`;
+  if(!payes.length){ h+=`<div class="hint">Aucun paiement à son nom. Pour noter un virement, crée un frais dont la <b>catégorie</b> ou le <b>fournisseur</b> = « ${escH(nom)} ».</div>`; }
   else{
     h+=`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Catégorie</th><th>Fournisseur</th><th>Libellé</th><th class="num">Montant</th></tr></thead><tbody>`
       +payes.map(f=>`<tr><td>${fdate(f.date)}</td><td><span class="pill">${escH(f.categorie||'')}</span></td><td>${escH(f.fournisseur||'')}</td><td>${escH(f.libelle||'')}</td><td class="num">${eur(f.montant)}</td></tr>`).join('')
@@ -1314,10 +1334,10 @@ function buildAssocUI(){
     : "Marge brute = Prime − tous les coûts. Puis manager % et régie % → marge nette (partagée en "+as.length+").";
   document.getElementById('dossier-fields').innerHTML = PROJ.dossierType==='velo' ? veloDossierForm() : ledDossierForm();
   document.getElementById('dossiers-head').innerHTML = PROJ.dossierType==='velo' ? veloDossierHead() : ledDossierHead();
+  { const fr=document.getElementById('dossiers-filter-row'); if(fr) fr.innerHTML = PROJ.dossierType==='velo' ? veloDossierFilterRow() : ledDossierFilterRow(); }
   document.getElementById('dossier-managerrow').innerHTML = managerRegieRow();
   // régie config adaptée au projet
   const velo=PROJ.dossierType==='velo';
-  document.getElementById('dossiers-fregion-wrap').style.display = velo?'':'none';
   document.getElementById('rg-title').innerHTML = velo ? '⚙️ Régies / Campagnes (commission par vélo)' : '⚙️ Régies configurées (nom + % par défaut)';
   document.getElementById('rg-hint').innerHTML = velo
     ? "Ajoute tes régies ET tes campagnes internes. Indique la commission en € par vélo pour chaque région. Coche « Interne » si la commission reste dans la boîte (elle ne réduit pas la marge nette)."
@@ -1387,6 +1407,35 @@ function sortDossiers(col){ if(dossierSort.col===col) dossierSort.dir=-dossierSo
 function dossierSortVal(d,col){ const delg=(window._delegataires||[]).find(x=>x.id===dossierDelegId(d)); switch(col){ case 'date':return d.date||''; case 'crm_id':return (d.crm_id||'').toLowerCase(); case 'client':return (d.nom_client||'').toLowerCase(); case 'depot':return (d.numero_depot||'').toLowerCase(); case 'delegataire':return (delg?delg.nom:'').toLowerCase(); case 'cumac':return Number(d.cumac)||0; case 'prime':return Number(d.montant_prime)||0; case 'brute':return Number(d.marge_brute)||0; case 'regie':return (d.commercial_regie||'').toLowerCase(); case 'commission':return Number(d.commission_regie)||0; case 'nette':return Number(d.marge_nette)||0; case 'statut':return (d.statut||'').toLowerCase(); default:return ''; } }
 function updateDossierSortArrows(){ document.querySelectorAll('#dossiers-head .sort-arrow').forEach(s=>{ s.textContent = s.getAttribute('data-dsort')===dossierSort.col ? (dossierSort.dir>0?' ▲':' ▼') : ''; }); }
 function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
+function ledDossierFilterRow(){ return `<th><input type="text" id="dof-date" placeholder="filtrer…" oninput="renderDossiers()"></th>
+  <th><input type="text" id="dof-id" placeholder="filtrer…" oninput="renderDossiers()"></th>
+  <th><input type="text" id="dof-client" placeholder="filtrer…" oninput="renderDossiers()"></th>
+  <th><select id="dof-depot" onchange="renderDossiers()"><option value="">Tous</option></select></th>
+  <th><select id="dof-deleg" onchange="renderDossiers()"><option value="">Tous</option></select></th>
+  <th class="num"></th><th class="num"></th><th class="num"></th>
+  <th><select id="dof-regie" onchange="renderDossiers()"><option value="">Toutes</option></select></th>
+  <th class="num"></th><th class="num"></th>
+  <th><select id="dof-statut" onchange="renderDossiers()"><option value="">Tous</option></select></th>
+  <th><button class="btn ghost small" type="button" onclick="resetDossierFilters()">Réinit.</button></th>`; }
+function veloDossierFilterRow(){ return `<th><input type="text" id="dof-date" placeholder="filtrer…" oninput="renderDossiers()"></th>
+  <th><input type="text" id="dof-id" placeholder="filtrer…" oninput="renderDossiers()"></th>
+  <th><input type="text" id="dof-client" placeholder="filtrer…" oninput="renderDossiers()"></th>
+  <th><select id="dof-region" onchange="renderDossiers()"><option value="">Toutes</option><option>France</option><option>Corse</option><option>DOM-TOM</option></select></th>
+  <th class="num"></th><th class="num"></th><th class="num"></th><th class="num"></th>
+  <th><select id="dof-regie" onchange="renderDossiers()"><option value="">Toutes</option></select></th>
+  <th class="num"></th><th class="num"></th>
+  <th><select id="dof-statut" onchange="renderDossiers()"><option value="">Tous</option></select></th>
+  <th><button class="btn ghost small" type="button" onclick="resetDossierFilters()">Réinit.</button></th>`; }
+function populateDossierFilters(){
+  const fill=(id,arr,def)=>{ const s=document.getElementById(id); if(!s) return; const p=s.value; s.innerHTML=`<option value="">${def}</option>`+arr.map(v=>`<option value="${escH(v)}"${v===p?' selected':''}>${escH(v)}</option>`).join(''); s.value=p; };
+  const depots=(window._depots||[]).map(d=>d.nom).filter(Boolean).sort((a,b)=>a.localeCompare(b,'fr'));
+  const delegs=(window._delegataires||[]).map(d=>d.nom).filter(Boolean).sort((a,b)=>a.localeCompare(b,'fr'));
+  const regies=[...new Set((window._dossiers||[]).map(d=>(d.commercial_regie||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const statuts=(STATUTS_CFG||[]).map(s=>s.nom);
+  fill('dof-depot',depots,'Tous'); fill('dof-deleg',delegs,'Tous'); fill('dof-statut',statuts,'Tous');
+  const rs=document.getElementById('dof-regie'); if(rs){ const p=rs.value; rs.innerHTML='<option value="">Toutes</option><option value="__interne__">Interne</option>'+regies.map(v=>`<option value="${escH(v)}"${v===p?' selected':''}>${escH(v)}</option>`).join(''); rs.value=p; }
+}
+function resetDossierFilters(){ ['dof-date','dof-id','dof-client','dof-depot','dof-deleg','dof-regie','dof-statut','dof-region'].forEach(i=>{const el=document.getElementById(i); if(el) el.value='';}); const s=document.getElementById('dossiers-search'); if(s) s.value=''; renderDossiers(); }
 const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
 function regionFromCP(cp){ cp=(cp||'').toString(); if(/^20/.test(cp)) return 'Corse'; if(/^9[78]/.test(cp)) return 'DOM-TOM'; return 'France'; }
 function fetchWithTimeout(url, ms){
@@ -1896,22 +1945,30 @@ function renderDossiers(){
   const all=window._dossiers||[];
   const term=(document.getElementById('dossiers-search')||{}).value||'';
   const nt=searchNorm(term).trim(); const words=nt?nt.split(/\s+/):[];
-  const fRegie=(document.getElementById('dossiers-fregie')||{}).value||'';
-  const fRegion=(document.getElementById('dossiers-fregion')||{}).value||'';
-  const fStatut=(document.getElementById('dossiers-fstatut')||{}).value||'';
+  populateDossierFilters();
+  const gv=id=>((document.getElementById(id)||{}).value||'');
+  const fDate=gv('dof-date').trim().toLowerCase(), fId=gv('dof-id').trim().toLowerCase(), fClient=gv('dof-client').trim().toLowerCase();
+  const fDepot=gv('dof-depot'), fDeleg=gv('dof-deleg'), fRegie=gv('dof-regie'), fStatut=gv('dof-statut'), fRegion=gv('dof-region');
   const rows=[];
   for(const d of all){
-    const reg=(d.commercial_regie||'').trim();
-    if(fRegie==='__none__'){ if(reg) continue; } else if(fRegie){ if(reg!==fRegie) continue; }
-    if(fRegion && (d.region||'')!==fRegion) continue;
-    if(fStatut && (d.statut||'En cours')!==fStatut) continue;
     if(words.length){ const hay=d._hay||''; let ok=true; for(const w of words){ if(hay.indexOf(w)<0){ ok=false; break; } } if(!ok) continue; }
+    if(fDate && fdate(d.date).toLowerCase().indexOf(fDate)<0) continue;
+    if(fId && (d.crm_id||'').toLowerCase().indexOf(fId)<0) continue;
+    if(fClient && (d.nom_client||'').toLowerCase().indexOf(fClient)<0 && (d.contact_client||'').toLowerCase().indexOf(fClient)<0) continue;
+    if(fDepot && (d.numero_depot||'')!==fDepot) continue;
+    if(fDeleg && delegNameOf(dossierDelegId(d))!==fDeleg) continue;
+    const reg=(d.commercial_regie||'').trim();
+    if(fRegie==='__interne__'){ if(!(!reg||d.regie_interne)) continue; } else if(fRegie){ if(reg!==fRegie) continue; }
+    if(fStatut && (d.statut||'En cours')!==fStatut) continue;
+    if(fRegion && (d.region||'')!==fRegion) continue;
     rows.push(d);
   }
+  const anyFilter=!!(term||fDate||fId||fClient||fDepot||fDeleg||fRegie||fStatut||fRegion);
+  { const cnt=document.getElementById('dossiers-count'); if(cnt) cnt.textContent=anyFilter?`${rows.length} / ${all.length} dossier${all.length>1?'s':''} (filtré)`:`${all.length} dossier${all.length>1?'s':''}`; }
   updateDossierSortArrows();
   if(dossierSort.col) rows.sort((a,b)=>{ const va=dossierSortVal(a,dossierSort.col),vb=dossierSortVal(b,dossierSort.col); const c=(typeof va==='number'&&typeof vb==='number')?va-vb:String(va).localeCompare(String(vb),'fr'); return c*dossierSort.dir; });
   const body=document.getElementById('dossiers-body');
-  if(!rows.length){ body.innerHTML=`<tr><td colspan="13" class="empty">${(term||fRegie||fRegion||fStatut)?'Aucun dossier ne correspond à la recherche / aux filtres':'Aucun dossier'}</td></tr>`; return; }
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="13" class="empty">${anyFilter?'Aucun dossier ne correspond à la recherche / aux filtres':'Aucun dossier'}</td></tr>`; return; }
   const shown=rows.length>DOSSIER_ROW_CAP?rows.slice(0,DOSSIER_ROW_CAP):rows;
   let html=shown.map(d=>{
     const reg=((d.commercial_regie||'').trim() && !d.regie_interne)
@@ -1926,6 +1983,15 @@ function renderDossiers(){
     return `<tr><td>${fdate(d.date)}</td>${dossierIdCell(d)}<td>${d.nom_client||''}</td><td>${d.numero_depot||''}</td><td>${delgCell}</td><td class="num">${num(d.cumac||0)}</td><td class="num">${eur(d.montant_prime)}</td>${tail}</tr>`;
   }).join('');
   if(rows.length>shown.length) html+=`<tr><td colspan="13" class="empty">${shown.length} dossiers affichés sur ${rows.length}. Affine ta recherche (client, ville, ID…) pour voir les autres.</td></tr>`;
+  // Ligne de totaux (sur TOUS les dossiers filtrés)
+  const T2={cumac:0,prime:0,brute:0,comm:0,nette:0,nbvelos:0};
+  rows.forEach(d=>{ T2.cumac+=Number(d.cumac||0); T2.prime+=Number(d.montant_prime||0); T2.brute+=Number(d.marge_brute||0); T2.comm+=Number(d.commission_regie||0); T2.nette+=Number(d.marge_nette||0); T2.nbvelos+=Number(d.nb_velos||0); });
+  const lbl=`Σ TOTAL — ${rows.length} dossier${rows.length>1?'s':''}${anyFilter?' (filtré)':''}`;
+  if(velo){
+    html+=`<tr style="border-top:2px solid var(--accent);font-weight:700"><td colspan="4">${lbl}</td><td class="num">${num(T2.nbvelos)}</td><td></td><td class="num">${eur(T2.prime)}</td><td></td><td></td><td class="num">${eur(T2.comm)}</td><td class="num ${T2.nette>=0?'val-good':'val-bad'}">${eur(T2.nette)}</td><td></td><td></td></tr>`;
+  } else {
+    html+=`<tr style="border-top:2px solid var(--accent);font-weight:700"><td colspan="3">${lbl}</td><td></td><td></td><td class="num">${num(T2.cumac)}</td><td class="num">${eur(T2.prime)}</td><td class="num">${eur(T2.brute)}</td><td></td><td class="num">${eur(T2.comm)}</td><td class="num ${T2.nette>=0?'val-good':'val-bad'}">${eur(T2.nette)}</td><td></td><td></td></tr>`;
+  }
   body.innerHTML=html;
 }
 // Détail d'un dossier (LED) : montant + frais liés (factures) + net
