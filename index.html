@@ -3093,12 +3093,14 @@ function buildImportSpecs(){
       autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:regieName, regie_montant_unitaire:mu, regie_interne:interne, regie_pct:0, statut:_pick(m,'Statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours') }; }
   } : {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','ID CRM','Adresse','Code postal','Ville','Téléphone','Email','Dépôt Emmy','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut'],
-    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','12 rue des Fleurs','30000','Nîmes','0600000000','client@email.fr','14205','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours'],
-    build(m){ if(_isEx(m)||!_has(m)) return null; const rn=_pick(m,'Commercial régie','Régie'); const rc=(REGIES_CFG||[]).find(r=>r.nom===rn); return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), adresse:_pick(m,'Adresse'), code_postal:_pick(m,'Code postal','CP'), ville:_pick(m,'Ville'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'Dépôt Emmy','N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
+    headers:['Date','Client','ID CRM','Adresse','Code postal','Ville','Téléphone','Email','Dépôt Emmy','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut','Matériel 1','Qté livrée 1','Qté valorisée 1','Matériel 2','Qté livrée 2','Qté valorisée 2'],
+    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','12 rue des Fleurs','30000','Nîmes','0600000000','client@email.fr','14205','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours','Tube LED 120cm','50','48','Projecteur 100W','10','10'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; const rn=_pick(m,'Commercial régie','Régie'); const rc=(REGIES_CFG||[]).find(r=>r.nom===rn);
+      const _materiels=[]; [1,2].forEach(n=>{ const mn=_pick(m,'Matériel '+n,'Materiel '+n); if(mn&&(''+mn).trim()){ _materiels.push({ nom:(''+mn).trim(), qte_livree:_pnum(_pick(m,'Qté livrée '+n,'Qte livree '+n,'Quantité livrée '+n)), qte_valorisee:_pnum(_pick(m,'Qté valorisée '+n,'Qte valorisee '+n,'Quantité valorisée '+n)) }); } });
+      return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), adresse:_pick(m,'Adresse'), code_postal:_pick(m,'Code postal','CP'), ville:_pick(m,'Ville'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'Dépôt Emmy','N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
       montant_prime:_pnum(_pick(m,'Prime HT','Prime')), cout_installation:_pnum(_pick(m,'Coût installation')), cout_materiel:_pnum(_pick(m,'Coût matériel')), cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
       cout_hamid:_pnum(_pick(m,'Coût Hamid')), cout_livraison:_pnum(_pick(m,'Coût livraison')), frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp')), cout_audit:_pnum(_pick(m,'Coût audit')),
-      david_pct:5, commercial_regie:rn, regie_pct:rc?Number(rc.pct_defaut)||0:0, campagne:_pick(m,'Campagne') }; }
+      david_pct:5, commercial_regie:rn, regie_pct:rc?Number(rc.pct_defaut)||0:0, campagne:_pick(m,'Campagne'), _materiels:_materiels }; }
   };
   const apports = {
     table:T('apports'), reload:loadApports, sheet:'Apports',
@@ -3211,6 +3213,9 @@ async function importFile(type,file){
         else if(fail) siretMsg+='<div class="imp-line imp-warn">⚠️ '+fail+' SIRET introuvable(s) — ces lignes gardent les infos du fichier.</div>';
       }
     }
+    // Mémorise les matériels (dossiers LED) avant de nettoyer les clés « _ »
+    const matMap=new Map(); const ledMat=(type==='dossiers' && PROJ.key==='led');
+    if(ledMat) built.forEach(o=>{ if(o&&o._materiels&&o._materiels.length) matMap.set(o,o._materiels); });
     built.forEach(o=>{ if(o) Object.keys(o).forEach(k=>{ if(k[0]==='_') delete o[k]; }); });
     // Anti-doublons (contre l'existant ET à l'intérieur du fichier)
     impProgress('🔎 Vérification des doublons…');
@@ -3221,8 +3226,15 @@ async function importFile(type,file){
     // Enregistrement
     if(toInsert.length){
       impProgress('💾 Enregistrement de <b>'+toInsert.length+'</b> ligne(s)…');
-      const {error}=await db.from(spec.table).insert(toInsert);
-      if(error){ impDone('<div class="imp-line imp-err">❌ Erreur d\'enregistrement : '+error.message+'</div>', dups, problems); return; }
+      const ins=await db.from(spec.table).insert(toInsert).select('id');
+      if(ins.error){ impDone('<div class="imp-line imp-err">❌ Erreur d\'enregistrement : '+ins.error.message+'</div>', dups, problems); return; }
+      // Rattache les matériels aux dossiers LED insérés
+      if(ledMat && ins.data){
+        const matRows=[];
+        ins.data.forEach((row,i)=>{ const mats=matMap.get(toInsert[i]); if(row&&row.id&&mats) mats.forEach(mm=>{ const mat=(window._materiels||[]).find(x=>(x.nom||'').toLowerCase().trim()===(mm.nom||'').toLowerCase().trim()); matRows.push({ dossier_id:row.id, materiel_id:mat?mat.id:null, qte_livree:mm.qte_livree||0, qte_valorisee:mm.qte_valorisee||0 }); }); });
+        const valid=matRows.filter(r=>r.materiel_id);
+        if(valid.length){ impProgress('🔧 Rattachement de <b>'+valid.length+'</b> matériel(s)…'); await db.from('engco_dossier_materiels').insert(valid); }
+      }
     }
     let html=siretMsg+'<div class="imp-line imp-ok">✅ <b>'+toInsert.length+'</b> ligne(s) importée(s)'+(toInsert.length?' avec succès':'')+'</div>';
     if(dups.length) html+='<div class="imp-line imp-warn">⚠️ <b>'+dups.length+'</b> doublon(s) ignoré(s) — déjà présents, non réimportés</div>';
