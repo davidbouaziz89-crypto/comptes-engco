@@ -98,6 +98,10 @@
   .bulk-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px 14px;border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--accent) 8%,var(--panel2))}
   .bulk-bar select{width:auto;min-width:150px;padding:6px 8px;font-size:13px}
   .frais-check,#frais-check-all{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+  th.sortable{cursor:pointer;user-select:none} th.sortable:hover{color:var(--txt)}
+  .sort-arrow{color:var(--accent);font-size:10px}
+  .pill-warn{background:color-mix(in srgb,var(--danger) 16%,transparent)!important;border-color:color-mix(in srgb,var(--danger) 55%,transparent)!important;color:var(--bad)!important}
+  td.orphan{color:var(--bad)!important;font-weight:700}
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -564,7 +568,7 @@
       </div>
       <div class="table-wrap"><table id="frais-table">
         <thead>
-        <tr><th style="width:34px"><input type="checkbox" id="frais-check-all" onclick="toggleAllFrais(this)" title="Tout sélectionner"></th><th>Date</th><th>Mois</th><th>Ajout</th><th>Catégorie</th><th>Fournisseur</th><th>Type</th><th>Payé par</th><th class="num">Montant</th><th>Régie</th><th class="num">Refacturé</th><th class="num">Part société</th><th></th></tr>
+        <tr><th style="width:34px"><input type="checkbox" id="frais-check-all" onclick="toggleAllFrais(this)" title="Tout sélectionner"></th><th class="sortable" onclick="sortFrais('date')">Date<span class="sort-arrow" data-fsort="date"></span></th><th class="sortable" onclick="sortFrais('mois')">Mois<span class="sort-arrow" data-fsort="mois"></span></th><th>Ajout</th><th class="sortable" onclick="sortFrais('categorie')">Catégorie<span class="sort-arrow" data-fsort="categorie"></span></th><th class="sortable" onclick="sortFrais('fournisseur')">Fournisseur<span class="sort-arrow" data-fsort="fournisseur"></span></th><th class="sortable" onclick="sortFrais('ftype')">Type<span class="sort-arrow" data-fsort="ftype"></span></th><th class="sortable" onclick="sortFrais('source')">Payé par<span class="sort-arrow" data-fsort="source"></span></th><th class="num sortable" onclick="sortFrais('montant')">Montant<span class="sort-arrow" data-fsort="montant"></span></th><th class="sortable" onclick="sortFrais('regie')">Régie<span class="sort-arrow" data-fsort="regie"></span></th><th class="num sortable" onclick="sortFrais('refac')">Refacturé<span class="sort-arrow" data-fsort="refac"></span></th><th class="num sortable" onclick="sortFrais('societe')">Part société<span class="sort-arrow" data-fsort="societe"></span></th><th></th></tr>
         <tr class="filter-row">
           <th></th>
           <th><input type="text" id="frf-date" placeholder="filtrer…" oninput="renderFrais()"></th>
@@ -1293,7 +1297,11 @@ function veloDossierForm(){ return `
     <div class="field"><label>Tarif / vélo (€)</label><input type="number" step="0.01" id="d-tarif" value="80" oninput="dossierPreview()"></div>
     <div class="field"><label>Autres coûts (€)</label><input type="number" step="0.01" id="d-autrescouts" value="0" oninput="dossierPreview()"></div>
   </form>`; }
-function ledDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Dépôt Emmy</th><th>Délégataire</th><th class="num">Cumac</th><th class="num">Prime</th><th class="num">Marge brute</th><th>Régie</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
+function ledDossierHead(){ return `<th class="sortable" onclick="sortDossiers('date')">Date<span class="sort-arrow" data-dsort="date"></span></th><th class="sortable" onclick="sortDossiers('crm_id')">ID<span class="sort-arrow" data-dsort="crm_id"></span></th><th class="sortable" onclick="sortDossiers('client')">Client<span class="sort-arrow" data-dsort="client"></span></th><th class="sortable" onclick="sortDossiers('depot')">Dépôt Emmy<span class="sort-arrow" data-dsort="depot"></span></th><th class="sortable" onclick="sortDossiers('delegataire')">Délégataire<span class="sort-arrow" data-dsort="delegataire"></span></th><th class="num sortable" onclick="sortDossiers('cumac')">Cumac<span class="sort-arrow" data-dsort="cumac"></span></th><th class="num sortable" onclick="sortDossiers('prime')">Prime<span class="sort-arrow" data-dsort="prime"></span></th><th class="num sortable" onclick="sortDossiers('brute')">Marge brute<span class="sort-arrow" data-dsort="brute"></span></th><th class="sortable" onclick="sortDossiers('regie')">Régie<span class="sort-arrow" data-dsort="regie"></span></th><th class="num sortable" onclick="sortDossiers('commission')">Commission<span class="sort-arrow" data-dsort="commission"></span></th><th class="num sortable" onclick="sortDossiers('nette')">Marge nette<span class="sort-arrow" data-dsort="nette"></span></th><th class="sortable" onclick="sortDossiers('statut')">Statut<span class="sort-arrow" data-dsort="statut"></span></th><th></th>`; }
+let dossierSort={col:'',dir:1};
+function sortDossiers(col){ if(dossierSort.col===col) dossierSort.dir=-dossierSort.dir; else { dossierSort.col=col; dossierSort.dir=1; } renderDossiers(); }
+function dossierSortVal(d,col){ const delg=(window._delegataires||[]).find(x=>x.id===d.delegataire_id); switch(col){ case 'date':return d.date||''; case 'crm_id':return (d.crm_id||'').toLowerCase(); case 'client':return (d.nom_client||'').toLowerCase(); case 'depot':return (d.numero_depot||'').toLowerCase(); case 'delegataire':return (delg?delg.nom:'').toLowerCase(); case 'cumac':return Number(d.cumac)||0; case 'prime':return Number(d.montant_prime)||0; case 'brute':return Number(d.marge_brute)||0; case 'regie':return (d.commercial_regie||'').toLowerCase(); case 'commission':return Number(d.commission_regie)||0; case 'nette':return Number(d.marge_nette)||0; case 'statut':return (d.statut||'').toLowerCase(); default:return ''; } }
+function updateDossierSortArrows(){ document.querySelectorAll('#dossiers-head .sort-arrow').forEach(s=>{ s.textContent = s.getAttribute('data-dsort')===dossierSort.col ? (dossierSort.dir>0?' ▲':' ▼') : ''; }); }
 function veloDossierHead(){ return `<th>Date</th><th>ID</th><th>Client</th><th>Région</th><th class="num">Nb vélos</th><th class="num">Tarif</th><th class="num">Montant</th><th class="num">Manager</th><th>Régie / Campagne</th><th class="num">Commission</th><th class="num">Marge nette</th><th>Statut</th><th></th>`; }
 const VELO_TARIF_DEFAUT={France:80,Corse:390,'DOM-TOM':390};
 function regionFromCP(cp){ cp=(cp||'').toString(); if(/^20/.test(cp)) return 'Corse'; if(/^9[78]/.test(cp)) return 'DOM-TOM'; return 'France'; }
@@ -1778,6 +1786,8 @@ function renderDossiers(){
     if(words.length){ const hay=d._hay||''; let ok=true; for(const w of words){ if(hay.indexOf(w)<0){ ok=false; break; } } if(!ok) continue; }
     rows.push(d);
   }
+  updateDossierSortArrows();
+  if(dossierSort.col) rows.sort((a,b)=>{ const va=dossierSortVal(a,dossierSort.col),vb=dossierSortVal(b,dossierSort.col); const c=(typeof va==='number'&&typeof vb==='number')?va-vb:String(va).localeCompare(String(vb),'fr'); return c*dossierSort.dir; });
   const body=document.getElementById('dossiers-body');
   if(!rows.length){ body.innerHTML=`<tr><td colspan="13" class="empty">${(term||fRegie||fRegion||fStatut)?'Aucun dossier ne correspond à la recherche / aux filtres':'Aucun dossier'}</td></tr>`; return; }
   const shown=rows.length>DOSSIER_ROW_CAP?rows.slice(0,DOSSIER_ROW_CAP):rows;
@@ -1844,6 +1854,13 @@ function moisConcerneLabel(f){ const m=fraisMonth(f); return m?moisLabel(m+'-01'
 let inlineFraisId=null;
 function fraisTypeOf(f){ const four=(window._fournisseurs||[]).find(x=>(x.nom||'')===(f.fournisseur||'')); return four?(four.type||'depense'):null; }
 function fraisTypePill(f){ const t=fraisTypeOf(f); if(t==='recurrent') return '<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>'; if(t==='depense') return '<span class="pill">Dépense</span>'; return '<span style="color:var(--muted)">—</span>'; }
+let fraisSort={col:'',dir:1};
+function sortFrais(col){ if(fraisSort.col===col) fraisSort.dir=-fraisSort.dir; else { fraisSort.col=col; fraisSort.dir=1; } renderFrais(); }
+function fraisSortVal(f,col){ switch(col){ case 'date':return f.date||''; case 'mois':return fraisMonth(f)||''; case 'categorie':return (f.categorie||'').toLowerCase(); case 'fournisseur':return (f.fournisseur||'').toLowerCase(); case 'ftype':return fraisTypeOf(f)||''; case 'source':{const s=SOURCES.find(x=>x.id===f.source_id);return (s?s.nom:'').toLowerCase();} case 'montant':return Number(f.montant)||0; case 'regie':return (f.regie_concernee||'').toLowerCase(); case 'refac':return Number(f.montant_regie)||0; case 'societe':return Number(f.montant_societe)||0; default:return ''; } }
+function sortFraisRows(rows){ if(!fraisSort.col) return rows; return rows.slice().sort((a,b)=>{ const va=fraisSortVal(a,fraisSort.col),vb=fraisSortVal(b,fraisSort.col); const c=(typeof va==='number'&&typeof vb==='number')?va-vb:String(va).localeCompare(String(vb),'fr'); return c*fraisSort.dir; }); }
+function updateFraisSortArrows(){ document.querySelectorAll('#frais-table .sort-arrow').forEach(s=>{ s.textContent = s.getAttribute('data-fsort')===fraisSort.col ? (fraisSort.dir>0?' ▲':' ▼') : ''; }); }
+function catExists(nom){ if(!nom) return true; const n=(''+nom).toLowerCase(); return (window._fraiscats||[]).some(c=>(c.nom||'').toLowerCase()===n)||(window._recurrents||[]).some(r=>(r.libelle||'').toLowerCase()===n); }
+function fournExists(nom){ if(!nom) return true; const n=(''+nom).toLowerCase(); return (window._fournisseurs||[]).some(f=>(f.nom||'').toLowerCase()===n); }
 function renderFrais(){
   const led=!!(PROJ&&PROJ.key==='led');
   const df=document.getElementById('f-dossier-field'); if(df) df.style.display=led?'':'none';
@@ -1852,14 +1869,16 @@ function renderFrais(){
   const ncheck=document.getElementById('nav-check'); if(ncheck) ncheck.style.display=led?'':'none';
   const fm=document.getElementById('f-mois'); if(fm&&!fm.value) fm.value=today().slice(0,7);
   populateFraisFilters();
-  const rows=filterFraisRows();
+  const rows=sortFraisRows(filterFraisRows());
+  updateFraisSortArrows();
   document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
     if(f.id===inlineFraisId) return fraisEditRow(f);
     const src=SOURCES.find(s=>s.id===f.source_id);
     const dtag=f.dossier_crm_id?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier lié (ID CRM)">🔗 ${escH(f.dossier_crm_id)}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
     const autotag=f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)" title="Généré automatiquement (frais récurrent)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️ Manuel</span>';
-    return `<tr><td><input type="checkbox" class="frais-check" data-id="${f.id}" onchange="onFraisCheck()"></td><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill">${f.categorie||''}</span></td><td>${f.fournisseur||''}${dtag}${doctag}</td><td>${fraisTypePill(f)}</td>
+    const catOk=catExists(f.categorie), fourOk=fournExists(f.fournisseur);
+    return `<tr><td><input type="checkbox" class="frais-check" data-id="${f.id}" onchange="onFraisCheck()"></td><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill${catOk?'':' pill-warn'}"${catOk?'':' title="Catégorie absente des paramètres — modifie-la"'}>${f.categorie||''}</span></td><td class="${fourOk?'':'orphan'}"${fourOk?'':' title="Fournisseur absent des paramètres"'}>${f.fournisseur||''}${dtag}${doctag}</td><td>${fraisTypePill(f)}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
