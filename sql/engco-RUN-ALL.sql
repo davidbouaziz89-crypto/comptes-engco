@@ -164,3 +164,7 @@ alter table public.engco_materiels
   add column if not exists prix_ht numeric,
   add column if not exists puissance text,
   add column if not exists marque text;
+
+-- ===== engco-fournisseur-cat.sql =====
+-- Un fournisseur est relié à une catégorie de frais (auto-remplissage de la catégorie)
+alter table public.engco_fournisseurs add column if not exists categorie text;

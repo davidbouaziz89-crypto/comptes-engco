@@ -687,12 +687,13 @@
         </div>
         <div class="params-sec" id="ps-fournisseurs">
           <section class="panel"><h2>🚚 Fournisseurs</h2>
-            <div class="hint" style="margin-bottom:8px">Tes fournisseurs. Ils te seront proposés à la saisie d'un frais (le champ peut aussi rester vide).</div>
+            <div class="hint" style="margin-bottom:8px">Tes fournisseurs, chacun relié à une <b>catégorie</b>. Quand tu choisis un fournisseur à la saisie d'un frais, la catégorie se remplit toute seule.</div>
             <form class="row" onsubmit="addFournisseur(event)">
               <div class="field"><label>Nom du fournisseur</label><input type="text" id="fo-nom" placeholder="ex. Rexel, Sonepar…" required></div>
+              <div class="field"><label>Catégorie liée</label><select id="fo-cat"></select></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
-            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>Fournisseur</th><th>Catégorie</th><th></th></tr></thead><tbody id="fournisseurs-body"></tbody></table></div>
           </section>
         </div>
         <div class="params-sec" id="ps-liencrm">
@@ -1368,20 +1369,26 @@ async function loadFournisseurs(){
   const pm=document.getElementById('pm-fournisseurs'); if(pm) pm.style.display=isLed?'':'none';
   if(!isLed){ window._fournisseurs=[]; fillFournisseurSelect(); return; }
   const {data}=await db.from('engco_fournisseurs').select('*').order('nom');
-  window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurSelect();
+  window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurSelect(); fillFournisseurCatSelect();
 }
 let editingFournisseurId=null;
+function fournisseurCatOptions(cur){ const cats=[...new Set([...(window._fraiscats||[]).map(c=>c.nom),...(window._recurrents||[]).map(r=>r.libelle)])].filter(Boolean).sort(); let o='<option value="">— aucune —</option>'+cats.map(c=>`<option value="${escH(c)}"${c===cur?' selected':''}>${escH(c)}</option>`).join(''); if(cur&&!cats.includes(cur)) o+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`; return o; }
+function fillFournisseurCatSelect(){ const sel=document.getElementById('fo-cat'); if(sel){ const p=sel.value; sel.innerHTML=fournisseurCatOptions(p); sel.value=p; } }
+function fournisseurCatOf(nom){ const f=(window._fournisseurs||[]).find(x=>(x.nom||'')===nom); return f?(f.categorie||''):''; }
+function setCategorieValue(selId,cat){ const sel=document.getElementById(selId); if(!sel||!cat) return; if(![...sel.options].some(o=>o.value===cat)) sel.insertAdjacentHTML('afterbegin',`<option>${escH(cat)}</option>`); sel.value=cat; }
 function renderFournisseurs(){
   const b=document.getElementById('fournisseurs-body'); if(!b) return; const f=window._fournisseurs||[];
   b.innerHTML=f.length?f.map(x=>{
     if(x.id===editingFournisseurId) return `<tr class="rowedit"><td><input type="text" id="foe-nom" value="${escH(x.nom||'')}"></td>
+      <td><select id="foe-cat">${fournisseurCatOptions(x.categorie||'')}</select></td>
       <td class="num"><button class="btn small" onclick="saveFournisseur('${x.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelFournisseurEdit()">Annuler</button></td></tr>`;
-    return `<tr><td>${escH(x.nom)}</td><td class="num"><button class="btn ghost small" onclick="editFournisseur('${x.id}')">✏️</button> <button class="btn danger small" onclick="delFournisseur('${x.id}')">Suppr.</button></td></tr>`;
-  }).join(''):`<tr><td colspan="2" class="empty">Aucun fournisseur</td></tr>`;
+    return `<tr><td>${escH(x.nom)}</td><td>${x.categorie?`<span class="pill">${escH(x.categorie)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+      <td class="num"><button class="btn ghost small" onclick="editFournisseur('${x.id}')">✏️</button> <button class="btn danger small" onclick="delFournisseur('${x.id}')">Suppr.</button></td></tr>`;
+  }).join(''):`<tr><td colspan="3" class="empty">Aucun fournisseur</td></tr>`;
 }
 function editFournisseur(id){ editingFournisseurId=id; renderFournisseurs(); }
 function cancelFournisseurEdit(){ editingFournisseurId=null; renderFournisseurs(); }
-async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const {error}=await db.from('engco_fournisseurs').update({nom}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); }
+async function saveFournisseur(id){ const nom=(document.getElementById('foe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const categorie=(document.getElementById('foe-cat')||{}).value||null; const {error}=await db.from('engco_fournisseurs').update({nom,categorie}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingFournisseurId=null; toast('Fournisseur modifié ✅'); loadFournisseurs(); }
 function fournisseurOptions(cur){
   const list=(window._fournisseurs||[]).map(f=>f.nom);
   let opts='<option value="">— aucun —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join('');
@@ -1389,19 +1396,25 @@ function fournisseurOptions(cur){
   return opts+'<option value="__new__">➕ Nouveau fournisseur…</option>';
 }
 function fillFournisseurSelect(){ const sel=document.getElementById('f-fournisseur'); if(!sel) return; const prev=sel.value; sel.innerHTML=fournisseurOptions(prev==='__new__'?'':prev); if(prev&&prev!=='__new__'&&[...sel.options].some(o=>o.value===prev)) sel.value=prev; }
+async function createFournisseurPrompt(catSelId){
+  const nom=(prompt('Nom du nouveau fournisseur :')||'').trim(); if(!nom) return null;
+  const cat=(document.getElementById(catSelId)||{}).value||null;
+  const {error}=await db.from('engco_fournisseurs').insert({nom,categorie:cat}); if(error){ toast('Erreur : '+error.message); return null; }
+  await loadFournisseurs(); toast('Fournisseur créé ✅'+(cat?(' — catégorie '+cat):' (sans catégorie)')); return nom;
+}
 async function onFraisFournisseur(){
-  const sel=document.getElementById('f-fournisseur'); if(!sel||sel.value!=='__new__') return; sel.value='';
-  const nom=(prompt('Nom du nouveau fournisseur :')||'').trim(); if(!nom) return;
-  const {error}=await db.from('engco_fournisseurs').insert({nom}); if(error){ toast('Erreur : '+error.message); return; }
-  await loadFournisseurs(); const s2=document.getElementById('f-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } toast('Fournisseur créé ✅');
+  const sel=document.getElementById('f-fournisseur'); if(!sel) return;
+  if(sel.value==='__new__'){ sel.value=''; const nom=await createFournisseurPrompt('f-categorie'); if(!nom) return;
+    const s2=document.getElementById('f-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } return; }
+  const cat=fournisseurCatOf(sel.value); if(cat){ setCategorieValue('f-categorie',cat); if(typeof onFraisCategorie==='function') onFraisCategorie(); }
 }
 async function onInlineFournisseur(){
-  const sel=document.getElementById('if-fournisseur'); if(!sel||sel.value!=='__new__') return; sel.value='';
-  const nom=(prompt('Nom du nouveau fournisseur :')||'').trim(); if(!nom) return;
-  const {error}=await db.from('engco_fournisseurs').insert({nom}); if(error){ toast('Erreur : '+error.message); return; }
-  await loadFournisseurs(); const s2=document.getElementById('if-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } toast('Fournisseur créé ✅');
+  const sel=document.getElementById('if-fournisseur'); if(!sel) return;
+  if(sel.value==='__new__'){ sel.value=''; const nom=await createFournisseurPrompt('if-categorie'); if(!nom) return;
+    const s2=document.getElementById('if-fournisseur'); if(s2){ if(![...s2.options].some(o=>o.value===nom)) s2.insertAdjacentHTML('afterbegin',`<option value="${escH(nom)}">${escH(nom)}</option>`); s2.value=nom; } return; }
+  const cat=fournisseurCatOf(sel.value); if(cat) setCategorieValue('if-categorie',cat);
 }
-async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const {error}=await db.from('engco_fournisseurs').insert({nom}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
+async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; if(!categorie){ toast('Choisis la catégorie liée'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
 async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
 async function loadDelegataires(){
   const isLed=!!(PROJ&&PROJ.key==='led');
