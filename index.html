@@ -354,10 +354,10 @@
 
     <section class="panel">
       <h2>💰 Ce qu'on se récupère (réel)</h2>
-      <div class="hint">Primes HT réellement encaissées (dossiers validés), moins <b>tous les frais réels</b> que tu saisis, moins la <b>commission régie déduite automatiquement</b>. Quand tu paies la régie, enregistre-le dans « Manager &amp; régies » : le virement n'est <b>pas recompté ici</b> (la déduction est déjà faite).</div>
+      <div class="hint">Primes HT réellement encaissées (dossiers validés), moins la <b>part société</b> des frais (un frais refacturé à X % à la régie n'est déduit qu'à <b>hauteur de sa part société</b> ; à 100 % régie il ne touche pas nos bénéfices), moins la <b>commission régie</b> déduite automatiquement. Les virements versés à la régie (« Manager &amp; régies ») ne sont <b>pas recomptés ici</b>.</div>
       <div class="grid cards">
         <div class="card good"><div class="label">Primes HT encaissées (validés)</div><div class="value val-good" id="db-primes">—</div></div>
-        <div class="card"><div class="label">− Frais réels saisis (hors régie)</div><div class="value val-bad" id="db-fraisreels">—</div></div>
+        <div class="card"><div class="label">− Frais réels (part société)</div><div class="value val-bad" id="db-fraisreels">—</div></div>
         <div class="card"><div class="label">− Commission régie (auto)</div><div class="value val-bad" id="db-regieauto">—</div></div>
         <div class="card good"><div class="label">= Ce qu'on se récupère</div><div class="value val-good" id="db-recup" style="font-size:24px">—</div></div>
       </div>
@@ -566,7 +566,7 @@
         <div class="field f-ils" style="display:none"><label>Montant (₪ shekels)</label><input type="number" step="0.01" id="f-shekels" placeholder="0.00" oninput="fraisPreview()"></div>
         <div class="field f-ils" style="display:none"><label>Taux 1 ₪ = ? € <span id="f-taux-note" style="color:var(--muted);font-weight:400"></span></label><input type="number" step="0.0001" id="f-taux-ils" placeholder="auto selon la date" oninput="fraisPreview()"></div>
         <div class="field"><label>Régie concernée</label><select id="f-regie" onchange="onFraisRegie()"></select></div>
-        <div class="field" id="f-pct-field" style="display:none"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
+        <div class="field" id="f-pct-field" style="display:none"><label>% refacturé régie <span style="color:var(--muted);font-weight:400">(modifiable)</span></label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
         <div class="field" id="f-doc-field" style="display:none"><label>Justificatif (facture, document)</label><input type="file" id="f-doc" accept="image/*,.pdf" onchange="onFraisDocPick()"><div class="hint" id="f-doc-current" style="display:none;margin-top:4px"></div></div>
       </form>
       <div class="preview" id="f-preview"></div>
@@ -1766,6 +1766,7 @@ function onFraisRegie(){
   const sel=document.getElementById('f-regie'); if(!sel) return;
   const r=REGIES_CFG.find(x=>x.nom===sel.value);
   const pct=document.getElementById('f-pct'); if(pct) pct.value=(r&&r.pct_defaut!=null)?r.pct_defaut:0;
+  const fld=document.getElementById('f-pct-field'); if(fld) fld.style.display=sel.value?'':'none';
   fraisPreview();
 }
 function fraisRegieOptions(cur){
@@ -2405,7 +2406,9 @@ function refreshDashboard(){
   const primesRealisees=valid.reduce((s,d)=>s+Number(d.montant_prime||0),0);
   const regieNames=[...new Set([...(REGIES_CFG||[]).map(r=>r.nom),...dossiers.map(d=>(d.commercial_regie||'').trim())].filter(Boolean))];
   const isRegieReversement=f=>regieNames.some(n=>payMatch(f,n));
-  const fraisReels=frais.filter(f=>!isRegieReversement(f)).reduce((s,f)=>s+Number(f.montant||0),0);
+  // On ne compte que la PART SOCIÉTÉ de chaque frais : la part refacturée à la régie (% régie) est récupérée
+  // sur la régie / déduite de ce qu'on lui doit, donc elle n'impacte pas nos bénéfices (un frais à 100 % régie = 0).
+  const fraisReels=frais.filter(f=>!isRegieReversement(f)).reduce((s,f)=>s+Number(f.montant_societe!=null?f.montant_societe:(f.montant||0)),0);
   const recup=primesRealisees-fraisReels-regieTot;
   const fairShare=invTot/as.length;
   as.forEach(a=>{
@@ -2852,6 +2855,7 @@ function cancelEditFrais(){
   { const fm=document.getElementById('f-mois'); if(fm) fm.value=today().slice(0,7); }
   { const cur=document.getElementById('f-doc-current'); if(cur){ cur.style.display='none'; cur.innerHTML=''; } }
   document.getElementById('f-pct').value='0'; document.getElementById('f-preview').innerHTML='';
+  if(typeof onFraisRegie==='function') onFraisRegie();
   document.getElementById('f-savebtn').textContent='+ Enregistrer le frais';
   document.getElementById('f-cancelbtn').style.display='none';
 }
