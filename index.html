@@ -543,8 +543,10 @@
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
         <div class="field" id="f-dossier-field" style="display:none"><label>Dossier lié (ID CRM)</label><input type="text" id="f-dossier" placeholder="ex. 12345 — laisser vide si hors dossier"></div>
         <div class="field"><label>Fournisseur</label><select id="f-fournisseur" onchange="onFraisFournisseur()"></select></div>
-        <div class="field"><label>Payé par (société)</label><select id="f-source"></select></div>
-        <div class="field"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" required oninput="fraisPreview()"></div>
+        <div class="field"><label>Payé par (société)</label><select id="f-source" onchange="onFraisSource()"></select></div>
+        <div class="field f-eur"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" oninput="fraisPreview()"></div>
+        <div class="field f-ils" style="display:none"><label>Montant (₪ shekels)</label><input type="number" step="0.01" id="f-shekels" placeholder="0.00" oninput="fraisPreview()"></div>
+        <div class="field f-ils" style="display:none"><label>Taux 1 ₪ = ? € (+20 % auto)</label><input type="number" step="0.0001" id="f-taux-ils" placeholder="ex. 0.25" oninput="fraisPreview()"></div>
         <div class="field"><label>Régie concernée</label><select id="f-regie" onchange="onFraisRegie()"></select></div>
         <div class="field" id="f-pct-field" style="display:none"><label>% refacturé régie</label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
         <div class="field" id="f-doc-field" style="display:none"><label>Justificatif (facture, document)</label><input type="file" id="f-doc" accept="image/*,.pdf" onchange="onFraisDocPick()"><div class="hint" id="f-doc-current" style="display:none;margin-top:4px"></div></div>
@@ -2664,9 +2666,13 @@ async function addSource(e){
 }
 
 // ===== Frais =====
+function fraisSourceIsILS(){ const s=SOURCES.find(x=>x.id===(document.getElementById('f-source')||{}).value); return !!(s&&s.devise==='ILS'); }
+function fraisMontantEur(){ if(fraisSourceIsILS()){ const shk=Number((document.getElementById('f-shekels')||{}).value)||0; const taux=Number((document.getElementById('f-taux-ils')||{}).value)||0; return shk*taux*1.20; } return Number((document.getElementById('f-montant')||{}).value)||0; }
+function onFraisSource(){ const ils=fraisSourceIsILS(); document.querySelectorAll('.f-ils').forEach(el=>el.style.display=ils?'':'none'); document.querySelectorAll('.f-eur').forEach(el=>el.style.display=ils?'none':''); fraisPreview(); }
 function fraisPreview(){
-  const m=Number(document.getElementById('f-montant').value)||0, pct=Number(document.getElementById('f-pct').value)||0;
-  document.getElementById('f-preview').innerHTML=`Refacturé régie : <b>${eur(m*pct/100)}</b> / À charge société : <b class="val-bad">${eur(m-m*pct/100)}</b>`;
+  const m=fraisMontantEur(), pct=Number(document.getElementById('f-pct').value)||0;
+  const ilsNote=fraisSourceIsILS()?`Converti : <b>${eur(m)}</b> <span style="color:var(--muted)">(shekels × taux × 1,20)</span><br>`:'';
+  document.getElementById('f-preview').innerHTML=`${ilsNote}Refacturé régie : <b>${eur(m*pct/100)}</b> / À charge société : <b class="val-bad">${eur(m-m*pct/100)}</b>`;
 }
 let editingFraisId=null;
 // Modification directement sur la ligne du tableau (plus besoin de remonter au formulaire du haut)
@@ -2679,7 +2685,8 @@ function editFrais(id){
 }
 function cancelEditFrais(){
   editingFraisId=null;
-  ['f-fournisseur','f-montant','f-regie','f-dossier','f-doc'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  ['f-fournisseur','f-montant','f-regie','f-dossier','f-doc','f-shekels','f-taux-ils'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  if(typeof onFraisSource==='function') onFraisSource();
   { const fm=document.getElementById('f-mois'); if(fm) fm.value=today().slice(0,7); }
   { const cur=document.getElementById('f-doc-current'); if(cur){ cur.style.display='none'; cur.innerHTML=''; } }
   document.getElementById('f-pct').value='0'; document.getElementById('f-preview').innerHTML='';
@@ -2694,7 +2701,7 @@ function onFraisDocPick(){
 }
 async function addFrais(e){
   e.preventDefault();
-  const montant=Number(document.getElementById('f-montant').value); if(!montant){toast('⚠️ Indique un montant');document.getElementById('f-montant').focus();return;}
+  const montant=fraisMontantEur(); if(!montant){toast('⚠️ Indique un montant');(document.getElementById(fraisSourceIsILS()?'f-shekels':'f-montant')||{}).focus&&document.getElementById(fraisSourceIsILS()?'f-shekels':'f-montant').focus();return;}
   const _cat=document.getElementById('f-categorie').value;
   const row={ date:document.getElementById('f-date').value||today(), categorie:_cat,
     mois_concerne:document.getElementById('f-mois').value||null,
