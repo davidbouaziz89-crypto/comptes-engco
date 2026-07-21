@@ -1697,6 +1697,8 @@ async function loadDepots(){
   if(!isLed){ window._depots=[]; fillDepotSelect(); return; }
   const {data}=await db.from('engco_depots').select('*').order('nom');
   window._depots=data||[]; renderDepots(); fillDepotSelect(); fillDepotDelegSelect();
+  // Le délégataire des dossiers se déduit du dépôt → re-render une fois les dépôts chargés
+  if(window._dossiers && typeof renderDossiers==='function'){ renderDossiers(); if(typeof refreshDashboard==='function') refreshDashboard(); }
 }
 function renderDepots(){
   const b=document.getElementById('depots-body'); if(!b) return; const list=window._depots||[];
@@ -1724,6 +1726,8 @@ async function loadDelegataires(){
   renderDelegatairesParams();
   if(typeof renderDepots==='function') renderDepots();
   if(typeof fillDepotDelegSelect==='function') fillDepotDelegSelect();
+  // Les dossiers affichent le nom du délégataire → re-render une fois la liste chargée
+  if(window._dossiers && typeof renderDossiers==='function'){ renderDossiers(); if(typeof refreshDashboard==='function') refreshDashboard(); }
 }
 function fillDelegataireSelect(){
   const sel=document.getElementById('d-delegataire'); if(!sel) return;
