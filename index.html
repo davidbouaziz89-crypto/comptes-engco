@@ -656,6 +656,7 @@
         <button data-psec="delegataires" id="pm-delegataires" onclick="showParam('delegataires')">🏛️ Délégataires CEE</button>
         <button data-psec="materiels" id="pm-materiels" onclick="showParam('materiels')">🔧 Matériels</button>
         <button data-psec="fournisseurs" id="pm-fournisseurs" onclick="showParam('fournisseurs')">🚚 Fournisseurs</button>
+        <button data-psec="campagnes" id="pm-campagnes" onclick="showParam('campagnes')">📣 Campagnes</button>
         <button data-psec="check" id="pm-check" onclick="showParam('check')">🧩 Check</button>
         <button data-psec="liencrm" id="pm-liencrm" onclick="showParam('liencrm')">🔗 Lien CRM</button>
         <button data-psec="categories" onclick="showParam('categories')">🏷️ Catégories de frais</button>
@@ -704,6 +705,16 @@
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">💾 Enregistrer</button></div>
             </form>
             <div class="hint" id="crmurl-preview" style="margin-top:8px"></div>
+          </section>
+        </div>
+        <div class="params-sec" id="ps-campagnes">
+          <section class="panel"><h2>📣 Campagnes</h2>
+            <div class="hint" style="margin-bottom:8px">Tes campagnes. Tu les choisiras sur chaque dossier (et à l'import via la colonne « Campagne »).</div>
+            <form class="row" onsubmit="addCampagne(event)">
+              <div class="field"><label>Nom de la campagne</label><input type="text" id="cp-nom" placeholder="ex. Google Ads, Terrain Nord…" required></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+            </form>
+            <div class="table-wrap"><table><thead><tr><th>Campagne</th><th></th></tr></thead><tbody id="campagnes-body"></tbody></table></div>
           </section>
         </div>
         <div class="params-sec" id="ps-check">
@@ -1308,6 +1319,7 @@ function managerRegieRow(){
     <input type="hidden" id="d-davidpct" value="5">
     <div class="field"><label>Régie</label><select id="d-commercial" onchange="onDossierRegie()"></select></div>
     <input type="hidden" id="d-regiepct" value="0">
+    <div class="field"><label>Campagne</label><select id="d-campagne"></select></div>
     <div class="field"><label>Délégataire</label><select id="d-delegataire"></select></div>
     ${statutField}
   </form>`;
@@ -1320,7 +1332,7 @@ async function loadAll(){
   await loadRegiesConfig();
   await loadStatuts();
   await Promise.all([loadApports(), loadDossiers(), loadRemboursements(), loadFrais()]);
-  renderRegies(); loadRecurrents(); loadFraisCats(); loadDelegataires(); loadCheck(); loadMateriels(); loadFournisseurs(); renderCrmUrl();
+  renderRegies(); loadRecurrents(); loadFraisCats(); loadDelegataires(); loadCheck(); loadMateriels(); loadFournisseurs(); loadCampagnes(); renderCrmUrl();
   if(CURRENT_ROLE==='admin') loadUsers();
 }
 
@@ -1420,6 +1432,29 @@ async function onInlineFournisseur(){
 }
 async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categorie=(document.getElementById('fo-cat')||{}).value||null; if(!categorie){ toast('Choisis la catégorie liée'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
 async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
+// ===== Campagnes (LED) =====
+let editingCampagneId=null;
+async function loadCampagnes(){
+  const isLed=!!(PROJ&&PROJ.key==='led');
+  const pm=document.getElementById('pm-campagnes'); if(pm) pm.style.display=isLed?'':'none';
+  if(!isLed){ window._campagnes=[]; fillCampagneSelect(); return; }
+  const {data}=await db.from('engco_campagnes').select('*').order('nom');
+  window._campagnes=data||[]; renderCampagnes(); fillCampagneSelect();
+}
+function campagneOptions(cur){ const list=(window._campagnes||[]).map(c=>c.nom); let o='<option value="">— aucune —</option>'+list.map(n=>`<option value="${escH(n)}"${n===cur?' selected':''}>${escH(n)}</option>`).join(''); if(cur&&!list.includes(cur)) o+=`<option value="${escH(cur)}" selected>${escH(cur)}</option>`; return o; }
+function fillCampagneSelect(){ const sel=document.getElementById('d-campagne'); if(!sel) return; const prev=sel.value; sel.innerHTML=campagneOptions(prev); if(prev&&[...sel.options].some(o=>o.value===prev)) sel.value=prev; }
+function renderCampagnes(){
+  const b=document.getElementById('campagnes-body'); if(!b) return; const c=window._campagnes||[];
+  b.innerHTML=c.length?c.map(x=>{
+    if(x.id===editingCampagneId) return `<tr class="rowedit"><td><input type="text" id="cpe-nom" value="${escH(x.nom||'')}"></td><td class="num"><button class="btn small" onclick="saveCampagne('${x.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelCampagneEdit()">Annuler</button></td></tr>`;
+    return `<tr><td>${escH(x.nom)}</td><td class="num"><button class="btn ghost small" onclick="editCampagne('${x.id}')">✏️</button> <button class="btn danger small" onclick="delCampagne('${x.id}')">Suppr.</button></td></tr>`;
+  }).join(''):`<tr><td colspan="2" class="empty">Aucune campagne</td></tr>`;
+}
+function editCampagne(id){ editingCampagneId=id; renderCampagnes(); }
+function cancelCampagneEdit(){ editingCampagneId=null; renderCampagnes(); }
+async function saveCampagne(id){ const nom=(document.getElementById('cpe-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; } const {error}=await db.from('engco_campagnes').update({nom}).eq('id',id); if(error){ toast('Erreur : '+error.message); return; } editingCampagneId=null; toast('Campagne modifiée ✅'); loadCampagnes(); }
+async function addCampagne(e){ e.preventDefault(); const nom=(document.getElementById('cp-nom').value||'').trim(); if(!nom) return; const {error}=await db.from('engco_campagnes').insert({nom}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('cp-nom').value=''; toast('Campagne ajoutée ✅'); loadCampagnes(); }
+async function delCampagne(id){ if(!confirm('Supprimer cette campagne ?')) return; const {error}=await db.from('engco_campagnes').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadCampagnes(); }
 async function loadDelegataires(){
   const isLed=!!(PROJ&&PROJ.key==='led');
   const pm=document.getElementById('pm-delegataires'); if(pm) pm.style.display=isLed?'':'none';
@@ -2336,7 +2371,7 @@ function editDossier(id,btn){
   csel.value=d.commercial_regie||'';
   if(PROJ.dossierType==='velo'){ S('d-region',d.region||'France'); S('d-nbvelos',d.nb_velos); S('d-tarif',d.tarif_unitaire); S('d-autrescouts',d.autres_couts); S('d-regie-montant',d.regie_montant_unitaire); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=!!d.regie_interne; }
   else { S('d-prime',d.montant_prime); S('d-install',d.cout_installation); S('d-materiel',d.cout_materiel); S('d-nacelle',d.cout_nacelle); S('d-hamid',d.cout_hamid); S('d-livraison',d.cout_livraison); S('d-fraissupp',d.frais_supp); S('d-audit',d.cout_audit);
-    S('d-cumac',d.cumac); S('d-delegataire',d.delegataire_id);
+    S('d-cumac',d.cumac); S('d-delegataire',d.delegataire_id); S('d-campagne',d.campagne);
     renderDMaterielLines((window._dossierMat||[]).filter(x=>x.dossier_id===d.id)); }
   editingDossierId=id;
   { const h=document.getElementById('dossier-form-h2'); if(h) h.textContent='✏️ Modifier le dossier'; }
@@ -2370,6 +2405,7 @@ function cancelEditDossier(){
   if(PROJ.dossierType==='velo'){ ['d-nbvelos','d-autrescouts','d-regie-montant'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';}); const ci=document.getElementById('d-regie-interne'); if(ci) ci.checked=false; }
   else { ['d-prime','d-install','d-materiel','d-nacelle','d-hamid','d-livraison','d-fraissupp','d-audit','d-cumac'].forEach(i=>{const el=document.getElementById(i); if(el)el.value='0';});
     const dg=document.getElementById('d-delegataire'); if(dg) dg.value='';
+    const cg=document.getElementById('d-campagne'); if(cg) cg.value='';
     const mb=document.getElementById('d-materiels'); if(mb) mb.innerHTML=''; }
   document.getElementById('d-savebtn').textContent='+ Enregistrer le dossier';
   document.getElementById('d-cancelbtn').style.display='none';
@@ -2384,7 +2420,7 @@ async function addDossier(e){
     statut:v('d-statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours'), david_pct:g('d-davidpct'), regie_pct:g('d-regiepct'), commercial_regie:v('d-commercial') };
   if(PROJ.dossierType==='velo'){ row.region=v('d-region')||'France'; row.nb_velos=g('d-nbvelos'); row.tarif_unitaire=g('d-tarif'); row.autres_couts=g('d-autrescouts'); row.regie_montant_unitaire=g('d-regie-montant'); row.regie_interne=!!(document.getElementById('d-regie-interne')||{}).checked; row.regie_pct=0; }
   else { row.montant_prime=g('d-prime'); row.cout_installation=g('d-install'); row.cout_materiel=g('d-materiel'); row.cout_nacelle=g('d-nacelle'); row.cout_hamid=g('d-hamid'); row.cout_livraison=g('d-livraison'); row.frais_supp=g('d-fraissupp'); row.cout_audit=g('d-audit');
-    row.cumac=g('d-cumac'); row.delegataire_id=v('d-delegataire'); }
+    row.cumac=g('d-cumac'); row.delegataire_id=v('d-delegataire'); row.campagne=v('d-campagne'); }
   if(!editingDossierId){
     const nid=(row.crm_id||'').trim(), ndep=(row.numero_depot||'').trim();
     const dup=(window._dossiers||[]).find(d=> (nid && (d.crm_id||'').trim()===nid) || (ndep && (d.numero_depot||'').trim()===ndep) );
@@ -2539,12 +2575,34 @@ function renderCats(){
   const recs=(window._recurrents||[]).map(r=>({nom:r.libelle,type:'recurrent',id:r.id,montant:r.montant_defaut,mois:r.mois_debut,source_id:r.source_id}));
   const all=[...recs,...deps].sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
   const srcNom=id=>{ const s=SOURCES.find(x=>x.id===id); return s?s.nom:''; };
-  b.innerHTML=all.length? all.map(c=>`<tr><td>${escH(c.nom)}</td>
-    <td>${c.type==='recurrent'?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'}</td>
-    <td class="num">${c.type==='recurrent'&&c.montant!=null?eur(c.montant):'—'}</td>
-    <td>${c.type==='recurrent'?(escH(srcNom(c.source_id))||'—'):'—'}</td>
-    <td>${c.type==='recurrent'?(moisLabel(c.mois)||'—'):'—'}</td>
-    <td class="num"><button class="btn ghost small" onclick="editCat('${c.type}','${c.id}')">✏️</button> <button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`).join('') : `<tr><td colspan="6" class="empty">Aucune catégorie</td></tr>`;
+  b.innerHTML=all.length? all.map(c=>{
+    const rec=c.type==='recurrent';
+    if(editingCatInline.id===c.id) return `<tr class="rowedit">
+      <td><input type="text" id="cate-nom" value="${escH(c.nom||'')}"></td>
+      <td>${rec?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'}</td>
+      <td class="num">${rec?`<input type="number" step="0.01" id="cate-montant" value="${c.montant!=null?c.montant:''}">`:'—'}</td>
+      <td>${rec?`<select id="cate-source">${catSourceOptions(c.source_id||'')}</select>`:'—'}</td>
+      <td>${rec?`<input type="month" id="cate-mois" value="${(c.mois||'').slice(0,7)}">`:'—'}</td>
+      <td class="num"><button class="btn small" onclick="saveCatInline('${c.type}','${c.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelCatInline()">Annuler</button></td></tr>`;
+    return `<tr><td>${escH(c.nom)}</td>
+    <td>${rec?'<span class="pill" style="background:rgba(59,130,246,.18)">🔁 Récurrent</span>':'<span class="pill">Dépense</span>'}</td>
+    <td class="num">${rec&&c.montant!=null?eur(c.montant):'—'}</td>
+    <td>${rec?(escH(srcNom(c.source_id))||'—'):'—'}</td>
+    <td>${rec?(moisLabel(c.mois)||'—'):'—'}</td>
+    <td class="num"><button class="btn ghost small" onclick="editCat('${c.type}','${c.id}')">✏️</button> <button class="btn danger small" onclick="delCat('${c.type}','${c.id}')">Suppr.</button></td></tr>`;
+  }).join('') : `<tr><td colspan="6" class="empty">Aucune catégorie</td></tr>`;
+}
+let editingCatInline={id:null,type:null};
+function catSourceOptions(cur){ return '<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${escH(s.id)}"${s.id===cur?' selected':''}>${escH(s.nom)}</option>`).join(''); }
+function cancelCatInline(){ editingCatInline={id:null,type:null}; renderCats(); }
+async function saveCatInline(type,id){
+  const g=x=>document.getElementById(x); const nom=(g('cate-nom').value||'').trim(); if(!nom){ toast('Nom requis'); return; }
+  let error;
+  if(type==='recurrent'){ const montant=g('cate-montant').value; const mois=(g('cate-mois').value||today().slice(0,7)); const source_id=(g('cate-source')||{}).value||null;
+    ({error}=await db.from(T('recurrents')).update({libelle:nom, montant_defaut:montant===''?null:Number(montant), source_id, mois_debut:mois+'-01'}).eq('id',id));
+  } else { ({error}=await db.from(T('frais_cats')).update({nom}).eq('id',id)); }
+  if(error){ toast('Erreur : '+error.message); return; }
+  editingCatInline={id:null,type:null}; toast('Catégorie modifiée ✅'); await loadFraisCats(); await loadRecurrents();
 }
 function onCatType(){
   const rec=document.getElementById('fc-type').value==='recurrent';
@@ -2552,25 +2610,8 @@ function onCatType(){
   if(rec){ const m=document.getElementById('fc-mois'); if(m&&!m.value) m.value=today().slice(0,7); }
 }
 let editingCat={id:null,type:null};
-function editCat(type,id){
-  const item = type==='recurrent'
-    ? (window._recurrents||[]).find(x=>x.id===id)
-    : (window._fraiscats||[]).find(x=>x.id===id);
-  if(!item) return;
-  const ts=document.getElementById('fc-type'); ts.value=type; ts.disabled=true; // le type ne change pas en édition
-  document.getElementById('fc-nom').value = type==='recurrent' ? (item.libelle||'') : (item.nom||'');
-  onCatType();
-  if(type==='recurrent'){
-    document.getElementById('fc-montant').value = item.montant_defaut!=null?item.montant_defaut:'';
-    const fcs=document.getElementById('fc-source'); if(fcs) fcs.value=item.source_id||'';
-    document.getElementById('fc-mois').value = (item.mois_debut||'').slice(0,7)||today().slice(0,7);
-  }
-  editingCat={id,type};
-  document.getElementById('fc-savebtn').textContent='💾 Enregistrer';
-  document.getElementById('fc-cancelbtn').style.display='';
-  document.getElementById('fc-nom').scrollIntoView({behavior:'smooth',block:'center'});
-  document.getElementById('fc-nom').focus();
-}
+// Édition d'une catégorie directement sur sa ligne (le formulaire du haut ne sert qu'à l'ajout)
+function editCat(type,id){ editingCatInline={id,type}; renderCats(); const el=document.getElementById('cate-nom'); if(el){ el.scrollIntoView({behavior:'smooth',block:'nearest'}); el.focus(); } }
 function cancelEditCat(){
   editingCat={id:null,type:null};
   ['fc-nom','fc-montant','fc-mois'].forEach(i=>{const el=document.getElementById(i); if(el) el.value='';});
