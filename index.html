@@ -181,6 +181,8 @@
   .calc-pop{position:absolute;top:calc(100% + 8px);left:0;min-width:260px;max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.55);padding:12px 14px;z-index:30;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .16s ease,transform .16s ease;white-space:normal;text-align:left}
   .calc-card:hover .calc-pop{opacity:1;transform:none;pointer-events:auto}
   .kpi.calc-card{overflow:visible!important;cursor:help}
+  /* Sur les cartes du bandeau : le calcul s'affiche DANS la carte (par-dessus la mini-courbe), sans recouvrir les graphes voisins */
+  .kpi .calc-pop{top:50px;left:12px;right:12px;bottom:auto;min-width:0;max-width:none}
   .calc-pop .cp-title{font-weight:700;font-size:12.5px;margin-bottom:8px;font-family:var(--font-display)}
   .calc-pop .cp-row{display:flex;justify-content:space-between;gap:18px;padding:3px 0;font-size:12.5px}
   .calc-pop .cp-row.total{font-weight:800;font-size:13.5px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
