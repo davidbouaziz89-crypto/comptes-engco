@@ -183,6 +183,8 @@
   .kpi.calc-card{overflow:visible!important;cursor:help}
   /* Sur les cartes du bandeau : le calcul s'affiche DANS la carte (par-dessus la mini-courbe), sans recouvrir les graphes voisins */
   .kpi .calc-pop{top:50px;left:12px;right:12px;bottom:auto;min-width:0;max-width:none}
+  /* Sur les cartes de panneau : le calcul s'ouvre VERS LE HAUT (au-dessus), pour ne pas déborder sur la section suivante */
+  .card .calc-pop{top:auto;bottom:calc(100% + 8px);transform:translateY(4px)}
   .calc-pop .cp-title{font-weight:700;font-size:12.5px;margin-bottom:8px;font-family:var(--font-display)}
   .calc-pop .cp-row{display:flex;justify-content:space-between;gap:18px;padding:3px 0;font-size:12.5px}
   .calc-pop .cp-row.total{font-weight:800;font-size:13.5px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
@@ -596,7 +598,7 @@
         <div class="field"><label>Date d'ajout</label><input type="date" id="f-date" required onchange="onFraisDateChange()"></div>
         <div class="field"><label>Mois concerné</label><input type="month" id="f-mois"></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
-        <div class="field" id="f-dossier-field" style="display:none;flex:1;min-width:240px"><label>Dossier(s) lié(s) — ID CRM <span style="color:var(--muted);font-weight:400">(plusieurs possibles, séparés par des virgules)</span></label><input type="text" id="f-dossier" placeholder="ex. 12345, 16991, 17012 — vide si hors dossier"></div>
+        <div class="field" id="f-dossier-field" style="display:none"><label>Dossier(s) lié(s) — ID CRM</label><input type="text" id="f-dossier" placeholder="ex. 12345, 16991 — virgules si plusieurs"></div>
         <div class="field"><label>Fournisseur</label><select id="f-fournisseur" onchange="onFraisFournisseur()"></select></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source" onchange="onFraisSource()"></select></div>
         <div class="field f-eur"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" oninput="fraisPreview()"></div>
@@ -605,7 +607,7 @@
         <div class="field"><label>Régie concernée</label><select id="f-regie" onchange="onFraisRegie()"></select></div>
         <div class="field" id="f-pct-field" style="display:none"><label>% refacturé régie <span style="color:var(--muted);font-weight:400">(modifiable)</span></label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
         <div class="field" id="f-doc-field" style="display:none"><label>Justificatif (facture, document)</label><input type="file" id="f-doc" accept="image/*,.pdf" onchange="onFraisDocPick()"><div class="hint" id="f-doc-current" style="display:none;margin-top:4px"></div></div>
-        <div class="field" style="flex:1;min-width:220px"><label>Détail <span style="color:var(--muted);font-weight:400">(facultatif)</span></label><input type="text" id="f-detail" placeholder="ex. annulation dossier 12345, note…"></div>
+        <div class="field"><label>Détail <span style="color:var(--muted);font-weight:400">(facultatif)</span></label><input type="text" id="f-detail" placeholder="ex. annulation dossier 12345, note…"></div>
       </form>
       <div class="preview" id="f-preview"></div>
       <div style="margin-top:14px"><button class="btn" id="f-savebtn" onclick="addFrais(event)">+ Enregistrer le frais</button> <button class="btn ghost" type="button" id="f-cancelbtn" onclick="cancelEditFrais()" style="display:none">Annuler</button></div>
