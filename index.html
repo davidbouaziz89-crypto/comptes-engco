@@ -176,6 +176,15 @@
   .cat-checks{display:flex;flex-wrap:wrap;gap:4px 12px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;max-height:120px;overflow:auto;background:var(--panel2)}
   .cat-chk{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;white-space:nowrap}
   .cat-chk input{margin:0}
+  /* Popover de calcul au survol (comme sur le CRM PV) */
+  .calc-card{overflow:visible!important;cursor:help}
+  .calc-pop{position:absolute;top:calc(100% + 8px);left:0;min-width:260px;max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.55);padding:12px 14px;z-index:30;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .16s ease,transform .16s ease;white-space:normal;text-align:left}
+  .card.calc-card:hover .calc-pop{opacity:1;transform:none;pointer-events:auto}
+  .calc-pop .cp-title{font-weight:700;font-size:12.5px;margin-bottom:8px;font-family:var(--font-display)}
+  .calc-pop .cp-row{display:flex;justify-content:space-between;gap:18px;padding:3px 0;font-size:12.5px}
+  .calc-pop .cp-row.total{font-weight:800;font-size:13.5px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
+  .calc-pop .cp-row .lbl{color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+  @media(max-width:880px){.calc-pop{left:auto;right:0}}
   .auth-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
   .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px;max-width:390px;width:100%}
   .auth-card h2{margin:0 0 6px;font-size:22px} .auth-card .p{color:var(--muted);margin:0 0 20px;font-size:14px}
@@ -367,7 +376,7 @@
         <div class="card good"><div class="label">Primes HT encaissées (validés)</div><div class="value val-good" id="db-primes">—</div></div>
         <div class="card"><div class="label">− Frais réels (part société)</div><div class="value val-bad" id="db-fraisreels">—</div></div>
         <div class="card"><div class="label">− Commission régie (auto)</div><div class="value val-bad" id="db-regieauto">—</div></div>
-        <div class="card good"><div class="label">= Ce qu'on se récupère</div><div class="value val-good" id="db-recup" style="font-size:24px">—</div></div>
+        <div class="card good" id="db-recup-card"><div class="label">= Ce qu'on se récupère <span style="opacity:.6">ⓘ</span></div><div class="value val-good" id="db-recup" style="font-size:24px">—</div></div>
       </div>
     </section>
 
@@ -375,11 +384,11 @@
       <h2>🏦 Résultat de la société (estimation via marges)</h2>
       <div class="hint">Estimation basée sur la <b>marge des dossiers</b> validés (prime − coûts déclarés), moins les frais à charge de la société. Sert d'indicateur ; le chiffre réel est ci-dessus.</div>
       <div class="grid cards">
-        <div class="card good"><div class="label">Marge nette validée</div><div class="value val-good" id="db-marge">—</div></div>
+        <div class="card good" id="db-marge-card"><div class="label">Marge nette validée <span style="opacity:.6">ⓘ</span></div><div class="value val-good" id="db-marge">—</div></div>
         <div class="card"><div class="label">Commissions de régie versées</div><div class="value" id="db-regie">—</div></div>
         <div class="card"><div class="label">Part manager prélevée</div><div class="value" id="db-david">—</div></div>
         <div class="card"><div class="label">Frais / dépenses (part société)</div><div class="value val-bad" id="db-frais">—</div></div>
-        <div class="card good"><div class="label">Résultat net société</div><div class="value val-good" id="db-resultat">—</div></div>
+        <div class="card good" id="db-resultat-card"><div class="label">Résultat net société <span style="opacity:.6">ⓘ</span></div><div class="value val-good" id="db-resultat">—</div></div>
       </div>
     </section>
 
@@ -2467,6 +2476,8 @@ async function toggleCheckState(dossierId,itemId,checked){
 }
 
 // ===== Tableau de bord =====
+function calcPop(title,rows){ return `<div class="calc-pop"><div class="cp-title">${title}</div>`+rows.map(r=>`<div class="cp-row${r.t?' total':''}"><span class="lbl">${escH(r.l)}</span><span>${r.v}</span></div>`).join('')+`</div>`; }
+function attachPop(cardId,title,rows){ const c=document.getElementById(cardId); if(!c) return; c.classList.add('calc-card'); c.querySelectorAll('.calc-pop').forEach(p=>p.remove()); c.insertAdjacentHTML('beforeend', calcPop(title,rows)); }
 function refreshDashboard(){
   if(!PROJ) return;
   const as=A();
@@ -2505,14 +2516,16 @@ function refreshDashboard(){
   const cat={realise:{n:0,ca:0,mn:0},potentiel:{n:0,ca:0,mn:0},perdu:{n:0,ca:0,mn:0}};
   dossiers.forEach(d=>{ const c=statutCat(d.statut||''); const b=cat[c]||cat.potentiel; b.n++; b.ca+=Number(d.montant_prime||0); b.mn+=Number(d.marge_nette||0); });
   const partAssoc=margeNette/as.length;
+  const partReal=recup/as.length;
   const statCard=(icon,label,o,good)=>`<div class="card${good?' good':''}"><div class="label">${icon} ${label}</div><div class="value ${good?'val-good':''}" style="font-size:21px">${eur(o.mn)}</div><div class="label" style="margin-top:6px">${o.n} dossier${o.n>1?'s':''} · CA ${eur(o.ca)}</div></div>`;
   document.getElementById('db-stat-cards').innerHTML =
     statCard('✅','Réalisé — marge nette',cat.realise,true)+
     statCard('⏳','En cours — potentiel',cat.potentiel,false)+
     statCard('❌','Perdu',cat.perdu,false);
+  const shareRows=[{l:'Primes HT encaissées (validés)',v:eur(primesRealisees)},{l:'− Frais réels (part société)',v:'−'+eur(fraisReels)},{l:'− Commission régie',v:'−'+eur(regieTot)},{l:'= À se partager',v:eur(recup),t:1}];
   document.getElementById('db-share-cards').innerHTML =
-    `<div class="card good"><div class="label">Marge nette validée à se partager</div><div class="value val-good">${eur(margeNette)}</div></div>`+
-    `<div class="card"><div class="label">→ Part par associé (÷ ${as.length})</div><div class="value">${eur(partAssoc)}</div></div>`;
+    `<div class="card good calc-card"><div class="label">💰 Bénéfice réel à se partager <span style="opacity:.6">ⓘ</span></div><div class="value ${recup>=0?'val-good':'val-bad'}">${eur(recup)}</div>${calcPop('Bénéfice à se partager',shareRows)}</div>`+
+    `<div class="card calc-card"><div class="label">→ Part par associé (÷ ${as.length}) <span style="opacity:.6">ⓘ</span></div><div class="value">${eur(partReal)}</div>${calcPop('Part par associé',[{l:'Bénéfice à se partager',v:eur(recup)},{l:'÷ Associés',v:String(as.length)},{l:'= Part chacun',v:eur(partReal),t:1}])}</div>`;
   const rentaShown = dossiers.slice(0, 12);
   document.getElementById('db-renta-body').innerHTML = dossiers.length
     ? rentaShown.map(d=>{
@@ -2536,6 +2549,18 @@ function refreshDashboard(){
     set('db-fraisreels',eur(fraisReels));
     set('db-regieauto',eur(regieTot));
     const rc=document.getElementById('db-recup'); if(rc){ rc.textContent=eur(recup); rc.className='value '+(recup>=0?'val-good':'val-bad'); rc.style.fontSize='24px'; } }
+  attachPop('db-recup-card','Ce qu\'on se récupère',[
+    {l:'Primes HT encaissées (validés)',v:eur(primesRealisees)},
+    {l:'− Frais réels (part société)',v:'−'+eur(fraisReels)},
+    {l:'− Commission régie (auto)',v:'−'+eur(regieTot)},
+    {l:'= Ce qu\'on récupère',v:eur(recup),t:1}]);
+  attachPop('db-resultat-card','Résultat société (estimation via marges)',[
+    {l:'Marge nette validée (dossiers)',v:eur(margeNette)},
+    {l:'− Frais / dépenses (part société)',v:'−'+eur(fraisSociete)},
+    {l:'= Résultat estimé',v:eur(marge),t:1}]);
+  attachPop('db-marge-card','Marge nette validée',[
+    {l:'Somme des marges nettes',v:eur(margeNette)},
+    {l:'(dossiers validés uniquement)',v:''}]);
   const benef=Math.max(0,marge-invTot);
   document.getElementById('db-benef').textContent=eur(benef);
   as.forEach(a=>document.getElementById('db-benef-'+a.k).textContent=eur(benef/as.length));
