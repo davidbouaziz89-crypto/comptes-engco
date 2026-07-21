@@ -859,6 +859,10 @@
       <button class="btn ghost small" id="imp-dup-btn" onclick="toggleImpDup()">▸ Voir les doublons</button>
       <div id="imp-dup-list" class="imp-duplist" style="display:none"></div>
     </div>
+    <div id="imp-probwrap" style="display:none;margin-top:12px">
+      <button class="btn ghost small" id="imp-prob-btn" onclick="toggleImpProb()">▸ Voir les lignes en problème</button>
+      <div id="imp-prob-list" class="imp-duplist" style="display:none"></div>
+    </div>
     <div style="margin-top:18px;text-align:right"><button class="btn" id="imp-closebtn" onclick="closeImportModal()">Fermer</button></div>
   </div>
 </div>
@@ -3029,12 +3033,12 @@ function buildImportSpecs(){
       autres_couts:_pnum(_pick(m,'Autres coûts')), david_pct:(_pick(m,'% manager')!=null?_pnum(_pick(m,'% manager')):5), commercial_regie:regieName, regie_montant_unitaire:mu, regie_interne:interne, regie_pct:0, statut:_pick(m,'Statut')||(STATUTS_CFG[0]?STATUTS_CFG[0].nom:'En cours') }; }
   } : {
     table:T('dossiers'), reload:loadDossiers, sheet:'Dossiers',
-    headers:['Date','Client','ID CRM','Adresse','Code postal','Ville','Téléphone','Email','N° dépôt','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','% manager','Commercial régie','% commission régie','Statut'],
-    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','12 rue des Fleurs','30000','Nîmes','0600000000','client@email.fr','14205','2255','0','1296','87','0','0','360','0','5','JO','40','En cours'],
-    build(m){ if(_isEx(m)||!_has(m)) return null; return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), adresse:_pick(m,'Adresse'), code_postal:_pick(m,'Code postal','CP'), ville:_pick(m,'Ville'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
+    headers:['Date','Client','ID CRM','Adresse','Code postal','Ville','Téléphone','Email','N° dépôt','Prime HT','Coût installation','Coût matériel','Coût nacelle','Coût Hamid','Coût livraison','Frais supp.','Coût audit','Commercial régie','Campagne','Statut'],
+    example:['05/07/2026','EXEMPLE (supprimez)','ID-001','12 rue des Fleurs','30000','Nîmes','0600000000','client@email.fr','14205','2255','0','1296','87','0','0','360','0','JO','Campagne A','En cours'],
+    build(m){ if(_isEx(m)||!_has(m)) return null; const rn=_pick(m,'Commercial régie','Régie'); const rc=(REGIES_CFG||[]).find(r=>r.nom===rn); return { date:_pdate(_pick(m,'Date')), nom_client:_pick(m,'Client'), crm_id:_pick(m,'ID CRM','ID'), adresse:_pick(m,'Adresse'), code_postal:_pick(m,'Code postal','CP'), ville:_pick(m,'Ville'), telephone:_pick(m,'Téléphone','Telephone','Tel'), email:_pick(m,'Email','Mail'), numero_depot:_pick(m,'N° dépôt','Numéro de dépôt'), statut:_pick(m,'Statut')||'En cours',
       montant_prime:_pnum(_pick(m,'Prime HT','Prime')), cout_installation:_pnum(_pick(m,'Coût installation')), cout_materiel:_pnum(_pick(m,'Coût matériel')), cout_nacelle:_pnum(_pick(m,'Coût nacelle')),
       cout_hamid:_pnum(_pick(m,'Coût Hamid')), cout_livraison:_pnum(_pick(m,'Coût livraison')), frais_supp:_pnum(_pick(m,'Frais supp.','Frais supp')), cout_audit:_pnum(_pick(m,'Coût audit')),
-      david_pct:(_pick(m,'% manager','% manager David')!=null?_pnum(_pick(m,'% manager','% manager David')):5), commercial_regie:_pick(m,'Commercial régie','Régie'), regie_pct:_pnum(_pick(m,'% commission régie','% régie')) }; }
+      david_pct:5, commercial_regie:rn, regie_pct:rc?Number(rc.pct_defaut)||0:0, campagne:_pick(m,'Campagne') }; }
   };
   const apports = {
     table:T('apports'), reload:loadApports, sheet:'Apports',
@@ -3070,17 +3074,23 @@ function openImportModal(title){
   m.classList.remove('hidden');
 }
 function impProgress(html){ const e=document.getElementById('imp-progress'); if(e) e.innerHTML='<div class="imp-run">'+html+'</div>'; }
-function impDone(summaryHtml, dups){
+function impDone(summaryHtml, dups, problems){
   document.getElementById('imp-progress').innerHTML='';
   document.getElementById('imp-summary').innerHTML=summaryHtml;
   const cb=document.getElementById('imp-closebtn'); cb.disabled=false; cb.textContent='Fermer';
-  if(dups && dups.length){
-    document.getElementById('imp-dupwrap').style.display='';
+  const dw=document.getElementById('imp-dupwrap');
+  if(dups && dups.length){ dw.style.display='';
     document.getElementById('imp-dup-btn').textContent='▸ Voir les '+dups.length+' doublon(s)';
     document.getElementById('imp-dup-list').innerHTML=dups.map((d,i)=>`<div class="imp-dup"><span class="imp-dup-n">${i+1}</span><span>${d.label}<br><span class="imp-dup-r">↳ ${d.reason}</span></span></div>`).join('');
-  }
+  } else if(dw){ dw.style.display='none'; }
+  const pw=document.getElementById('imp-probwrap');
+  if(pw){ if(problems && problems.length){ pw.style.display='';
+    document.getElementById('imp-prob-btn').textContent='▸ Voir les '+problems.length+' ligne(s) en problème';
+    document.getElementById('imp-prob-list').innerHTML=problems.map((d,i)=>`<div class="imp-dup"><span class="imp-dup-n">⚠️</span><span>${escH(d.label)}<br><span class="imp-dup-r">↳ ${escH(d.reason)}</span></span></div>`).join('');
+  } else { pw.style.display='none'; } }
 }
 function toggleImpDup(){ const l=document.getElementById('imp-dup-list'); const btn=document.getElementById('imp-dup-btn'); const shown=l.style.display!=='none'; l.style.display=shown?'none':'block'; btn.textContent=btn.textContent.replace(/^[▸▾]/, shown?'▸':'▾'); }
+function toggleImpProb(){ const l=document.getElementById('imp-prob-list'); const btn=document.getElementById('imp-prob-btn'); const shown=l.style.display!=='none'; l.style.display=shown?'none':'block'; btn.textContent=btn.textContent.replace(/^[▸▾]/, shown?'▸':'▾'); }
 function closeImportModal(){ const m=document.getElementById('import-modal'); if(m) m.classList.add('hidden'); }
 function _impLabel(type,o){
   if(type==='dossiers') return (o.nom_client||'(sans nom)')+' · ID '+(o.crm_id||'—')+(o.region?' · '+o.region:'')+(o.numero_depot?' · dépôt '+o.numero_depot:'');
@@ -3107,10 +3117,12 @@ async function importFile(type,file){
     const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true});
     const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{raw:true,cellDates:true,defval:null});
     const rows=raw.map(r=>{ const m={}; for(const k in r) m[_norm(k)]=r[k]; return m; });
-    const built=[]; rows.forEach(m=>{ const o=spec.build(m); if(o) built.push(o); });
-    impProgress('✔️ '+rows.length+' ligne(s) lue(s) — '+built.length+' exploitable(s).');
+    const built=[]; const problems=[];
+    rows.forEach(m=>{ const o=spec.build(m); if(o){ built.push(o); }
+      else if(_has(m) && !_isEx(m)){ problems.push({ label:((_pick(m,'Client')||_pick(m,'Libellé','Libelle')||_pick(m,'Source')||'ligne')+(_pick(m,'Date')?' · '+_pick(m,'Date'):'')), reason:(type==='apports'?'source introuvable ou champs manquants':'champs obligatoires manquants (date, montants…)') }); } });
+    impProgress('✔️ '+rows.length+' ligne(s) lue(s) — '+built.length+' exploitable(s)'+(problems.length?' — <span class="imp-warn">'+problems.length+' en problème</span>':'')+'.');
     await new Promise(r=>setTimeout(r,120));
-    if(!built.length){ impDone('<div class="imp-line imp-warn">Aucune ligne à importer.</div><div class="imp-hint">Vérifie que ton fichier suit bien le modèle : la 1ʳᵉ ligne = les en-têtes, puis au moins une ligne de données (autre que la ligne « EXEMPLE »). Astuce : re-télécharge le modèle et remplis-le.</div>'); return; }
+    if(!built.length){ impDone('<div class="imp-line imp-warn">Aucune ligne à importer.</div><div class="imp-hint">Vérifie que ton fichier suit bien le modèle : la 1ʳᵉ ligne = les en-têtes, puis au moins une ligne de données (autre que la ligne « EXEMPLE »). Astuce : re-télécharge le modèle et remplis-le.</div>', null, problems); return; }
     // Enrichissement SIRET (dossiers vélo) — seulement les lignes incomplètes ; robuste (timeout, parallèle limité, arrêt si l'annuaire bloque)
     let siretMsg='';
     if(type==='dossiers' && PROJ.dossierType==='velo'){
@@ -3150,12 +3162,13 @@ async function importFile(type,file){
     if(toInsert.length){
       impProgress('💾 Enregistrement de <b>'+toInsert.length+'</b> ligne(s)…');
       const {error}=await db.from(spec.table).insert(toInsert);
-      if(error){ impDone('<div class="imp-line imp-err">❌ Erreur d\'enregistrement : '+error.message+'</div>', dups); return; }
+      if(error){ impDone('<div class="imp-line imp-err">❌ Erreur d\'enregistrement : '+error.message+'</div>', dups, problems); return; }
     }
     let html=siretMsg+'<div class="imp-line imp-ok">✅ <b>'+toInsert.length+'</b> ligne(s) importée(s)'+(toInsert.length?' avec succès':'')+'</div>';
     if(dups.length) html+='<div class="imp-line imp-warn">⚠️ <b>'+dups.length+'</b> doublon(s) ignoré(s) — déjà présents, non réimportés</div>';
-    if(!toInsert.length && !dups.length) html+='<div class="imp-line imp-warn">Rien de nouveau à importer.</div>';
-    impDone(html, dups);
+    if(problems.length) html+='<div class="imp-line imp-err">⛔ <b>'+problems.length+'</b> ligne(s) en problème (non importées) — voir le détail ci-dessous</div>';
+    if(!toInsert.length && !dups.length && !problems.length) html+='<div class="imp-line imp-warn">Rien de nouveau à importer.</div>';
+    impDone(html, dups, problems);
     if(toInsert.length) spec.reload();
   }catch(e){ impDone('<div class="imp-line imp-err">❌ Fichier illisible : '+(e.message||e)+'</div>'); }
 }
