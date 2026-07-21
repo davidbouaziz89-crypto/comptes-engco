@@ -2192,7 +2192,7 @@ function renderFrais(){
   document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
     if(f.id===inlineFraisId) return fraisEditRow(f);
     const src=SOURCES.find(s=>s.id===f.source_id);
-    const _dids=fraisDossierIds(f); const dtag=_dids.length?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier(s) lié(s) — ID CRM">🔗 ${_dids.map(escH).join(', ')}</span>`:'';
+    const _dids=fraisDossierIds(f); const _didHtml=_dids.map(id=>{ const u=(typeof crmLink==='function')?crmLink(id):''; return u?`<a href="${u}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${escH(id)} ↗</a>`:escH(id); }).join(', '); const dtag=_dids.length?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier(s) lié(s) — ID CRM">🔗 ${_didHtml}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
     const autotag=f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)" title="Généré automatiquement (frais récurrent)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️ Manuel</span>';
     const catOk=catExists(f.categorie), fourOk=fournExists(f.fournisseur);
