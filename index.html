@@ -741,7 +741,7 @@
               <div class="field" style="max-width:170px"><label>Type</label><select id="fo-type" onchange="onFoType()"><option value="depense">Dépense</option><option value="recurrent">🔁 Récurrent</option></select></div>
               <div class="field"><label>Catégorie liée</label><select id="fo-cat"></select></div>
               <div class="field fo-rec" style="display:none;max-width:150px"><label>Montant habituel (€)</label><input type="number" step="0.01" id="fo-montant" placeholder="laisse vide si variable"></div>
-              <div class="field fo-rec" style="display:none"><label>Payé par (société)</label><select id="fo-source"></select></div>
+              <div class="field"><label>Payé par (société)</label><select id="fo-source"></select></div>
               <div class="field fo-rec" style="display:none;max-width:150px"><label>À partir du mois</label><input type="month" id="fo-mois"></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
@@ -1648,6 +1648,7 @@ async function loadSources(){
   document.getElementById('f-source').innerHTML=optsBlank;
   document.getElementById('rc-source').innerHTML='<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join('');
   { const fcs=document.getElementById('fc-source'); if(fcs) fcs.innerHTML='<option value="">— (facultatif) —</option>'+SOURCES.map(s=>`<option value="${s.id}">${s.nom}</option>`).join(''); }
+  if(typeof fillFoSourceSelect==='function') fillFoSourceSelect();
   onSourceChange();
   const as=A();
   document.getElementById('sources-body').innerHTML = SOURCES.length? SOURCES.map(s=>`<tr>
@@ -2776,7 +2777,7 @@ function fillCategorieOptions(){
 async function loadFraisCats(){
   const {data,error}=await db.from(T('frais_cats')).select('*').order('nom');
   window._fraiscats=error?(window._fraiscats||[]):(data||[]);
-  renderCats(); fillCategorieOptions();
+  renderCats(); fillCategorieOptions(); if(typeof fillFournisseurCatSelect==='function') fillFournisseurCatSelect();
 }
 function renderCats(){
   const b=document.getElementById('cats-body'); if(!b) return;
