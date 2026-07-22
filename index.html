@@ -2526,7 +2526,7 @@ function openCheckColsModal(){ renderCheckCols(); const m=document.getElementByI
 function closeCheckColsModal(){ const m=document.getElementById('check-cols-modal'); if(m) m.classList.add('hidden'); }
 function checkWhyNot(d,item){
   const need=checkMaterielNeed(item);
-  if(need!=null){ const base=searchNorm((item.nom||'').replace(/[0-9]+/g,''))||'materiel'; return 'Factures « matériel » liées à ce dossier : '+checkFacturesCat(d,base)+' (il en faut '+need+' pour cocher) · frais liés au total : '+fraisOfDossier(d).length; }
+  if(need!=null){ const base=searchNorm((item.nom||'').replace(/[0-9]+/g,''))||'materiel'; const det=fraisOfDossier(d).map(f=>(f.categorie||'(sans cat.)')+' / '+(f.fournisseur||'(sans fourn.)')).join(' · ')||'aucun'; return 'Factures « matériel » reconnues : '+checkFacturesCat(d,base)+'/'+need+'. Frais liés au dossier : ['+det+']'; }
   const gc=guessCheckChamp(item);
   if(gc) return checkChampLabel(gc)+' = '+num(d[gc]||0)+' € (coché auto si 0)';
   const nm=searchNorm(item.nom||'');
