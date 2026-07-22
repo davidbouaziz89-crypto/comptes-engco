@@ -2500,7 +2500,7 @@ async function saveCheckItem(id){ const nom=(document.getElementById('cie-nom').
 const CHECK_COL_DEFS=[
   {key:'date',label:'Date',cell:d=>`<td>${fdate(d.date)}</td>`},
   {key:'crm_id',label:'ID',cell:d=>dossierIdCell(d)},
-  {key:'nom_client',label:'Raison sociale',cell:d=>`<td>${escH(d.nom_client||'')}</td>`},
+  {key:'nom_client',label:'Raison sociale',cell:d=>`<td><a href="#" onclick="openDossierDetail('${d.id}');return false" style="color:var(--accent);cursor:pointer" title="Voir le détail du dossier">${escH(d.nom_client||'')||'(voir dossier)'}</a></td>`},
   {key:'contact_client',label:'Contact client',cell:d=>`<td>${escH(d.contact_client||'')}</td>`},
   {key:'numero_depot',label:'Dépôt Emmy',cell:d=>`<td>${escH(d.numero_depot||'')}</td>`},
   {key:'ville',label:'Ville',cell:d=>`<td>${escH(d.ville||'')}</td>`},
