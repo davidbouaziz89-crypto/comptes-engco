@@ -2526,6 +2526,17 @@ function renderCheckCols(){
 }
 function openCheckColsModal(){ renderCheckCols(); const m=document.getElementById('check-cols-modal'); if(m) m.classList.remove('hidden'); }
 function closeCheckColsModal(){ const m=document.getElementById('check-cols-modal'); if(m) m.classList.add('hidden'); }
+function checkWhyNot(d,item){
+  const need=checkMaterielNeed(item);
+  if(need!=null){ const base=searchNorm((item.nom||'').replace(/[0-9]+/g,''))||'materiel'; return 'Dossier : '+checkMaterielCount(d)+' matériel(s) importé(s) · factures « matériel » liées : '+checkFacturesCat(d,base)+' (il en faut '+need+' pour cocher)'; }
+  const gc=guessCheckChamp(item);
+  if(gc) return checkChampLabel(gc)+' = '+num(d[gc]||0)+' € (coché auto si 0)';
+  const nm=searchNorm(item.nom||'');
+  const nb=nm?fraisOfDossier(d).filter(f=>fraisMatchesCat(f,nm)).length:0;
+  const tot=fraisOfDossier(d).length;
+  if(item.categorie) return 'Aucun frais « '+item.categorie+' » lié à ce dossier';
+  return nm? ('Factures « '+item.nom+' » liées : '+nb+' (frais liés au dossier : '+tot+')') : 'À cocher manuellement';
+}
 let _checkColF={}, _checkItemF={};
 function checkColText(c,d){ try{ return (''+c.cell(d)).replace(/<[^>]*>/g,' '); }catch(e){ return ''; } }
 function onCheckColFilter(el){ _checkColF[el.dataset.key]=el.value; renderCheckBody(); }
@@ -2565,7 +2576,7 @@ function renderCheckBody(){
       if(auto){ const need=checkMaterielNeed(i); const gc=guessCheckChamp(i);
         const why=(need!=null)?(checkMaterielCount(d)<need?('pas de '+need+'ᵉ matériel sur le dossier'):(need+' facture(s) matériel rattachée(s)')):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('facture « '+(i.categorie||i.nom||'')+' » rattachée au dossier');
         return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
-      return `<td class="num"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
+      return `<td class="num" title="${escH(checkWhyNot(d,i))}"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
     }).join('');
     const prog=items.length?`<td class="num"><div class="chk-prog"><div class="chk-prog-bar" style="width:${Math.round(done/items.length*100)}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span></td>`:'';
     return `<tr>${dcells}${icells}${prog}</tr>`;
