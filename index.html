@@ -2104,9 +2104,12 @@ function openDossierDetail(id){
 
   // Coûts déclarés
   if(couts.length){
+    const matLiv=Number(d.cout_materiel||0)+Number(d.cout_livraison||0);
     h+=`<div class="dd-sec">💸 Coûts déclarés</div><div class="table-wrap"><table><tbody>`
       +couts.map(c=>`<tr><td>${c[0]}</td><td class="num">${eur(c[1])}</td></tr>`).join('')
-      +`<tr><td><b>Total coûts</b></td><td class="num"><b>${eur(couts.reduce((s,c)=>s+Number(c[1]||0),0))}</b></td></tr></tbody></table></div>`;
+      +`<tr><td><b>Total coûts</b></td><td class="num"><b>${eur(couts.reduce((s,c)=>s+Number(c[1]||0),0))}</b></td></tr>`
+      +`<tr><td style="color:var(--muted)">🔎 Matériel + Livraison <span style="font-size:11px">(indicatif)</span></td><td class="num" style="color:var(--muted)">${eur(matLiv)}</td></tr>`
+      +`</tbody></table></div><div class="hint" style="margin-top:4px">🔎 « Matériel + Livraison » est juste un repère (déjà inclus dans les coûts ci-dessus, ne pas recompter).</div>`;
   }
 
   // Frais / factures liés
@@ -2143,6 +2146,7 @@ async function loadFrais(){
   const {data,error}=await db.from(T('frais')).select('*').order('date',{ascending:false});
   if(error){showError(error);return;}
   window._frais=data||[]; renderFrais(); refreshDashboard(); renderRegies(); checkMissingRecurrents();
+  if(typeof renderCheck==='function') renderCheck(); // les cases Check dépendent des frais rattachés
   generateFournRecurrents();
 }
 // ===== Frais récurrents pilotés par le fournisseur (génération auto + manquants) =====
