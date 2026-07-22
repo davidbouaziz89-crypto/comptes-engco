@@ -2581,9 +2581,7 @@ function renderCheckBody(){
       if(auto){ const need=checkMaterielNeed(i); const gc=guessCheckChamp(i);
         const why=(need!=null)?(checkMaterielCount(d)<need?('pas de '+need+'ᵉ matériel à l\'import (rien à acheter)'):(need+' facture(s) matériel liée(s) au dossier')):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('facture « '+(i.categorie||i.nom||'')+' » rattachée au dossier');
         return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
-      const need2=checkMaterielNeed(i);
-      const diag=(need2!=null)?`<div style="font-size:10px;color:var(--muted)">${checkFacturesCat(d,checkMaterielBase(i))}/${need2} · ${fraisOfDossier(d).length} liés</div>`:'';
-      return `<td class="num" title="${escH(checkWhyNot(d,i))}"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)">${diag}</td>`;
+      return `<td class="num" title="${escH(checkWhyNot(d,i))}"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
     }).join('');
     const prog=items.length?`<td class="num"><div class="chk-prog"><div class="chk-prog-bar" style="width:${Math.round(done/items.length*100)}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span></td>`:'';
     return `<tr>${dcells}${icells}${prog}</tr>`;
