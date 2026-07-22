@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
     const fourList = (fournisseurs ?? []).join(", ");
     const prompt =
       "Tu es un assistant comptable. Analyse cette facture française et réponds UNIQUEMENT par un objet JSON avec exactement ces clés :\n" +
-      '{"fournisseur": string, "date": "AAAA-MM-JJ", "montant_ht": number, "montant_ttc": number, "devise": string, "categorie": string, "detail": string, "confidence": number}\n' +
+      '{"fournisseur": string, "numero_facture": string, "date": "AAAA-MM-JJ", "montant_ht": number, "montant_ttc": number, "devise": string, "categorie": string, "detail": string, "confidence": number}\n' +
+      "- numero_facture = le numéro de la facture (référence), vide si absent.\n" +
       "- montant_ht = montant HORS TAXES (nombre, point décimal). montant_ttc = TTC.\n" +
       "- devise : code ISO (EUR, ILS...).\n" +
       (fourList ? `- fournisseur : réutilise EXACTEMENT un existant si proche. Existants : ${fourList}.\n` : "") +
