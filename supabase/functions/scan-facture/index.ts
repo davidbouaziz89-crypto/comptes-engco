@@ -1,18 +1,18 @@
 // =====================================================================
 //  Edge Function : scan-facture  (Compta LED / comptes-engco)
-//  Scan de factures par IA via GOOGLE GEMINI (palier gratuit).
-//  Reçoit une image/PDF (base64) + catégories/fournisseurs connus,
-//  renvoie les champs extraits (fournisseur, date, montant HT/TTC,
-//  catégorie, détail, devise). Ne touche pas à la base : le front valide.
+//  Scan de factures par IA via GROQ (Llama 4 vision) — GRATUIT, sans carte.
+//  Reçoit une image (base64) + catégories/fournisseurs connus, renvoie les
+//  champs extraits (fournisseur, date, montant HT/TTC, catégorie, détail).
+//  Ne touche pas à la base : le front affiche/valide puis insère.
 //
 //  Déploiement :
 //    supabase functions deploy scan-facture --project-ref lrslisyydbiejqzpsoxc --no-verify-jwt
-//  Secret requis (clé GRATUITE sur https://aistudio.google.com/app/apikey) :
-//    supabase secrets set GEMINI_API_KEY=AIza... --project-ref lrslisyydbiejqzpsoxc
+//  Secret requis (clé GRATUITE sans carte sur https://console.groq.com/keys) :
+//    supabase secrets set GROQ_API_KEY=gsk_... --project-ref lrslisyydbiejqzpsoxc
 // =====================================================================
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
-const MODEL = "gemini-2.0-flash"; // vision + JSON structuré, palier gratuit
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY")!;
+const MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"; // multimodal, palier gratuit Groq
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,62 +23,54 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    if (!GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY non configurée (supabase secrets set GEMINI_API_KEY=...)" }, 500);
+    if (!GROQ_API_KEY) return json({ error: "GROQ_API_KEY non configurée (supabase secrets set GROQ_API_KEY=...)" }, 500);
     const { image_b64, mime, categories, fournisseurs } = await req.json();
     if (!image_b64) return json({ error: "image_b64 manquant" }, 400);
+    if ((mime ?? "").includes("pdf")) return json({ error: "PDF non supporté par le scan IA gratuit — prends une photo de la facture (JPG/PNG)." }, 400);
 
     const catList = (categories ?? []).join(", ");
     const fourList = (fournisseurs ?? []).join(", ");
-
     const prompt =
-      "Tu es un assistant comptable. Extrais les champs de cette facture française et renvoie UNIQUEMENT le JSON demandé.\n" +
+      "Tu es un assistant comptable. Analyse cette facture française et réponds UNIQUEMENT par un objet JSON (sans texte autour, sans balises Markdown) avec exactement ces clés :\n" +
+      '{"fournisseur": string, "date": "AAAA-MM-JJ", "montant_ht": number, "montant_ttc": number, "devise": string, "categorie": string, "detail": string, "confidence": number}\n' +
       "- montant_ht = montant HORS TAXES (nombre, point décimal). montant_ttc = TTC.\n" +
-      "- date au format AAAA-MM-JJ.\n" +
       "- devise : code ISO (EUR, ILS...).\n" +
       (fourList ? `- fournisseur : réutilise EXACTEMENT un existant si proche. Existants : ${fourList}.\n` : "") +
       (catList ? `- categorie : de préférence parmi : ${catList}. Sinon la plus adaptée.\n` : "") +
-      "- detail : court objet de la facture (n° facture / prestation).\n" +
+      "- detail : court objet (n° facture / prestation).\n" +
       "- confidence : 0 à 1. N'invente rien : champ illisible = vide + confiance basse.";
 
+    const dataUrl = `data:${mime || "image/jpeg"};base64,${image_b64}`;
     const body = {
-      contents: [{
-        parts: [
-          { inline_data: { mime_type: mime || "image/jpeg", data: image_b64 } },
-          { text: prompt },
+      model: MODEL,
+      temperature: 0,
+      max_tokens: 1024,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: dataUrl } },
         ],
       }],
-      generationConfig: {
-        temperature: 0,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            fournisseur: { type: "STRING" },
-            date: { type: "STRING" },
-            montant_ht: { type: "NUMBER" },
-            montant_ttc: { type: "NUMBER" },
-            devise: { type: "STRING" },
-            categorie: { type: "STRING" },
-            detail: { type: "STRING" },
-            confidence: { type: "NUMBER" },
-          },
-        },
-      },
     };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-    const resp = await fetch(url, {
+    const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "authorization": "Bearer " + GROQ_API_KEY, "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!resp.ok) return json({ error: `Gemini API ${resp.status}: ${await resp.text()}` }, 502);
+    if (!resp.ok) return json({ error: `Groq API ${resp.status}: ${await resp.text()}` }, 502);
     const result = await resp.json();
-    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text: string = result?.choices?.[0]?.message?.content ?? "";
     if (!text) return json({ error: "pas d'extraction retournée" }, 502);
 
-    let extracted: any = {};
-    try { extracted = JSON.parse(text); } catch { return json({ error: "réponse IA non JSON" }, 502); }
+    let extracted: any = null;
+    try { extracted = JSON.parse(text); }
+    catch {
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) { try { extracted = JSON.parse(m[0]); } catch { /* ignore */ } }
+    }
+    if (!extracted || typeof extracted !== "object") return json({ error: "réponse IA non exploitable" }, 502);
     return json({ ok: true, extracted });
   } catch (e) {
     return json({ error: String(e) }, 500);
