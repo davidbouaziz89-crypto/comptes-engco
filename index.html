@@ -574,7 +574,7 @@
       <input type="file" id="imp-frais" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile('frais',this.files[0]);this.value='';">
     </section>
     <div id="scan-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeScanModal()">
-      <div class="dossier-modal-card" style="max-width:1100px">
+      <div class="dossier-modal-card" style="max-width:min(1600px,97vw);width:97vw">
         <section class="panel">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px"><h2 style="margin:0">📸 Scan de factures (IA)</h2><button class="btn ghost small" type="button" onclick="closeScanModal()">✕</button></div>
           <div class="hint" id="scan-hint" style="margin:6px 0 12px">Vérifie et ajuste les champs pré-remplis, puis enregistre.</div>
@@ -2449,7 +2449,10 @@ function checkAuto(d,item){
   if(need!=null) return checkMaterielCount(d)<need;
   const champ=guessCheckChamp(item);
   if(champ && Number(d[champ]||0)===0) return true; // coût = 0 → rien à faire → coché
-  if(item.categorie && fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie)) return true;
+  if(item.categorie && fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie)) return true; // catégorie liée + frais rattaché
+  // Auto par le NOM : un frais dont la catégorie = nom de l'élément, rattaché au dossier → coché
+  const nm=((item.nom||'')+'').trim().toLowerCase();
+  if(nm && fraisOfDossier(d).some(f=>((f.categorie||'')+'').trim().toLowerCase()===nm)) return true;
   return false;
 }
 function checkManual(d,item){ const s=(window._checkState||[]).find(x=>x.dossier_id===d.id&&x.item_id===item.id); return !!(s&&s.checked); }
@@ -2521,7 +2524,7 @@ function renderCheck(){
     const dcells=cols.map(c=>c.cell(d)).join('');
     const icells=items.map(i=>{
       const auto=checkAuto(d,i), on=auto||checkManual(d,i); if(on) done++;
-      if(auto){ const need=checkMaterielNeed(i); const gc=guessCheckChamp(i); const why=(need!=null)?('moins de '+need+' matériel(s) sur le dossier'):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('frais '+(i.categorie||'')+' rattaché'); return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
+      if(auto){ const need=checkMaterielNeed(i); const gc=guessCheckChamp(i); const why=(need!=null)?('moins de '+need+' matériel(s) sur le dossier'):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('facture « '+(i.categorie||i.nom||'')+' » rattachée au dossier'); return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
       return `<td class="num"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
     }).join('');
     const prog=items.length?`<td class="num"><div class="chk-prog"><div class="chk-prog-bar" style="width:${Math.round(done/items.length*100)}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span></td>`:'';
