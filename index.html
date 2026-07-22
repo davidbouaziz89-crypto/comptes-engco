@@ -620,6 +620,7 @@
         <div class="field"><label>Régie concernée</label><select id="f-regie" onchange="onFraisRegie()"></select></div>
         <div class="field" id="f-pct-field" style="display:none"><label>% refacturé régie <span style="color:var(--muted);font-weight:400">(modifiable)</span></label><input type="number" step="0.01" id="f-pct" value="0" oninput="fraisPreview()"></div>
         <div class="field" id="f-doc-field" style="display:none"><label>Justificatif (facture, document)</label><input type="file" id="f-doc" accept="image/*,.pdf" onchange="onFraisDocPick()"><div class="hint" id="f-doc-current" style="display:none;margin-top:4px"></div></div>
+        <div class="field"><label>N° de facture <span style="color:var(--muted);font-weight:400">(facultatif)</span></label><input type="text" id="f-numfacture" placeholder="ex. FAC-2026-018"></div>
         <div class="field"><label>Détail <span style="color:var(--muted);font-weight:400">(facultatif)</span></label><input type="text" id="f-detail" placeholder="ex. annulation dossier 12345, note…"></div>
       </form>
       <div class="preview" id="f-preview"></div>
@@ -2206,10 +2207,11 @@ function renderFrais(){
     if(f.id===inlineFraisId) return fraisEditRow(f);
     const src=SOURCES.find(s=>s.id===f.source_id);
     const _dids=fraisDossierIds(f); const _didHtml=_dids.map(id=>{ const u=(typeof crmLink==='function')?crmLink(id):''; return u?`<a href="${u}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${escH(id)} ↗</a>`:escH(id); }).join(', '); const dtag=_dids.length?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier(s) lié(s) — ID CRM">🔗 ${_didHtml}</span>`:'';
+    const nftag=f.numero_facture?` <span class="pill" style="background:rgba(16,185,129,.16)" title="N° de facture">🧾 ${escH(f.numero_facture)}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
     const autotag=f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)" title="Généré automatiquement (frais récurrent)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️ Manuel</span>';
     const catOk=catExists(f.categorie), fourOk=fournExists(f.fournisseur);
-    return `<tr><td><input type="checkbox" class="frais-check" data-id="${f.id}" onchange="onFraisCheck()"></td><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill${catOk?'':' pill-warn'}"${catOk?'':' title="Catégorie absente des paramètres — modifie-la"'}>${f.categorie||''}</span></td><td class="${fourOk?'':'orphan'}"${fourOk?'':' title="Fournisseur absent des paramètres"'}>${f.fournisseur||''}${dtag}${doctag}</td><td>${fraisTypePill(f)}</td>
+    return `<tr><td><input type="checkbox" class="frais-check" data-id="${f.id}" onchange="onFraisCheck()"></td><td>${fdate(f.date)}</td><td>${moisConcerneLabel(f)}</td><td>${autotag}</td><td><span class="pill${catOk?'':' pill-warn'}"${catOk?'':' title="Catégorie absente des paramètres — modifie-la"'}>${f.categorie||''}</span></td><td class="${fourOk?'':'orphan'}"${fourOk?'':' title="Fournisseur absent des paramètres"'}>${f.fournisseur||''}${dtag}${nftag}${doctag}</td><td>${fraisTypePill(f)}</td>
       <td>${src?src.nom:'—'}</td><td class="num">${eur(f.montant)}</td><td>${f.regie_concernee||'—'}</td>
       <td class="num">${eur(f.montant_regie)}${f.pct_decompte>0?` <span style="color:var(--muted);font-size:11px">(${num(f.pct_decompte)}%)</span>`:''}</td>
       <td class="num val-bad">${eur(f.montant_societe)}</td>
@@ -2231,7 +2233,7 @@ function filterFraisRows(){
   const q=fraisFilterState();
   return (window._frais||[]).filter(f=>{
     const src=SOURCES.find(s=>s.id===f.source_id);
-    if(q.term && !matchSearch(q.term,[fdate(f.date),moisConcerneLabel(f),f.categorie,f.libelle,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,fraisDossierIds(f).join(' ')].join(' '))) return false;
+    if(q.term && !matchSearch(q.term,[fdate(f.date),moisConcerneLabel(f),f.categorie,f.libelle,f.numero_facture,f.fournisseur,src?src.nom:'',f.regie_concernee,f.montant,fraisDossierIds(f).join(' ')].join(' '))) return false;
     if(q.date && !((fdate(f.date)+' '+moisConcerneLabel(f)).toLowerCase().includes(q.date))) return false;
     if(q.mois && fraisMonth(f)!==q.mois) return false;
     if(q.type==='auto' && !f.auto) return false;
@@ -2338,7 +2340,7 @@ function fraisEditRow(f){
     <td><select id="if-regie" onchange="onInlineRegie()">${fraisRegieOptions(f.regie_concernee||'')}</select></td>
     <td class="num"><input type="number" step="0.01" id="if-pct" value="${f.pct_decompte||0}" oninput="inlineFraisPreview()" style="display:inline-block;width:64px"> %</td>
     <td class="num val-bad" id="if-societe">${eur(f.montant_societe)}</td>
-    <td><input type="text" id="if-detail" placeholder="détail (facultatif)" value="${escH(f.libelle||'')}" style="min-width:120px"></td>
+    <td><input type="text" id="if-numfacture" placeholder="n° facture" value="${escH(f.numero_facture||'')}" style="min-width:90px;margin-bottom:4px"><input type="text" id="if-detail" placeholder="détail (facultatif)" value="${escH(f.libelle||'')}" style="min-width:120px"></td>
     <td class="num"><button class="btn small" onclick="saveFraisInline('${f.id}')">💾 OK</button> <button class="btn ghost small" onclick="cancelFraisInline()">Annuler</button></td>
   </tr>`;
 }
@@ -2362,7 +2364,7 @@ async function saveFraisInline(id){
     mois_concerne:g('if-mois').value||null,
     fournisseur:(function(v){return (v&&v!=='__new__')?v:null;})(g("if-fournisseur").value), montant,
     source_id:g('if-source').value||null, regie_concernee:g('if-regie').value||null,
-    pct_decompte:Number(g('if-pct').value)||0, libelle:(g('if-detail')?g('if-detail').value.trim():'')||null };
+    pct_decompte:Number(g('if-pct').value)||0, libelle:(g('if-detail')?g('if-detail').value.trim():'')||null, numero_facture:(g('if-numfacture')?g('if-numfacture').value.trim():'')||null };
   if(PROJ&&PROJ.key==='led'){
     const dv=g('if-dossier'); if(dv){ const ids=parseDossierIds(dv.value); row.dossier_crm_ids=ids.length?ids:null; row.dossier_crm_id=ids[0]||null; }
     const fi=g('if-doc'), file=fi&&fi.files&&fi.files[0];
@@ -3160,7 +3162,7 @@ function editFrais(id){
 }
 function cancelEditFrais(){
   editingFraisId=null;
-  ['f-fournisseur','f-montant','f-regie','f-dossier','f-doc','f-shekels','f-taux-ils','f-detail'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  ['f-fournisseur','f-montant','f-regie','f-dossier','f-doc','f-shekels','f-taux-ils','f-detail','f-numfacture'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
   if(typeof onFraisSource==='function') onFraisSource();
   { const fm=document.getElementById('f-mois'); if(fm) fm.value=today().slice(0,7); }
   { const cur=document.getElementById('f-doc-current'); if(cur){ cur.style.display='none'; cur.innerHTML=''; } }
@@ -3184,7 +3186,8 @@ async function addFrais(e){
     fournisseur:(function(v){return (v&&v!=='__new__')?v:null;})(document.getElementById('f-fournisseur').value), montant,
     source_id:document.getElementById('f-source').value||null, regie_concernee:document.getElementById('f-regie').value||null,
     pct_decompte:Number(document.getElementById('f-pct').value)||0,
-    libelle:((document.getElementById('f-detail')||{}).value||'').trim()||null };
+    libelle:((document.getElementById('f-detail')||{}).value||'').trim()||null,
+    numero_facture:((document.getElementById('f-numfacture')||{}).value||'').trim()||null };
   if(PROJ&&PROJ.key==='led'){
     { const dv=document.getElementById('f-dossier'); const ids=parseDossierIds(dv&&dv.value); row.dossier_crm_ids=ids.length?ids:null; row.dossier_crm_id=ids[0]||null; }
     const fi=document.getElementById('f-doc'), file=fi&&fi.files&&fi.files[0];
@@ -3197,10 +3200,22 @@ async function addFrais(e){
     }
   }
   if(!editingFraisId){
+    // 1) Doublon de NUMÉRO DE FACTURE
+    const nf=((row.numero_facture||'')+'').trim().toLowerCase();
+    if(nf){
+      const dupNf=(window._frais||[]).find(f=>((f.numero_facture||'')+'').trim().toLowerCase()===nf);
+      if(dupNf){
+        const ok=confirm('⚠️ DOUBLON DE FACTURE\n\nLe n° de facture « '+row.numero_facture+' » existe déjà :\n• '+(dupNf.fournisseur||'')+(dupNf.montant!=null?' — '+eur(dupNf.montant):'')+' le '+fdate(dupNf.date)+'\n\nEnregistrer quand même ?');
+        if(!ok) return;
+      }
+    }
+    // 2) Doublon par montant : seulement si MÊME mois + montant + catégorie + fournisseur ET MÊME dossier lié (ID différent = pas un doublon)
     const ym=row.mois_concerne||(row.date||'').slice(0,7);
-    const dup=(window._frais||[]).find(f=>fraisMonth(f)===ym && Number(f.montant)===Number(row.montant) && (f.categorie||'')===(row.categorie||''));
+    const keyIds=a=>JSON.stringify([...fraisDossierIds(a)].sort());
+    const rowKey=JSON.stringify([...parseDossierIds((row.dossier_crm_ids||[]).join(','))].sort());
+    const dup=(window._frais||[]).find(f=>fraisMonth(f)===ym && Number(f.montant)===Number(row.montant) && (f.categorie||'')===(row.categorie||'') && (f.fournisseur||'')===(row.fournisseur||'') && keyIds(f)===rowKey);
     if(dup){
-      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais « '+(row.categorie||'')+' » du MÊME montant ('+eur(row.montant)+') existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+(dup.libelle||dup.categorie||'')+(dup.fournisseur?' — '+dup.fournisseur:'')+' le '+fdate(dup.date)+'\n\nEs-tu sûr de vouloir enregistrer ce nouveau frais quand même ?');
+      const ok=confirm('⚠️ ATTENTION — possible doublon.\n\nUn frais « '+(row.categorie||'')+' » du MÊME montant ('+eur(row.montant)+'), même fournisseur et même dossier existe déjà pour '+moisLabel(ym+'-01')+' :\n• '+(dup.libelle||dup.categorie||'')+(dup.fournisseur?' — '+dup.fournisseur:'')+' le '+fdate(dup.date)+'\n\nEnregistrer quand même ?');
       if(!ok) return;
     }
   }
