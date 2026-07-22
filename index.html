@@ -2476,10 +2476,10 @@ function checkFacturesCat(d,base){ const b=searchNorm(base||''); if(!b) return 0
 function checkAuto(d,item){
   const need=checkMaterielNeed(item); // élément "Matériel N"
   if(need!=null){
-    const has=checkMaterielCount(d);               // nb de matériels du dossier (import)
-    if(has<need) return true;                      // pas de Nème matériel à l'import → rien à acheter → coché
-    const base=checkMaterielBase(item);
-    return checkFacturesCat(d,base)>=need;         // sinon il faut ≥ N factures matériel liées
+    // Matériel 1 : il y a TOUJOURS du matériel → il faut toujours une facture (jamais coché d'office).
+    // Matériel 2+ : coché d'office s'il n'y a pas de Nème matériel à l'import ; sinon il faut ≥ N factures.
+    if(need>=2 && checkMaterielCount(d)<need) return true;
+    return checkFacturesCat(d,checkMaterielBase(item))>=need;
   }
   const champ=guessCheckChamp(item);
   if(champ && Number(d[champ]||0)===0) return true; // coût = 0 → rien à faire → coché
@@ -2596,7 +2596,7 @@ function renderCheckBody(){
     const icells=items.map(i=>{
       const auto=checkAuto(d,i), on=auto||checkManual(d,i); if(on) done++;
       if(auto){ const need=checkMaterielNeed(i); const gc=guessCheckChamp(i);
-        const why=(need!=null)?(checkMaterielCount(d)<need?('pas de '+need+'ᵉ matériel à l\'import (rien à acheter)'):(need+' facture(s) matériel liée(s) au dossier')):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('facture « '+(i.categorie||i.nom||'')+' » rattachée au dossier');
+        const why=(need!=null)?((need>=2&&checkMaterielCount(d)<need)?('pas de '+need+'ᵉ matériel à l\'import (rien à acheter)'):(need+' facture(s) matériel liée(s) au dossier')):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('facture « '+(i.categorie||i.nom||'')+' » rattachée au dossier');
         return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
       return `<td class="num" title="${escH(checkWhyNot(d,i))}"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
     }).join('');
