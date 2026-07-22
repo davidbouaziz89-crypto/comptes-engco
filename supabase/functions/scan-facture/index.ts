@@ -12,7 +12,7 @@
 // =====================================================================
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
-const MODEL = "gemini-2.5-flash"; // vision + JSON structuré, palier gratuit
+const MODEL = "gemini-2.0-flash"; // vision + JSON structuré, palier gratuit
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
