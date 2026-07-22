@@ -1223,6 +1223,7 @@ function showParam(sec){
   document.querySelectorAll('#params-content > .params-sec').forEach(s=>s.classList.toggle('active', s.id==='ps-'+sec));
 }
 function showTab(t){
+  try{ window.scrollTo({top:0,behavior:'auto'}); }catch(e){ window.scrollTo(0,0); }
   buildParamsLayout();
   if(PARAM_SECS.includes(t)){ // raccourci legacy vers une section de Paramètres
     document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab==='parametres'));
