@@ -685,6 +685,12 @@
   </div>
 
   <!-- DÉTAIL DOSSIER (LED) -->
+  <div id="fraisids-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeFraisIds()">
+    <div class="auth-card" style="max-width:320px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h2 style="margin:0;font-size:18px">🔗 Dossiers liés</h2><button class="btn ghost small" style="margin-left:auto" onclick="closeFraisIds()">✕</button></div>
+      <div id="fraisids-body" style="max-height:50vh;overflow:auto"></div>
+    </div>
+  </div>
   <div id="dossier-detail" onclick="if(event.target===this)closeDossierDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;align-items:flex-start;justify-content:center;padding:24px;overflow:auto">
     <div class="panel" style="max-width:820px;width:100%;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.6)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;position:sticky;top:-24px;background:var(--panel);padding:6px 0;z-index:5">
@@ -2227,7 +2233,12 @@ function renderFrais(){
   document.getElementById('frais-body').innerHTML=rows.length? rows.map(f=>{
     if(f.id===inlineFraisId) return fraisEditRow(f);
     const src=SOURCES.find(s=>s.id===f.source_id);
-    const _dids=fraisDossierIds(f); const _didHtml=_dids.map(id=>{ const u=(typeof crmLink==='function')?crmLink(id):''; return u?`<a href="${u}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${escH(id)} ↗</a>`:escH(id); }).join(', '); const dtag=_dids.length?` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier(s) lié(s) — ID CRM">🔗 ${_didHtml}</span>`:'';
+    const _dids=fraisDossierIds(f);
+    let dtag='';
+    if(_dids.length){
+      if(_dids.length<=3){ const _h=_dids.map(id=>{ const u=(typeof crmLink==='function')?crmLink(id):''; return u?`<a href="${u}" target="_blank" rel="noopener" title="Ouvrir la fiche dans le CRM">${escH(id)} ↗</a>`:escH(id); }).join(', '); dtag=` <span class="pill" style="background:rgba(99,102,241,.16)" title="Dossier(s) lié(s) — ID CRM">🔗 ${_h}</span>`; }
+      else { dtag=` <button type="button" class="pill" style="background:rgba(99,102,241,.16);border:0;cursor:pointer;font:inherit" title="Voir les ${_dids.length} dossiers liés" onclick="openFraisIds('${_dids.join(',')}')">🔗 ${_dids.length} dossiers +</button>`; }
+    }
     const nftag=f.numero_facture?` <span class="pill" style="background:rgba(16,185,129,.16)" title="N° de facture">🧾 ${escH(f.numero_facture)}</span>`:'';
     const doctag=f.doc_path?` <a href="#" title="Justificatif : ${escH(f.doc_name||'document')}" onclick="openFraisDoc('${escH(f.doc_path)}');return false">📎</a>`:'';
     const autotag=f.auto?'<span class="pill" style="background:rgba(59,130,246,.18)" title="Généré automatiquement (frais récurrent)">🤖 Auto</span>':'<span style="color:var(--muted)">✍️ Manuel</span>';
@@ -3071,6 +3082,13 @@ function closeApportModal(){ const m=document.getElementById('apport-modal'); if
 function closeApportForm(){ cancelEditApport(); closeApportModal(); }
 function openFraisModal(){ cancelEditFrais(); const fm=document.getElementById('f-mois'); if(fm&&!fm.value) fm.value=today().slice(0,7); const fd=document.getElementById('f-date'); if(fd&&!fd.value) fd.value=today(); const m=document.getElementById('frais-modal'); if(m) m.classList.remove('hidden'); }
 function closeFraisModal(){ const m=document.getElementById('frais-modal'); if(m) m.classList.add('hidden'); }
+function openFraisIds(idsStr){
+  const ids=((idsStr||'')+'').split(',').map(s=>s.trim()).filter(Boolean);
+  const body=document.getElementById('fraisids-body'); if(!body) return;
+  body.innerHTML=ids.length?ids.map(id=>{ const u=(typeof crmLink==='function')?crmLink(id):''; return `<div style="padding:7px 0;border-bottom:1px solid var(--line)">${u?`<a href="${u}" target="_blank" rel="noopener">${escH(id)} ↗</a>`:escH(id)}</div>`; }).join(''):'<div class="hint">Aucun ID</div>';
+  document.getElementById('fraisids-modal').classList.remove('hidden');
+}
+function closeFraisIds(){ const m=document.getElementById('fraisids-modal'); if(m) m.classList.add('hidden'); }
 // ===== Scan de factures par IA (edge function scan-facture → Claude vision) =====
 const SCAN_FN_URL = SUPABASE_URL + '/functions/v1/scan-facture';
 let _scanRows=[];
