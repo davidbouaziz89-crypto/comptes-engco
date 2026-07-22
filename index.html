@@ -1609,6 +1609,8 @@ async function loadFournisseurs(){
   if(!isLed){ window._fournisseurs=[]; fillFournisseurSelect(); return; }
   const {data}=await db.from('engco_fournisseurs').select('*').order('nom');
   window._fournisseurs=data||[]; renderFournisseurs(); fillFournisseurSelect(); fillFournisseurCatSelect(); fillFoSourceSelect();
+  if(window._frais && typeof renderFrais==='function') renderFrais(); // le surlignage rouge (fournisseur/catégorie absent) dépend de cette liste
+  if(typeof renderCheck==='function') renderCheck();
   if(typeof generateFournRecurrents==='function') generateFournRecurrents();
 }
 let editingFournisseurId=null;
@@ -3388,6 +3390,7 @@ async function loadFraisCats(){
   const {data,error}=await db.from(T('frais_cats')).select('*').order('nom');
   window._fraiscats=error?(window._fraiscats||[]):(data||[]);
   renderCats(); fillCategorieOptions(); if(typeof fillFournisseurCatSelect==='function') fillFournisseurCatSelect();
+  if(window._frais && typeof renderFrais==='function') renderFrais(); // surlignage catégorie absente
 }
 function renderCats(){
   const b=document.getElementById('cats-body'); if(!b) return;
