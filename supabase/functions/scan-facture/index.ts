@@ -1,6 +1,6 @@
 // =====================================================================
 //  Edge Function : scan-facture  (Compta LED / comptes-engco)
-//  Scan de factures par IA via MISTRAL (Pixtral vision) — GRATUIT, sans carte.
+//  Scan de factures par IA via MISTRAL (mistral-small vision) — GRATUIT, sans carte.
 //  Reçoit une image (base64) + catégories/fournisseurs connus, renvoie les
 //  champs extraits (fournisseur, date, montant HT/TTC, catégorie, détail).
 //  Ne touche pas à la base : le front affiche/valide puis insère.
@@ -12,7 +12,7 @@
 // =====================================================================
 
 const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY")!;
-const MODEL = "pixtral-12b-2409"; // vision, palier gratuit Mistral
+const MODEL = "mistral-small-latest"; // vision, palier gratuit Mistral
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
