@@ -616,7 +616,7 @@
         <div class="field"><label>Mois concerné</label><input type="month" id="f-mois"></div>
         <div class="field"><label>Fournisseur</label><select id="f-fournisseur" onchange="onFraisFournisseur()"></select></div>
         <div class="field"><label>Catégorie</label><select id="f-categorie" onchange="onFraisCategorie()"></select></div>
-        <div class="field" id="f-dossier-field" style="display:none"><label>Dossier(s) lié(s) — ID CRM</label><input type="text" id="f-dossier" placeholder="ex. 12345, 16991 — virgules si plusieurs"></div>
+        <div class="field" id="f-dossier-field" style="display:none"><label>Dossier(s) lié(s) — ID CRM</label><input type="text" id="f-dossier" placeholder="ex. 12345 16991 — espace ou virgule si plusieurs"></div>
         <div class="field"><label>Payé par (société)</label><select id="f-source" onchange="onFraisSource()"></select></div>
         <div class="field f-eur"><label>Montant (€ HT)</label><input type="number" step="0.01" id="f-montant" placeholder="0.00 (hors taxes)" oninput="fraisPreview()"></div>
         <div class="field f-ils" style="display:none"><label>Montant (₪ shekels)</label><input type="number" step="0.01" id="f-shekels" placeholder="0.00" oninput="fraisPreview()"></div>
@@ -2345,7 +2345,7 @@ function fraisEditRow(f){
   let ledCell='';
   if(led){
     const cur=f.doc_path?`<div class="hint" style="margin-top:4px">📎 <a href="#" onclick="openFraisDoc('${escH(f.doc_path)}');return false">${escH(f.doc_name||'justificatif')}</a> — choisis un fichier pour le remplacer.</div>`:'';
-    ledCell=`<input type="text" id="if-dossier" placeholder="ID(s) dossier — virgules" value="${escH(fraisDossierIds(f).join(', '))}" style="margin-top:5px" title="Un ou plusieurs ID CRM séparés par des virgules">
+    ledCell=`<input type="text" id="if-dossier" placeholder="ID(s) — espace ou virgule" value="${escH(fraisDossierIds(f).join(', '))}" style="margin-top:5px" title="Un ou plusieurs ID CRM séparés par un espace ou une virgule">
       <input type="file" id="if-doc" accept="image/*,.pdf" style="margin-top:5px">${cur}`;
   }
   return `<tr class="rowedit">
@@ -3140,7 +3140,7 @@ function renderScanRows(){
       <td><input type="text" id="scr-nf-${i}" value="${escH(x.numero_facture||'')}" placeholder="n° facture" style="min-width:90px"></td>
       <td><input type="text" id="scr-four-${i}" value="${escH(x.fournisseur||'')}" style="min-width:110px"></td>
       <td><select id="scr-cat-${i}">${fraisCatOptions(x.categorie||'')}</select></td>
-      <td><input type="text" id="scr-dos-${i}" placeholder="ID(s) — virgules" style="min-width:100px"></td>
+      <td><input type="text" id="scr-dos-${i}" placeholder="ID(s) — espace/virgule" style="min-width:100px"></td>
       <td><select id="scr-src-${i}">${fraisSrcOptions(fournisseurSourceOf(x.fournisseur||''))}</select></td>
       <td class="num"><input type="number" step="0.01" id="scr-mnt-${i}" value="${mnt}" style="max-width:90px">${dev}</td>
       <td><select id="scr-reg-${i}" onchange="scanRegie(${i})">${fraisRegieOptions('')}</select></td>
