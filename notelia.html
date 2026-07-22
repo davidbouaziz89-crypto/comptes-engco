@@ -265,7 +265,6 @@
   <div class="userbox">
     <span id="user-email"></span>
     <button class="btn ghost small" id="btn-changeproj" onclick="showProjectPicker()" style="display:none">🔀 Changer de projet</button>
-    <button class="btn ghost small" id="btn-admin" onclick="openAdminUsers()" style="display:none">👥 Utilisateurs</button>
     <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
     <button class="btn ghost small" onclick="reloadData()">🔄 Rafraîchir</button>
     <button class="btn ghost small" onclick="changePassword()">🔑 Mot de passe</button>
@@ -957,7 +956,6 @@ async function openAdminConsole(which){
   document.getElementById('projpick').style.display='none';
   document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">Admin</span>';
   document.getElementById('btn-changeproj').style.display='';
-  { const ba=document.getElementById('btn-admin'); if(ba) ba.style.display='none'; }
   document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='none');
   document.getElementById('adminnav').style.display='flex';
   await loadRolesCfg();
@@ -992,7 +990,6 @@ function enterProject(key){
   document.getElementById('proj-label').innerHTML=PROJ.icon+' '+PROJ.nom;
   document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">'+roleLabel+'</span>';
   document.getElementById('btn-changeproj').style.display = myProjectKeys().length>1?'':'none';
-  { const ba=document.getElementById('btn-admin'); if(ba) ba.style.display=isAdminUser()?'':'none'; }
   buildAssocUI();
   applyRole(CURRENT_ROLE);
   if(CURRENT_ROLE==='regie'){ loadMonEspace(); } else { loadAll(); }
