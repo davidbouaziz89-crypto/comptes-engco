@@ -2450,7 +2450,15 @@ function guessCheckChamp(item){
 }
 function checkMaterielCount(d){ return (window._dossierMat||[]).filter(m=>m.dossier_id===d.id).length; }
 function checkMaterielNeed(item){ const m=((item&&item.nom)||'').toLowerCase().match(/mat[eé]riel\s*(\d+)/); return m?(Number(m[1])||1):null; }
-function checkFacturesCat(d,base){ const b=searchNorm(base||''); if(!b) return 0; return fraisOfDossier(d).filter(f=>searchNorm(f.categorie||'').includes(b)).length; }
+// Un frais correspond-il à une catégorie donnée ? via SA catégorie OU via les catégories de son fournisseur (multi-catégories).
+function fraisMatchesCat(f,normName){
+  if(!normName) return false;
+  if(searchNorm(f.categorie||'').includes(normName)) return true;
+  const fo=(window._fournisseurs||[]).find(x=>(x.nom||'')===(f.fournisseur||''));
+  if(fo && fournCats(fo).some(c=>searchNorm(c).includes(normName))) return true;
+  return false;
+}
+function checkFacturesCat(d,base){ const b=searchNorm(base||''); if(!b) return 0; return fraisOfDossier(d).filter(f=>fraisMatchesCat(f,b)).length; }
 function checkAuto(d,item){
   const need=checkMaterielNeed(item); // élément "Matériel N"
   if(need!=null){
@@ -2462,9 +2470,9 @@ function checkAuto(d,item){
   const champ=guessCheckChamp(item);
   if(champ && Number(d[champ]||0)===0) return true; // coût = 0 → rien à faire → coché
   if(item.categorie && fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie)) return true; // catégorie liée + frais rattaché
-  // Auto par le NOM (accents/casse ignorés) : un frais dont la catégorie = nom de l'élément, rattaché au dossier → coché
+  // Auto par le NOM (accents/casse ignorés) : une facture rattachée dont la catégorie (ou celle de son fournisseur) = nom de l'élément → coché
   const nm=searchNorm(item.nom||'');
-  if(nm && fraisOfDossier(d).some(f=>searchNorm(f.categorie||'')===nm)) return true;
+  if(nm && fraisOfDossier(d).some(f=>fraisMatchesCat(f,nm))) return true;
   return false;
 }
 function checkManual(d,item){ const s=(window._checkState||[]).find(x=>x.dossier_id===d.id&&x.item_id===item.id); return !!(s&&s.checked); }
