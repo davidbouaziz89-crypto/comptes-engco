@@ -740,7 +740,7 @@
         <div class="search-box" style="margin:0;flex:1;min-width:220px"><span class="ic">🔎</span><input type="text" id="check-search" placeholder="Rechercher un dossier (client, ID, ville…)" oninput="renderCheck()"></div>
       </div>
       <div class="table-wrap"><table id="check-table">
-        <thead><tr id="check-head"></tr></thead>
+        <thead><tr id="check-head"></tr><tr id="check-filter" class="filter-row"></tr></thead>
         <tbody id="check-body"></tbody>
       </table></div>
     </section>
@@ -1682,7 +1682,11 @@ async function onFraisFournisseur(){
   const cats=fournisseurCatsOf(sel.value);
   if(cats.length===1){ setCategorieValue('f-categorie',cats[0]); if(typeof onFraisCategorie==='function') onFraisCategorie(); }
   else if(cats.length>1){ toast('Ce fournisseur a plusieurs catégories — choisis-la dans la liste'); }
+  // Société qui paie : depuis le paramétrage du fournisseur
+  const sid=fournisseurSourceOf(sel.value);
+  if(sid){ const src=document.getElementById('f-source'); if(src && [...src.options].some(o=>o.value===sid)){ src.value=sid; if(typeof onFraisSource==='function') onFraisSource(); } }
 }
+function fournisseurSourceOf(nom){ const f=(window._fournisseurs||[]).find(x=>(x.nom||'')===nom); return f?(f.source_id||''):''; }
 async function onInlineFournisseur(){
   const sel=document.getElementById('if-fournisseur'); if(!sel) return;
   if(sel.value==='__new__'){ sel.value=''; const nom=await createFournisseurPrompt('if-categorie'); if(!nom) return;
@@ -1690,6 +1694,8 @@ async function onInlineFournisseur(){
   const cats=fournisseurCatsOf(sel.value);
   if(cats.length===1) setCategorieValue('if-categorie',cats[0]);
   else if(cats.length>1) toast('Ce fournisseur a plusieurs catégories — choisis-la dans la liste');
+  const sid=fournisseurSourceOf(sel.value);
+  if(sid){ const src=document.getElementById('if-source'); if(src && [...src.options].some(o=>o.value===sid)) src.value=sid; }
 }
 async function addFournisseur(e){ e.preventDefault(); const nom=(document.getElementById('fo-nom').value||'').trim(); if(!nom) return; const categories=readCatChecks('fo-cat-chk'); const type=(document.getElementById('fo-type')||{}).value||'depense'; const mv=(document.getElementById('fo-montant')||{}).value; const montant=mv!==''?Number(mv):null; const source_id=(document.getElementById('fo-source')||{}).value||null; const mois_debut=(document.getElementById('fo-mois')||{}).value||null; if(!categories.length){ toast('Choisis au moins une catégorie liée'); return; } if(type==='recurrent'&&!mois_debut){ toast('Indique le mois de début du récurrent'); return; } const {error}=await db.from('engco_fournisseurs').insert({nom,categorie:categories[0],categories,type,montant,source_id,mois_debut}); if(error){ toast('Erreur : '+error.message); return; } document.getElementById('fo-nom').value=''; { const m=document.getElementById('fo-montant'); if(m) m.value=''; } { const mo=document.getElementById('fo-mois'); if(mo) mo.value=''; } readCatChecks('fo-cat-chk').length&&document.querySelectorAll('input.fo-cat-chk:checked').forEach(x=>x.checked=false); toast('Fournisseur ajouté ✅'); loadFournisseurs(); }
 async function delFournisseur(id){ if(!confirm('Supprimer ce fournisseur ?')) return; const {error}=await db.from('engco_fournisseurs').delete().eq('id',id); if(error){ toast('Erreur : '+error.message); return; } toast('Supprimé'); loadFournisseurs(); }
@@ -2456,9 +2462,9 @@ function checkAuto(d,item){
   const champ=guessCheckChamp(item);
   if(champ && Number(d[champ]||0)===0) return true; // coût = 0 → rien à faire → coché
   if(item.categorie && fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie)) return true; // catégorie liée + frais rattaché
-  // Auto par le NOM : un frais dont la catégorie = nom de l'élément, rattaché au dossier → coché
-  const nm=((item.nom||'')+'').trim().toLowerCase();
-  if(nm && fraisOfDossier(d).some(f=>((f.categorie||'')+'').trim().toLowerCase()===nm)) return true;
+  // Auto par le NOM (accents/casse ignorés) : un frais dont la catégorie = nom de l'élément, rattaché au dossier → coché
+  const nm=searchNorm(item.nom||'');
+  if(nm && fraisOfDossier(d).some(f=>searchNorm(f.categorie||'')===nm)) return true;
   return false;
 }
 function checkManual(d,item){ const s=(window._checkState||[]).find(x=>x.dossier_id===d.id&&x.item_id===item.id); return !!(s&&s.checked); }
@@ -2512,19 +2518,37 @@ function renderCheckCols(){
 }
 function openCheckColsModal(){ renderCheckCols(); const m=document.getElementById('check-cols-modal'); if(m) m.classList.remove('hidden'); }
 function closeCheckColsModal(){ const m=document.getElementById('check-cols-modal'); if(m) m.classList.add('hidden'); }
+let _checkColF={}, _checkItemF={};
+function checkColText(c,d){ try{ return (''+c.cell(d)).replace(/<[^>]*>/g,' '); }catch(e){ return ''; } }
+function onCheckColFilter(el){ _checkColF[el.dataset.key]=el.value; renderCheckBody(); }
+function onCheckItemFilter(el){ _checkItemF[el.dataset.id]=el.value; renderCheckBody(); }
+function resetCheckFilters(){ _checkColF={}; _checkItemF={}; renderCheck(); }
+function _checkColsItems(){ return { cols:getCheckCols().map(k=>CHECK_COL_DEFS.find(c=>c.key===k)).filter(Boolean), items:window._checkItems||[] }; }
 function renderCheck(){
   renderCheckCols();
-  const head=document.getElementById('check-head'), body=document.getElementById('check-body'); if(!head||!body) return;
-  const items=window._checkItems||[];
-  const cols=getCheckCols().map(k=>CHECK_COL_DEFS.find(c=>c.key===k)).filter(Boolean);
+  const head=document.getElementById('check-head'), filterRow=document.getElementById('check-filter'); if(!head) return;
+  const {cols,items}=_checkColsItems();
   head.innerHTML=cols.map(c=>`<th${c.num?' class="num"':''}>${escH(c.label)}</th>`).join('')
     + items.map(i=>`<th class="num" title="${escH(i.nom)}">${escH(i.nom)}</th>`).join('')
     + (items.length?`<th class="num">Progression</th>`:'');
+  if(filterRow){
+    filterRow.innerHTML=cols.map(c=>`<th${c.num?' class="num"':''}><input type="text" data-key="${escH(c.key)}" placeholder="filtrer…" value="${escH(_checkColF[c.key]||'')}" oninput="onCheckColFilter(this)"></th>`).join('')
+      + items.map(i=>`<th class="num"><select data-id="${escH(i.id)}" onchange="onCheckItemFilter(this)"><option value="">Tous</option><option value="ok"${_checkItemF[i.id]==='ok'?' selected':''}>✅ Coché</option><option value="no"${_checkItemF[i.id]==='no'?' selected':''}>⬜ Non</option></select></th>`).join('')
+      + (items.length?`<th class="num"><button class="btn ghost small" type="button" onclick="resetCheckFilters()">Réinit.</button></th>`:(cols.length?`<th></th>`:''));
+  }
+  renderCheckBody();
+}
+function renderCheckBody(){
+  const body=document.getElementById('check-body'); if(!body) return;
+  const {cols,items}=_checkColsItems();
   const totalCols=Math.max(1,cols.length+items.length+(items.length?1:0));
   if(!cols.length && !items.length){ body.innerHTML=`<tr><td class="empty">Choisis des colonnes ci-dessus, et ajoute des éléments à vérifier dans ⚙️ Paramètres → Check.</td></tr>`; return; }
   const term=(document.getElementById('check-search')||{}).value||'';
-  const rows=(window._dossiers||[]).filter(d=>matchSearch(term,[fdate(d.date),d.crm_id,d.nom_client,d.ville,d.numero_depot].join(' ')));
-  if(!rows.length){ body.innerHTML=`<tr><td colspan="${totalCols}" class="empty">${term?'Aucun dossier trouvé':'Aucun dossier'}</td></tr>`; return; }
+  let rows=(window._dossiers||[]).filter(d=>matchSearch(term,[fdate(d.date),d.crm_id,d.nom_client,d.ville,d.numero_depot].join(' ')));
+  cols.forEach(c=>{ const fv=searchNorm(_checkColF[c.key]||''); if(fv) rows=rows.filter(d=>searchNorm(checkColText(c,d)).includes(fv)); });
+  items.forEach(i=>{ const fv=_checkItemF[i.id]; if(fv) rows=rows.filter(d=>{ const on=checkAuto(d,i)||checkManual(d,i); return fv==='ok'?on:!on; }); });
+  const active=term||Object.values(_checkColF).some(Boolean)||Object.values(_checkItemF).some(Boolean);
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="${totalCols}" class="empty">${active?'Aucun dossier ne correspond aux filtres':'Aucun dossier'}</td></tr>`; return; }
   body.innerHTML=rows.map(d=>{
     let done=0;
     const dcells=cols.map(c=>c.cell(d)).join('');
@@ -3050,7 +3074,7 @@ function renderScanRows(){
       <td><input type="text" id="scr-four-${i}" value="${escH(x.fournisseur||'')}" style="min-width:110px"></td>
       <td><select id="scr-cat-${i}">${fraisCatOptions(x.categorie||'')}</select></td>
       <td><input type="text" id="scr-dos-${i}" placeholder="ID(s) — virgules" style="min-width:100px"></td>
-      <td><select id="scr-src-${i}">${fraisSrcOptions('')}</select></td>
+      <td><select id="scr-src-${i}">${fraisSrcOptions(fournisseurSourceOf(x.fournisseur||''))}</select></td>
       <td class="num"><input type="number" step="0.01" id="scr-mnt-${i}" value="${mnt}" style="max-width:90px">${dev}</td>
       <td><select id="scr-reg-${i}" onchange="scanRegie(${i})">${fraisRegieOptions('')}</select></td>
       <td class="num"><input type="number" step="0.01" id="scr-pct-${i}" value="0" style="max-width:56px"></td>
