@@ -2453,6 +2453,7 @@ function guessCheckChamp(item){
   return null;
 }
 function checkMaterielCount(d){ return (window._dossierMat||[]).filter(m=>m.dossier_id===d.id).length; }
+function checkMaterielBase(item){ return searchNorm(((item&&item.nom)||'').replace(/[0-9]+/g,'')).trim()||'materiel'; }
 function checkMaterielNeed(item){ const m=((item&&item.nom)||'').toLowerCase().match(/mat[eé]riel\D*(\d+)/); return m?(Number(m[1])||1):null; }
 // Un frais correspond-il à une catégorie donnée ? via SA catégorie OU via les catégories de son fournisseur (multi-catégories).
 function fraisMatchesCat(f,normName){
@@ -2468,7 +2469,7 @@ function checkAuto(d,item){
   if(need!=null){
     const has=checkMaterielCount(d);               // nb de matériels du dossier (import)
     if(has<need) return true;                      // pas de Nème matériel à l'import → rien à acheter → coché
-    const base=searchNorm((item.nom||'').replace(/[0-9]+/g,''))||'materiel';
+    const base=checkMaterielBase(item);
     return checkFacturesCat(d,base)>=need;         // sinon il faut ≥ N factures matériel liées
   }
   const champ=guessCheckChamp(item);
@@ -2532,7 +2533,7 @@ function openCheckColsModal(){ renderCheckCols(); const m=document.getElementByI
 function closeCheckColsModal(){ const m=document.getElementById('check-cols-modal'); if(m) m.classList.add('hidden'); }
 function checkWhyNot(d,item){
   const need=checkMaterielNeed(item);
-  if(need!=null){ const base=searchNorm((item.nom||'').replace(/[0-9]+/g,''))||'materiel'; const det=fraisOfDossier(d).map(f=>(f.categorie||'(sans cat.)')+' / '+(f.fournisseur||'(sans fourn.)')).join(' · ')||'aucun'; return 'Matériels du dossier (import) : '+checkMaterielCount(d)+' · factures « matériel » reconnues : '+checkFacturesCat(d,base)+'/'+need+'. Frais liés : ['+det+']'; }
+  if(need!=null){ const base=checkMaterielBase(item); const det=fraisOfDossier(d).map(f=>(f.categorie||'(sans cat.)')+' / '+(f.fournisseur||'(sans fourn.)')).join(' · ')||'aucun'; return 'Matériels du dossier (import) : '+checkMaterielCount(d)+' · factures « matériel » reconnues : '+checkFacturesCat(d,base)+'/'+need+'. Frais liés : ['+det+']'; }
   const gc=guessCheckChamp(item);
   if(gc) return checkChampLabel(gc)+' = '+num(d[gc]||0)+' € (coché auto si 0)';
   const nm=searchNorm(item.nom||'');
@@ -2581,7 +2582,7 @@ function renderCheckBody(){
         const why=(need!=null)?(checkMaterielCount(d)<need?('pas de '+need+'ᵉ matériel à l\'import (rien à acheter)'):(need+' facture(s) matériel liée(s) au dossier')):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('facture « '+(i.categorie||i.nom||'')+' » rattachée au dossier');
         return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
       const need2=checkMaterielNeed(i);
-      const diag=(need2!=null)?`<div style="font-size:10px;color:var(--muted)">${checkFacturesCat(d,searchNorm((i.nom||'').replace(/[0-9]+/g,''))||'materiel')}/${need2} · ${fraisOfDossier(d).length} liés</div>`:'';
+      const diag=(need2!=null)?`<div style="font-size:10px;color:var(--muted)">${checkFacturesCat(d,checkMaterielBase(i))}/${need2} · ${fraisOfDossier(d).length} liés</div>`:'';
       return `<td class="num" title="${escH(checkWhyNot(d,i))}"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)">${diag}</td>`;
     }).join('');
     const prog=items.length?`<td class="num"><div class="chk-prog"><div class="chk-prog-bar" style="width:${Math.round(done/items.length*100)}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span></td>`:'';
