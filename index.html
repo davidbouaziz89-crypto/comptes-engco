@@ -739,6 +739,10 @@
         <button class="btn ghost" type="button" onclick="openCheckColsModal()">🧩 Colonnes <span id="check-cols-count" class="pill" style="margin-left:6px"></span></button>
         <div class="search-box" style="margin:0;flex:1;min-width:220px"><span class="ic">🔎</span><input type="text" id="check-search" placeholder="Rechercher un dossier (client, ID, ville…)" oninput="renderCheck()"></div>
       </div>
+      <div style="display:flex;gap:8px;margin:10px 0 4px">
+        <button class="btn ghost small frais-subtab active" id="check-tab-todo" type="button" onclick="showCheckView('todo')">🔲 À checker</button>
+        <button class="btn ghost small frais-subtab" id="check-tab-done" type="button" onclick="showCheckView('done')">✅ Complets</button>
+      </div>
       <div class="table-wrap"><table id="check-table">
         <thead><tr id="check-head"></tr><tr id="check-filter" class="filter-row"></tr></thead>
         <tbody id="check-body"></tbody>
@@ -2547,6 +2551,9 @@ function checkColText(c,d){ try{ return (''+c.cell(d)).replace(/<[^>]*>/g,' '); 
 function onCheckColFilter(el){ _checkColF[el.dataset.key]=el.value; renderCheckBody(); }
 function onCheckItemFilter(el){ _checkItemF[el.dataset.id]=el.value; renderCheckBody(); }
 function resetCheckFilters(){ _checkColF={}; _checkItemF={}; renderCheck(); }
+let _checkView='todo';
+function showCheckView(v){ _checkView=v; const t=document.getElementById('check-tab-todo'), dn=document.getElementById('check-tab-done'); if(t)t.classList.toggle('active',v==='todo'); if(dn)dn.classList.toggle('active',v==='done'); renderCheckBody(); }
+function dossierComplete(d,items){ if(!items.length) return false; return items.every(i=>checkAuto(d,i)||checkManual(d,i)); }
 function _checkColsItems(){ return { cols:getCheckCols().map(k=>CHECK_COL_DEFS.find(c=>c.key===k)).filter(Boolean), items:window._checkItems||[] }; }
 function renderCheck(){
   renderCheckCols();
@@ -2571,8 +2578,13 @@ function renderCheckBody(){
   let rows=(window._dossiers||[]).filter(d=>matchSearch(term,[fdate(d.date),d.crm_id,d.nom_client,d.ville,d.numero_depot].join(' ')));
   cols.forEach(c=>{ const fv=searchNorm(_checkColF[c.key]||''); if(fv) rows=rows.filter(d=>searchNorm(checkColText(c,d)).includes(fv)); });
   items.forEach(i=>{ const fv=_checkItemF[i.id]; if(fv) rows=rows.filter(d=>{ const on=checkAuto(d,i)||checkManual(d,i); return fv==='ok'?on:!on; }); });
+  // Sous-onglets : À checker (incomplets) / Complets (toutes les cases cochées)
+  const nbDone=items.length?rows.filter(d=>dossierComplete(d,items)).length:0, nbTodo=rows.length-nbDone;
+  { const t=document.getElementById('check-tab-todo'); if(t) t.innerHTML='🔲 À checker'+(nbTodo?` <span class="pill" style="background:rgba(239,68,68,.22)">${nbTodo}</span>`:''); }
+  { const dn=document.getElementById('check-tab-done'); if(dn) dn.innerHTML='✅ Complets'+(nbDone?` <span class="pill" style="background:rgba(16,185,129,.22)">${nbDone}</span>`:''); }
+  if(items.length) rows=rows.filter(d=>_checkView==='done'?dossierComplete(d,items):!dossierComplete(d,items));
   const active=term||Object.values(_checkColF).some(Boolean)||Object.values(_checkItemF).some(Boolean);
-  if(!rows.length){ body.innerHTML=`<tr><td colspan="${totalCols}" class="empty">${active?'Aucun dossier ne correspond aux filtres':'Aucun dossier'}</td></tr>`; return; }
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="${totalCols}" class="empty">${_checkView==='done'?'Aucun dossier complet pour le moment':(active?'Aucun dossier ne correspond aux filtres':'Tous les dossiers sont complets 🎉')}</td></tr>`; return; }
   body.innerHTML=rows.map(d=>{
     let done=0;
     const dcells=cols.map(c=>c.cell(d)).join('');
@@ -2610,6 +2622,7 @@ async function toggleCheckState(dossierId,itemId,checked){
   const st=window._checkState||[]; const ex=st.find(x=>x.dossier_id===dossierId&&x.item_id===itemId);
   if(ex) ex.checked=checked; else st.push({dossier_id:dossierId,item_id:itemId,checked});
   window._checkState=st;
+  renderCheckBody(); // bascule le dossier vers « Complets » si tout est coché
 }
 
 // ===== Tableau de bord =====
