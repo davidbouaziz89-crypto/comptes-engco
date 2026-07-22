@@ -2444,9 +2444,15 @@ function guessCheckChamp(item){
 }
 function checkMaterielCount(d){ return (window._dossierMat||[]).filter(m=>m.dossier_id===d.id).length; }
 function checkMaterielNeed(item){ const m=((item&&item.nom)||'').toLowerCase().match(/mat[eé]riel\s*(\d+)/); return m?(Number(m[1])||1):null; }
+function checkFacturesCat(d,base){ const b=searchNorm(base||''); if(!b) return 0; return fraisOfDossier(d).filter(f=>searchNorm(f.categorie||'').includes(b)).length; }
 function checkAuto(d,item){
-  const need=checkMaterielNeed(item); // "Matériel N" → coché si le dossier a moins de N matériels
-  if(need!=null) return checkMaterielCount(d)<need;
+  const need=checkMaterielNeed(item); // élément "Matériel N"
+  if(need!=null){
+    const has=checkMaterielCount(d);              // nb de matériels du dossier (import)
+    if(has<need) return true;                     // pas de Nème matériel → rien à faire → coché
+    const base=searchNorm((item.nom||'').replace(/[0-9]+/g,''))||'materiel';
+    return checkFacturesCat(d,base)>=need;        // il faut ≥ N factures matériel rattachées
+  }
   const champ=guessCheckChamp(item);
   if(champ && Number(d[champ]||0)===0) return true; // coût = 0 → rien à faire → coché
   if(item.categorie && fraisOfDossier(d).some(f=>(f.categorie||'')===item.categorie)) return true; // catégorie liée + frais rattaché
@@ -2524,7 +2530,9 @@ function renderCheck(){
     const dcells=cols.map(c=>c.cell(d)).join('');
     const icells=items.map(i=>{
       const auto=checkAuto(d,i), on=auto||checkManual(d,i); if(on) done++;
-      if(auto){ const need=checkMaterielNeed(i); const gc=guessCheckChamp(i); const why=(need!=null)?('moins de '+need+' matériel(s) sur le dossier'):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('facture « '+(i.categorie||i.nom||'')+' » rattachée au dossier'); return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
+      if(auto){ const need=checkMaterielNeed(i); const gc=guessCheckChamp(i);
+        const why=(need!=null)?(checkMaterielCount(d)<need?('pas de '+need+'ᵉ matériel sur le dossier'):(need+' facture(s) matériel rattachée(s)')):(gc && Number(d[gc]||0)===0)?(checkChampLabel(gc)+' = 0 (rien à faire)'):('facture « '+(i.categorie||i.nom||'')+' » rattachée au dossier');
+        return `<td class="num"><span class="chk-auto" title="Coché automatiquement — ${escH(why)}">✅ auto</span></td>`; }
       return `<td class="num"><input type="checkbox" class="chk-box" ${on?'checked':''} onchange="toggleCheckState('${d.id}','${i.id}',this.checked)"></td>`;
     }).join('');
     const prog=items.length?`<td class="num"><div class="chk-prog"><div class="chk-prog-bar" style="width:${Math.round(done/items.length*100)}%"></div></div><span class="chk-prog-txt">${done}/${items.length}</span></td>`:'';
