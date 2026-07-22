@@ -1371,7 +1371,7 @@ function buildAssocUI(){
   // investi cards
   document.getElementById('db-invest-cards').innerHTML =
     as.map(a=>`<div class="card"><div class="label">Investi par ${a.label}</div><div class="value" id="db-inv-${a.k}">—</div></div>`).join('')
-    + `<div class="card"><div class="label">Total investi</div><div class="value" id="db-inv-tot">—</div></div>`;
+    + `<div class="card" id="db-invtot-card"><div class="label">Total investi <span style="opacity:.6">ⓘ</span></div><div class="value" id="db-inv-tot">—</div></div>`;
   document.getElementById('db-reste-body').innerHTML = as.map(a=>`<tr><td>${a.label}</td><td class="num" id="db-inv2-${a.k}">—</td><td class="num" id="db-part-${a.k}">—</td><td class="num" id="db-rec-${a.k}">—</td><td class="num" id="db-reste-${a.k}">—</td></tr>`).join('');
   const share=(100/as.length).toFixed(as.length===3?1:0);
   document.getElementById('db-benef-cards').innerHTML = as.map(a=>`<div class="card"><div class="label">→ Part ${a.label} (${share}%)</div><div class="value" id="db-benef-${a.k}">—</div></div>`).join('');
@@ -2652,6 +2652,11 @@ function refreshDashboard(){
   // sur la régie / déduite de ce qu'on lui doit, donc elle n'impacte pas nos bénéfices (un frais à 100 % régie = 0).
   const fraisReels=frais.filter(f=>!isReversement(f)).reduce((s,f)=>s+Number(f.montant_societe!=null?f.montant_societe:(f.montant||0)),0);
   const recup=primesRealisees-fraisReels-regieTot-davidTot;
+  // ===== Réconciliation « Frais réels » ↔ « Total investi » =====
+  const apportsTot=as.reduce((s,a)=>s+apports.reduce((ss,ap)=>ss+Number(ap['montant_'+a.k]||0),0),0);
+  const refacRegieAll=frais.reduce((s,f)=>s+Number(f.montant_regie||0),0); // part refacturée régie (dans les frais)
+  const reversementsSoc=frais.filter(isReversement).reduce((s,f)=>s+Number(f.montant_societe!=null?f.montant_societe:(f.montant||0)),0); // reversements régie/manager exclus des frais réels
+  const ecartResidu=invTot-(fraisReels+refacRegieAll+reversementsSoc+apportsTot); // reliquat (répartition sociétés / arrondis)
   const fairShare=invTot/as.length;
   as.forEach(a=>{
     document.getElementById('db-inv-'+a.k).textContent=eur(inv[a.k]);
@@ -2690,6 +2695,13 @@ function refreshDashboard(){
       + `<tr style="border-top:2px solid var(--accent)"><td colspan="5"><b>TOTAL — Réalisé (${cat.realise.n} / ${dossiers.length} dossiers)</b></td><td class="num"><b>${eur(cat.realise.ca)}</b></td><td class="num"><b class="val-good">${eur(margeNette)}</b></td><td class="num"><b>${eur(partAssoc)}</b></td></tr>`
     : `<tr><td colspan="8" class="empty">Aucun dossier</td></tr>`;
   document.getElementById('db-inv-tot').textContent=eur(invTot);
+  attachPop('db-invtot-card','Total investi (composition)',[
+    {l:'Apports directs',v:eur(apportsTot)},
+    {l:'+ Frais réels (part société)',v:'+'+eur(fraisReels)},
+    {l:'+ Part refacturée régie',v:'+'+eur(refacRegieAll)},
+    {l:'+ Reversements régie / manager',v:'+'+eur(reversementsSoc)},
+    ...(Math.abs(ecartResidu)>1?[{l:'+ Répartition sociétés (arrondis)',v:'+'+eur(ecartResidu)}]:[]),
+    {l:'= Total investi',v:eur(invTot),t:1}]);
   document.getElementById('db-marge').textContent=eur(margeNette);
   document.getElementById('db-regie').textContent=eur(regieTot);
   document.getElementById('db-david').textContent=eur(davidTot);
@@ -2727,7 +2739,8 @@ function refreshDashboard(){
     else { const cible=new Date(Date.now()+(nonCouvert/parMois)*30.44*24*60*60*1000); el.innerHTML='<span class="val-good">~ '+cible.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</span>'; }
   } else el.textContent='—';
   // ---- Refonte « Cockpit LED » : KPI héros animés + graphiques ----
-  updateHeroKpis({recup:recup,primes:primesRealisees,fraisReels:fraisReels,regie:regieTot,manager:davidTot,recupPart:partReal,valides:cat.realise.n,total:dossiers.length,nb:as.length});
+  updateHeroKpis({recup:recup,primes:primesRealisees,fraisReels:fraisReels,regie:regieTot,manager:davidTot,recupPart:partReal,valides:cat.realise.n,total:dossiers.length,nb:as.length,
+    invTot:invTot,apports:apportsTot,refacRegie:refacRegieAll,reversementsSoc:reversementsSoc,residu:ecartResidu});
   renderDashboardCharts({cat:cat,frais:frais,as:as,inv:inv,dossiers:dossiers,flux:{margeNette:margeNette,regie:regieTot,frais:fraisSociete,resultat:marge}});
   renderDashboardTables({frais:frais,dossiers:dossiers,valid:valid});
 }
@@ -2766,10 +2779,13 @@ function updateHeroKpis(d){
   attachPop('hero-primes-card','Primes HT encaissées',[
     {l:'Somme des primes HT',v:eur(d.primes)},
     {l:'(dossiers validés uniquement)',v:''}]);
-  attachPop('hero-frais-card','Frais réels à charge société',[
-    {l:'Frais saisis (part société)',v:eur(d.fraisReels)},
-    {l:'part refacturée régie exclue',v:''},
-    {l:'reversements régie exclus',v:''}]);
+  attachPop('hero-frais-card','Frais réels → Total investi',[
+    {l:'Frais réels (part société)',v:eur(d.fraisReels)},
+    {l:'+ Part refacturée à la régie',v:'+'+eur(d.refacRegie||0)},
+    {l:'+ Reversements régie / manager',v:'+'+eur(d.reversementsSoc||0)},
+    {l:'+ Apports directs',v:'+'+eur(d.apports||0)},
+    ...(Math.abs(d.residu||0)>1?[{l:'+ Répartition sociétés (arrondis)',v:'+'+eur(d.residu)}]:[]),
+    {l:'= Total investi',v:eur(d.invTot||0),t:1}]);
   attachPop('hero-part-card','Part par associé',[
     {l:'Ce qu\'on récupère',v:eur(d.recup)},
     {l:'÷ Associés',v:String(d.nb)},
