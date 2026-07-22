@@ -2973,6 +2973,26 @@ function closeFraisModal(){ const m=document.getElementById('frais-modal'); if(m
 const SCAN_FN_URL = SUPABASE_URL + '/functions/v1/scan-facture';
 let _scanRows=[];
 async function fileToB64(file){ const bytes=new Uint8Array(await file.arrayBuffer()); let bin=''; const chunk=0x8000; for(let i=0;i<bytes.length;i+=chunk){ bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk)); } return btoa(bin); }
+let _pdfjsLoading=null;
+function ensurePdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if(_pdfjsLoading) return _pdfjsLoading;
+  _pdfjsLoading=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){} res(window.pdfjsLib); };
+    s.onerror=()=>rej(new Error('Chargement pdf.js échoué')); document.head.appendChild(s); });
+  return _pdfjsLoading;
+}
+async function pdfFirstPageToImageB64(file){
+  const lib=await ensurePdfJs();
+  const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const page=await pdf.getPage(1);
+  const base=page.getViewport({scale:1});
+  const scale=base.width*2>2200?2200/base.width:2;
+  const viewport=page.getViewport({scale});
+  const canvas=document.createElement('canvas'); canvas.width=viewport.width; canvas.height=viewport.height;
+  await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+  return canvas.toDataURL('image/jpeg',0.85).split(',')[1];
+}
 function closeScanModal(){ const m=document.getElementById('scan-modal'); if(m) m.classList.add('hidden'); _scanRows=[]; }
 function scanConf(c){ c=Number(c||0); const col=c>=0.85?'val-good':(c>=0.6?'':'val-bad'); return `<span class="${col}">${Math.round(c*100)}%</span>`; }
 async function scanFactures(fileList){
@@ -2991,8 +3011,11 @@ async function scanFactures(fileList){
     if(prog) prog.textContent='🔎 Analyse '+(idx+1)+'/'+files.length+' : '+file.name+'…';
     let extracted={};
     try{
-      const b64=await fileToB64(file);
-      const r=await fetch(SCAN_FN_URL,{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+(token||SUPABASE_KEY),'apikey':SUPABASE_KEY},body:JSON.stringify({image_b64:b64,mime:file.type,categories:cats,fournisseurs:fours})});
+      const isPdf=(file.type||'').includes('pdf')||/\.pdf$/i.test(file.name);
+      let b64, mime2;
+      if(isPdf){ if(prog) prog.textContent='📄 Conversion PDF '+(idx+1)+'/'+files.length+' : '+file.name+'…'; b64=await pdfFirstPageToImageB64(file); mime2='image/jpeg'; }
+      else { b64=await fileToB64(file); mime2=file.type; }
+      const r=await fetch(SCAN_FN_URL,{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+(token||SUPABASE_KEY),'apikey':SUPABASE_KEY},body:JSON.stringify({image_b64:b64,mime:mime2,categories:cats,fournisseurs:fours})});
       const j=await r.json();
       extracted=j.error?{_err:j.error}:(j.extracted||{});
     }catch(e){ extracted={_err:String(e)}; }
