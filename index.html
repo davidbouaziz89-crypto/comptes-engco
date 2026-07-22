@@ -401,6 +401,9 @@
         <div class="card"><div class="label">− Commission manager (auto)</div><div class="value val-bad" id="db-mgrauto">—</div></div>
         <div class="card good" id="db-recup-card"><div class="label">= Ce qu'on se récupère <span style="opacity:.6">ⓘ</span></div><div class="value val-good" id="db-recup" style="font-size:24px">—</div></div>
       </div>
+      <div class="grid cards" style="margin-top:12px">
+        <div class="card" id="db-fraisbrut-card"><div class="label">🧾 Total des frais payés (brut) <span style="opacity:.6">ⓘ</span></div><div class="value" id="db-fraisbrut">—</div><div class="label" style="margin-top:6px">montant complet de toutes tes factures — pour info, pas utilisé dans le calcul de marge</div></div>
+      </div>
     </section>
 
     <section class="panel">
@@ -2657,6 +2660,7 @@ function refreshDashboard(){
   const refacRegieAll=frais.reduce((s,f)=>s+Number(f.montant_regie||0),0); // part refacturée régie (dans les frais)
   const reversementsSoc=frais.filter(isReversement).reduce((s,f)=>s+Number(f.montant_societe!=null?f.montant_societe:(f.montant||0)),0); // reversements régie/manager exclus des frais réels
   const ecartResidu=invTot-(fraisReels+refacRegieAll+reversementsSoc+apportsTot); // reliquat (répartition sociétés / arrondis)
+  const fraisPayesTotal=frais.reduce((s,f)=>s+Number(f.montant||0),0); // montant complet de TOUTES les factures (brut)
   const fairShare=invTot/as.length;
   as.forEach(a=>{
     document.getElementById('db-inv-'+a.k).textContent=eur(inv[a.k]);
@@ -2712,7 +2716,13 @@ function refreshDashboard(){
     set('db-fraisreels',eur(fraisReels));
     set('db-regieauto',eur(regieTot));
     set('db-mgrauto',eur(davidTot));
-    const rc=document.getElementById('db-recup'); if(rc){ rc.textContent=eur(recup); rc.className='value '+(recup>=0?'val-good':'val-bad'); rc.style.fontSize='24px'; } }
+    const rc=document.getElementById('db-recup'); if(rc){ rc.textContent=eur(recup); rc.className='value '+(recup>=0?'val-good':'val-bad'); rc.style.fontSize='24px'; }
+    set('db-fraisbrut',eur(fraisPayesTotal)); }
+  attachPop('db-fraisbrut-card','Total brut → Frais réels',[
+    {l:'Toutes tes factures (montant complet)',v:eur(fraisPayesTotal)},
+    {l:'− Part refacturée à la régie',v:'−'+eur(refacRegieAll)},
+    {l:'− Reversements régie / manager',v:'−'+eur(reversementsSoc)},
+    {l:'= Frais réels (part société)',v:eur(fraisReels),t:1}]);
   attachPop('db-recup-card','Ce qu\'on se récupère',[
     {l:'Primes HT encaissées (validés)',v:eur(primesRealisees)},
     {l:'− Frais réels (part société)',v:'−'+eur(fraisReels)},
