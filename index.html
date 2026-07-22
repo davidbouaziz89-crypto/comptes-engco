@@ -2467,10 +2467,11 @@ function checkMaterielNeed(item){ const m=((item&&item.nom)||'').toLowerCase().m
 // Un frais correspond-il à une catégorie donnée ? via SA catégorie OU via les catégories de son fournisseur (multi-catégories).
 function fraisMatchesCat(f,normName){
   if(!normName) return false;
-  if(searchNorm(f.categorie||'').includes(normName)) return true;
+  const cat=searchNorm(f.categorie||'');
+  if(cat) return cat.includes(normName); // le frais A une catégorie → on s'y fie (pas au fournisseur)
+  // catégorie vide → on se rabat sur les catégories du fournisseur
   const fo=(window._fournisseurs||[]).find(x=>(x.nom||'')===(f.fournisseur||''));
-  if(fo && fournCats(fo).some(c=>searchNorm(c).includes(normName))) return true;
-  return false;
+  return !!(fo && fournCats(fo).some(c=>searchNorm(c).includes(normName)));
 }
 function checkFacturesCat(d,base){ const b=searchNorm(base||''); if(!b) return 0; return fraisOfDossier(d).filter(f=>fraisMatchesCat(f,b)).length; }
 function checkAuto(d,item){
