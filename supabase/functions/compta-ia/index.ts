@@ -49,8 +49,11 @@ const FACTURE_SCHEMA = {
     vat_rate: { type: ["number", "null"], description: "Taux de TVA en %" },
     vat_amount: { type: ["number", "null"] },
     amount_ttc: { type: ["number", "null"] },
+    is_restaurant: { type: ["boolean", "null"], description: "true si c'est une note de restaurant / repas" },
+    meals: { type: ["integer", "null"], description: "Nombre de couverts/repas (personnes) si c'est un restaurant, sinon null" },
+    guests: { type: ["string", "null"], description: "Noms des convives si mentionnés sur la note de restaurant, sinon null" },
   },
-  required: ["direction", "counterparty", "invoice_number", "invoice_date", "amount_ht", "vat_rate", "vat_amount", "amount_ttc"],
+  required: ["direction", "counterparty", "invoice_number", "invoice_date", "amount_ht", "vat_rate", "vat_amount", "amount_ttc", "is_restaurant", "meals", "guests"],
 };
 
 function tryParseJson(s: string): unknown {
@@ -110,7 +113,8 @@ Si tu identifies clairement le client/fournisseur, indique-le dans counterparty,
 Propose la catégorie la plus adaptée parmi cette liste (utilise son id exact), ou null si tu n'es pas sûr :
 ${catList}
 N'invente aucune ligne. Ne renvoie que ce qui figure réellement sur le relevé.`
-      : `Tu es un assistant comptable. Analyse cette facture et extrais : le sens (achat = facture reçue d'un fournisseur / vente = facture émise à un client), le tiers (fournisseur ou client), le numéro de facture, la date (AAAA-MM-JJ), le montant HT, le taux de TVA (%), le montant de TVA et le montant TTC. Mets null pour tout champ absent. Calcule les montants manquants si c'est déductible des autres.`;
+      : `Tu es un assistant comptable. Analyse cette facture et extrais : le sens (achat = facture reçue d'un fournisseur / vente = facture émise à un client), le tiers (fournisseur ou client), le numéro de facture, la date (AAAA-MM-JJ), le montant HT, le taux de TVA (%), le montant de TVA et le montant TTC. Mets null pour tout champ absent. Calcule les montants manquants si c'est déductible des autres.
+Si le document est une note/addition de RESTAURANT ou de repas : mets is_restaurant=true, et indique dans meals le nombre de couverts/repas (nombre de personnes servies, déductible si visible sur la note : couverts, menus, cafés…), et dans guests les noms des convives s'ils sont écrits. Sinon is_restaurant=false et meals/guests à null.`;
 
     const schema = kind === "releve" ? RELEVE_SCHEMA : FACTURE_SCHEMA;
 

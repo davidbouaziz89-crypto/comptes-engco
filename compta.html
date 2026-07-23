@@ -139,6 +139,8 @@
   table.compact tr:hover td{background:rgba(59,130,246,.10)}
   table.compact select,table.compact input{padding:5px 8px;font-size:13px}
   select.mini{min-width:150px;max-width:220px;width:auto}
+  .banner-ok{background:rgba(34,197,94,.12);border:1px solid #2f6b43;color:var(--txt);padding:10px 14px;border-radius:10px;font-size:14px}
+  .banner-info{background:rgba(59,130,246,.12);border:1px solid var(--accent);color:var(--txt);padding:10px 14px;border-radius:10px;font-size:14px}
   /* Catégories : menu latéral gauche + édition à droite (comme le CRM) */
   .cat-layout{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:12px}
   .cat-menu{flex:0 0 250px;display:flex;flex-direction:column;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px;max-height:62vh;overflow:auto}
@@ -214,6 +216,14 @@
   <!-- DASHBOARD -->
   <div id="tab-dashboard">
     <div class="grid cards" id="db-cards"></div>
+    <section class="panel" id="db-torappro" style="display:none;border-left:4px solid var(--danger)">
+      <h2 style="margin:0 0 4px">📄 Factures à rapprocher</h2>
+      <div class="hint">Ces factures ne sont pas encore reliées à leur paiement sur le relevé. Clique « Relier » pour retrouver le paiement (le logiciel cherche aussi dans tes autres sociétés).</div>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Date</th><th>Sens</th><th>Tiers</th><th>Catégorie</th><th class="num">TTC</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="db-inv-body"></tbody>
+      </table></div>
+    </section>
     <section class="panel">
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <h2 style="margin:0;flex:1">📊 Rapprochement du mois</h2>
@@ -291,6 +301,7 @@
         <div class="field"><label>Montant TTC (€)</label><input type="number" step="0.01" id="i-ttc" placeholder="auto si vide" oninput="invPreview()"></div>
         <div class="field"><label>Catégorie</label><select id="i-cat" onchange="onInvCatChange()"><option value="">— catégorie —</option></select></div>
         <div class="field" id="i-guests-field" style="display:none;min-width:240px"><label>🍽️ Invités (restaurant)</label><input type="text" id="i-guests" placeholder="ex. M. Durand (client X), Mme Martin"></div>
+        <div class="field" id="i-meals-field" style="display:none;max-width:130px"><label>Nb repas</label><input type="number" min="0" step="1" id="i-meals" placeholder="ex. 2"></div>
         <div class="field"><label>Rapprocher d'un paiement</label><select id="i-tx"><option value="">— plus tard —</option></select></div>
         <div class="field" style="min-width:260px"><label>Facture (PDF / photo)</label>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -303,6 +314,7 @@
         </div>
       </form>
       <div class="preview" id="i-preview"></div>
+      <div id="i-match" style="margin-top:10px"></div>
       <div style="margin-top:14px"><button class="btn" onclick="addInvoice(event)">+ Enregistrer la facture</button></div>
     </section>
 
@@ -313,7 +325,7 @@
         <div class="field"><label>Mois</label><select id="inv-fmonth" onchange="renderInvoices()"><option value="">Tous</option><option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option><option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option><option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option><option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option></select></div>
         <div class="field"><label>Fournisseur / client</label><select id="inv-ftiers" onchange="renderInvoices()"><option value="">Tous</option></select></div>
         <div class="field"><label>Sens</label><select id="inv-fdir" onchange="renderInvoices()"><option value="">Tous</option><option value="achat">Achats</option><option value="vente">Ventes</option></select></div>
-        <div class="field"><label>Rapprochement</label><select id="inv-fmatch" onchange="renderInvoices()"><option value="">Tous</option><option value="rapproche">Rapprochées</option><option value="a_rapprocher">À rapprocher</option></select></div>
+        <div class="field"><label>Rapprochement</label><select id="inv-fmatch" onchange="renderInvoices()"><option value="">Tous</option><option value="rapproche">✅ Rapprochées</option><option value="partiel">⏳ Partielles</option><option value="a_rapprocher">⏳ En attente</option></select></div>
         <div class="field" style="max-width:200px"><label>Recherche</label><input type="text" id="inv-search" placeholder="tiers, n°…" oninput="renderInvoices()"></div>
       </div>
       <div class="table-wrap"><table class="compact">
@@ -517,6 +529,34 @@
   </div>
 </div>
 
+<!-- MODALE SENS INVERSE : factures reliées automatiquement aux lignes importées -->
+<div id="revlink-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:680px">
+    <div class="modal-head"><h3>🔗 Factures reconnues dans ce relevé</h3><button class="btn ghost small" onclick="closeRevlink()">✕</button></div>
+    <div class="hint">Des factures en attente correspondent à des lignes de ce relevé. Décoche celles que tu ne veux pas relier, puis valide.</div>
+    <div id="revlink-body" style="max-height:50vh;overflow:auto;margin-top:8px"></div>
+    <div style="margin-top:16px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn ghost" onclick="closeRevlink()">Ignorer</button>
+      <button class="btn" onclick="confirmRevlink()">✔ Relier les factures cochées</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE RELIER (rapprochement facture ↔ lignes de relevé) -->
+<div id="rappro-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:720px">
+    <div class="modal-head"><h3>🔗 Relier la facture à un paiement</h3><button class="btn ghost small" onclick="closeRappro()">✕</button></div>
+    <div class="hint" id="rappro-head"></div>
+    <div class="hint">Coche la (ou les) ligne(s) du relevé qui correspond(ent) à ce paiement. Pour une facture payée en 2 fois, coches-en plusieurs.</div>
+    <div id="rappro-body" style="max-height:46vh;overflow:auto;margin-top:8px"></div>
+    <div id="rappro-warn" class="hint" style="margin-top:10px;color:var(--txt)"></div>
+    <div style="margin-top:16px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn ghost" onclick="closeRappro()">Plus tard</button>
+      <button class="btn" onclick="confirmRappro()">✔ Relier la sélection</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -533,7 +573,7 @@ updateThemeBtn();
 
 /* ---------- État global ---------- */
 let SESSION=null, IS_ADMIN=false, MY_ACCESS=[], COMPANIES=[], CO=null, MY_ROLE=null;
-let CATS=[], TX=[], INVOICES=[], RULES=[], TIERS=[];
+let CATS=[], TX=[], INVOICES=[], RULES=[], TIERS=[], LINKS=[];
 let INV_FROM_IA=false;
 /* ---------- Registre des tiers (enrichi manuel + IA) ---------- */
 function tiersKey(n){ return String(n||'').toLowerCase().trim(); }
@@ -850,6 +890,10 @@ async function reloadData(){
     db.from('compta_tiers').select('*').eq('company_id',CO.id).order('name'),
   ]);
   CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[]; STATEMENTS=(stmts&&stmts.data)||[]; TIERS=(tiers&&tiers.data)||[];
+  // Liens facture ↔ lignes (rapprochement multi-lignes) — table optionnelle
+  const invIds=INVOICES.map(i=>i.id);
+  if(invIds.length){ try{ const {data:lk}=await db.from('compta_invoice_links').select('*').in('invoice_id',invIds); LINKS=lk||[]; }catch(_){ LINKS=[]; } }
+  else LINKS=[];
   fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto();
 }
 
@@ -861,7 +905,9 @@ function fillCatSelects(){
   const dl=document.getElementById('tiers-list'); if(dl){ const names=[...new Set([].concat(INVOICES.map(i=>i.counterparty),TX.map(t=>t.counterparty)).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join(''); }
 }
 function catIsRestaurant(id){ const c=catById(id); return !!(c&&/restaurant|restau|repas/i.test(c.name||'')); }
-function onInvCatChange(){ const f=document.getElementById('i-guests-field'); if(f) f.style.display=catIsRestaurant(document.getElementById('i-cat').value)?'':'none'; }
+function onInvCatChange(){ const resto=catIsRestaurant(document.getElementById('i-cat').value);
+  const f=document.getElementById('i-guests-field'); if(f) f.style.display=resto?'':'none';
+  const m=document.getElementById('i-meals-field'); if(m) m.style.display=resto?'':'none'; }
 
 /* ---------- Catégorie helpers ---------- */
 function catById(id){ return CATS.find(c=>c.id===id); }
@@ -874,7 +920,7 @@ function renderDashboard(){
   const body=document.getElementById('db-body'); body.innerHTML='';
   let entrees=0,sorties=0,manque=0,tvaColl=0,tvaRec=0,aClasser=0;
   rows.forEach(t=>{
-    const inv=INVOICES.find(i=>i.transaction_id===t.id);
+    const inv=INVOICES.find(i=>invTxIds(i).includes(t.id));
     const hasInv=!!inv; const verified=hasInv && t.status==='classe';
     if(t.amount>0) entrees+=Number(t.amount); else sorties+=Math.abs(Number(t.amount));
     if(t.amount<0 && !hasInv) manque++;
@@ -891,13 +937,32 @@ function renderDashboard(){
   if(!rows.length) body.innerHTML='<tr><td colspan="7" class="empty">Aucun mouvement sur ce mois.</td></tr>';
   const cards=document.getElementById('db-cards');
   const solde=entrees-sorties, tvaNette=tvaColl-tvaRec;
+  const toRappro=INVOICES.filter(i=>invMatchState(i)!=='rapproche').length;
   cards.innerHTML=`
     <div class="card good"><div class="label">↗ Entrées du mois</div><div class="value val-good">${euro(entrees)}</div></div>
     <div class="card bad"><div class="label">↘ Sorties du mois</div><div class="value val-bad">${euro(sorties)}</div></div>
     <div class="card ${solde>=0?'good':'bad'}"><div class="label">Solde du mois</div><div class="value ${solde>=0?'val-good':'val-bad'}">${euro(solde)}</div></div>
     <div class="card"><div class="label">TVA nette du mois</div><div class="value">${euro(tvaNette)}</div><div class="label" style="margin:6px 0 0">collectée ${euro(tvaColl)} · récup. ${euro(tvaRec)}</div></div>
     <div class="card ${aClasser?'bad':'good'}"><div class="label">⏳ Lignes à classer</div><div class="value ${aClasser?'val-bad':'val-good'}">${aClasser}</div></div>
-    <div class="card ${manque?'bad':'good'}"><div class="label">Paiements sans facture</div><div class="value ${manque?'val-bad':'val-good'}">${manque}</div></div>`;
+    <div class="card ${toRappro?'bad':'good'}"><div class="label">📄 Factures à rapprocher</div><div class="value ${toRappro?'val-bad':'val-good'}">${toRappro}</div></div>`;
+  renderDashInvoices();
+}
+// Liste des factures pas encore (totalement) reliées à un paiement — toutes périodes.
+function renderDashInvoices(){
+  const wrap=document.getElementById('db-torappro'); if(!wrap) return;
+  const list=INVOICES.filter(i=>invMatchState(i)!=='rapproche')
+    .sort((a,b)=>(b.invoice_date||b.created_at||'').localeCompare(a.invoice_date||a.created_at||''));
+  const body=document.getElementById('db-inv-body'); if(!body) return;
+  if(!list.length){ wrap.style.display='none'; body.innerHTML=''; return; }
+  wrap.style.display='';
+  body.innerHTML=list.map(i=>{ const st=invMatchState(i); const sum=invLinkedSum(i); const ttc=Math.abs(Number(i.amount_ttc)||0);
+    return `<tr><td>${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
+      <td class="lbl" title="${esc(i.counterparty||'')}">${esc(i.counterparty||'')}</td>
+      <td>${esc(catName(i.category_id))}</td>
+      <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td>
+      <td>${matchBadge(st)}${st==='partiel'?`<div class="hint">${euro(sum)} / ${euro(ttc)}</div>`:''}</td>
+      <td>${canEdit()?`<button class="btn small" onclick="openRappro('${i.id}')">🔗 Relier</button>`:''}</td></tr>`;
+  }).join('');
 }
 
 /* ================= RELEVÉS / TRANSACTIONS ================= */
@@ -1075,7 +1140,7 @@ async function runIAReleveImport(){
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur : '+error.message); return; }
   registerTiersMany(recs.map(r=>r.counterparty),'ia');
-  LAST_RELEVE_FILE=null; closeIA(); toast(recs.length+' lignes importées'+(statement_id?' — PDF consultable dans « Relevés importés ».':'.')); reloadData();
+  LAST_RELEVE_FILE=null; closeIA(); toast(recs.length+' lignes importées'+(statement_id?' — PDF consultable dans « Relevés importés ».':'.')); await reloadData(); proposeReverseLinks();
 }
 function importReleveSheet(file){ if(!file||!canEdit()) return;
   const r=new FileReader();
@@ -1128,7 +1193,141 @@ async function runReleveImport(){
   }).filter(r=>r.amount!==0||r.label);
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur import : '+error.message); return; }
-  closeMap(); toast(recs.length+' lignes importées.'); reloadData();
+  closeMap(); toast(recs.length+' lignes importées.'); await reloadData(); proposeReverseLinks();
+}
+
+/* ================= RAPPROCHEMENT (facture ↔ lignes de relevé) ================= */
+const MATCH_TOL=0.02;        // tolérance montant (€)
+const MATCH_DAYS=7;          // fenêtre de date pour une correspondance « sûre »
+function coName(id){ const c=COMPANIES.find(x=>x.id===id); return c?c.name:'?'; }
+// Toutes les lignes reliées à une facture (transaction_id historique + table de liens)
+function invTxIds(inv){ const s=new Set(); if(inv&&inv.transaction_id) s.add(inv.transaction_id);
+  LINKS.filter(l=>l.invoice_id===(inv&&inv.id)).forEach(l=>s.add(l.transaction_id)); return [...s]; }
+function invLinkedTx(inv){ return invTxIds(inv).map(id=>TX.find(t=>t.id===id)).filter(Boolean); }
+function invLinkedSum(inv){ return invLinkedTx(inv).reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0); }
+function invMatchState(inv){ const ids=invTxIds(inv); if(!ids.length) return 'a_rapprocher';
+  const ttc=Math.abs(Number(inv.amount_ttc)||0); if(!ttc) return 'rapproche';
+  return invLinkedSum(inv)>=ttc-MATCH_TOL ? 'rapproche' : 'partiel'; }
+function matchBadge(st){ return st==='rapproche'?'<span class="badge b-ok">✅ Rapprochée</span>'
+  :st==='partiel'?'<span class="badge b-wip">⏳ Partielle</span>':'<span class="badge b-lost">⏳ En attente</span>'; }
+function txUsedByOther(tId,exceptInvId){ return INVOICES.some(i=>i.id!==exceptInvId&&invTxIds(i).includes(tId)); }
+
+// Recherche du/des paiement(s) correspondant(s), dans la société courante ET les autres (admin/multi-sociétés).
+async function findPaymentCandidates(ttc,dateISO,direction,exceptInvId){
+  ttc=Math.abs(Number(ttc)||0); if(!ttc) return {local:[],other:[]};
+  const wantSign = direction==='vente' ? 1 : -1;   // achat → débit (négatif) ; vente → crédit (positif)
+  const tol=Math.max(MATCH_TOL, ttc*0.005);
+  const lo = wantSign<0 ? -(ttc+tol) : (ttc-tol);
+  const hi = wantSign<0 ? -(ttc-tol) : (ttc+tol);
+  let cands=[]; try{ const {data}=await db.from('compta_transactions').select('id,company_id,op_date,label,amount').gte('amount',lo).lte('amount',hi); cands=data||[]; }catch(_){ cands=[]; }
+  // exclure les lignes déjà reliées (via transaction_id ou table de liens)
+  const ids=cands.map(c=>c.id); const used=new Set();
+  if(ids.length){ try{
+    const [{data:lk},{data:iv}]=await Promise.all([
+      db.from('compta_invoice_links').select('invoice_id,transaction_id').in('transaction_id',ids),
+      db.from('compta_invoices').select('id,transaction_id').in('transaction_id',ids) ]);
+    (lk||[]).forEach(x=>{ if(x.invoice_id!==exceptInvId) used.add(x.transaction_id); });
+    (iv||[]).forEach(x=>{ if(x.transaction_id&&x.id!==exceptInvId) used.add(x.transaction_id); });
+  }catch(_){}}
+  const scored=cands.filter(c=>!used.has(c.id)).map(c=>({t:c,
+    days:(dateISO&&c.op_date)?Math.abs((new Date(c.op_date)-new Date(dateISO))/86400000):999}))
+    .sort((a,b)=>a.days-b.days);
+  return { local:scored.filter(x=>x.t.company_id===CO.id), other:scored.filter(x=>x.t.company_id!==CO.id) };
+}
+
+// Applique un ensemble de liens à une facture (remplace les liens existants). Gère le déplacement de société.
+async function saveInvoiceLinks(invId, txs, opts){
+  opts=opts||{}; const inv=INVOICES.find(i=>i.id===invId)||opts.invoice||{};
+  if(opts.moveToCompany && opts.moveToCompany!==inv.company_id){
+    await db.from('compta_invoices').update({company_id:opts.moveToCompany}).eq('id',invId); }
+  let linksOk=true;
+  try{ await db.from('compta_invoice_links').delete().eq('invoice_id',invId); }catch(_){ linksOk=false; }
+  if(txs.length){ const rows=txs.map(t=>({invoice_id:invId,transaction_id:t.id}));
+    const {error}=await db.from('compta_invoice_links').insert(rows);
+    if(error){ if(/invoice_links|relation|does not exist|schema cache/i.test(error.message||'')){ linksOk=false;
+        if(txs.length>1) toast('Multi-lignes indispo : exécute sql/compta-rapprochement.sql (reliée à 1 ligne).'); }
+      else { toast('Erreur : '+error.message); return false; } } }
+  const ttc=Math.abs(Number(inv.amount_ttc)||0);
+  const sum=txs.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+  const status = !txs.length ? 'a_rapprocher' : (!ttc || sum>=ttc-MATCH_TOL ? 'rapproche' : 'partiel');
+  await db.from('compta_invoices').update({transaction_id:txs[0]?txs[0].id:null,status}).eq('id',invId);
+  for(const t of txs){ try{ await db.from('compta_transactions').update({status:'classe'}).eq('id',t.id); }catch(_){}}
+  return true;
+}
+
+/* ---- Modale « Relier » (facture existante) : multi-lignes + inter-sociétés ---- */
+let RAPPRO={invId:null,cands:[],picked:new Set()};
+async function openRappro(invId){
+  const inv=INVOICES.find(i=>i.id===invId); if(!inv){ toast('Facture introuvable.'); return; }
+  toast('Recherche des paiements correspondants…');
+  const {local,other}=await findPaymentCandidates(inv.amount_ttc,inv.invoice_date,inv.direction,invId);
+  // ajoute les lignes déjà reliées (pour pouvoir les décocher) + pré-coche
+  const already=invLinkedTx(inv).map(t=>({t,days:0}));
+  const seen=new Set(); const list=[];
+  already.concat(local).concat(other).forEach(x=>{ if(!seen.has(x.t.id)){ seen.add(x.t.id); list.push(x); } });
+  RAPPRO={invId, cands:list, picked:new Set(invTxIds(inv)), inv};
+  renderRappro(); document.getElementById('rappro-modal').classList.remove('hidden');
+}
+function renderRappro(){
+  const inv=RAPPRO.inv; const ttc=Math.abs(Number(inv.amount_ttc)||0);
+  const sum=[...RAPPRO.picked].reduce((s,id)=>{ const c=RAPPRO.cands.find(x=>x.t.id===id); return s+(c?Math.abs(Number(c.t.amount)||0):0); },0);
+  const head=document.getElementById('rappro-head');
+  head.innerHTML=`Facture <b>${esc(inv.counterparty||'')}</b> · TTC <b>${euro(ttc)}</b>`+
+    (RAPPRO.picked.size?` · sélectionné <b class="${sum>=ttc-MATCH_TOL?'val-good':'val-bad'}">${euro(sum)}</b>${(ttc&&sum<ttc-MATCH_TOL)?` (reste ${euro(ttc-sum)})`:''}`:'');
+  const rows=RAPPRO.cands;
+  const body=document.getElementById('rappro-body');
+  if(!rows.length){ body.innerHTML='<div class="empty">Aucune ligne de relevé approchante trouvée (montant proche du TTC). Tu peux fermer et relier plus tard, ou vérifier tes relevés.</div>'; }
+  else body.innerHTML=rows.map(x=>{ const t=x.t; const other=t.company_id!==CO.id; const ck=RAPPRO.picked.has(t.id);
+    return `<label class="chk" style="display:flex;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line)">
+      <input type="checkbox" ${ck?'checked':''} onchange="toggleRappro('${t.id}')">
+      <span style="flex:1">${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')} ${other?`<span class="badge b-wip" title="Payé avec une autre société">🏢 ${esc(coName(t.company_id))}</span>`:''}</span>
+      <b class="num ${Number(t.amount)>=0?'val-good':'val-bad'}">${euro(t.amount)}</b></label>`; }).join('');
+  const warn=document.getElementById('rappro-warn'); const comps=new Set([...RAPPRO.picked].map(id=>{ const c=RAPPRO.cands.find(x=>x.t.id===id); return c?c.t.company_id:null; }).filter(Boolean));
+  const otherComp=[...comps].find(c=>c!==CO.id);
+  warn.innerHTML = comps.size>1 ? '⚠️ Les lignes sélectionnées doivent appartenir à la même société.'
+    : (otherComp ? `💡 Ce paiement a été fait avec <b>${esc(coName(otherComp))}</b> — la facture sera déplacée sur cette société.` : '');
+}
+function toggleRappro(id){ if(RAPPRO.picked.has(id)) RAPPRO.picked.delete(id); else RAPPRO.picked.add(id); renderRappro(); }
+function closeRappro(){ document.getElementById('rappro-modal').classList.add('hidden'); RAPPRO={invId:null,cands:[],picked:new Set()}; }
+async function confirmRappro(){
+  const txs=[...RAPPRO.picked].map(id=>RAPPRO.cands.find(x=>x.t.id===id)).filter(Boolean).map(x=>x.t);
+  const comps=new Set(txs.map(t=>t.company_id));
+  if(comps.size>1){ toast('Les lignes doivent être de la même société.'); return; }
+  const target=[...comps][0]; const move=(target&&target!==CO.id)?target:null;
+  const ok=await saveInvoiceLinks(RAPPRO.invId, txs, {moveToCompany:move, invoice:RAPPRO.inv});
+  if(ok){ toast(move?('Facture déplacée sur '+coName(move)+' et rapprochée.'):(txs.length?'Facture rapprochée.':'Liens retirés.')); }
+  closeRappro(); reloadData();
+}
+
+/* ---- Sens inverse : après import d'un relevé, proposer de relier les factures en attente ---- */
+let REVLINK=[];
+function proposeReverseLinks(){
+  const usedTx=new Set(); INVOICES.forEach(i=>invTxIds(i).forEach(id=>usedTx.add(id)));
+  const proposals=[];
+  INVOICES.filter(i=>invMatchState(i)==='a_rapprocher').forEach(i=>{
+    const ttc=Math.abs(Number(i.amount_ttc)||0); if(!ttc) return;
+    const wantSign=i.direction==='vente'?1:-1;
+    const cand=TX.filter(t=>!usedTx.has(t.id) && (wantSign<0?Number(t.amount)<0:Number(t.amount)>0)
+        && Math.abs(Math.abs(Number(t.amount))-ttc)<=Math.max(MATCH_TOL,ttc*0.005))
+      .map(t=>({t,days:(i.invoice_date&&t.op_date)?Math.abs((new Date(t.op_date)-new Date(i.invoice_date))/86400000):999}))
+      .filter(x=>x.days<=MATCH_DAYS).sort((a,b)=>a.days-b.days);
+    if(cand.length){ proposals.push({inv:i,tx:cand[0].t,picked:true}); usedTx.add(cand[0].t.id); }
+  });
+  if(!proposals.length) return;
+  REVLINK=proposals; renderRevlink(); document.getElementById('revlink-modal').classList.remove('hidden');
+}
+function renderRevlink(){
+  const body=document.getElementById('revlink-body');
+  body.innerHTML=REVLINK.map((p,idx)=>`<label class="chk" style="display:flex;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--line)">
+    <input type="checkbox" ${p.picked?'checked':''} onchange="REVLINK[${idx}].picked=this.checked">
+    <span style="flex:1"><b>${esc(p.inv.counterparty||'')}</b> · ${p.inv.amount_ttc!=null?euro(p.inv.amount_ttc):''} <span class="hint">(facture ${esc((p.inv.invoice_date||'').slice(0,10))})</span><br>
+      ↔ ${esc((p.tx.op_date||'').slice(0,10))} · ${esc(p.tx.label||'')} · <b>${euro(p.tx.amount)}</b></span></label>`).join('');
+}
+function closeRevlink(){ document.getElementById('revlink-modal').classList.add('hidden'); REVLINK=[]; }
+async function confirmRevlink(){
+  const todo=REVLINK.filter(p=>p.picked); let n=0;
+  for(const p of todo){ const ok=await saveInvoiceLinks(p.inv.id,[p.tx],{invoice:p.inv}); if(ok) n++; }
+  closeRevlink(); toast(n+' facture(s) rapprochée(s).'); reloadData();
 }
 
 /* ================= FACTURES ================= */
@@ -1156,19 +1355,36 @@ async function onInvoiceFilePick(inputId){
     if(r.amount_ht!=null) document.getElementById('i-ht').value=r.amount_ht;
     if(r.vat_rate!=null) document.getElementById('i-tva').value=r.vat_rate;
     if(r.amount_ttc!=null) document.getElementById('i-ttc').value=r.amount_ttc;
-    const ru=applyRule({label:r.counterparty||'',counterparty:r.counterparty||''}); if(ru&&ru.category_id){ const ic=document.getElementById('i-cat'); if(ic){ ic.value=ru.category_id; onInvCatChange(); } }
-    invPreview(); autoMatchInvoice(r);
+    const ru=applyRule({label:r.counterparty||'',counterparty:r.counterparty||''}); if(ru&&ru.category_id){ const ic=document.getElementById('i-cat'); if(ic){ ic.value=ru.category_id; } }
+    // Restaurant détecté par l'IA : catégorie resto + couverts + convives
+    if(r.is_restaurant){ const ic=document.getElementById('i-cat');
+      if(ic && !catIsRestaurant(ic.value)){ const rc=txCompanyCats().find(c=>catIsRestaurant(c.id)); if(rc) ic.value=rc.id; } }
+    onInvCatChange();
+    if(r.guests){ const g=document.getElementById('i-guests'); if(g&&!g.value) g.value=r.guests; }
+    if(r.meals!=null){ const mm=document.getElementById('i-meals'); if(mm&&!mm.value) mm.value=r.meals; }
+    invPreview(); await autoMatchInvoice(r);
     toast("Facture lue ✓ Vérifie les montants et enregistre.");
   }catch(e){ alert("❌ Erreur IA (facture) :\n\n"+e.message); }
 }
-function autoMatchInvoice(r){
-  const ttc=Math.abs(Number(r.amount_ttc)); if(!ttc) return;
-  const cand=TX.filter(t=>!INVOICES.some(i=>i.transaction_id===t.id))
-    .map(t=>({t,d:Math.abs(Math.abs(Number(t.amount))-ttc)}))
-    .filter(x=>x.d<=0.02).sort((a,b)=>a.d-b.d);
-  if(cand.length){ const sel=document.getElementById('i-tx'); sel.value=cand[0].t.id;
-    if(sel.value===cand[0].t.id) toast("🔗 Paiement correspondant trouvé et pré-sélectionné."); }
+let PENDING_MATCH=null, PENDING_MOVE=null;
+async function autoMatchInvoice(r){
+  PENDING_MATCH=null; PENDING_MOVE=null;
+  const box=document.getElementById('i-match'); if(box) box.innerHTML='';
+  const ttc=Math.abs(Number(r.amount_ttc)||0); if(!ttc) return;
+  const dir=r.direction||document.getElementById('i-dir').value;
+  const {local,other}=await findPaymentCandidates(ttc, r.invoice_date, dir, null);
+  const near=local.filter(x=>x.days<=MATCH_DAYS);
+  if(near.length){ const t=near[0].t; PENDING_MATCH={txId:t.id};
+    const sel=document.getElementById('i-tx'); if(sel) sel.value=t.id;
+    if(box) box.innerHTML=`<div class="banner-ok">🔗 <b>Correspondance trouvée</b> : ${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')} · <b>${euro(t.amount)}</b> — elle sera reliée à l'enregistrement. <button type="button" class="btn ghost small" onclick="clearMatch()">Plus tard</button></div>`;
+  } else if(other.length){ const t=other[0].t; PENDING_MOVE={companyId:t.company_id,txId:t.id};
+    if(box) box.innerHTML=`<div class="banner-info">💡 Ce paiement semble avoir été réglé avec <b>${esc(coName(t.company_id))}</b> (${esc((t.op_date||'').slice(0,10))} · <b>${euro(t.amount)}</b>). <button type="button" class="btn small" onclick="acceptMove()">Déplacer sur ${esc(coName(t.company_id))} & relier</button> <button type="button" class="btn ghost small" onclick="clearMatch()">Plus tard</button></div>`;
+  } else if(box){ box.innerHTML=`<div class="banner-info">Aucun paiement trouvé pour l'instant. Enregistre la facture — elle restera « en attente de rapprochement » et tu la relieras plus tard depuis le Dashboard.</div>`; }
 }
+function clearMatch(){ PENDING_MATCH=null; PENDING_MOVE=null; const sel=document.getElementById('i-tx'); if(sel) sel.value='';
+  const box=document.getElementById('i-match'); if(box) box.innerHTML='<div class="banner-info">OK : la facture restera « en attente de rapprochement ».</div>'; }
+function acceptMove(){ if(!PENDING_MOVE) return; const box=document.getElementById('i-match');
+  if(box) box.innerHTML=`<div class="banner-ok">✅ La facture sera enregistrée sur <b>${esc(coName(PENDING_MOVE.companyId))}</b> et reliée à ce paiement.</div>`; }
 async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const tiers=document.getElementById('i-tiers').value.trim(); if(!tiers){ toast('Indique le tiers.'); return; }
   let ht=parseFloat(document.getElementById('i-ht').value); let rate=parseFloat(document.getElementById('i-tva').value);
@@ -1178,7 +1394,8 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
   const tva=(!isNaN(ttc)&&!isNaN(ht))?(ttc-ht):null;
   const catId=document.getElementById('i-cat').value||null;
   const guests=catIsRestaurant(catId)?(document.getElementById('i-guests').value.trim()||null):null;
-  const txId=document.getElementById('i-tx').value||null;
+  const mealsRaw=catIsRestaurant(catId)?parseInt((document.getElementById('i-meals')||{}).value,10):NaN;
+  const meals=isNaN(mealsRaw)?null:mealsRaw;
   const file=INVOICE_FILE;
   let storage_path=null, original_filename=null;
   if(file){
@@ -1191,17 +1408,27 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
     invoice_number:document.getElementById('i-num').value.trim()||null, invoice_date:document.getElementById('i-date').value||null,
     amount_ht:isNaN(ht)?null:Math.round(ht*100)/100, vat_rate:isNaN(rate)?null:rate,
     vat_amount:tva!=null?Math.round(tva*100)/100:null, amount_ttc:isNaN(ttc)?null:Math.round(ttc*100)/100,
-    category_id:catId, guests, storage_path, original_filename, transaction_id:txId, status:txId?'rapproche':'a_rapprocher', uploaded_by:SESSION.user.id };
-  let {error}=await db.from('compta_invoices').insert(rec);
-  if(error && /category_id|guests|column|colonne/i.test(error.message||'')){ // colonnes pas encore ajoutées (compta-extra.sql)
-    delete rec.category_id; delete rec.guests; ({error}=await db.from('compta_invoices').insert(rec));
+    category_id:catId, guests, meals, storage_path, original_filename, transaction_id:null, status:'a_rapprocher', uploaded_by:SESSION.user.id };
+  let ins=await db.from('compta_invoices').insert(rec).select('id').single();
+  if(ins.error && /category_id|guests|meals|column|colonne/i.test(ins.error.message||'')){ // colonnes optionnelles pas encore ajoutées
+    const r2={...rec}; delete r2.category_id; delete r2.guests; delete r2.meals;
+    ins=await db.from('compta_invoices').insert(r2).select('id').single();
   }
-  if(error){ toast('Erreur : '+error.message); return; }
+  if(ins.error){ toast('Erreur : '+ins.error.message); return; }
+  const newId=ins.data&&ins.data.id;
   await registerTiers(tiers, INV_FROM_IA?'ia':'manuel'); INV_FROM_IA=false;
   if(catId){ try{ await learnRule(tiers, tiers, catId); }catch(_){} }
-  if(txId){ await db.from('compta_transactions').update({status:'classe'}).eq('id',txId); }
-  ['i-tiers','i-num','i-date','i-ht','i-ttc','i-guests'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Rapprochement : inter-société (déplacement) ou paiement local sélectionné
+  if(newId){
+    if(PENDING_MOVE){ const {data:t}=await db.from('compta_transactions').select('id,company_id,op_date,label,amount').eq('id',PENDING_MOVE.txId).maybeSingle();
+      if(t){ await saveInvoiceLinks(newId,[t],{moveToCompany:t.company_id,invoice:{...rec,id:newId}}); } }
+    else { const txId=document.getElementById('i-tx').value||null; const t=txId?TX.find(x=>x.id===txId):null;
+      if(t){ await saveInvoiceLinks(newId,[t],{invoice:{...rec,id:newId}}); } }
+  }
+  PENDING_MOVE=null; PENDING_MATCH=null;
+  ['i-tiers','i-num','i-date','i-ht','i-ttc','i-guests','i-meals'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('i-tva').value='20'; const ic=document.getElementById('i-cat'); if(ic)ic.value=''; onInvCatChange();
+  const itx=document.getElementById('i-tx'); if(itx) itx.value=''; const mb=document.getElementById('i-match'); if(mb) mb.innerHTML='';
   const fn=document.getElementById('i-filename'); if(fn)fn.textContent=''; INVOICE_FILE=null;
   document.getElementById('i-preview').innerHTML='—'; toast('Facture enregistrée.'); reloadData();
 }
@@ -1221,15 +1448,17 @@ function renderInvoices(){
   rows.sort((a,b)=>(b.invoice_date||'').localeCompare(a.invoice_date||''));
   const body=document.getElementById('inv-body'); body.innerHTML='';
   rows.forEach(i=>{
-    const tx=TX.find(t=>t.id===i.transaction_id);
+    const st=invMatchState(i); const linked=invLinkedTx(i);
     const catTxt=i.category_id?esc(catName(i.category_id)):'—';
-    const guestsBadge=i.guests?` <span title="Invités : ${esc(i.guests)}" style="cursor:help">🍽️</span>`:'';
+    const gm=[]; if(i.guests) gm.push('Invités : '+i.guests); if(i.meals!=null) gm.push(i.meals+' repas');
+    const guestsBadge=gm.length?` <span title="${esc(gm.join(' · '))}" style="cursor:help">🍽️</span>`:'';
+    const linkTxt=linked.length?`<div class="hint" style="margin-top:3px">${linked.map(t=>esc((t.op_date||'').slice(0,10))+' · '+euro(t.amount)).join('<br>')}</div>`:'';
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
       <td>${esc(i.counterparty||'')}</td><td>${catTxt}${guestsBadge}</td><td>${esc(i.invoice_number||'—')}</td>
       <td class="num">${i.amount_ht!=null?euro(i.amount_ht):'—'}</td><td class="num">${i.vat_amount!=null?euro(i.vat_amount):'—'}</td>
       <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td>
-      <td>${tx?`${tx.op_date} · ${euro(tx.amount)}`:(canEdit()?matchSelect(i):'<span class="badge b-lost">Non</span>')}</td>
+      <td>${matchBadge(st)}${linkTxt}${canEdit()?`<div style="margin-top:3px"><button class="btn ghost small" onclick="openRappro('${i.id}')">🔗 Relier</button></div>`:''}</td>
       <td>${i.storage_path?`<a href="#" onclick="openDoc('${esc(i.storage_path)}');return false">📄 Ouvrir</a>`:'—'}</td>
       <td>${canEdit()?`<button class="btn ghost small" onclick="delInvoice('${i.id}')">🗑</button>`:''}</td>`;
     body.appendChild(tr);
