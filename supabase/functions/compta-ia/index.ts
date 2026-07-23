@@ -53,12 +53,21 @@ const FACTURE_SCHEMA = {
   required: ["direction", "counterparty", "invoice_number", "invoice_date", "amount_ht", "vat_rate", "vat_amount", "amount_ttc"],
 };
 
+function tryParseJson(s: string): unknown {
+  try { return JSON.parse(s); } catch (_) { /* continue */ }
+  let t = s.trim().replace(/^```(?:json)?/i, "").replace(/```\s*$/i, "").trim();
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (_) { /* continue */ } }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    console.log("compta-ia invoked; apiKey present:", !!apiKey);
     if (!apiKey) return json({ error: "Clé IA non configurée (ANTHROPIC_API_KEY manquante)." }, 500);
     const admin = createClient(url, serviceKey);
 
@@ -115,7 +124,7 @@ N'invente aucune ligne. Ne renvoie que ce qui figure réellement sur le relevé.
       },
       body: JSON.stringify({
         model: "claude-opus-4-8",
-        max_tokens: 8000,
+        max_tokens: 16000,
         output_config: { format: { type: "json_schema", schema } },
         messages: [{ role: "user", content: [docBlock, { type: "text", text: instruction }] }],
       }),
@@ -123,17 +132,24 @@ N'invente aucune ligne. Ne renvoie que ce qui figure réellement sur le relevé.
 
     if (!resp.ok) {
       const errTxt = await resp.text();
+      console.error("ANTHROPIC_HTTP_ERROR", resp.status, errTxt.slice(0, 500));
       return json({ error: "Erreur IA (" + resp.status + ") : " + errTxt.slice(0, 400) }, 502);
     }
     const out = await resp.json();
+    console.log("anthropic stop_reason=", out.stop_reason, "usage=", JSON.stringify(out.usage || {}));
     if (out.stop_reason === "refusal") return json({ error: "Document refusé par l'IA." }, 422);
     const textBlock = (out.content || []).find((b: { type: string }) => b.type === "text");
-    if (!textBlock) return json({ error: "Réponse IA vide." }, 502);
+    if (!textBlock) { console.error("NO_TEXT_BLOCK", JSON.stringify(out.content || [])); return json({ error: "Réponse IA vide." }, 502); }
 
-    let parsed;
-    try { parsed = JSON.parse(textBlock.text); }
-    catch { return json({ error: "Réponse IA illisible." }, 502); }
-
+    const raw = String(textBlock.text || "");
+    const parsed = tryParseJson(raw);
+    if (parsed == null) {
+      console.error("PARSE_FAIL stop_reason=", out.stop_reason, "len=", raw.length, "preview=", raw.slice(0, 500));
+      const hint = out.stop_reason === "max_tokens"
+        ? "Le document est trop long : la lecture a été coupée. Essaie un relevé plus court (par mois)."
+        : "Réponse IA illisible (format inattendu). Réessaie ; si ça persiste, je corrige le format.";
+      return json({ error: hint, stop_reason: out.stop_reason }, 502);
+    }
     return json({ ok: true, kind, result: parsed, usage: out.usage || null });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
