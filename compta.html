@@ -15,51 +15,82 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/compta-192.png" />
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 <script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0f172a; --panel:#111c33; --panel2:#16233f; --line:#25324f;
-    --txt:#e8eefc; --muted:#93a1c0; --accent:#3b82f6; --accent2:#22c55e;
-    --danger:#ef4444; --radius:14px;
+    --bg:#080b16; --bg2:#0c1122; --panel:#111830; --panel2:#171f3a; --line:#26304f;
+    --txt:#e9eefc; --muted:#8a97ba; --accent:#38bdf8; --accent-ink:#04121e;
+    --accent2:#a3e635; --accent3:#a78bfa; --warm:#fbbf24; --danger:#fb7185;
+    --good:#7ee787; --bad:#fda4af; --radius:16px;
+    --glow:0 0 0 1px rgba(56,189,248,.14), 0 14px 40px -18px rgba(56,189,248,.45);
+    --shadow:0 18px 45px -22px rgba(0,0,0,.75);
+    --grad-accent:linear-gradient(135deg,#38bdf8,#818cf8 55%,#a78bfa);
+    --grad-lime:linear-gradient(135deg,#a3e635,#34d399);
+    --font-display:"Space Grotesk","Segoe UI",system-ui,sans-serif;
+    --font-body:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",monospace;
   }
   :root[data-theme="light"]{
-    --bg:#f4f6fb; --panel:#ffffff; --panel2:#eef1f7; --line:#dde3ec;
-    --txt:#1a2230; --muted:#5b6675; --accent:#3b82f6; --accent2:#16a34a; --danger:#dc2626;
+    --bg:#eef2fa; --bg2:#e6ecf7; --panel:#ffffff; --panel2:#f1f5fc; --line:#dde5f1;
+    --txt:#141c2e; --muted:#5a6a86; --accent:#0ea5e9; --accent-ink:#ffffff;
+    --accent2:#65a30d; --accent3:#7c3aed; --warm:#d97706; --danger:#e11d48;
+    --good:#15803d; --bad:#be123c;
+    --glow:0 0 0 1px rgba(14,165,233,.14), 0 16px 40px -20px rgba(14,165,233,.35);
+    --shadow:0 18px 45px -24px rgba(30,50,90,.35);
   }
   :root[data-theme="light"] header{background:linear-gradient(120deg,#eef2fb,#e3e9f6)}
+  :root[data-theme="light"] body::before{opacity:.5}
   *{box-sizing:border-box}
-  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);}
-  header{padding:16px 22px;background:linear-gradient(120deg,#0b1224,#16233f);
-    border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
-  header h1{font-size:19px;margin:0}
-  .btn{background:var(--accent);color:#fff;border:0;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600}
-  .btn:hover{filter:brightness(1.08)}
-  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
-  .btn.small{padding:6px 10px;font-size:12px}
-  .btn.danger{background:transparent;border:1px solid var(--danger);color:#fca5a5}
-  .btn:disabled{opacity:.5;cursor:default}
-  nav{display:flex;gap:6px;padding:12px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:40;box-shadow:0 6px 16px rgba(0,0,0,.28)}
-  nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:10px;cursor:pointer;font-size:15px;font-weight:600}
-  nav button.active{background:var(--panel2);color:var(--txt)}
-  #adminnav{display:flex;gap:6px;padding:10px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel2);position:static;box-shadow:none}
-  #adminnav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
-  #adminnav button.active{background:var(--panel);color:var(--txt);border-color:var(--line)}
-  main{padding:22px;max-width:1200px;margin:0 auto}
+  body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--txt);position:relative;min-height:100vh;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(60% 45% at 12% -5%, rgba(56,189,248,.16), transparent 60%),
+      radial-gradient(55% 45% at 95% 0%, rgba(167,139,250,.14), transparent 60%),
+      radial-gradient(50% 40% at 60% 105%, rgba(163,230,53,.08), transparent 60%);}
+  header{padding:16px 22px;background:linear-gradient(115deg,#0a1224,#141d3a 55%,#101a36);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;position:relative;overflow:hidden}
+  header::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(115deg,transparent 30%,rgba(56,189,248,.12),transparent 62%,rgba(167,139,250,.1),transparent 85%);
+    background-size:250% 100%;animation:aurora 14s linear infinite}
+  @keyframes aurora{0%{background-position:0% 0}100%{background-position:250% 0}}
+  header h1{font-size:20px;margin:0;font-family:var(--font-display);font-weight:600;letter-spacing:-.3px;position:relative;display:flex;align-items:center;gap:6px}
+  .btn{background:var(--grad-accent);color:var(--accent-ink);border:0;padding:10px 16px;border-radius:11px;cursor:pointer;font-size:14px;font-weight:600;font-family:var(--font-body);box-shadow:0 8px 20px -10px rgba(56,189,248,.7);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+  .btn:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 12px 26px -10px rgba(56,189,248,.8)}
+  .btn:active{transform:translateY(0)}
+  .btn.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt);box-shadow:none}
+  .btn.ghost:hover{border-color:var(--accent)}
+  .btn.small{padding:6px 11px;font-size:12px}
+  .btn.danger{background:transparent;border:1px solid color-mix(in srgb,var(--danger) 55%,transparent);color:var(--bad);box-shadow:none}
+  .btn.danger:hover{background:color-mix(in srgb,var(--danger) 14%,transparent);border-color:var(--danger)}
+  .btn:disabled{opacity:.5;cursor:default;transform:none}
+  nav{display:flex;gap:6px;padding:12px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel) 86%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:40;box-shadow:0 10px 24px -12px rgba(0,0,0,.5)}
+  nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:11px;cursor:pointer;font-size:15px;font-weight:600;font-family:var(--font-body);transition:color .15s ease,background .15s ease}
+  nav button:hover{color:var(--txt)}
+  nav button.active{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--txt);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+  main{padding:24px 22px 40px;max-width:min(1480px,97vw);margin:0 auto}
   .grid{display:grid;gap:16px}
   .cards{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
-  .card .label{color:var(--muted);font-size:13px;margin-bottom:6px}
-  .card .value{font-size:24px;font-weight:700}
-  .card.good{border-left:4px solid var(--accent2)}
-  .card.bad{border-left:4px solid var(--danger)}
-  .val-good{color:#86efac}.val-bad{color:#fca5a5}
-  section.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:18px}
-  section.panel h2{margin:0 0 4px;font-size:17px}
+  .card{background:linear-gradient(160deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 17px;position:relative;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+  .card::before{content:"";position:absolute;left:0;top:0;height:100%;width:3px;background:var(--grad-accent);opacity:0;transition:opacity .18s ease}
+  .card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow)}
+  .card:hover::before{opacity:.9}
+  .card .label{color:var(--muted);font-size:12.5px;margin-bottom:7px;font-weight:500}
+  .card .value{font-size:26px;font-weight:700;font-family:var(--font-mono);letter-spacing:-.5px;line-height:1.1}
+  .card.good::before{opacity:.9;background:var(--grad-lime)}
+  .card.good .value{color:var(--good)}
+  .card.bad::before{opacity:.9;background:linear-gradient(135deg,var(--danger),#f43f5e)}
+  .val-good{color:var(--good)}.val-bad{color:var(--bad)}
+  section.panel{background:linear-gradient(165deg,var(--panel),color-mix(in srgb,var(--panel2) 70%,var(--panel)));border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-top:18px;box-shadow:var(--shadow)}
+  section.panel h2{margin:0 0 4px;font-size:18px;font-family:var(--font-display);font-weight:600;letter-spacing:-.2px}
   section.panel .hint{color:var(--muted);font-size:13px;margin-bottom:16px}
   form.row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end}
   .field{display:flex;flex-direction:column;gap:5px}
   .field label{font-size:12px;color:var(--muted)}
-  input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:10px;border-radius:9px;font-size:14px;width:100%;font-family:inherit}
-  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);border-color:transparent}
+  input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:10px;border-radius:10px;font-size:14px;width:100%;font-family:var(--font-body);transition:border-color .15s ease,box-shadow .15s ease}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+  td.num,.card .value{font-variant-numeric:tabular-nums}
   .table-wrap{overflow-x:auto;margin-top:16px}
   table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -627,12 +658,15 @@ function renderDashboard(){
   const m=document.getElementById('db-month').value;
   const rows=TX.filter(t=>!m||(t.op_date||'').slice(0,7)===m);
   const body=document.getElementById('db-body'); body.innerHTML='';
-  let entrees=0,sorties=0,manque=0;
+  let entrees=0,sorties=0,manque=0,tvaColl=0,tvaRec=0,aClasser=0;
   rows.forEach(t=>{
     const inv=INVOICES.find(i=>i.transaction_id===t.id);
     const hasInv=!!inv; const verified=hasInv && t.status==='classe';
     if(t.amount>0) entrees+=Number(t.amount); else sorties+=Math.abs(Number(t.amount));
     if(t.amount<0 && !hasInv) manque++;
+    if(!t.category_id) aClasser++;
+    const va=Number(t.vat_amount)||0;
+    if(va){ if(t.amount>0) tvaColl+=va; else { const c=CATS.find(x=>x.id===t.category_id); if(!c||c.vat_recoverable!==false) tvaRec+=va; } }
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td>
       <td>${esc(t.counterparty||'—')}</td><td class="num">${euro(t.amount)}</td>
@@ -642,10 +676,13 @@ function renderDashboard(){
   });
   if(!rows.length) body.innerHTML='<tr><td colspan="7" class="empty">Aucun mouvement sur ce mois.</td></tr>';
   const cards=document.getElementById('db-cards');
+  const solde=entrees-sorties, tvaNette=tvaColl-tvaRec;
   cards.innerHTML=`
-    <div class="card good"><div class="label">Entrées du mois</div><div class="value val-good">${euro(entrees)}</div></div>
-    <div class="card bad"><div class="label">Sorties du mois</div><div class="value val-bad">${euro(sorties)}</div></div>
-    <div class="card"><div class="label">Solde du mois</div><div class="value">${euro(entrees-sorties)}</div></div>
+    <div class="card good"><div class="label">↗ Entrées du mois</div><div class="value val-good">${euro(entrees)}</div></div>
+    <div class="card bad"><div class="label">↘ Sorties du mois</div><div class="value val-bad">${euro(sorties)}</div></div>
+    <div class="card ${solde>=0?'good':'bad'}"><div class="label">Solde du mois</div><div class="value ${solde>=0?'val-good':'val-bad'}">${euro(solde)}</div></div>
+    <div class="card"><div class="label">TVA nette du mois</div><div class="value">${euro(tvaNette)}</div><div class="label" style="margin:6px 0 0">collectée ${euro(tvaColl)} · récup. ${euro(tvaRec)}</div></div>
+    <div class="card ${aClasser?'bad':'good'}"><div class="label">⏳ Lignes à classer</div><div class="value ${aClasser?'val-bad':'val-good'}">${aClasser}</div></div>
     <div class="card ${manque?'bad':'good'}"><div class="label">Paiements sans facture</div><div class="value ${manque?'val-bad':'val-good'}">${manque}</div></div>`;
 }
 
