@@ -1,0 +1,17 @@
+{
+  "id": "/documents",
+  "name": "Générateur de documents",
+  "short_name": "Documents",
+  "description": "Générateur de documents — ProFormationPlus",
+  "start_url": "/documents.html?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#3f5bd6",
+  "theme_color": "#3730a3",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icons/documents-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/documents-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/documents-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

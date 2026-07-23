@@ -1,0 +1,17 @@
+{
+  "id": "/crm-formation",
+  "name": "CRM Formation",
+  "short_name": "Formation",
+  "description": "CRM Formation — ProFormationPlus",
+  "start_url": "/crm.html?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#7c5cf0",
+  "theme_color": "#6d3ff0",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icons/formation-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/formation-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/formation-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

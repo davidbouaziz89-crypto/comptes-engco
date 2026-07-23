@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Générateur de documents</title>
+<!-- PWA — installable (iPhone & Android) -->
+<link rel="manifest" href="/manifest-documents.webmanifest" />
+<meta name="theme-color" content="#3730a3" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Documents" />
+<link rel="apple-touch-icon" href="/icons/documents-apple-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/documents-192.png" />
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 <script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>

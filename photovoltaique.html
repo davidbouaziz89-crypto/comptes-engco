@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CRM Photovoltaïque</title>
+<!-- PWA — installable (iPhone & Android) -->
+<link rel="manifest" href="/manifest-pv.webmanifest" />
+<meta name="theme-color" content="#ef7d13" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="CRM PV" />
+<link rel="apple-touch-icon" href="/icons/pv-apple-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/pv-192.png" />
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 <script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">

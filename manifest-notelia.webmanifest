@@ -1,0 +1,17 @@
+{
+  "id": "/notelia",
+  "name": "Notelia — CRM Télécom",
+  "short_name": "Notelia",
+  "description": "Notelia — CRM Télécom",
+  "start_url": "/notelia.html?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#14284d",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icons/notelia-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/notelia-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/notelia-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

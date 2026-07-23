@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TimeGuard Pro — Pointage</title>
+<!-- PWA — installable (iPhone & Android) -->
+<link rel="manifest" href="/manifest-pointage.webmanifest" />
+<meta name="theme-color" content="#059669" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Pointage" />
+<link rel="apple-touch-icon" href="/icons/pointage-apple-180.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/pointage-192.png" />
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 <script>(function(){try{if(localStorage.getItem('pfp-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
