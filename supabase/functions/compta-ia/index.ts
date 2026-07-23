@@ -52,8 +52,9 @@ const FACTURE_SCHEMA = {
     is_restaurant: { type: ["boolean", "null"], description: "true si c'est une note de restaurant / repas" },
     meals: { type: ["integer", "null"], description: "Nombre de couverts/repas (personnes) si c'est un restaurant, sinon null" },
     guests: { type: ["string", "null"], description: "Noms des convives si mentionnés sur la note de restaurant, sinon null" },
+    suggested_category_id: { type: ["string", "null"], description: "id EXACT de la catégorie la plus adaptée parmi la liste fournie, ou null si aucune ne convient" },
   },
-  required: ["direction", "counterparty", "invoice_number", "invoice_date", "amount_ht", "vat_rate", "vat_amount", "amount_ttc", "is_restaurant", "meals", "guests"],
+  required: ["direction", "counterparty", "invoice_number", "invoice_date", "amount_ht", "vat_rate", "vat_amount", "amount_ttc", "is_restaurant", "meals", "guests", "suggested_category_id"],
 };
 
 function tryParseJson(s: string): unknown {
@@ -124,7 +125,9 @@ RÈGLE CLÉ sur le TIERS (counterparty) et le SENS (direction) :
 - En cas de doute, choisis comme counterparty la partie qui n'est PAS ${companyName ? companyName : "notre société"}.
 
 Extrais aussi : le numéro de facture, la date (AAAA-MM-JJ), le montant HT, le taux de TVA (%), le montant de TVA et le montant TTC. Mets null pour tout champ absent. Calcule les montants manquants si c'est déductible des autres.
-Si le document est une note/addition de RESTAURANT ou de repas : is_restaurant=true, meals = nombre de couverts/repas (personnes servies, d'après couverts/menus/cafés…), guests = noms des convives si écrits. Sinon is_restaurant=false et meals/guests à null.`;
+Si le document est une note/addition de RESTAURANT ou de repas : is_restaurant=true, meals = nombre de couverts/repas (personnes servies, d'après couverts/menus/cafés…), guests = noms des convives si écrits. Sinon is_restaurant=false et meals/guests à null.
+Propose enfin la catégorie la plus adaptée dans suggested_category_id (utilise l'id EXACT de la liste ci-dessous), ou null si tu n'es pas sûr :
+${catList}`;
 
     const schema = kind === "releve" ? RELEVE_SCHEMA : FACTURE_SCHEMA;
 
