@@ -402,7 +402,16 @@ updateThemeBtn();
 
 /* ---------- État global ---------- */
 let SESSION=null, IS_ADMIN=false, MY_ACCESS=[], COMPANIES=[], CO=null, MY_ROLE=null;
-let CATS=[], TX=[], INVOICES=[];
+let CATS=[], TX=[], INVOICES=[], RULES=[];
+// ===== Apprentissage : règles apprises =====
+const RULE_STOP=new Set(['sepa','vir','virement','prlv','prelevement','carte','cb','com','libelle','facture','fact','recue','recu','paiement','achat','le','du','de','des','la','les','sur','par','pour','and','inc','ltd','sas','sasu','sarl','eur']);
+function firstKeyword(label){ const words=(label||'').toLowerCase().replace(/[^a-zà-ÿ0-9 ]/gi,' ').split(/\s+/).filter(w=>w.length>=4&&!RULE_STOP.has(w)&&!/^\d+$/.test(w)); return words[0]||''; }
+function ruleKeyFor(counterparty,label){ const cp=(counterparty||'').toLowerCase().trim(); return cp || firstKeyword(label); }
+function applyRule(line){ const lab=(line.label||'').toLowerCase(); const cp=(line.counterparty||'').toLowerCase().trim();
+  return RULES.find(r=>r.pattern && ((cp && cp===r.pattern) || lab.includes(r.pattern))) || null; }
+async function learnRule(counterparty,label,categoryId){ if(!CO||!categoryId) return; const pattern=ruleKeyFor(counterparty,label); if(!pattern||pattern.length<3) return;
+  await db.from('compta_rules').upsert({company_id:CO.id,pattern,category_id:categoryId,counterparty:counterparty||null,updated_at:new Date().toISOString()},{onConflict:'company_id,pattern'});
+  const ex=RULES.find(r=>r.pattern===pattern); if(ex){ ex.category_id=categoryId; ex.counterparty=counterparty||null; } else RULES.push({pattern,category_id:categoryId,counterparty:counterparty||null}); }
 // Logos des sociétés (fichiers dans assets/logos/<key>.png) + couleur de marque.
 const LOGO_DIR='assets/logos/';
 const LOGOS=[
@@ -543,12 +552,13 @@ function showAdminTab(t){
 async function reloadData(){
   if(!CO){ if(IS_ADMIN){ renderCompanies(); } return; }
   document.getElementById('loaderr').style.display='none';
-  const [cats,tx,inv]=await Promise.all([
+  const [cats,tx,inv,rules]=await Promise.all([
     db.from('compta_categories').select('*').or('company_id.eq.'+CO.id+',company_id.is.null').order('name'),
     db.from('compta_transactions').select('*').eq('company_id',CO.id).order('op_date',{ascending:false}),
     db.from('compta_invoices').select('*').eq('company_id',CO.id).order('created_at',{ascending:false}),
+    db.from('compta_rules').select('pattern,category_id,counterparty').eq('company_id',CO.id),
   ]);
-  CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[];
+  CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[];
   fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva();
 }
 
@@ -666,7 +676,8 @@ async function saveTxEdit(e){ if(e&&e.preventDefault)e.preventDefault(); if(!edi
     amount:amount, vat_rate:rate, vat_amount:tva, status:document.getElementById('te-status').value };
   const {error}=await db.from('compta_transactions').update(rec).eq('id',editingTxId);
   if(error){ toast('Erreur : '+error.message); return; }
-  toast('✔ Modification enregistrée.'); closeTxEdit(); reloadData();
+  if(catId){ try{ await learnRule(rec.counterparty, rec.label, catId); }catch(_){} }
+  toast('✔ Enregistré'+(catId?' — l’IA a mémorisé ce classement.':'.')); closeTxEdit(); reloadData();
 }
 async function setTxCat(id,cid){
   const c=catById(cid);
@@ -705,6 +716,7 @@ async function importReleveIA(file){
     const res=await callComptaIA('releve',file);
     const lines=(res&&res.lines)||[];
     if(!lines.length){ toast("Aucune ligne détectée."); return; }
+    lines.forEach(l=>{ if(!l.suggested_category_id){ const r=applyRule(l); if(r){ l.suggested_category_id=r.category_id; if(!l.counterparty&&r.counterparty) l.counterparty=r.counterparty; } } });
     IA_RELEVE_LINES=lines; openIAReleve(lines);
   }catch(e){ alert("❌ Erreur IA (relevé) :\n\n"+e.message); }
 }
@@ -773,8 +785,13 @@ async function runReleveImport(){
     let amount=NaN;
     if(cAmt!=null) amount=parseNum(rw[cAmt]);
     else { const d=parseNum(rw[cDeb]), c=parseNum(rw[cCred]); if(!isNaN(c)&&c) amount=Math.abs(c); else if(!isNaN(d)&&d) amount=-Math.abs(d); }
-    return { company_id:CO.id, op_date:parseDate(rw[cDate]), label:String(rw[cLabel]||'').trim()||'(sans libellé)',
-      amount:isNaN(amount)?0:amount, status:'a_classer', created_by:SESSION.user.id };
+    const rec={ company_id:CO.id, op_date:parseDate(rw[cDate]), label:String(rw[cLabel]||'').trim()||'(sans libellé)',
+      amount:isNaN(amount)?0:amount, counterparty:null, category_id:null, vat_rate:null, vat_amount:null, status:'a_classer', created_by:SESSION.user.id };
+    const r=applyRule(rec);
+    if(r){ rec.category_id=r.category_id; rec.counterparty=r.counterparty||null; rec.status='classe';
+      const cat=CATS.find(c=>c.id===r.category_id);
+      if(cat&&cat.default_vat_rate!=null){ const rate=Number(cat.default_vat_rate); rec.vat_rate=rate; rec.vat_amount=rate?Math.round(Math.abs(rec.amount)*rate/(100+rate)*100)/100:0; } }
+    return rec;
   }).filter(r=>r.amount!==0||r.label);
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur import : '+error.message); return; }
