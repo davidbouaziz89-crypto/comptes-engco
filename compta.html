@@ -225,7 +225,11 @@
         <div class="field"><label>TVA %</label><input type="number" step="0.01" id="i-tva" value="20" oninput="invPreview()"></div>
         <div class="field"><label>Montant TTC (€)</label><input type="number" step="0.01" id="i-ttc" placeholder="auto si vide" oninput="invPreview()"></div>
         <div class="field"><label>Rapprocher d'un paiement</label><select id="i-tx"><option value="">— plus tard —</option></select></div>
-        <div class="field"><label>Fichier (PDF / image)</label><input type="file" id="i-file" accept="image/*,.pdf" onchange="onInvoiceFilePick()"></div>
+        <div class="field" style="min-width:220px"><label>Facture (PDF / photo)</label>
+          <button type="button" class="btn small" onclick="document.getElementById('i-file').click()">⬆️ Choisir la facture</button>
+          <input type="file" id="i-file" accept="image/*,.pdf" class="hidden" onchange="onInvoiceFilePick()">
+          <div id="i-filename" class="hint" style="margin-top:4px"></div>
+        </div>
       </form>
       <div class="preview" id="i-preview"></div>
       <div style="margin-top:14px"><button class="btn" onclick="addInvoice(event)">+ Enregistrer la facture</button></div>
@@ -725,6 +729,7 @@ function invPreview(){
 async function onInvoiceFilePick(){
   if(!canEdit()) return;
   const f=document.getElementById('i-file').files[0]; if(!f) return;
+  const fn=document.getElementById('i-filename'); if(fn) fn.textContent='📎 '+f.name;
   if(!askUseIA("Facture « "+f.name+" » — la lire avec l'IA pour pré-remplir ?")) return;
   toast("🪄 Lecture IA de la facture…");
   try{
