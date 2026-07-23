@@ -83,6 +83,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const kind = body.kind; // 'releve' | 'facture'
     const companyId = body.company_id;
+    const companyName = (body.company_name || "").toString().trim();
     const mime = body.mime || "application/pdf";
     const dataB64 = body.data; // base64 sans préfixe data:
     const categories = Array.isArray(body.categories) ? body.categories : [];
@@ -113,8 +114,17 @@ Si tu identifies clairement le client/fournisseur, indique-le dans counterparty,
 Propose la catégorie la plus adaptée parmi cette liste (utilise son id exact), ou null si tu n'es pas sûr :
 ${catList}
 N'invente aucune ligne. Ne renvoie que ce qui figure réellement sur le relevé.`
-      : `Tu es un assistant comptable. Analyse cette facture et extrais : le sens (achat = facture reçue d'un fournisseur / vente = facture émise à un client), le tiers (fournisseur ou client), le numéro de facture, la date (AAAA-MM-JJ), le montant HT, le taux de TVA (%), le montant de TVA et le montant TTC. Mets null pour tout champ absent. Calcule les montants manquants si c'est déductible des autres.
-Si le document est une note/addition de RESTAURANT ou de repas : mets is_restaurant=true, et indique dans meals le nombre de couverts/repas (nombre de personnes servies, déductible si visible sur la note : couverts, menus, cafés…), et dans guests les noms des convives s'ils sont écrits. Sinon is_restaurant=false et meals/guests à null.`;
+      : `Tu es un assistant comptable qui tient la comptabilité de la société ${companyName ? `« ${companyName} »` : "de l'utilisateur"}. Analyse cette facture.
+
+RÈGLE CLÉ sur le TIERS (counterparty) et le SENS (direction) :
+- ${companyName ? `« ${companyName} »` : "Notre société"} = NOUS. Le champ counterparty ne doit JAMAIS être notre propre société : c'est TOUJOURS l'AUTRE partie.
+- Repère l'émetteur (celui qui édite/envoie la facture, souvent en en-tête/logo) et le destinataire (le « facturé à », « client », adresse de facturation).
+- Si l'émetteur est NOUS (${companyName ? companyName : "notre société"}), alors direction = "vente" et counterparty = le CLIENT destinataire (le « facturé à »).
+- Si le destinataire est NOUS, alors direction = "achat" et counterparty = le FOURNISSEUR émetteur.
+- En cas de doute, choisis comme counterparty la partie qui n'est PAS ${companyName ? companyName : "notre société"}.
+
+Extrais aussi : le numéro de facture, la date (AAAA-MM-JJ), le montant HT, le taux de TVA (%), le montant de TVA et le montant TTC. Mets null pour tout champ absent. Calcule les montants manquants si c'est déductible des autres.
+Si le document est une note/addition de RESTAURANT ou de repas : is_restaurant=true, meals = nombre de couverts/repas (personnes servies, d'après couverts/menus/cafés…), guests = noms des convives si écrits. Sinon is_restaurant=false et meals/guests à null.`;
 
     const schema = kind === "releve" ? RELEVE_SCHEMA : FACTURE_SCHEMA;
 

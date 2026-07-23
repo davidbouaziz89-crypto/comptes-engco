@@ -797,7 +797,7 @@ function fileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader
 async function callComptaIA(kind,file){
   const b64=await fileToB64(file);
   const cats=CATS.map(c=>({id:c.id,name:c.name,flow:c.flow}));
-  const {data,error}=await db.functions.invoke('compta-ia',{body:{kind,company_id:CO.id,filename:file.name,mime:file.type||'application/pdf',data:b64,categories:cats}});
+  const {data,error}=await db.functions.invoke('compta-ia',{body:{kind,company_id:CO.id,company_name:(CO&&CO.name)||'',filename:file.name,mime:file.type||'application/pdf',data:b64,categories:cats}});
   if(error){ let m=error.message||'Erreur IA'; let st=''; try{ st=error.context&&error.context.status?(' [HTTP '+error.context.status+']'):''; }catch(_){}
     try{ const ctx=await error.context.json(); if(ctx&&ctx.error) m=ctx.error; }catch(_){ try{ const t=await error.context.text(); if(t) m=t; }catch(__){} }
     throw new Error(m+st); }
