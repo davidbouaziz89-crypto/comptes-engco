@@ -179,7 +179,7 @@
       <b style="margin-right:auto">📥 Importer un relevé bancaire (CSV / Excel)</b>
       <button class="btn ghost small" onclick="downloadReleveTemplate()">⬇️ Modèle</button>
       <button class="btn small" onclick="document.getElementById('imp-releve').click()">⬆️ Importer un fichier</button>
-      <input type="file" id="imp-releve" accept=".xlsx,.xls,.csv" class="hidden" onchange="importReleve(this.files[0]);this.value='';">
+      <input type="file" id="imp-releve" accept=".xlsx,.xls,.csv,.pdf,image/*" class="hidden" onchange="importReleve(this.files[0]);this.value='';">
     </section>
 
     <section class="panel canedit">
@@ -225,7 +225,7 @@
         <div class="field"><label>TVA %</label><input type="number" step="0.01" id="i-tva" value="20" oninput="invPreview()"></div>
         <div class="field"><label>Montant TTC (€)</label><input type="number" step="0.01" id="i-ttc" placeholder="auto si vide" oninput="invPreview()"></div>
         <div class="field"><label>Rapprocher d'un paiement</label><select id="i-tx"><option value="">— plus tard —</option></select></div>
-        <div class="field"><label>Fichier (PDF / image)</label><input type="file" id="i-file" accept="image/*,.pdf"></div>
+        <div class="field"><label>Fichier (PDF / image)</label><input type="file" id="i-file" accept="image/*,.pdf" onchange="onInvoiceFilePick()"></div>
       </form>
       <div class="preview" id="i-preview"></div>
       <div style="margin-top:14px"><button class="btn" onclick="addInvoice(event)">+ Enregistrer la facture</button></div>
@@ -344,6 +344,18 @@
   </div>
 </div>
 
+<!-- MODALE VÉRIF IA RELEVÉ -->
+<div id="ia-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:820px">
+    <div class="modal-head"><h3>🪄 Relevé lu par l'IA — vérifie avant d'importer</h3><button class="btn ghost small" onclick="closeIA()">✕</button></div>
+    <div id="ia-body"></div>
+    <div style="margin-top:16px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn ghost" onclick="closeIA()">Annuler</button>
+      <button class="btn" onclick="runIAReleveImport()">✔ Importer ces lignes</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -379,6 +391,18 @@ function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;
 function canEdit(){ return IS_ADMIN || MY_ROLE==='secretaire'; }
 function ymNow(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
+// ===== IA (edge function compta-ia) =====
+let IA_RELEVE_LINES=[];
+function fileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>{ const s=String(r.result); res(s.slice(s.indexOf(',')+1)); }; r.onerror=rej; r.readAsDataURL(file); }); }
+async function callComptaIA(kind,file){
+  const b64=await fileToB64(file);
+  const cats=CATS.map(c=>({id:c.id,name:c.name,flow:c.flow}));
+  const {data,error}=await db.functions.invoke('compta-ia',{body:{kind,company_id:CO.id,filename:file.name,mime:file.type||'application/pdf',data:b64,categories:cats}});
+  if(error){ let m=error.message||'Erreur IA'; try{ const ctx=await error.context.json(); if(ctx&&ctx.error) m=ctx.error; }catch(_){} throw new Error(m); }
+  if(data&&data.error) throw new Error(data.error);
+  return data.result;
+}
+function askUseIA(msg){ return confirm(msg+"\n\nOK = 🪄 Lire avec l'IA (Claude)\nAnnuler = saisie manuelle"); }
 
 /* ---------- Auth ---------- */
 async function doLogin(e){ e.preventDefault();
@@ -599,6 +623,46 @@ function downloadReleveTemplate(){
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Relevé'); XLSX.writeFile(wb,'modele_releve.xlsx');
 }
 function importReleve(file){ if(!file||!canEdit()) return;
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(['xlsx','xls','csv'].includes(ext)){ importReleveSheet(file); return; }
+  // PDF / image -> proposer l'IA
+  if(askUseIA("Relevé « "+file.name+" » — le lire avec l'IA ?")) importReleveIA(file);
+  else toast("Sans IA : exporte ton relevé en CSV/Excel depuis ta banque, ou saisis les lignes à la main.");
+}
+async function importReleveIA(file){
+  toast("🪄 Lecture IA du relevé… (quelques secondes)");
+  try{
+    const res=await callComptaIA('releve',file);
+    const lines=(res&&res.lines)||[];
+    if(!lines.length){ toast("Aucune ligne détectée."); return; }
+    IA_RELEVE_LINES=lines; openIAReleve(lines);
+  }catch(e){ toast("Erreur IA : "+e.message); }
+}
+function openIAReleve(lines){
+  const body=document.getElementById('ia-body');
+  let tot=0; lines.forEach(l=>tot+=Number(l.amount)||0);
+  body.innerHTML=`<div class="hint" style="margin-bottom:10px"><b>${lines.length}</b> lignes lues · solde ${euro(tot)}. Vérifie, puis importe (tout part en « à classer » ou pré-classé selon la catégorie suggérée).</div>`+
+    `<div class="table-wrap" style="max-height:46vh;overflow:auto"><table><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie suggérée</th><th>Tiers</th><th class="num">Montant</th></tr></thead><tbody>`+
+    lines.map(l=>{ const c=CATS.find(x=>x.id===l.suggested_category_id); return `<tr><td>${esc(l.op_date||'')}</td><td>${esc(l.label||'')}</td><td>${c?esc(c.name):'<span class="badge b-wip">à classer</span>'}</td><td>${esc(l.counterparty||'—')}</td><td class="num">${euro(l.amount)}</td></tr>`; }).join('')+
+    `</tbody></table></div>`;
+  document.getElementById('ia-modal').classList.remove('hidden');
+}
+function closeIA(){ document.getElementById('ia-modal').classList.add('hidden'); }
+async function runIAReleveImport(){
+  const recs=IA_RELEVE_LINES.map(l=>{
+    const cat=CATS.find(c=>c.id===l.suggested_category_id);
+    let rate=(l.vat_rate!=null)?Number(l.vat_rate):(cat&&cat.default_vat_rate!=null?Number(cat.default_vat_rate):null);
+    const ttc=Math.abs(Number(l.amount)||0);
+    const tva=(rate)?Math.round(ttc*rate/(100+rate)*100)/100:null;
+    return { company_id:CO.id, op_date:l.op_date, label:(l.label||'(sans libellé)'), amount:Number(l.amount)||0,
+      category_id:cat?cat.id:null, counterparty:l.counterparty||null,
+      vat_rate:(rate!=null&&!isNaN(rate))?rate:null, vat_amount:tva, status:cat?'classe':'a_classer', created_by:SESSION.user.id };
+  });
+  const {error}=await db.from('compta_transactions').insert(recs);
+  if(error){ toast('Erreur : '+error.message); return; }
+  closeIA(); toast(recs.length+' lignes importées par IA.'); reloadData();
+}
+function importReleveSheet(file){ if(!file||!canEdit()) return;
   const r=new FileReader();
   r.onload=ev=>{
     const wb=XLSX.read(ev.target.result,{type:'binary',cellDates:true});
@@ -655,6 +719,32 @@ function invPreview(){
   if(isNaN(ttc)||!ttc){ ttc=ht*(1+rate/100); }
   const tva=ttc-ht;
   document.getElementById('i-preview').innerHTML=ht?`HT <b>${euro(ht)}</b> · TVA <b>${euro(tva)}</b> · TTC <b>${euro(ttc)}</b>`:'—';
+}
+async function onInvoiceFilePick(){
+  if(!canEdit()) return;
+  const f=document.getElementById('i-file').files[0]; if(!f) return;
+  if(!askUseIA("Facture « "+f.name+" » — la lire avec l'IA pour pré-remplir ?")) return;
+  toast("🪄 Lecture IA de la facture…");
+  try{
+    const r=await callComptaIA('facture',f);
+    if(r.direction) document.getElementById('i-dir').value=r.direction;
+    if(r.counterparty) document.getElementById('i-tiers').value=r.counterparty;
+    if(r.invoice_number) document.getElementById('i-num').value=r.invoice_number;
+    if(r.invoice_date) document.getElementById('i-date').value=r.invoice_date;
+    if(r.amount_ht!=null) document.getElementById('i-ht').value=r.amount_ht;
+    if(r.vat_rate!=null) document.getElementById('i-tva').value=r.vat_rate;
+    if(r.amount_ttc!=null) document.getElementById('i-ttc').value=r.amount_ttc;
+    invPreview(); autoMatchInvoice(r);
+    toast("Facture lue ✓ Vérifie les montants et enregistre.");
+  }catch(e){ toast("Erreur IA : "+e.message); }
+}
+function autoMatchInvoice(r){
+  const ttc=Math.abs(Number(r.amount_ttc)); if(!ttc) return;
+  const cand=TX.filter(t=>!INVOICES.some(i=>i.transaction_id===t.id))
+    .map(t=>({t,d:Math.abs(Math.abs(Number(t.amount))-ttc)}))
+    .filter(x=>x.d<=0.02).sort((a,b)=>a.d-b.d);
+  if(cand.length){ const sel=document.getElementById('i-tx'); sel.value=cand[0].t.id;
+    if(sel.value===cand[0].t.id) toast("🔗 Paiement correspondant trouvé et pré-sélectionné."); }
 }
 async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const tiers=document.getElementById('i-tiers').value.trim(); if(!tiers){ toast('Indique le tiers.'); return; }
