@@ -2081,6 +2081,58 @@ function renderDossiers(){
   body.innerHTML=html;
 }
 // Détail d'un dossier (LED) : montant + frais liés (factures) + net
+let _ddEdit=null;
+function renderDossierDetailEdit(d){
+  const optS=(arr,cur)=>'<option value=""></option>'+arr.filter(Boolean).map(x=>`<option${x===cur?' selected':''}>${escH(x)}</option>`).join('')+((cur&&!arr.includes(cur))?`<option selected>${escH(cur)}</option>`:'');
+  const statuts=(STATUTS_CFG||[]).map(s=>s.nom), regies=(REGIES_CFG||[]).map(r=>r.nom), camps=(window._campagnes||[]).map(c=>c.nom), depots=(window._depots||[]).map(x=>x.nom);
+  const delegOpts='<option value="">—</option>'+(window._delegataires||[]).map(g=>`<option value="${g.id}"${g.id===dossierDelegId(d)?' selected':''}>${escH(g.nom)}</option>`).join('');
+  const F=(lab,inner)=>`<div class="field"><label>${lab}</label>${inner}</div>`;
+  let e=`<div class="dd-sec">🧾 Fiche client</div><form class="row" onsubmit="return false">`
+    +F('Raison sociale',`<input type="text" id="dde-client" value="${escH(d.nom_client||'')}">`)
+    +F('Contact',`<input type="text" id="dde-contact" value="${escH(d.contact_client||'')}">`)
+    +F('Téléphone',`<input type="text" id="dde-tel" value="${escH(d.telephone||'')}">`)
+    +F('Email',`<input type="email" id="dde-email" value="${escH(d.email||'')}">`)
+    +F('ID CRM',`<input type="text" id="dde-crmid" value="${escH(d.crm_id||'')}">`)
+    +F('Date',`<input type="date" id="dde-date" value="${escH(d.date||today())}">`)
+    +F('Statut',`<select id="dde-statut">${optS(statuts,d.statut)}</select>`)
+    +F('Dépôt Emmy',`<select id="dde-depot">${optS(depots,d.numero_depot)}</select>`)
+    +F('Délégataire',`<select id="dde-deleg">${delegOpts}</select>`)
+    +F('Régie',`<select id="dde-regie">${optS(regies,d.commercial_regie)}</select>`)
+    +F('Campagne',`<select id="dde-campagne">${optS(camps,d.campagne)}</select>`)
+    +`</form>`;
+  e+=`<div class="dd-sec">📊 Chiffres & coûts</div><form class="row" onsubmit="return false">`
+    +F('Cumac',`<input type="number" step="1" id="dde-cumac" value="${d.cumac||0}">`)
+    +F('Prime (HT)',`<input type="number" step="0.01" id="dde-prime" value="${d.montant_prime||0}">`)
+    +F('Coût matériel',`<input type="number" step="0.01" id="dde-materiel" value="${d.cout_materiel||0}">`)
+    +F('Coût installation',`<input type="number" step="0.01" id="dde-install" value="${d.cout_installation||0}">`)
+    +F('Coût nacelle',`<input type="number" step="0.01" id="dde-nacelle" value="${d.cout_nacelle||0}">`)
+    +F('Coût Hamid',`<input type="number" step="0.01" id="dde-hamid" value="${d.cout_hamid||0}">`)
+    +F('Coût livraison',`<input type="number" step="0.01" id="dde-livraison" value="${d.cout_livraison||0}">`)
+    +F('Frais supp.',`<input type="number" step="0.01" id="dde-fraissupp" value="${d.frais_supp||0}">`)
+    +F('Coût audit',`<input type="number" step="0.01" id="dde-audit" value="${d.cout_audit||0}">`)
+    +`</form>`;
+  e+=`<div class="hint" style="margin-top:8px">💡 Marge, commission et délégataire se recalculent automatiquement. Toute modif ici se répercute partout (liste, dashboard, check).</div>`;
+  e+=`<div style="margin-top:14px;display:flex;gap:10px"><button class="btn" onclick="saveDossierDetailEdit('${d.id}')">💾 Enregistrer</button><button class="btn ghost" onclick="_ddEdit=null;openDossierDetail('${d.id}')">Annuler</button></div>`;
+  document.getElementById('dd-body').innerHTML=e;
+  document.getElementById('dossier-detail').style.display='flex';
+}
+async function saveDossierDetailEdit(id){
+  const g=x=>document.getElementById(x), v=x=>{const el=g(x);return el?el.value:'';}, n=x=>{const el=g(x);return el?(Number(el.value)||0):0;};
+  const old=(window._dossiers||[]).find(x=>x.id===id)||{};
+  const regie=v('dde-regie')||null; const rc=(REGIES_CFG||[]).find(r=>r.nom===regie);
+  const upd={ nom_client:v('dde-client')||null, contact_client:v('dde-contact')||null, telephone:v('dde-tel')||null, email:v('dde-email')||null,
+    crm_id:v('dde-crmid')||null, date:v('dde-date')||old.date, statut:v('dde-statut')||old.statut,
+    numero_depot:v('dde-depot')||null, delegataire_id:v('dde-deleg')||null, commercial_regie:regie, regie_pct:rc?Number(rc.pct_defaut)||0:0,
+    campagne:v('dde-campagne')||null, cumac:n('dde-cumac'), montant_prime:n('dde-prime'),
+    cout_materiel:n('dde-materiel'), cout_installation:n('dde-install'), cout_nacelle:n('dde-nacelle'),
+    cout_hamid:n('dde-hamid'), cout_livraison:n('dde-livraison'), frais_supp:n('dde-fraissupp'), cout_audit:n('dde-audit') };
+  const {error}=await db.from(T('dossiers')).update(upd).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('Dossier mis à jour ✅');
+  _ddEdit=null;
+  await loadDossiers(); if(typeof loadFrais==='function') await loadFrais();
+  openDossierDetail(id);
+}
 function openDossierDetail(id){
   const d=(window._dossiers||[]).find(x=>x.id===id); if(!d) return;
   const cid=(d.crm_id||'').toString().trim();
@@ -2092,6 +2144,8 @@ function openDossierDetail(id){
   const mats=(window._dossierMat||[]).filter(m=>m.dossier_id===d.id);
 
   document.getElementById('dd-title').innerHTML=`📄 ${escH(d.nom_client||'Dossier')}${cid?` &nbsp;<a href="${crmLink(cid)||'#'}" target="_blank" rel="noopener" style="font-size:14px;font-weight:500">${escH(cid)} ↗</a>`:''}`;
+
+  if(_ddEdit===id){ renderDossierDetailEdit(d); return; }
 
   const item=(k,v)=> v?`<div class="dd-item"><div class="k">${k}</div><div class="v">${v}</div></div>`:'';
   // Fiche client
@@ -2148,7 +2202,7 @@ function openDossierDetail(id){
       +`<tr><td colspan="4" class="num"><b>Total frais liés</b></td><td class="num val-bad"><b>${eur(totalFrais)}</b></td></tr></tbody></table></div>`;
   }
 
-  h+=`<div style="margin-top:16px;text-align:right"><button class="btn ghost small" onclick="editDossierFromDetail('${d.id}')">✏️ Modifier ce dossier</button></div>`;
+  h+=`<div style="margin-top:16px;text-align:right"><button class="btn" onclick="_ddEdit='${d.id}';openDossierDetail('${d.id}')">✏️ Modifier les données</button></div>`;
 
   document.getElementById('dd-body').innerHTML=h;
   document.getElementById('dossier-detail').style.display='flex';
