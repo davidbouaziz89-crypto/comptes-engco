@@ -137,6 +137,8 @@
   td.lbl{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help}
   table.compact td,table.compact th{padding:7px 10px;font-size:13px}
   table.compact tr:hover td{background:rgba(59,130,246,.10)}
+  table.compact select,table.compact input{padding:5px 8px;font-size:13px}
+  select.mini{min-width:150px;max-width:220px;width:auto}
   /* Catégories : menu latéral gauche + édition à droite (comme le CRM) */
   .cat-layout{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:12px}
   .cat-menu{flex:0 0 250px;display:flex;flex-direction:column;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px;max-height:62vh;overflow:auto}
@@ -352,6 +354,7 @@
       <div class="params-menu" id="params-menu">
         <button data-psec="categories" class="active" onclick="showParam('categories')">🏷️ Catégories de la société</button>
         <button data-psec="tiers" onclick="showParam('tiers')">🤝 Tiers (clients / fournisseurs)</button>
+        <button data-psec="resto" onclick="showParam('resto')">🍽️ Repas d'affaires (restaurant)</button>
         <button data-psec="societes" id="pm-societes" style="display:none" onclick="showParam('societes')">🏢 Sociétés</button>
         <button data-psec="users" id="pm-users" style="display:none" onclick="showParam('users')">👥 Utilisateurs &amp; accès</button>
       </div>
@@ -385,6 +388,7 @@
             <div class="hint">Cette liste s'enrichit toute seule : chaque tiers que tu saisis ou que l'IA détecte à l'import y apparaît, avec sa provenance. Tu peux aussi en ajouter à la main.</div>
             <form class="row" onsubmit="addTiersManual(event)">
               <div class="field" style="min-width:220px"><label>Nouveau tiers</label><input type="text" id="ti-new" placeholder="ex. DHL Express" required></div>
+              <div class="field" style="min-width:180px"><label>Catégorie</label><select id="ti-cat"><option value="">— catégorie —</option></select></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
             <div class="filterbar" style="margin-top:12px">
@@ -392,8 +396,24 @@
               <div class="field"><label>Source</label><select id="ti-fsource" onchange="renderTiersRegistry()"><option value="">Toutes</option><option value="manuel">Manuel</option><option value="ia">IA</option><option value="auto">Détecté</option></select></div>
             </div>
             <div class="table-wrap"><table class="compact">
-              <thead><tr><th>Tiers</th><th>Source</th><th class="num">Opérations</th><th class="num">Encaissé</th><th class="num">Payé</th><th></th></tr></thead>
+              <thead><tr><th>Tiers</th><th>Catégorie</th><th>Source</th><th class="num">Opérations</th><th class="num">Encaissé</th><th class="num">Payé</th><th></th></tr></thead>
               <tbody id="tiers-reg-body"></tbody>
+            </table></div>
+          </section>
+        </div>
+
+        <div class="ps" id="ps-resto" style="display:none">
+          <section class="panel">
+            <h2>🍽️ Repas d'affaires (restaurant)</h2>
+            <div class="hint">Chaque frais classé dans une catégorie « restaurant » apparaît ici automatiquement (relevés + factures). Note avec qui tu étais et le nombre de repas (couverts) pour justifier la déductibilité.</div>
+            <div class="filterbar" style="margin-top:4px">
+              <div class="field"><label>Mois</label><input type="month" id="resto-fmonth" onchange="renderResto()"></div>
+              <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="resto-search" placeholder="restaurant, convive…" oninput="renderResto()"></div>
+            </div>
+            <div id="resto-cards" class="grid cards" style="margin:12px 0"></div>
+            <div class="table-wrap"><table class="compact">
+              <thead><tr><th>Date</th><th>Source</th><th>Restaurant</th><th class="num">Montant</th><th>Convives (avec qui ?)</th><th class="num">Nb repas</th></tr></thead>
+              <tbody id="resto-body"></tbody>
             </table></div>
           </section>
         </div>
@@ -517,10 +537,10 @@ let CATS=[], TX=[], INVOICES=[], RULES=[], TIERS=[];
 let INV_FROM_IA=false;
 /* ---------- Registre des tiers (enrichi manuel + IA) ---------- */
 function tiersKey(n){ return String(n||'').toLowerCase().trim(); }
-async function registerTiers(name,source){
+async function registerTiers(name,source,categoryId){
   if(!CO) return; const nm=String(name||'').trim(); if(nm.length<2) return;
   const key=tiersKey(nm); if(TIERS.some(t=>t.name_key===key)) return;
-  const rec={company_id:CO.id,name:nm,name_key:key,source:(source==='ia'?'ia':'manuel')};
+  const rec={company_id:CO.id,name:nm,name_key:key,source:(source==='ia'?'ia':'manuel'),category_id:categoryId||null};
   try{
     const {error}=await db.from('compta_tiers').upsert(rec,{onConflict:'company_id,name_key',ignoreDuplicates:true});
     if(!error) TIERS.push(rec);
@@ -530,7 +550,7 @@ function registerTiersMany(names,source){ [...new Set((names||[]).map(tiersKey).
 // Liste fusionnée : registre + tiers détectés dans les mouvements/factures
 function allTiers(){
   const map=new Map();
-  TIERS.forEach(t=>map.set(t.name_key,{name:t.name,key:t.name_key,source:t.source,inTable:true}));
+  TIERS.forEach(t=>map.set(t.name_key,{name:t.name,key:t.name_key,source:t.source,inTable:true,category_id:t.category_id||null}));
   [].concat(TX.map(t=>t.counterparty),INVOICES.map(i=>i.counterparty)).filter(Boolean).forEach(n=>{
     const k=tiersKey(n); if(!map.has(k)) map.set(k,{name:n,key:k,source:'auto',inTable:false});
   });
@@ -557,15 +577,33 @@ function renderTiersRegistry(){
   const fs=document.getElementById('ti-fsource')?.value||'';
   const list=allTiers().filter(t=>(!q||t.name.toLowerCase().includes(q))&&(!fs||t.source===fs));
   body.innerHTML=list.map(t=>{ const s=tiersStats(t.key);
+    const catCell=canEdit()
+      ? `<select class="mini" onchange="setTiersCat('${esc(t.key)}',this.value)"><option value="">— catégorie —</option>`+
+        txCompanyCats().map(c=>`<option value="${c.id}"${c.id===t.category_id?' selected':''}>${esc(c.name)}</option>`).join('')+`</select>`
+      : esc(catName(t.category_id));
     return `<tr><td class="lbl" title="${esc(t.name)}"><a href="#" onclick="openTiersFor('${esc(t.key)}');return false">${esc(t.name)}</a></td>
+      <td>${catCell}</td>
       <td>${tiersSourceBadge(t.source)}</td><td class="num">${s.count}</td>
       <td class="num val-good">${s.inn?euro(s.inn):'—'}</td><td class="num val-bad">${s.out?euro(s.out):'—'}</td>
       <td>${(canEdit()&&t.inTable)?`<button class="btn danger small" onclick="deleteTiers('${esc(t.key)}')">🗑</button>`:''}</td></tr>`;
-  }).join('')||'<tr><td colspan="6" class="empty">Aucun tiers pour le moment. Ils apparaîtront ici automatiquement à mesure que tu saisis ou importes.</td></tr>';
+  }).join('')||'<tr><td colspan="7" class="empty">Aucun tiers pour le moment. Ils apparaîtront ici automatiquement à mesure que tu saisis ou importes.</td></tr>';
 }
 async function addTiersManual(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const inp=document.getElementById('ti-new'); const nm=(inp.value||'').trim(); if(nm.length<2){ toast('Nom trop court.'); return; }
-  await registerTiers(nm,'manuel'); inp.value=''; toast('Tiers ajouté.'); renderTiersRegistry(); fillTiersSelect();
+  const catSel=document.getElementById('ti-cat'); const catId=(catSel&&catSel.value)||null;
+  const key=tiersKey(nm); const existed=TIERS.some(t=>t.name_key===key);
+  await registerTiers(nm,'manuel',catId);
+  if(catId&&existed) await setTiersCat(key,catId);   // applique la catégorie même si le tiers existait déjà
+  inp.value=''; if(catSel) catSel.value=''; toast('Tiers ajouté.'); renderTiersRegistry(); fillTiersSelect();
+}
+async function setTiersCat(key,catId){ if(!canEdit()) return;
+  const t=allTiers().find(x=>x.key===key); if(!t) return;
+  const rec={company_id:CO.id,name:t.name,name_key:key,category_id:catId||null};
+  const {error}=await db.from('compta_tiers').upsert(rec,{onConflict:'company_id,name_key'});
+  if(error){ toast('Erreur : '+error.message); return; }
+  const ex=TIERS.find(x=>x.name_key===key);
+  if(ex){ ex.category_id=catId||null; } else { TIERS.push({...rec,source:'manuel'}); }
+  toast('Catégorie du tiers enregistrée.'); renderTiersRegistry();
 }
 async function deleteTiers(key){ if(!canEdit()) return;
   const t=TIERS.find(x=>x.name_key===key); if(!t){ return; }
@@ -573,6 +611,50 @@ async function deleteTiers(key){ if(!canEdit()) return;
   const {error}=await db.from('compta_tiers').delete().eq('company_id',CO.id).eq('name_key',key);
   if(error){ toast('Erreur : '+error.message); return; }
   TIERS=TIERS.filter(x=>x.name_key!==key); toast('Tiers retiré.'); renderTiersRegistry(); fillTiersSelect();
+}
+
+/* ---------- Registre RESTAURANT (repas d'affaires) ---------- */
+// Rassemble tout frais classé en catégorie restaurant : lignes de relevé + factures.
+function restoRows(){
+  const rows=[];
+  TX.forEach(t=>{ if(catIsRestaurant(t.category_id)) rows.push({source:'tx',id:t.id,date:t.op_date,
+    tiers:t.counterparty||t.label||'—',amount:Math.abs(Number(t.amount)||0),guests:t.guests||'',meals:t.meals}); });
+  INVOICES.forEach(i=>{ if(catIsRestaurant(i.category_id)) rows.push({source:'inv',id:i.id,date:i.invoice_date||(i.created_at||'').slice(0,10),
+    tiers:i.counterparty||'—',amount:Math.abs(Number(i.amount_ttc)||0),guests:i.guests||'',meals:i.meals}); });
+  return rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+}
+function renderResto(){
+  const body=document.getElementById('resto-body'); if(!body) return;
+  const m=document.getElementById('resto-fmonth')?.value||'';
+  const q=(document.getElementById('resto-search')?.value||'').toLowerCase().trim();
+  const rows=restoRows().filter(r=>(!m||String(r.date||'').slice(0,7)===m)&&
+    (!q||String(r.tiers).toLowerCase().includes(q)||String(r.guests).toLowerCase().includes(q)));
+  const ed=canEdit();
+  body.innerHTML=rows.map(r=>{
+    const guestCell=ed?`<input type="text" value="${esc(r.guests)}" placeholder="ex. M. Durand (client X)" style="min-width:220px" onchange="setRestoField('${r.source}','${r.id}','guests',this.value)">`:esc(r.guests||'—');
+    const mealCell=ed?`<input type="number" min="0" step="1" value="${r.meals!=null?r.meals:''}" placeholder="—" style="max-width:90px;text-align:right" onchange="setRestoField('${r.source}','${r.id}','meals',this.value)">`:(r.meals!=null?r.meals:'—');
+    return `<tr><td>${(r.date||'').slice(0,10)}</td>
+      <td>${r.source==='inv'?'<span class="pill">📄 Facture</span>':'<span class="pill">🏦 Relevé</span>'}</td>
+      <td class="lbl" title="${esc(r.tiers)}">${esc(r.tiers)}</td>
+      <td class="num val-bad">${euro(r.amount)}</td>
+      <td>${guestCell}</td><td class="num">${mealCell}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" class="empty">Aucun frais restaurant. Classe un frais dans une catégorie « restaurant » et il apparaîtra ici.</td></tr>';
+  const totAmount=rows.reduce((s,r)=>s+r.amount,0);
+  const totMeals=rows.reduce((s,r)=>s+(Number(r.meals)||0),0);
+  const cards=document.getElementById('resto-cards');
+  if(cards) cards.innerHTML=`
+    <div class="card"><div class="label">Sorties restaurant</div><div class="value">${rows.length}</div></div>
+    <div class="card bad"><div class="label">Total dépensé</div><div class="value val-bad">${euro(totAmount)}</div></div>
+    <div class="card"><div class="label">Nombre de repas</div><div class="value">${totMeals||'—'}</div></div>`;
+}
+async function setRestoField(source,id,field,val){ if(!canEdit()) return;
+  const table=source==='inv'?'compta_invoices':'compta_transactions';
+  const v=field==='meals'?(val===''?null:parseInt(val,10)):(String(val||'').trim()||null);
+  const {error}=await db.from(table).update({[field]:v}).eq('id',id);
+  if(error){ toast(/column|colonne|guests|meals|schema/i.test(error.message||'')
+      ?'Colonnes manquantes : exécute sql/compta-restaurant.sql dans Supabase.':'Erreur : '+error.message); return; }
+  const arr=source==='inv'?INVOICES:TX; const r=arr.find(x=>x.id===id); if(r) r[field]=v;
+  toast('Enregistré.'); renderResto();
 }
 function openTiersFor(key){ showTab('tiers'); const sel=document.getElementById('ti-select'); if(sel){ fillTiersSelect(); sel.value=key; } renderTiersTab();
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab==='tiers')); }
@@ -747,9 +829,10 @@ function showParam(sec){
   if((sec==='societes'||sec==='users') && !IS_ADMIN) sec='categories';
   CURRENT_PARAM=sec;
   document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.psec===sec));
-  ['categories','tiers','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
+  ['categories','tiers','resto','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
   if(sec==='categories') renderCats();
   if(sec==='tiers') renderTiersRegistry();
+  if(sec==='resto') renderResto();
   if(sec==='societes') renderCompanies();
   if(sec==='users') renderUsers();
 }
@@ -767,12 +850,12 @@ async function reloadData(){
     db.from('compta_tiers').select('*').eq('company_id',CO.id).order('name'),
   ]);
   CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[]; STATEMENTS=(stmts&&stmts.data)||[]; TIERS=(tiers&&tiers.data)||[];
-  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab();
+  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto();
 }
 
 function fillCatSelects(){
   const catOpts='<option value="">— catégorie —</option>'+txCompanyCats().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  ['t-cat','i-cat'].forEach(id=>{ const el=document.getElementById(id); if(el){ const cur=el.value; el.innerHTML=catOpts; el.value=cur; } });
+  ['t-cat','i-cat','ti-cat'].forEach(id=>{ const el=document.getElementById(id); if(el){ const cur=el.value; el.innerHTML=catOpts; el.value=cur; } });
   const itx=document.getElementById('i-tx'); if(itx) itx.innerHTML='<option value="">— plus tard —</option>'+
     TX.map(t=>`<option value="${t.id}">${t.op_date} · ${esc(t.label).slice(0,28)} · ${euro(t.amount)}</option>`).join('');
   const dl=document.getElementById('tiers-list'); if(dl){ const names=[...new Set([].concat(INVOICES.map(i=>i.counterparty),TX.map(t=>t.counterparty)).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join(''); }
