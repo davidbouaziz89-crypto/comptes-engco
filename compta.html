@@ -159,6 +159,11 @@
   select.mini{min-width:150px;max-width:220px;width:auto}
   .banner-ok{background:rgba(34,197,94,.12);border:1px solid #2f6b43;color:var(--txt);padding:10px 14px;border-radius:10px;font-size:14px}
   .banner-info{background:rgba(59,130,246,.12);border:1px solid var(--accent);color:var(--txt);padding:10px 14px;border-radius:10px;font-size:14px}
+  .btn.active-pick{border-color:var(--accent);color:var(--txt);background:color-mix(in srgb,var(--accent) 12%,var(--panel2))}
+  .pp-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;margin-bottom:7px;cursor:pointer;background:var(--panel2);transition:border-color .12s ease,transform .12s ease,background .12s ease}
+  .pp-row:hover{border-color:var(--accent);transform:translateX(2px)}
+  .pp-row.sel{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent)}
+  .pp-lbl{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* Catégories : menu latéral gauche + édition à droite (comme le CRM) */
   .cat-layout{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:12px}
   .cat-menu{flex:0 0 250px;display:flex;flex-direction:column;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px;max-height:62vh;overflow:auto}
@@ -335,7 +340,10 @@
         <div class="field"><label>Catégorie</label><select id="i-cat" onchange="onInvCatChange()"><option value="">— catégorie —</option></select></div>
         <div class="field" id="i-guests-field" style="display:none;min-width:240px"><label>🍽️ Invités (restaurant)</label><input type="text" id="i-guests" placeholder="ex. M. Durand (client X), Mme Martin"></div>
         <div class="field" id="i-meals-field" style="display:none;max-width:130px"><label>Nb repas</label><input type="number" min="0" step="1" id="i-meals" placeholder="ex. 2"></div>
-        <div class="field"><label>Rapprocher d'un paiement</label><select id="i-tx"><option value="">— plus tard —</option></select></div>
+        <div class="field"><label>Rapprocher d'un paiement</label>
+          <input type="hidden" id="i-tx" value="">
+          <button type="button" class="btn ghost" id="i-tx-btn" onclick="openPayPick()" style="justify-content:flex-start;text-align:left">— plus tard —</button>
+        </div>
         <div class="field" style="min-width:260px"><label>Facture (PDF / photo)</label>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button type="button" class="btn small" onclick="document.getElementById('i-file').click()">⬆️ Choisir un fichier</button>
@@ -571,6 +579,24 @@
     <div style="margin-top:16px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
       <button class="btn ghost" onclick="closeRevlink()">Ignorer</button>
       <button class="btn" onclick="confirmRevlink()">✔ Relier les factures cochées</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE CHOIX DU PAIEMENT (formulaire facture) -->
+<div id="paypick-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:740px">
+    <div class="modal-head"><h3>🏦 Choisir le paiement</h3><button class="btn ghost small" onclick="closePayPick()">✕</button></div>
+    <div class="hint">Sélectionne la ligne du relevé qui correspond à ce paiement. <b id="pp-count">0</b> ligne(s) affichée(s).</div>
+    <div class="filterbar" style="margin:8px 0 4px">
+      <div class="field" style="max-width:150px"><label>Mois</label><input type="month" id="pp-month" onchange="renderPayPick()"></div>
+      <div class="field" style="max-width:170px"><label>Sens</label><select id="pp-sens" onchange="renderPayPick()"><option value="">Tous</option><option value="deb">Débits (sorties)</option><option value="cred">Crédits (entrées)</option></select></div>
+      <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="pp-search" placeholder="libellé, tiers, montant…" oninput="renderPayPick()"></div>
+      <label class="chk" style="align-self:flex-end;white-space:nowrap"><input type="checkbox" id="pp-onlyfree" checked onchange="renderPayPick()" style="width:auto"> Masquer les lignes déjà reliées</label>
+    </div>
+    <div id="pp-body" style="max-height:52vh;overflow:auto;margin-top:6px"></div>
+    <div style="margin-top:14px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn ghost" onclick="pickPay('')">— Laisser en attente —</button>
     </div>
   </div>
 </div>
@@ -934,8 +960,7 @@ async function reloadData(){
 function fillCatSelects(){
   const catOpts='<option value="">— catégorie —</option>'+txCompanyCats().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   ['t-cat','i-cat','ti-cat'].forEach(id=>{ const el=document.getElementById(id); if(el){ const cur=el.value; el.innerHTML=catOpts; el.value=cur; } });
-  const itx=document.getElementById('i-tx'); if(itx) itx.innerHTML='<option value="">— plus tard —</option>'+
-    TX.map(t=>`<option value="${t.id}">${t.op_date} · ${esc(t.label).slice(0,28)} · ${euro(t.amount)}</option>`).join('');
+  const itx=document.getElementById('i-tx'); if(itx) setPayPick(itx.value); // rafraîchit le libellé du bouton
   const dl=document.getElementById('tiers-list'); if(dl){ const names=[...new Set([].concat(INVOICES.map(i=>i.counterparty),TX.map(t=>t.counterparty)).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join(''); }
 }
 function catIsRestaurant(id){ const c=catById(id); return !!(c&&/restaurant|restau|repas/i.test(c.name||'')); }
@@ -1460,17 +1485,52 @@ async function autoMatchInvoice(r){
   const dir=r.direction||document.getElementById('i-dir').value;
   const {local,other}=await findPaymentCandidates(ttc, r.invoice_date, dir, null);
   const near=local.filter(x=>x.days<=MATCH_DAYS);
-  if(near.length){ const t=near[0].t; PENDING_MATCH={txId:t.id};
-    const sel=document.getElementById('i-tx'); if(sel) sel.value=t.id;
+  if(near.length){ const t=near[0].t; PENDING_MATCH={txId:t.id}; setPayPick(t.id);
     if(box) box.innerHTML=`<div class="banner-ok">🔗 <b>Correspondance trouvée</b> : ${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')} · <b>${euro(t.amount)}</b> — elle sera reliée à l'enregistrement. <button type="button" class="btn ghost small" onclick="clearMatch()">Plus tard</button></div>`;
   } else if(other.length){ const t=other[0].t; PENDING_MOVE={companyId:t.company_id,txId:t.id};
     if(box) box.innerHTML=`<div class="banner-info">💡 Ce paiement semble avoir été réglé avec <b>${esc(coName(t.company_id))}</b> (${esc((t.op_date||'').slice(0,10))} · <b>${euro(t.amount)}</b>). <button type="button" class="btn small" onclick="acceptMove()">Déplacer sur ${esc(coName(t.company_id))} & relier</button> <button type="button" class="btn ghost small" onclick="clearMatch()">Plus tard</button></div>`;
   } else if(box){ box.innerHTML=`<div class="banner-info">Aucun paiement trouvé pour l'instant. Enregistre la facture — elle restera « en attente de rapprochement » et tu la relieras plus tard depuis le Dashboard.</div>`; }
 }
-function clearMatch(){ PENDING_MATCH=null; PENDING_MOVE=null; const sel=document.getElementById('i-tx'); if(sel) sel.value='';
+function clearMatch(){ PENDING_MATCH=null; PENDING_MOVE=null; setPayPick('');
   const box=document.getElementById('i-match'); if(box) box.innerHTML='<div class="banner-info">OK : la facture restera « en attente de rapprochement ».</div>'; }
 function acceptMove(){ if(!PENDING_MOVE) return; const box=document.getElementById('i-match');
   if(box) box.innerHTML=`<div class="banner-ok">✅ La facture sera enregistrée sur <b>${esc(coName(PENDING_MOVE.companyId))}</b> et reliée à ce paiement.</div>`; }
+
+/* ---- Sélecteur de paiement (modale propre) pour le formulaire facture ---- */
+function setPayPick(id){ const inp=document.getElementById('i-tx'); if(inp) inp.value=id||'';
+  const btn=document.getElementById('i-tx-btn'); if(!btn) return;
+  if(!id){ btn.textContent='— plus tard —'; btn.classList.remove('active-pick'); return; }
+  const t=TX.find(x=>x.id===id);
+  btn.textContent = t ? ('🔗 '+(t.op_date||'').slice(0,10)+' · '+esc(t.label||'').slice(0,22)+' · '+euro(t.amount)) : '🔗 paiement sélectionné';
+  btn.classList.add('active-pick'); }
+function openPayPick(){ if(!TX.length){ toast('Aucune ligne de relevé. Importe d’abord un relevé.'); return; }
+  renderPayPick(); document.getElementById('paypick-modal').classList.remove('hidden'); }
+function closePayPick(){ document.getElementById('paypick-modal').classList.add('hidden'); }
+function renderPayPick(){
+  const q=(document.getElementById('pp-search').value||'').toLowerCase().trim();
+  const mo=document.getElementById('pp-month').value, sens=document.getElementById('pp-sens').value;
+  const onlyFree=document.getElementById('pp-onlyfree').checked;
+  const cur=document.getElementById('i-tx').value;
+  let rows=TX.filter(t=>{
+    if(mo && (t.op_date||'').slice(0,7)!==mo) return false;
+    if(sens==='deb' && Number(t.amount)>=0) return false;
+    if(sens==='cred' && Number(t.amount)<0) return false;
+    if(onlyFree && t.id!==cur && txUsedByOther(t.id,null)) return false;
+    if(q){ const hay=((t.label||'')+' '+(t.counterparty||'')+' '+t.amount).toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  }).sort((a,b)=>(b.op_date||'').localeCompare(a.op_date||''));
+  const body=document.getElementById('pp-body');
+  document.getElementById('pp-count').textContent=rows.length;
+  if(!rows.length){ body.innerHTML='<div class="empty">Aucune ligne ne correspond. Élargis les filtres, ou importe le relevé du mois.</div>'; return; }
+  body.innerHTML=rows.map(t=>{ const sel=t.id===cur; const used=txUsedByOther(t.id,null);
+    return `<div class="pp-row${sel?' sel':''}" onclick="pickPay('${t.id}')">
+      <div style="flex:1;min-width:0"><div class="pp-lbl">${esc(t.label||'')}</div>
+        <div class="hint" style="margin:0">${esc((t.op_date||'').slice(0,10))}${t.counterparty?' · '+esc(t.counterparty):''}${(t.category_id?' · '+esc(catName(t.category_id)):'')}${used?' · <span class="val-bad">déjà reliée</span>':''}</div></div>
+      <b class="num ${Number(t.amount)>=0?'val-good':'val-bad'}">${euro(t.amount)}</b>
+      <span class="tick ${sel?'ok':''}" style="width:16px">${sel?'✔':''}</span></div>`;
+  }).join('');
+}
+function pickPay(id){ setPayPick(id); closePayPick(); const box=document.getElementById('i-match'); if(id&&box) box.innerHTML=''; }
 async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const tiers=document.getElementById('i-tiers').value.trim(); if(!tiers){ toast('Indique le tiers.'); return; }
   let ht=parseFloat(document.getElementById('i-ht').value); let rate=parseFloat(document.getElementById('i-tva').value);
@@ -1514,7 +1574,7 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
   PENDING_MOVE=null; PENDING_MATCH=null;
   ['i-tiers','i-num','i-date','i-ht','i-ttc','i-guests','i-meals'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('i-tva').value='20'; const ic=document.getElementById('i-cat'); if(ic)ic.value=''; onInvCatChange();
-  const itx=document.getElementById('i-tx'); if(itx) itx.value=''; const mb=document.getElementById('i-match'); if(mb) mb.innerHTML='';
+  setPayPick(''); const mb=document.getElementById('i-match'); if(mb) mb.innerHTML='';
   const fn=document.getElementById('i-filename'); if(fn)fn.textContent=''; INVOICE_FILE=null;
   document.getElementById('i-preview').innerHTML='—'; toast('Facture enregistrée.'); reloadData();
 }
