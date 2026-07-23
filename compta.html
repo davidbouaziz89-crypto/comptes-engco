@@ -398,7 +398,9 @@ async function callComptaIA(kind,file){
   const b64=await fileToB64(file);
   const cats=CATS.map(c=>({id:c.id,name:c.name,flow:c.flow}));
   const {data,error}=await db.functions.invoke('compta-ia',{body:{kind,company_id:CO.id,filename:file.name,mime:file.type||'application/pdf',data:b64,categories:cats}});
-  if(error){ let m=error.message||'Erreur IA'; try{ const ctx=await error.context.json(); if(ctx&&ctx.error) m=ctx.error; }catch(_){} throw new Error(m); }
+  if(error){ let m=error.message||'Erreur IA'; let st=''; try{ st=error.context&&error.context.status?(' [HTTP '+error.context.status+']'):''; }catch(_){}
+    try{ const ctx=await error.context.json(); if(ctx&&ctx.error) m=ctx.error; }catch(_){ try{ const t=await error.context.text(); if(t) m=t; }catch(__){} }
+    throw new Error(m+st); }
   if(data&&data.error) throw new Error(data.error);
   return data.result;
 }
@@ -636,7 +638,7 @@ async function importReleveIA(file){
     const lines=(res&&res.lines)||[];
     if(!lines.length){ toast("Aucune ligne détectée."); return; }
     IA_RELEVE_LINES=lines; openIAReleve(lines);
-  }catch(e){ toast("Erreur IA : "+e.message); }
+  }catch(e){ alert("❌ Erreur IA (relevé) :\n\n"+e.message); }
 }
 function openIAReleve(lines){
   const body=document.getElementById('ia-body');
@@ -736,7 +738,7 @@ async function onInvoiceFilePick(){
     if(r.amount_ttc!=null) document.getElementById('i-ttc').value=r.amount_ttc;
     invPreview(); autoMatchInvoice(r);
     toast("Facture lue ✓ Vérifie les montants et enregistre.");
-  }catch(e){ toast("Erreur IA : "+e.message); }
+  }catch(e){ alert("❌ Erreur IA (facture) :\n\n"+e.message); }
 }
 function autoMatchInvoice(r){
   const ttc=Math.abs(Number(r.amount_ttc)); if(!ttc) return;
