@@ -201,6 +201,7 @@
   <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">📊 Tableau de bord</button>
   <button data-tab="releves" onclick="showTab('releves')">🏦 Relevés</button>
   <button data-tab="factures" onclick="showTab('factures')">📁 Factures</button>
+  <button data-tab="tiers" onclick="showTab('tiers')">🤝 Tiers</button>
   <button data-tab="tva" onclick="showTab('tva')">🧮 TVA</button>
   <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
 </nav>
@@ -320,6 +321,19 @@
     </section>
   </div>
 
+  <!-- TIERS (analyse par tiers) -->
+  <div id="tab-tiers" class="hidden">
+    <section class="panel">
+      <h2>🤝 Suivi d'un tiers</h2>
+      <div class="hint">Choisis un client ou fournisseur pour voir tout ce que tu as encaissé / payé avec lui, mois par mois.</div>
+      <div class="filterbar">
+        <div class="field" style="min-width:280px"><label>Tiers</label><select id="ti-select" onchange="renderTiersTab()"><option value="">— choisir —</option></select></div>
+      </div>
+      <div id="ti-cards" class="grid cards" style="margin-top:16px"></div>
+      <div id="ti-detail"></div>
+    </section>
+  </div>
+
   <!-- TVA -->
   <div id="tab-tva" class="hidden">
     <section class="panel">
@@ -337,6 +351,7 @@
     <div class="params-layout">
       <div class="params-menu" id="params-menu">
         <button data-psec="categories" class="active" onclick="showParam('categories')">🏷️ Catégories de la société</button>
+        <button data-psec="tiers" onclick="showParam('tiers')">🤝 Tiers (clients / fournisseurs)</button>
         <button data-psec="societes" id="pm-societes" style="display:none" onclick="showParam('societes')">🏢 Sociétés</button>
         <button data-psec="users" id="pm-users" style="display:none" onclick="showParam('users')">👥 Utilisateurs &amp; accès</button>
       </div>
@@ -360,6 +375,25 @@
             <div class="table-wrap"><table class="compact">
               <thead><tr><th>Catégorie</th><th>Flux</th><th class="num">TVA %</th><th>Récupérable</th><th></th></tr></thead>
               <tbody id="cats-body"></tbody>
+            </table></div>
+          </section>
+        </div>
+
+        <div class="ps" id="ps-tiers" style="display:none">
+          <section class="panel canedit">
+            <h2>🤝 Tiers (clients / fournisseurs)</h2>
+            <div class="hint">Cette liste s'enrichit toute seule : chaque tiers que tu saisis ou que l'IA détecte à l'import y apparaît, avec sa provenance. Tu peux aussi en ajouter à la main.</div>
+            <form class="row" onsubmit="addTiersManual(event)">
+              <div class="field" style="min-width:220px"><label>Nouveau tiers</label><input type="text" id="ti-new" placeholder="ex. DHL Express" required></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+            </form>
+            <div class="filterbar" style="margin-top:12px">
+              <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="ti-search" placeholder="nom du tiers…" oninput="renderTiersRegistry()"></div>
+              <div class="field"><label>Source</label><select id="ti-fsource" onchange="renderTiersRegistry()"><option value="">Toutes</option><option value="manuel">Manuel</option><option value="ia">IA</option><option value="auto">Détecté</option></select></div>
+            </div>
+            <div class="table-wrap"><table class="compact">
+              <thead><tr><th>Tiers</th><th>Source</th><th class="num">Opérations</th><th class="num">Encaissé</th><th class="num">Payé</th><th></th></tr></thead>
+              <tbody id="tiers-reg-body"></tbody>
             </table></div>
           </section>
         </div>
@@ -479,7 +513,101 @@ updateThemeBtn();
 
 /* ---------- État global ---------- */
 let SESSION=null, IS_ADMIN=false, MY_ACCESS=[], COMPANIES=[], CO=null, MY_ROLE=null;
-let CATS=[], TX=[], INVOICES=[], RULES=[];
+let CATS=[], TX=[], INVOICES=[], RULES=[], TIERS=[];
+let INV_FROM_IA=false;
+/* ---------- Registre des tiers (enrichi manuel + IA) ---------- */
+function tiersKey(n){ return String(n||'').toLowerCase().trim(); }
+async function registerTiers(name,source){
+  if(!CO) return; const nm=String(name||'').trim(); if(nm.length<2) return;
+  const key=tiersKey(nm); if(TIERS.some(t=>t.name_key===key)) return;
+  const rec={company_id:CO.id,name:nm,name_key:key,source:(source==='ia'?'ia':'manuel')};
+  try{
+    const {error}=await db.from('compta_tiers').upsert(rec,{onConflict:'company_id,name_key',ignoreDuplicates:true});
+    if(!error) TIERS.push(rec);
+  }catch(_){}
+}
+function registerTiersMany(names,source){ [...new Set((names||[]).map(tiersKey).filter(Boolean))].forEach((k,i)=>{ const n=(names.find(x=>tiersKey(x)===k)); registerTiers(n,source); }); }
+// Liste fusionnée : registre + tiers détectés dans les mouvements/factures
+function allTiers(){
+  const map=new Map();
+  TIERS.forEach(t=>map.set(t.name_key,{name:t.name,key:t.name_key,source:t.source,inTable:true}));
+  [].concat(TX.map(t=>t.counterparty),INVOICES.map(i=>i.counterparty)).filter(Boolean).forEach(n=>{
+    const k=tiersKey(n); if(!map.has(k)) map.set(k,{name:n,key:k,source:'auto',inTable:false});
+  });
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name));
+}
+function tiersStats(key){
+  const tx=TX.filter(t=>tiersKey(t.counterparty)===key);
+  let inn=0,out=0; const byMonth={};
+  tx.forEach(t=>{ const a=Number(t.amount)||0; if(a>0) inn+=a; else out+=Math.abs(a);
+    const m=(t.op_date||'').slice(0,7); if(m){ const b=(byMonth[m]=byMonth[m]||{inn:0,out:0}); if(a>0) b.inn+=a; else b.out+=Math.abs(a); } });
+  const invs=INVOICES.filter(i=>tiersKey(i.counterparty)===key);
+  return {count:tx.length, inn, out, byMonth, invCount:invs.length, lastTx:tx[0]||null};
+}
+const MONTHS_FR=['','janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+function monthLabel(m){ const p=(m||'').split('-'); return p.length===2?MONTHS_FR[parseInt(p[1],10)]+' '+p[0]:m; }
+function tiersSourceBadge(s){
+  if(s==='ia') return '<span class="badge b-wip">🪄 IA</span>';
+  if(s==='manuel') return '<span class="badge b-ok">✍️ Manuel</span>';
+  return '<span class="pill">Détecté</span>';
+}
+function renderTiersRegistry(){
+  const body=document.getElementById('tiers-reg-body'); if(!body) return;
+  const q=(document.getElementById('ti-search')?.value||'').toLowerCase().trim();
+  const fs=document.getElementById('ti-fsource')?.value||'';
+  const list=allTiers().filter(t=>(!q||t.name.toLowerCase().includes(q))&&(!fs||t.source===fs));
+  body.innerHTML=list.map(t=>{ const s=tiersStats(t.key);
+    return `<tr><td class="lbl" title="${esc(t.name)}"><a href="#" onclick="openTiersFor('${esc(t.key)}');return false">${esc(t.name)}</a></td>
+      <td>${tiersSourceBadge(t.source)}</td><td class="num">${s.count}</td>
+      <td class="num val-good">${s.inn?euro(s.inn):'—'}</td><td class="num val-bad">${s.out?euro(s.out):'—'}</td>
+      <td>${(canEdit()&&t.inTable)?`<button class="btn danger small" onclick="deleteTiers('${esc(t.key)}')">🗑</button>`:''}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" class="empty">Aucun tiers pour le moment. Ils apparaîtront ici automatiquement à mesure que tu saisis ou importes.</td></tr>';
+}
+async function addTiersManual(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
+  const inp=document.getElementById('ti-new'); const nm=(inp.value||'').trim(); if(nm.length<2){ toast('Nom trop court.'); return; }
+  await registerTiers(nm,'manuel'); inp.value=''; toast('Tiers ajouté.'); renderTiersRegistry(); fillTiersSelect();
+}
+async function deleteTiers(key){ if(!canEdit()) return;
+  const t=TIERS.find(x=>x.name_key===key); if(!t){ return; }
+  if(!confirm('Retirer « '+t.name+' » du registre ? (les mouvements liés ne sont pas supprimés)')) return;
+  const {error}=await db.from('compta_tiers').delete().eq('company_id',CO.id).eq('name_key',key);
+  if(error){ toast('Erreur : '+error.message); return; }
+  TIERS=TIERS.filter(x=>x.name_key!==key); toast('Tiers retiré.'); renderTiersRegistry(); fillTiersSelect();
+}
+function openTiersFor(key){ showTab('tiers'); const sel=document.getElementById('ti-select'); if(sel){ fillTiersSelect(); sel.value=key; } renderTiersTab();
+  document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab==='tiers')); }
+function fillTiersSelect(){
+  const sel=document.getElementById('ti-select'); if(!sel) return; const cur=sel.value;
+  sel.innerHTML='<option value="">— choisir —</option>'+allTiers().map(t=>`<option value="${esc(t.key)}">${esc(t.name)}</option>`).join('');
+  sel.value=cur;
+}
+function renderTiersTab(){
+  fillTiersSelect();
+  const key=document.getElementById('ti-select')?.value||'';
+  const cards=document.getElementById('ti-cards'), detail=document.getElementById('ti-detail');
+  if(!cards||!detail) return;
+  if(!key){ cards.innerHTML=''; detail.innerHTML='<div class="empty" style="padding:24px 0">Sélectionne un tiers ci-dessus pour voir son suivi.</div>'; return; }
+  const s=tiersStats(key); const net=s.inn-s.out;
+  cards.innerHTML=`
+    <div class="card"><div class="label">Opérations</div><div class="value">${s.count}</div><div class="label" style="margin:6px 0 0">${s.invCount} facture(s)</div></div>
+    <div class="card good"><div class="label">↗ Total encaissé</div><div class="value val-good">${euro(s.inn)}</div></div>
+    <div class="card bad"><div class="label">↘ Total payé</div><div class="value val-bad">${euro(s.out)}</div></div>
+    <div class="card ${net>=0?'good':'bad'}"><div class="label">Solde net</div><div class="value ${net>=0?'val-good':'val-bad'}">${euro(net)}</div></div>`;
+  const months=Object.keys(s.byMonth).sort().reverse();
+  const rowsM=months.map(m=>{ const b=s.byMonth[m]; const n=b.inn-b.out;
+    return `<tr><td>${monthLabel(m)}</td><td class="num val-good">${b.inn?euro(b.inn):'—'}</td><td class="num val-bad">${b.out?euro(b.out):'—'}</td><td class="num ${n>=0?'val-good':'val-bad'}">${euro(n)}</td></tr>`; }).join('');
+  const ops=TX.filter(t=>tiersKey(t.counterparty)===key).slice(0,40).map(t=>
+    `<tr><td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td><td class="num ${t.amount>=0?'val-good':'val-bad'}">${euro(t.amount)}</td></tr>`).join('');
+  detail.innerHTML=`
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:8px">
+      <div><h3 style="margin:10px 0 6px">Par mois</h3>
+        <div class="table-wrap"><table class="compact"><thead><tr><th>Mois</th><th class="num">Encaissé</th><th class="num">Payé</th><th class="num">Net</th></tr></thead>
+        <tbody>${rowsM||'<tr><td colspan="4" class="empty">Aucun mouvement.</td></tr>'}</tbody></table></div></div>
+      <div><h3 style="margin:10px 0 6px">Derniers mouvements</h3>
+        <div class="table-wrap"><table class="compact"><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th class="num">Montant</th></tr></thead>
+        <tbody>${ops||'<tr><td colspan="4" class="empty">Aucun mouvement.</td></tr>'}</tbody></table></div></div>
+    </div>`;
+}
 // ===== Apprentissage : règles apprises =====
 const RULE_STOP=new Set(['sepa','vir','virement','prlv','prelevement','carte','cb','com','libelle','facture','fact','recue','recu','paiement','achat','le','du','de','des','la','les','sur','par','pour','and','inc','ltd','sas','sasu','sarl','eur']);
 function firstKeyword(label){ const words=(label||'').toLowerCase().replace(/[^a-zà-ÿ0-9 ]/gi,' ').split(/\s+/).filter(w=>w.length>=4&&!RULE_STOP.has(w)&&!/^\d+$/.test(w)); return words[0]||''; }
@@ -605,12 +733,13 @@ function startApp(){
 let CURRENT_PARAM='categories';
 function showTab(t){
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dashboard','releves','factures','tva','parametres'].forEach(x=>{
+  ['dashboard','releves','factures','tiers','tva','parametres'].forEach(x=>{
     const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
   });
   if(t==='dashboard') renderDashboard();
   if(t==='releves'){ renderTx(); renderStatements(); }
   if(t==='factures') renderInvoices();
+  if(t==='tiers') renderTiersTab();
   if(t==='tva') renderTva();
   if(t==='parametres') showParam(CURRENT_PARAM);
 }
@@ -618,8 +747,9 @@ function showParam(sec){
   if((sec==='societes'||sec==='users') && !IS_ADMIN) sec='categories';
   CURRENT_PARAM=sec;
   document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.psec===sec));
-  ['categories','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
+  ['categories','tiers','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
   if(sec==='categories') renderCats();
+  if(sec==='tiers') renderTiersRegistry();
   if(sec==='societes') renderCompanies();
   if(sec==='users') renderUsers();
 }
@@ -628,15 +758,16 @@ function showParam(sec){
 async function reloadData(){
   if(!CO){ if(IS_ADMIN){ renderCompanies(); } return; }
   document.getElementById('loaderr').style.display='none';
-  const [cats,tx,inv,rules,stmts]=await Promise.all([
+  const [cats,tx,inv,rules,stmts,tiers]=await Promise.all([
     db.from('compta_categories').select('*').or('company_id.eq.'+CO.id+',company_id.is.null').order('name'),
     db.from('compta_transactions').select('*').eq('company_id',CO.id).order('op_date',{ascending:false}),
     db.from('compta_invoices').select('*').eq('company_id',CO.id).order('created_at',{ascending:false}),
     db.from('compta_rules').select('pattern,category_id,counterparty').eq('company_id',CO.id),
     db.from('compta_bank_statements').select('*').eq('company_id',CO.id).order('created_at',{ascending:false}),
+    db.from('compta_tiers').select('*').eq('company_id',CO.id).order('name'),
   ]);
-  CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[]; STATEMENTS=(stmts&&stmts.data)||[];
-  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements();
+  CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[]; STATEMENTS=(stmts&&stmts.data)||[]; TIERS=(tiers&&tiers.data)||[];
+  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab();
 }
 
 function fillCatSelects(){
@@ -705,6 +836,7 @@ async function addTx(e){ e.preventDefault(); if(!canEdit()) return;
     status:catId?'classe':'a_classer', created_by:SESSION.user.id };
   const {error}=await db.from('compta_transactions').insert(rec);
   if(error){ toast('Erreur : '+error.message); return; }
+  if(rec.counterparty) await registerTiers(rec.counterparty,'manuel');
   e.target.reset(); document.getElementById('t-preview').innerHTML='—'; toast('Ligne ajoutée.'); reloadData();
 }
 function txCompanyCats(){ return CATS.filter(c=>c.company_id===CO.id||c.company_id==null); }
@@ -778,6 +910,7 @@ async function saveTxEdit(e){ if(e&&e.preventDefault)e.preventDefault(); if(!edi
     amount:amount, vat_rate:rate, vat_amount:tva, status:document.getElementById('te-status').value };
   const {error}=await db.from('compta_transactions').update(rec).eq('id',editingTxId);
   if(error){ toast('Erreur : '+error.message); return; }
+  if(rec.counterparty) await registerTiers(rec.counterparty,'manuel');
   if(catId){ try{ await learnRule(rec.counterparty, rec.label, catId); }catch(_){} }
   toast('✔ Enregistré'+(catId?' — l’IA a mémorisé ce classement.':'.')); closeTxEdit(); reloadData();
 }
@@ -858,6 +991,7 @@ async function runIAReleveImport(){
   });
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur : '+error.message); return; }
+  registerTiersMany(recs.map(r=>r.counterparty),'ia');
   LAST_RELEVE_FILE=null; closeIA(); toast(recs.length+' lignes importées'+(statement_id?' — PDF consultable dans « Relevés importés ».':'.')); reloadData();
 }
 function importReleveSheet(file){ if(!file||!canEdit()) return;
@@ -926,14 +1060,14 @@ function invPreview(){
 async function onInvoiceFilePick(inputId){
   if(!canEdit()) return;
   const el=document.getElementById(inputId||'i-file'); const f=el&&el.files[0]; if(!f) return;
-  INVOICE_FILE=f;
+  INVOICE_FILE=f; INV_FROM_IA=false;
   const fn=document.getElementById('i-filename'); if(fn) fn.textContent='📎 '+f.name;
   if(!askUseIA("Facture « "+f.name+" » — la lire avec l'IA pour pré-remplir ?")) return;
   toast("🪄 Lecture IA de la facture…");
   try{
     const r=await callComptaIA('facture',f);
     if(r.direction) document.getElementById('i-dir').value=r.direction;
-    if(r.counterparty) document.getElementById('i-tiers').value=r.counterparty;
+    if(r.counterparty){ document.getElementById('i-tiers').value=r.counterparty; INV_FROM_IA=true; }
     if(r.invoice_number) document.getElementById('i-num').value=r.invoice_number;
     if(r.invoice_date) document.getElementById('i-date').value=r.invoice_date;
     if(r.amount_ht!=null) document.getElementById('i-ht').value=r.amount_ht;
@@ -980,6 +1114,7 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
     delete rec.category_id; delete rec.guests; ({error}=await db.from('compta_invoices').insert(rec));
   }
   if(error){ toast('Erreur : '+error.message); return; }
+  await registerTiers(tiers, INV_FROM_IA?'ia':'manuel'); INV_FROM_IA=false;
   if(catId){ try{ await learnRule(tiers, tiers, catId); }catch(_){} }
   if(txId){ await db.from('compta_transactions').update({status:'classe'}).eq('id',txId); }
   ['i-tiers','i-num','i-date','i-ht','i-ttc','i-guests'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
