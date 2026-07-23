@@ -123,6 +123,9 @@
   .params-menu button.active{background:var(--panel2);color:var(--txt);border-color:var(--line)}
   .params-content{flex:1;min-width:300px}
   @media(max-width:760px){.params-menu{flex-basis:100%;flex-direction:row;flex-wrap:wrap}}
+  /* Édition inline : le formulaire s'insère sous la ligne cliquée (comme le CRM) */
+  tr.inline-edit-row>td{padding:0;background:transparent}
+  tr.inline-edit-row .panel{margin:6px 0;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 </style>
 </head>
 <body>
@@ -313,13 +316,16 @@
             <h2>🏷️ Catégories de la société</h2>
             <div class="hint">Ajoute, modifie (✏️) ou supprime tes catégories. « TVA % » = taux appliqué automatiquement quand tu classes une ligne dans cette catégorie.</div>
             <div style="margin:8px 0"><button class="btn ghost small" onclick="importDefaultCats()">📋 Importer les catégories par défaut</button></div>
-            <form class="row" onsubmit="saveCat(event)">
-              <div class="field"><label>Nom</label><input type="text" id="c-nom" placeholder="ex. Téléphonie" required></div>
-              <div class="field"><label>Type de flux</label><select id="c-flow"><option value="achat">Achat</option><option value="vente">Vente</option><option value="both">Les deux</option></select></div>
-              <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="c-tva" placeholder="20"></div>
-              <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-recup" checked> TVA récupérable</label></div>
-              <div class="field" style="align-self:flex-end"><button class="btn" id="c-savebtn" type="submit">+ Ajouter</button> <button class="btn ghost" type="button" id="c-cancelbtn" style="display:none" onclick="newCat()">Annuler</button></div>
-            </form>
+            <div id="cat-form-panel" class="panel" style="margin-bottom:12px">
+              <div id="cat-form-title" style="margin-bottom:6px;font-weight:700">➕ Nouvelle catégorie</div>
+              <form class="row" onsubmit="saveCat(event)">
+                <div class="field"><label>Nom</label><input type="text" id="c-nom" placeholder="ex. Téléphonie" required></div>
+                <div class="field"><label>Type de flux</label><select id="c-flow"><option value="achat">Achat</option><option value="vente">Vente</option><option value="both">Les deux</option></select></div>
+                <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="c-tva" placeholder="20"></div>
+                <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-recup" checked> TVA récupérable</label></div>
+                <div class="field" style="align-self:flex-end"><button class="btn" id="c-savebtn" type="submit">+ Ajouter</button> <button class="btn ghost" type="button" id="c-cancelbtn" style="display:none" onclick="newCat()">Annuler</button></div>
+              </form>
+            </div>
             <div class="table-wrap"><table class="compact">
               <thead><tr><th>Catégorie</th><th>Flux</th><th class="num">TVA %</th><th>Récupérable</th><th></th></tr></thead>
               <tbody id="cats-body"></tbody>
@@ -396,23 +402,21 @@
   </div>
 </div>
 
-<!-- MODALE ÉDITION D'UNE LIGNE -->
-<div id="tx-modal" class="modal-overlay hidden">
-  <div class="modal-card" style="max-width:560px">
-    <div class="modal-head"><h3>✏️ Modifier la ligne</h3><button class="btn ghost small" onclick="closeTxEdit()">✕</button></div>
-    <form class="row" onsubmit="saveTxEdit(event)">
-      <div class="field"><label>Date</label><input type="date" id="te-date"></div>
-      <div class="field" style="min-width:200px"><label>Libellé</label><input type="text" id="te-label"></div>
-      <div class="field"><label>Catégorie</label><select id="te-cat"></select></div>
-      <div class="field"><label>Tiers (client / fournisseur)</label><input type="text" id="te-tiers"></div>
-      <div class="field"><label>Montant (€, signé)</label><input type="number" step="0.01" id="te-montant"></div>
-      <div class="field"><label>TVA %</label><input type="number" step="0.01" id="te-tva"></div>
-      <div class="field"><label>Statut</label><select id="te-status"><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
-    </form>
-    <div style="margin-top:16px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn ghost" type="button" onclick="closeTxEdit()">Annuler</button>
-      <button class="btn" type="button" onclick="saveTxEdit(event)">💾 Enregistrer</button>
-    </div>
+<!-- PANNEAU ÉDITION LIGNE (inséré inline sous la ligne cliquée) -->
+<div id="tx-edit-panel" class="panel" style="display:none">
+  <div style="margin-bottom:6px"><b>✏️ Modifier la ligne</b></div>
+  <form class="row" onsubmit="saveTxEdit(event)">
+    <div class="field"><label>Date</label><input type="date" id="te-date"></div>
+    <div class="field" style="min-width:200px"><label>Libellé</label><input type="text" id="te-label"></div>
+    <div class="field"><label>Catégorie</label><select id="te-cat"></select></div>
+    <div class="field"><label>Tiers (client / fournisseur)</label><input type="text" id="te-tiers"></div>
+    <div class="field"><label>Montant (€, signé)</label><input type="number" step="0.01" id="te-montant"></div>
+    <div class="field"><label>TVA %</label><input type="number" step="0.01" id="te-tva"></div>
+    <div class="field"><label>Statut</label><select id="te-status"><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
+  </form>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn ghost" type="button" onclick="closeTxEdit()">Annuler</button>
+    <button class="btn" type="button" onclick="saveTxEdit(event)">💾 Enregistrer</button>
   </div>
 </div>
 
@@ -676,6 +680,7 @@ function fillTxFilters(){
     ft.innerHTML='<option value="">Tous</option>'+tiers.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); ft.value=cur; }
 }
 function renderTx(){
+  const tep=document.getElementById('tx-edit-panel'); if(tep&&tep._holder){ restoreInlineForm(tep); tep.style.display='none'; editingTxId=null; }
   fillTxFilters();
   const m=document.getElementById('tx-fmonth').value, st=document.getElementById('tx-fstatus').value;
   const fc=document.getElementById('tx-fcat').value, ft=document.getElementById('tx-ftiers').value;
@@ -691,13 +696,29 @@ function renderTx(){
     tr.innerHTML=`<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
-      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openTxEdit('${t.id}')" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openTxEdit('${t.id}',this)" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
   if(!rows.length) body.innerHTML='<tr><td colspan="8" class="empty">Aucune ligne.</td></tr>';
 }
+// ===== Édition inline générique (reprise du pattern du CRM LED) : le formulaire s'insère sous la ligne cliquée =====
+function inlineEditAtRow(panel,btn){
+  if(!panel||!btn) return false;
+  const tr=btn.closest('tr'); if(!tr) return false;
+  restoreInlineForm(panel);
+  if(!panel._slot){ panel._slot=document.createComment('inline-slot'); panel.parentNode.insertBefore(panel._slot,panel); }
+  const holder=document.createElement('tr'); holder.className='inline-edit-row';
+  const td=document.createElement('td'); td.colSpan=tr.children.length||99; td.appendChild(panel); holder.appendChild(td);
+  tr.after(holder); panel._holder=holder; panel.style.display='';
+  setTimeout(()=>{ try{panel.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(e){} },30);
+  return true;
+}
+function restoreInlineForm(panel){
+  if(panel&&panel._slot){ panel._slot.parentNode.insertBefore(panel,panel._slot); panel._slot.remove(); panel._slot=null; }
+  if(panel&&panel._holder){ try{panel._holder.remove();}catch(e){} panel._holder=null; }
+}
 let editingTxId=null;
-function openTxEdit(id){ const t=TX.find(x=>x.id===id); if(!t) return; editingTxId=id;
+function openTxEdit(id,btn){ const t=TX.find(x=>x.id===id); if(!t) return; editingTxId=id;
   document.getElementById('te-date').value=t.op_date||'';
   document.getElementById('te-label').value=t.label||'';
   document.getElementById('te-cat').innerHTML='<option value="">— à classer —</option>'+
@@ -706,9 +727,10 @@ function openTxEdit(id){ const t=TX.find(x=>x.id===id); if(!t) return; editingTx
   document.getElementById('te-montant').value=t.amount;
   document.getElementById('te-tva').value=(t.vat_rate!=null)?t.vat_rate:'';
   document.getElementById('te-status').value=t.status||'a_classer';
-  document.getElementById('tx-modal').classList.remove('hidden');
+  const panel=document.getElementById('tx-edit-panel');
+  if(!inlineEditAtRow(panel,btn)){ panel.style.display=''; }
 }
-function closeTxEdit(){ editingTxId=null; document.getElementById('tx-modal').classList.add('hidden'); }
+function closeTxEdit(){ editingTxId=null; const panel=document.getElementById('tx-edit-panel'); restoreInlineForm(panel); panel.style.display='none'; }
 async function saveTxEdit(e){ if(e&&e.preventDefault)e.preventDefault(); if(!editingTxId) return;
   const catId=document.getElementById('te-cat').value||null;
   const amount=parseFloat(document.getElementById('te-montant').value)||0;
@@ -1020,17 +1042,20 @@ function renderTva(){
 /* ================= CATÉGORIES ================= */
 let editingCatId=null;
 function newCat(){ editingCatId=null;
+  restoreInlineForm(document.getElementById('cat-form-panel'));
   const g=id=>document.getElementById(id);
   g('c-nom').value=''; g('c-flow').value='achat'; g('c-tva').value=''; g('c-recup').checked=true;
   g('c-savebtn').textContent='+ Ajouter'; g('c-cancelbtn').style.display='none';
+  const ti=g('cat-form-title'); if(ti) ti.textContent='➕ Nouvelle catégorie';
   renderCats();
 }
-function selectCat(id){ const c=CATS.find(x=>x.id===id); if(!c) return; editingCatId=id;
+function selectCat(id,btn){ const c=CATS.find(x=>x.id===id); if(!c) return; editingCatId=id;
   const g=i=>document.getElementById(i);
   g('c-nom').value=c.name||''; g('c-flow').value=c.flow||'achat';
   g('c-tva').value=(c.default_vat_rate!=null)?c.default_vat_rate:''; g('c-recup').checked=c.vat_recoverable!==false;
   g('c-savebtn').textContent='💾 Enregistrer'; g('c-cancelbtn').style.display='';
-  window.scrollTo({top:0,behavior:'smooth'}); renderCats();
+  const ti=g('cat-form-title'); if(ti) ti.textContent='✏️ Modifier la catégorie';
+  const panel=g('cat-form-panel'); if(!inlineEditAtRow(panel,btn)){ window.scrollTo({top:0,behavior:'smooth'}); }
 }
 async function saveCat(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const name=document.getElementById('c-nom').value.trim(); if(!name){ toast('Indique un nom.'); return; }
@@ -1055,12 +1080,13 @@ async function importDefaultCats(){ if(!canEdit()) return;
   toast(error?('Erreur : '+error.message):recs.length+' catégories importées.'); reloadData();
 }
 function renderCats(){
+  const cfp=document.getElementById('cat-form-panel'); if(cfp&&cfp._holder) restoreInlineForm(cfp);
   const own=CATS.filter(c=>c.company_id===CO.id).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const body=document.getElementById('cats-body'); if(!body) return; body.innerHTML='';
-  own.forEach(c=>{ const tr=document.createElement('tr'); if(c.id===editingCatId) tr.style.background='rgba(59,130,246,.12)';
+  own.forEach(c=>{ const tr=document.createElement('tr');
     tr.innerHTML=`<td>${esc(c.name)}</td><td><span class="pill">${esc(c.flow)}</span></td><td class="num">${c.default_vat_rate!=null?c.default_vat_rate+' %':'—'}</td>
       <td>${c.vat_recoverable?'<span class="tick ok">✔</span>':'<span class="tick no">✗</span>'}</td>
-      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="selectCat('${c.id}')" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delCat('${c.id}')" title="Supprimer">🗑</button>`:''}</td>`;
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="selectCat('${c.id}',this)" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delCat('${c.id}')" title="Supprimer">🗑</button>`:''}</td>`;
     body.appendChild(tr); });
   if(!own.length) body.innerHTML='<tr><td colspan="5" class="empty">Aucune catégorie. Clique « 📋 Importer les catégories par défaut » ci-dessus, ou ajoute-en une.</td></tr>';
 }
