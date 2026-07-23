@@ -288,6 +288,29 @@
   /* Édition inline : formulaire déplacé sous la ligne cliquée */
   tr.inline-edit-row>td{padding:0;background:transparent}
   tr.inline-edit-row .panel{margin:6px 0;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));box-shadow:var(--glow);white-space:normal}
+  /* --- Membres / avatars (design IA) --- */
+  .users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;margin-top:8px}
+  .ucard{position:relative;background:linear-gradient(165deg,var(--panel),color-mix(in srgb,var(--panel2) 72%,var(--panel)));border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow);overflow:hidden;opacity:0;transform:translateY(12px);animation:ucin .5s cubic-bezier(.2,.7,.2,1) forwards;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+  @keyframes ucin{to{opacity:1;transform:none}}
+  .ucard:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:var(--glow)}
+  .ucard::after{content:"";position:absolute;right:-40px;top:-40px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--a1) 30%,transparent),transparent 70%);pointer-events:none}
+  .uc-top{display:flex;align-items:center;gap:13px}
+  .uav{position:relative;width:56px;height:56px;flex:0 0 56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:20px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.35);z-index:0}
+  .uav::before{content:"";position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(from 0deg,var(--a1),var(--a2),var(--a1));z-index:-2;animation:uspin 6s linear infinite}
+  .uav::after{content:"";position:absolute;inset:0;border-radius:50%;background:linear-gradient(135deg,var(--a1),var(--a2));z-index:-1}
+  @keyframes uspin{to{transform:rotate(360deg)}}
+  .uav .dot{position:absolute;right:0;bottom:0;width:13px;height:13px;border-radius:50%;background:var(--good);border:2.5px solid var(--panel);box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent);animation:udot 2.4s ease-in-out infinite}
+  @keyframes udot{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 55%,transparent)}50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--good) 0%,transparent)}}
+  .uc-name{font-family:var(--font-display);font-weight:600;font-size:15px;letter-spacing:-.2px;line-height:1.15;word-break:break-word}
+  .uc-mail{color:var(--muted);font-size:12px;word-break:break-all;margin-top:2px}
+  .uc-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+  .ubadge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--txt)}
+  .ubadge.admin{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#241800;border:0}
+  .uc-projects{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}
+  .uchip{font-size:11px;padding:3px 9px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .uc-actions{position:absolute;top:12px;right:12px;display:flex;gap:5px;opacity:0;transition:opacity .15s ease;z-index:2}
+  .ucard:hover .uc-actions{opacity:1}
+  @media(prefers-reduced-motion:reduce){.ucard{animation:none;opacity:1;transform:none}.uav::before,.uav .dot{animation:none}}
 </style>
 </head>
 <body>
@@ -968,11 +991,12 @@
       <div class="preview" id="u-msg"></div>
     </section>
     <section class="panel">
-      <h2>Utilisateurs &amp; accès</h2>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Email</th><th>Projets</th><th>Rôle</th><th class="num">Actions</th></tr></thead>
-        <tbody id="users-body"></tbody>
-      </table></div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+        <h2 style="margin:0;flex:1">👥 Membres de l'équipe</h2>
+        <div class="search-box" style="max-width:280px;margin:0"><span class="ic">🔍</span><input type="text" id="users-search" placeholder="rechercher un membre…" oninput="renderUsersGrid()"></div>
+      </div>
+      <div class="hint" id="users-stats"></div>
+      <div class="users-grid" id="users-grid"></div>
     </section>
   </div>
 
@@ -3792,19 +3816,44 @@ async function loadUsers(){
   const byUser={};
   (data||[]).forEach(m=>{ if(!byUser[m.user_id]) byUser[m.user_id]={user_id:m.user_id,email:m.email,mems:[]}; byUser[m.user_id].mems.push(m); });
   USERS_CACHE=Object.values(byUser);
-  const body=document.getElementById('users-body');
-  if(!USERS_CACHE.length){ body.innerHTML=`<tr><td colspan="4" class="empty">Aucun utilisateur</td></tr>`; return; }
-  body.innerHTML=USERS_CACHE.map(u=>{
+  renderUsersGrid();
+}
+/* ---- Grille de membres avec avatars (design IA) ---- */
+function uAvatarColors(seed){ seed=String(seed||'x'); let h=0; for(let i=0;i<seed.length;i++) h=(h*31+seed.charCodeAt(i))>>>0;
+  const a=h%360, b=(a+42+((h>>3)%70))%360; return ['hsl('+a+' 72% 56%)','hsl('+b+' 70% 46%)']; }
+function uInitials(email){ const n=(email||'?').split('@')[0].replace(/[._\-+]+/g,' ').trim(); const p=n.split(' ').filter(Boolean);
+  return (((p[0]||'?')[0]||'?')+(p[1]?p[1][0]:((p[0]||'')[1]||''))).toUpperCase(); }
+function uName(email){ const n=(email||'').split('@')[0].replace(/[._\-+]+/g,' ').trim(); return n?n.replace(/\b\w/g,c=>c.toUpperCase()):(email||'—'); }
+function renderUsersGrid(){
+  const grid=document.getElementById('users-grid'); if(!grid) return;
+  const q=(document.getElementById('users-search')?.value||'').toLowerCase().trim();
+  const list=(USERS_CACHE||[]).filter(u=>!q||(u.email||'').toLowerCase().includes(q));
+  const admins=(USERS_CACHE||[]).filter(u=>u.mems.some(m=>m.role==='admin')).length;
+  const st=document.getElementById('users-stats'); if(st) st.innerHTML=`<b>${(USERS_CACHE||[]).length}</b> membre(s) · <b>${admins}</b> administrateur(s)`;
+  if(!list.length){ grid.innerHTML='<div class="empty" style="grid-column:1/-1">Aucun membre trouvé.</div>'; return; }
+  grid.innerHTML=list.map((u,idx)=>{
     const isAdmin=u.mems.some(m=>m.role==='admin');
-    let projCell, roleCell;
-    if(isAdmin){ projCell='<span class="pill">👑 Tous les projets</span>'; roleCell='Admin'; }
-    else {
-      projCell=u.mems.map(m=>`<span class="pill">${PROJECTS[m.project_key]?PROJECTS[m.project_key].nom:m.project_key}${m.regie_name?' · '+m.regie_name:''}</span>`).join(' ');
-      roleCell=[...new Set(u.mems.map(m=>roleLabelOf(m.role)))].join(', ');
-    }
+    const cols=uAvatarColors(u.email||u.user_id);
+    const roleBadge=isAdmin?'<span class="ubadge admin">👑 Administrateur</span>'
+      :([...new Set(u.mems.map(m=>roleLabelOf(m.role)))].map(r=>`<span class="ubadge">${escH(r)}</span>`).join('')||'<span class="ubadge">—</span>');
+    const projects=isAdmin?'<span class="uchip">✨ Accès à tous les logiciels</span>'
+      :(u.mems.map(m=>`<span class="uchip">${escH(PROJECTS[m.project_key]?PROJECTS[m.project_key].nom:m.project_key)}${m.regie_name?' · '+escH(m.regie_name):''}</span>`).join('')||'<span class="uchip">aucun accès</span>');
     const emailEsc=(u.email||'').replace(/'/g,"\\'");
-    return `<tr><td>${u.email||''}</td><td>${projCell}</td><td>${roleCell}</td>`+
-      `<td class="num"><button class="btn ghost small" onclick="editUser('${u.user_id}')">✏️</button> <button class="btn danger small" onclick="delUser('${u.user_id}','${emailEsc}')">🗑️</button></td></tr>`;
+    return `<div class="ucard" style="--a1:${cols[0]};--a2:${cols[1]};animation-delay:${Math.min(idx*45,450)}ms">
+      <div class="uc-actions">
+        <button class="btn ghost small" onclick="editUser('${u.user_id}')" title="Modifier">✏️</button>
+        <button class="btn danger small" onclick="delUser('${u.user_id}','${emailEsc}')" title="Supprimer">🗑️</button>
+      </div>
+      <div class="uc-top">
+        <div class="uav">${escH(uInitials(u.email))}<span class="dot"></span></div>
+        <div style="min-width:0">
+          <div class="uc-name">${escH(uName(u.email))}${isAdmin?' <span title="Administrateur">👑</span>':''}</div>
+          <div class="uc-mail">${escH(u.email||'')}</div>
+        </div>
+      </div>
+      <div class="uc-badges">${roleBadge}</div>
+      <div class="uc-projects">${projects}</div>
+    </div>`;
   }).join('');
 }
 
