@@ -102,6 +102,10 @@
   .tick{font-weight:800}.tick.ok{color:#86efac}.tick.no{color:#fca5a5}
   .filterbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;align-items:end}
   .filterbar .field{max-width:200px}
+  /* Libellé tronqué : garde toutes les colonnes visibles ; détail complet au survol (title) */
+  td.lbl{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help}
+  table.compact td,table.compact th{padding:7px 10px;font-size:13px}
+  table.compact tr:hover td{background:rgba(59,130,246,.10)}
 </style>
 </head>
 <body>
@@ -166,7 +170,7 @@
         <div class="field" style="max-width:180px;margin:0"><input type="month" id="db-month" onchange="renderDashboard()"></div>
       </div>
       <div class="hint">Pour chaque paiement du mois : sa catégorie, le client/fournisseur, si la facture est déposée et si le paiement est vérifié (rapproché).</div>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="compact">
         <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Tiers</th><th class="num">Montant</th><th>Facture</th><th>Vérifié</th></tr></thead>
         <tbody id="db-body"></tbody>
       </table></div>
@@ -206,7 +210,7 @@
         <div class="field"><label>Tiers</label><select id="tx-ftiers" onchange="renderTx()"><option value="">Tous</option></select></div>
         <div class="field" style="max-width:240px"><label>Recherche</label><input type="text" id="tx-search" placeholder="libellé, tiers…" oninput="renderTx()"></div>
       </div>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="compact">
         <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Tiers</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th></th></tr></thead>
         <tbody id="tx-body"></tbody>
       </table></div>
@@ -573,7 +577,7 @@ function renderDashboard(){
     if(t.amount>0) entrees+=Number(t.amount); else sorties+=Math.abs(Number(t.amount));
     if(t.amount<0 && !hasInv) manque++;
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${t.op_date||''}</td><td>${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td>
+    tr.innerHTML=`<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td>
       <td>${esc(t.counterparty||'—')}</td><td class="num">${euro(t.amount)}</td>
       <td>${hasInv?'<span class="tick ok">✔</span>':'<span class="tick no">✗</span>'}</td>
       <td>${verified?'<span class="badge b-ok">Vérifié</span>':(hasInv?'<span class="badge b-wip">À classer</span>':'<span class="badge b-lost">Non</span>')}</td>`;
@@ -631,7 +635,7 @@ function renderTx(){
   rows.forEach(t=>{
     const tr=document.createElement('tr');
     const catTxt=t.category_id?esc(catName(t.category_id)):'<span class="badge b-wip">à classer</span>';
-    tr.innerHTML=`<td>${t.op_date||''}</td><td>${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>
+    tr.innerHTML=`<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openTxEdit('${t.id}')" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
