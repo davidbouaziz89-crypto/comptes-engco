@@ -106,6 +106,15 @@
   td.lbl{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help}
   table.compact td,table.compact th{padding:7px 10px;font-size:13px}
   table.compact tr:hover td{background:rgba(59,130,246,.10)}
+  /* Catégories : menu latéral gauche + édition à droite (comme le CRM) */
+  .cat-layout{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:12px}
+  .cat-menu{flex:0 0 250px;display:flex;flex-direction:column;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px;max-height:62vh;overflow:auto}
+  .cat-menu button{background:transparent;border:1px solid transparent;color:var(--txt);text-align:left;padding:9px 11px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .cat-menu button:hover{background:var(--panel)}
+  .cat-menu button.active{background:var(--panel);border-color:var(--accent);font-weight:600}
+  .cat-menu .cmini{color:var(--muted);font-size:12px;white-space:nowrap}
+  .cat-content{flex:1;min-width:300px}
+  @media(max-width:760px){.cat-menu{flex-basis:100%;max-height:none}}
 </style>
 </head>
 <body>
@@ -289,19 +298,25 @@
   <div id="tab-parametres" class="hidden">
     <section class="panel canedit">
       <h2>⚙️ Catégories de la société</h2>
-      <div class="hint">Elles apparaissent dans le menu « Catégorie ». Coche « TVA récupérable » si la TVA de cette catégorie est déductible.</div>
-      <form class="row" onsubmit="addCat(event)">
-        <div class="field"><label>Nom</label><input type="text" id="c-nom" placeholder="ex. Téléphonie" required></div>
-        <div class="field"><label>Type de flux</label><select id="c-flow"><option value="achat">Achat</option><option value="vente">Vente</option><option value="both">Les deux</option></select></div>
-        <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="c-tva" placeholder="20"></div>
-        <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-recup" checked> TVA récupérable</label></div>
-        <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
-      </form>
-      <div style="margin-top:6px"><button class="btn ghost small" onclick="importDefaultCats()">📋 Importer les catégories par défaut</button></div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Catégorie</th><th>Flux</th><th class="num">TVA %</th><th>Récupérable</th><th></th></tr></thead>
-        <tbody id="cats-body"></tbody>
-      </table></div>
+      <div class="hint">Clique une catégorie à gauche pour la <b>modifier</b>, ou crée-en une nouvelle. Coche « TVA récupérable » si sa TVA est déductible.</div>
+      <div style="margin:8px 0"><button class="btn ghost small" onclick="importDefaultCats()">📋 Importer les catégories par défaut</button></div>
+      <div class="cat-layout">
+        <div class="cat-menu" id="cat-menu"></div>
+        <div class="cat-content">
+          <form class="row" onsubmit="saveCat(event)">
+            <div class="field"><label>Nom</label><input type="text" id="c-nom" placeholder="ex. Téléphonie" required></div>
+            <div class="field"><label>Type de flux</label><select id="c-flow"><option value="achat">Achat</option><option value="vente">Vente</option><option value="both">Les deux</option></select></div>
+            <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="c-tva" placeholder="20"></div>
+            <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-recup" checked> TVA récupérable</label></div>
+          </form>
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn" id="c-savebtn" onclick="saveCat(event)">+ Ajouter</button>
+            <button class="btn ghost" id="c-cancelbtn" style="display:none" onclick="newCat()">Annuler</button>
+            <button class="btn danger" id="c-delbtn" style="display:none;margin-left:auto" onclick="delCatEditing()">🗑 Supprimer</button>
+          </div>
+          <div class="preview" id="c-msg" style="display:none;margin-top:10px"></div>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -995,35 +1010,50 @@ function renderTva(){
 }
 
 /* ================= CATÉGORIES ================= */
-async function addCat(e){ e.preventDefault(); if(!canEdit()) return;
-  const rec={ company_id:CO.id, name:document.getElementById('c-nom').value.trim(),
-    flow:document.getElementById('c-flow').value, vat_recoverable:document.getElementById('c-recup').checked,
-    default_vat_rate:parseFloat(document.getElementById('c-tva').value)||null };
-  const {error}=await db.from('compta_categories').insert(rec);
-  if(error){ toast('Erreur : '+error.message); return; } e.target.reset(); toast('Catégorie ajoutée.'); reloadData();
+let editingCatId=null;
+function newCat(){ editingCatId=null;
+  const g=id=>document.getElementById(id);
+  g('c-nom').value=''; g('c-flow').value='achat'; g('c-tva').value=''; g('c-recup').checked=true;
+  g('c-savebtn').textContent='+ Ajouter'; g('c-cancelbtn').style.display='none'; g('c-delbtn').style.display='none';
+  document.querySelectorAll('#cat-menu button').forEach(b=>b.classList.remove('active'));
+}
+function selectCat(id){ const c=CATS.find(x=>x.id===id); if(!c) return; editingCatId=id;
+  const g=i=>document.getElementById(i);
+  g('c-nom').value=c.name||''; g('c-flow').value=c.flow||'achat';
+  g('c-tva').value=(c.default_vat_rate!=null)?c.default_vat_rate:''; g('c-recup').checked=c.vat_recoverable!==false;
+  g('c-savebtn').textContent='💾 Enregistrer'; g('c-cancelbtn').style.display=''; g('c-delbtn').style.display='';
+  document.querySelectorAll('#cat-menu button').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+}
+async function saveCat(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
+  const name=document.getElementById('c-nom').value.trim(); if(!name){ toast('Indique un nom.'); return; }
+  const dv=parseFloat(document.getElementById('c-tva').value);
+  const rec={ name, flow:document.getElementById('c-flow').value, vat_recoverable:document.getElementById('c-recup').checked, default_vat_rate:isNaN(dv)?null:dv };
+  let error;
+  if(editingCatId){ ({error}=await db.from('compta_categories').update(rec).eq('id',editingCatId)); }
+  else { ({error}=await db.from('compta_categories').insert(Object.assign({company_id:CO.id},rec))); }
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast(editingCatId?'Catégorie modifiée.':'Catégorie ajoutée.'); newCat(); reloadData();
+}
+async function delCatEditing(){ if(!editingCatId) return; if(!confirm('Supprimer cette catégorie ?')) return;
+  const {error}=await db.from('compta_categories').delete().eq('id',editingCatId);
+  if(error){ toast('Erreur : '+error.message); return; } toast('Catégorie supprimée.'); newCat(); reloadData();
 }
 async function importDefaultCats(){ if(!canEdit()) return;
   const globals=CATS.filter(c=>c.company_id==null);
-  const recs=globals.map(c=>({company_id:CO.id,name:c.name,flow:c.flow,vat_recoverable:c.vat_recoverable,default_vat_rate:c.default_vat_rate}));
-  if(!recs.length){ toast('Aucun modèle.'); return; }
+  const own=CATS.filter(c=>c.company_id===CO.id).map(c=>c.name.toLowerCase());
+  const recs=globals.filter(c=>!own.includes((c.name||'').toLowerCase())).map(c=>({company_id:CO.id,name:c.name,flow:c.flow,vat_recoverable:c.vat_recoverable,default_vat_rate:c.default_vat_rate}));
+  if(!recs.length){ toast('Catégories par défaut déjà présentes.'); return; }
   const {error}=await db.from('compta_categories').insert(recs);
   toast(error?('Erreur : '+error.message):recs.length+' catégories importées.'); reloadData();
 }
 function renderCats(){
-  const own=CATS.filter(c=>c.company_id===CO.id);
-  const body=document.getElementById('cats-body'); body.innerHTML='';
-  own.forEach(c=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${esc(c.name)}</td><td><span class="pill">${c.flow}</span></td><td class="num">${c.default_vat_rate!=null?c.default_vat_rate+' %':'—'}</td>
-      <td>${c.vat_recoverable?'<span class="tick ok">✔</span>':'<span class="tick no">✗</span>'}</td>
-      <td>${canEdit()?`<button class="btn ghost small" onclick="delCat('${c.id}')">🗑</button>`:''}</td>`;
-    body.appendChild(tr);
-  });
-  if(!own.length) body.innerHTML='<tr><td colspan="5" class="empty">Aucune catégorie pour cette société. Clique sur « 📋 Importer les catégories par défaut » ci-dessus, ou ajoute-les toi-même.</td></tr>';
-}
-async function delCat(id){ if(!confirm('Supprimer cette catégorie ?')) return;
-  const {error}=await db.from('compta_categories').delete().eq('id',id);
-  toast(error?('Erreur : '+error.message):'Supprimé.'); reloadData();
+  const own=CATS.filter(c=>c.company_id===CO.id).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const menu=document.getElementById('cat-menu'); if(!menu) return; menu.innerHTML='';
+  if(!own.length){ menu.innerHTML='<div class="empty" style="padding:14px">Aucune catégorie. Importe les modèles par défaut, ou crée-en une à droite.</div>'; return; }
+  own.forEach(c=>{ const b=document.createElement('button'); b.dataset.id=c.id;
+    b.innerHTML=`<span>${esc(c.name)}</span><span class="cmini">${esc(c.flow)} · ${c.default_vat_rate!=null?c.default_vat_rate+'%':'—'}${c.vat_recoverable===false?' · non récup':''}</span>`;
+    if(c.id===editingCatId) b.classList.add('active');
+    b.onclick=()=>selectCat(c.id); menu.appendChild(b); });
 }
 
 /* ================= ADMIN : SOCIÉTÉS ================= */
