@@ -215,6 +215,15 @@
         <tbody id="tx-body"></tbody>
       </table></div>
     </section>
+
+    <section class="panel">
+      <h2>📄 Relevés importés</h2>
+      <div class="hint">Les PDF de relevés importés avec l'IA, consultables à tout moment.</div>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Importé le</th><th>Mois</th><th>Fichier</th><th></th></tr></thead>
+        <tbody id="stmt-body"></tbody>
+      </table></div>
+    </section>
   </div>
 
   <!-- FACTURES -->
@@ -224,16 +233,22 @@
       <div class="hint">Dépose le PDF ou la photo, saisis les infos, et rapproche-la d'une ligne du relevé (le paiement correspondant).</div>
       <form class="row" onsubmit="addInvoice(event)">
         <div class="field"><label>Sens</label><select id="i-dir"><option value="achat">Achat (fournisseur)</option><option value="vente">Vente (client)</option></select></div>
-        <div class="field" style="min-width:180px"><label>Tiers</label><input type="text" id="i-tiers" placeholder="ex. Phone GS" required></div>
+        <div class="field" style="min-width:180px"><label>Tiers (fournisseur / client)</label><input type="text" id="i-tiers" list="tiers-list" placeholder="ex. DHL Express" required><datalist id="tiers-list"></datalist></div>
         <div class="field"><label>N° facture</label><input type="text" id="i-num" placeholder="facultatif"></div>
         <div class="field"><label>Date</label><input type="date" id="i-date"></div>
         <div class="field"><label>Montant HT (€)</label><input type="number" step="0.01" id="i-ht" oninput="invPreview()"></div>
         <div class="field"><label>TVA %</label><input type="number" step="0.01" id="i-tva" value="20" oninput="invPreview()"></div>
         <div class="field"><label>Montant TTC (€)</label><input type="number" step="0.01" id="i-ttc" placeholder="auto si vide" oninput="invPreview()"></div>
+        <div class="field"><label>Catégorie</label><select id="i-cat" onchange="onInvCatChange()"><option value="">— catégorie —</option></select></div>
+        <div class="field" id="i-guests-field" style="display:none;min-width:240px"><label>🍽️ Invités (restaurant)</label><input type="text" id="i-guests" placeholder="ex. M. Durand (client X), Mme Martin"></div>
         <div class="field"><label>Rapprocher d'un paiement</label><select id="i-tx"><option value="">— plus tard —</option></select></div>
-        <div class="field" style="min-width:220px"><label>Facture (PDF / photo)</label>
-          <button type="button" class="btn small" onclick="document.getElementById('i-file').click()">⬆️ Choisir la facture</button>
-          <input type="file" id="i-file" accept="image/*,.pdf" class="hidden" onchange="onInvoiceFilePick()">
+        <div class="field" style="min-width:260px"><label>Facture (PDF / photo)</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn small" onclick="document.getElementById('i-file').click()">⬆️ Choisir un fichier</button>
+            <button type="button" class="btn small ghost" onclick="document.getElementById('i-scan').click()">📷 Scanner</button>
+          </div>
+          <input type="file" id="i-file" accept="image/*,.pdf" class="hidden" onchange="onInvoiceFilePick('i-file')">
+          <input type="file" id="i-scan" accept="image/*" capture="environment" class="hidden" onchange="onInvoiceFilePick('i-scan')">
           <div id="i-filename" class="hint" style="margin-top:4px"></div>
         </div>
       </form>
@@ -244,12 +259,15 @@
     <section class="panel">
       <h2>Factures</h2>
       <div class="filterbar">
+        <div class="field"><label>Année</label><select id="inv-fyear" onchange="renderInvoices()"><option value="">Toutes</option></select></div>
+        <div class="field"><label>Mois</label><select id="inv-fmonth" onchange="renderInvoices()"><option value="">Tous</option><option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option><option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option><option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option><option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option></select></div>
+        <div class="field"><label>Fournisseur / client</label><select id="inv-ftiers" onchange="renderInvoices()"><option value="">Tous</option></select></div>
         <div class="field"><label>Sens</label><select id="inv-fdir" onchange="renderInvoices()"><option value="">Tous</option><option value="achat">Achats</option><option value="vente">Ventes</option></select></div>
         <div class="field"><label>Rapprochement</label><select id="inv-fmatch" onchange="renderInvoices()"><option value="">Tous</option><option value="rapproche">Rapprochées</option><option value="a_rapprocher">À rapprocher</option></select></div>
-        <div class="field" style="max-width:320px"><label>Recherche</label><input type="text" id="inv-search" placeholder="tiers, n°…" oninput="renderInvoices()"></div>
+        <div class="field" style="max-width:200px"><label>Recherche</label><input type="text" id="inv-search" placeholder="tiers, n°…" oninput="renderInvoices()"></div>
       </div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Date</th><th>Sens</th><th>Tiers</th><th>N°</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th>Paiement lié</th><th>Fichier</th><th></th></tr></thead>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Date</th><th>Sens</th><th>Tiers</th><th>Catégorie</th><th>N°</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th>Paiement lié</th><th>Fichier</th><th></th></tr></thead>
         <tbody id="inv-body"></tbody>
       </table></div>
     </section>
@@ -431,7 +449,7 @@ function canEdit(){ return IS_ADMIN || MY_ROLE==='secretaire'; }
 function ymNow(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 // ===== IA (edge function compta-ia) =====
-let IA_RELEVE_LINES=[];
+let IA_RELEVE_LINES=[], INVOICE_FILE=null, STATEMENTS=[], LAST_RELEVE_FILE=null;
 function fileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>{ const s=String(r.result); res(s.slice(s.indexOf(',')+1)); }; r.onerror=rej; r.readAsDataURL(file); }); }
 async function callComptaIA(kind,file){
   const b64=await fileToB64(file);
@@ -531,7 +549,7 @@ function showTab(t){
     const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
   });
   if(t==='dashboard') renderDashboard();
-  if(t==='releves') renderTx();
+  if(t==='releves'){ renderTx(); renderStatements(); }
   if(t==='factures') renderInvoices();
   if(t==='tva') renderTva();
   if(t==='parametres') renderCats();
@@ -552,24 +570,26 @@ function showAdminTab(t){
 async function reloadData(){
   if(!CO){ if(IS_ADMIN){ renderCompanies(); } return; }
   document.getElementById('loaderr').style.display='none';
-  const [cats,tx,inv,rules]=await Promise.all([
+  const [cats,tx,inv,rules,stmts]=await Promise.all([
     db.from('compta_categories').select('*').or('company_id.eq.'+CO.id+',company_id.is.null').order('name'),
     db.from('compta_transactions').select('*').eq('company_id',CO.id).order('op_date',{ascending:false}),
     db.from('compta_invoices').select('*').eq('company_id',CO.id).order('created_at',{ascending:false}),
     db.from('compta_rules').select('pattern,category_id,counterparty').eq('company_id',CO.id),
+    db.from('compta_bank_statements').select('*').eq('company_id',CO.id).order('created_at',{ascending:false}),
   ]);
-  CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[];
-  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva();
+  CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[]; STATEMENTS=(stmts&&stmts.data)||[];
+  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements();
 }
 
 function fillCatSelects(){
-  const opts='<option value="">— catégorie —</option>'+CATS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  ['t-cat'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=opts; });
-  // select des paiements à rapprocher (factures)
-  const unmatched=TX.filter(t=>!INVOICES.some(i=>i.transaction_id===t.id));
-  document.getElementById('i-tx').innerHTML='<option value="">— plus tard —</option>'+
+  const catOpts='<option value="">— catégorie —</option>'+txCompanyCats().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  ['t-cat','i-cat'].forEach(id=>{ const el=document.getElementById(id); if(el){ const cur=el.value; el.innerHTML=catOpts; el.value=cur; } });
+  const itx=document.getElementById('i-tx'); if(itx) itx.innerHTML='<option value="">— plus tard —</option>'+
     TX.map(t=>`<option value="${t.id}">${t.op_date} · ${esc(t.label).slice(0,28)} · ${euro(t.amount)}</option>`).join('');
+  const dl=document.getElementById('tiers-list'); if(dl){ const names=[...new Set([].concat(INVOICES.map(i=>i.counterparty),TX.map(t=>t.counterparty)).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join(''); }
 }
+function catIsRestaurant(id){ const c=catById(id); return !!(c&&/restaurant|restau|repas/i.test(c.name||'')); }
+function onInvCatChange(){ const f=document.getElementById('i-guests-field'); if(f) f.style.display=catIsRestaurant(document.getElementById('i-cat').value)?'':'none'; }
 
 /* ---------- Catégorie helpers ---------- */
 function catById(id){ return CATS.find(c=>c.id===id); }
@@ -717,7 +737,7 @@ async function importReleveIA(file){
     const lines=(res&&res.lines)||[];
     if(!lines.length){ toast("Aucune ligne détectée."); return; }
     lines.forEach(l=>{ if(!l.suggested_category_id){ const r=applyRule(l); if(r){ l.suggested_category_id=r.category_id; if(!l.counterparty&&r.counterparty) l.counterparty=r.counterparty; } } });
-    IA_RELEVE_LINES=lines; openIAReleve(lines);
+    LAST_RELEVE_FILE=file; IA_RELEVE_LINES=lines; openIAReleve(lines);
   }catch(e){ alert("❌ Erreur IA (relevé) :\n\n"+e.message); }
 }
 function openIAReleve(lines){
@@ -731,18 +751,32 @@ function openIAReleve(lines){
 }
 function closeIA(){ document.getElementById('ia-modal').classList.add('hidden'); }
 async function runIAReleveImport(){
+  // Stocke le PDF du relevé pour consultation ultérieure
+  let statement_id=null;
+  if(LAST_RELEVE_FILE){
+    try{
+      const ext=(LAST_RELEVE_FILE.name.split('.').pop()||'pdf');
+      const sp=`${CO.id}/releves/${crypto.randomUUID()}.${ext}`;
+      const up=await db.storage.from('compta-documents').upload(sp,LAST_RELEVE_FILE,{upsert:false});
+      if(!up.error){
+        const per=(IA_RELEVE_LINES.find(l=>l.op_date)||{}).op_date;
+        const {data:st}=await db.from('compta_bank_statements').insert({company_id:CO.id,original_filename:LAST_RELEVE_FILE.name,storage_path:sp,period_month:per?per.slice(0,7)+'-01':null,uploaded_by:SESSION.user.id}).select('id').single();
+        if(st) statement_id=st.id;
+      }
+    }catch(_){}
+  }
   const recs=IA_RELEVE_LINES.map(l=>{
     const cat=CATS.find(c=>c.id===l.suggested_category_id);
     let rate=(l.vat_rate!=null)?Number(l.vat_rate):(cat&&cat.default_vat_rate!=null?Number(cat.default_vat_rate):null);
     const ttc=Math.abs(Number(l.amount)||0);
     const tva=(rate)?Math.round(ttc*rate/(100+rate)*100)/100:null;
-    return { company_id:CO.id, op_date:l.op_date, label:(l.label||'(sans libellé)'), amount:Number(l.amount)||0,
+    return { company_id:CO.id, statement_id, op_date:l.op_date, label:(l.label||'(sans libellé)'), amount:Number(l.amount)||0,
       category_id:cat?cat.id:null, counterparty:l.counterparty||null,
       vat_rate:(rate!=null&&!isNaN(rate))?rate:null, vat_amount:tva, status:cat?'classe':'a_classer', created_by:SESSION.user.id };
   });
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur : '+error.message); return; }
-  closeIA(); toast(recs.length+' lignes importées par IA.'); reloadData();
+  LAST_RELEVE_FILE=null; closeIA(); toast(recs.length+' lignes importées'+(statement_id?' — PDF consultable dans « Relevés importés ».':'.')); reloadData();
 }
 function importReleveSheet(file){ if(!file||!canEdit()) return;
   const r=new FileReader();
@@ -807,9 +841,10 @@ function invPreview(){
   const tva=ttc-ht;
   document.getElementById('i-preview').innerHTML=ht?`HT <b>${euro(ht)}</b> · TVA <b>${euro(tva)}</b> · TTC <b>${euro(ttc)}</b>`:'—';
 }
-async function onInvoiceFilePick(){
+async function onInvoiceFilePick(inputId){
   if(!canEdit()) return;
-  const f=document.getElementById('i-file').files[0]; if(!f) return;
+  const el=document.getElementById(inputId||'i-file'); const f=el&&el.files[0]; if(!f) return;
+  INVOICE_FILE=f;
   const fn=document.getElementById('i-filename'); if(fn) fn.textContent='📎 '+f.name;
   if(!askUseIA("Facture « "+f.name+" » — la lire avec l'IA pour pré-remplir ?")) return;
   toast("🪄 Lecture IA de la facture…");
@@ -822,6 +857,7 @@ async function onInvoiceFilePick(){
     if(r.amount_ht!=null) document.getElementById('i-ht').value=r.amount_ht;
     if(r.vat_rate!=null) document.getElementById('i-tva').value=r.vat_rate;
     if(r.amount_ttc!=null) document.getElementById('i-ttc').value=r.amount_ttc;
+    const ru=applyRule({label:r.counterparty||'',counterparty:r.counterparty||''}); if(ru&&ru.category_id){ const ic=document.getElementById('i-cat'); if(ic){ ic.value=ru.category_id; onInvCatChange(); } }
     invPreview(); autoMatchInvoice(r);
     toast("Facture lue ✓ Vérifie les montants et enregistre.");
   }catch(e){ alert("❌ Erreur IA (facture) :\n\n"+e.message); }
@@ -841,11 +877,13 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
   if((isNaN(ttc)||!ttc)&&!isNaN(ht)) ttc=ht*(1+(rate||0)/100);
   if(isNaN(ht)&&!isNaN(ttc)&&rate) ht=ttc/(1+rate/100);
   const tva=(!isNaN(ttc)&&!isNaN(ht))?(ttc-ht):null;
+  const catId=document.getElementById('i-cat').value||null;
+  const guests=catIsRestaurant(catId)?(document.getElementById('i-guests').value.trim()||null):null;
   const txId=document.getElementById('i-tx').value||null;
-  const file=document.getElementById('i-file').files[0];
+  const file=INVOICE_FILE;
   let storage_path=null, original_filename=null;
   if(file){
-    const ext=file.name.split('.').pop();
+    const ext=(file.name.split('.').pop()||'bin');
     storage_path=`${CO.id}/invoices/${crypto.randomUUID()}.${ext}`; original_filename=file.name;
     const up=await db.storage.from('compta-documents').upload(storage_path,file,{upsert:false});
     if(up.error){ toast('Upload échoué : '+up.error.message); return; }
@@ -854,25 +892,41 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
     invoice_number:document.getElementById('i-num').value.trim()||null, invoice_date:document.getElementById('i-date').value||null,
     amount_ht:isNaN(ht)?null:Math.round(ht*100)/100, vat_rate:isNaN(rate)?null:rate,
     vat_amount:tva!=null?Math.round(tva*100)/100:null, amount_ttc:isNaN(ttc)?null:Math.round(ttc*100)/100,
-    storage_path, original_filename, transaction_id:txId, status:txId?'rapproche':'a_rapprocher', uploaded_by:SESSION.user.id };
-  const {error}=await db.from('compta_invoices').insert(rec);
+    category_id:catId, guests, storage_path, original_filename, transaction_id:txId, status:txId?'rapproche':'a_rapprocher', uploaded_by:SESSION.user.id };
+  let {error}=await db.from('compta_invoices').insert(rec);
+  if(error && /category_id|guests|column|colonne/i.test(error.message||'')){ // colonnes pas encore ajoutées (compta-extra.sql)
+    delete rec.category_id; delete rec.guests; ({error}=await db.from('compta_invoices').insert(rec));
+  }
   if(error){ toast('Erreur : '+error.message); return; }
-  // Si rapprochée, marque la ligne comme vérifiée/classée.
+  if(catId){ try{ await learnRule(tiers, tiers, catId); }catch(_){} }
   if(txId){ await db.from('compta_transactions').update({status:'classe'}).eq('id',txId); }
-  e.target && e.target.reset && e.target.reset();
+  ['i-tiers','i-num','i-date','i-ht','i-ttc','i-guests'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('i-tva').value='20'; const ic=document.getElementById('i-cat'); if(ic)ic.value=''; onInvCatChange();
+  const fn=document.getElementById('i-filename'); if(fn)fn.textContent=''; INVOICE_FILE=null;
   document.getElementById('i-preview').innerHTML='—'; toast('Facture enregistrée.'); reloadData();
 }
+function fillInvFilters(){
+  const yr=document.getElementById('inv-fyear'); if(yr){ const cur=yr.value; const years=[...new Set(INVOICES.map(i=>(i.invoice_date||'').slice(0,4)).filter(Boolean))].sort().reverse(); yr.innerHTML='<option value="">Toutes</option>'+years.map(y=>`<option>${y}</option>`).join(''); yr.value=cur; }
+  const ft=document.getElementById('inv-ftiers'); if(ft){ const cur=ft.value; const t=[...new Set(INVOICES.map(i=>i.counterparty).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); ft.innerHTML='<option value="">Tous</option>'+t.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); ft.value=cur; }
+}
 function renderInvoices(){
+  fillInvFilters();
   const dir=document.getElementById('inv-fdir').value, mt=document.getElementById('inv-fmatch').value;
+  const yr=document.getElementById('inv-fyear').value, mo=document.getElementById('inv-fmonth').value, ftiers=document.getElementById('inv-ftiers').value;
   const q=(document.getElementById('inv-search').value||'').toLowerCase();
-  let rows=INVOICES.filter(i=>(!dir||i.direction===dir)&&(!mt||i.status===mt)&&
-    (!q||(i.counterparty||'').toLowerCase().includes(q)||(i.invoice_number||'').toLowerCase().includes(q)));
+  let rows=INVOICES.filter(i=>(!dir||i.direction===dir)&&(!mt||i.status===mt)
+    &&(!yr||(i.invoice_date||'').slice(0,4)===yr)&&(!mo||(i.invoice_date||'').slice(5,7)===mo)
+    &&(!ftiers||(i.counterparty||'')===ftiers)
+    &&(!q||(i.counterparty||'').toLowerCase().includes(q)||(i.invoice_number||'').toLowerCase().includes(q)));
+  rows.sort((a,b)=>(b.invoice_date||'').localeCompare(a.invoice_date||''));
   const body=document.getElementById('inv-body'); body.innerHTML='';
   rows.forEach(i=>{
     const tx=TX.find(t=>t.id===i.transaction_id);
+    const catTxt=i.category_id?esc(catName(i.category_id)):'—';
+    const guestsBadge=i.guests?` <span title="Invités : ${esc(i.guests)}" style="cursor:help">🍽️</span>`:'';
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
-      <td>${esc(i.counterparty||'')}</td><td>${esc(i.invoice_number||'—')}</td>
+      <td>${esc(i.counterparty||'')}</td><td>${catTxt}${guestsBadge}</td><td>${esc(i.invoice_number||'—')}</td>
       <td class="num">${i.amount_ht!=null?euro(i.amount_ht):'—'}</td><td class="num">${i.vat_amount!=null?euro(i.vat_amount):'—'}</td>
       <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td>
       <td>${tx?`${tx.op_date} · ${euro(tx.amount)}`:(canEdit()?matchSelect(i):'<span class="badge b-lost">Non</span>')}</td>
@@ -880,7 +934,7 @@ function renderInvoices(){
       <td>${canEdit()?`<button class="btn ghost small" onclick="delInvoice('${i.id}')">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
-  if(!rows.length) body.innerHTML='<tr><td colspan="10" class="empty">Aucune facture.</td></tr>';
+  if(!rows.length) body.innerHTML='<tr><td colspan="11" class="empty">Aucune facture.</td></tr>';
 }
 function matchSelect(i){
   return `<select onchange="matchInvoice('${i.id}',this.value)"><option value="">— rapprocher —</option>`+
@@ -902,6 +956,22 @@ async function delInvoice(id){ if(!confirm('Supprimer cette facture ?')) return;
 async function openDoc(path){
   const {data,error}=await db.storage.from('compta-documents').createSignedUrl(path,120);
   if(error){ toast('Erreur : '+error.message); return; } window.open(data.signedUrl,'_blank');
+}
+function renderStatements(){
+  const body=document.getElementById('stmt-body'); if(!body) return; body.innerHTML='';
+  (STATEMENTS||[]).forEach(s=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${(s.created_at||'').slice(0,10)}</td><td>${s.period_month?String(s.period_month).slice(0,7):'—'}</td>
+      <td>${esc(s.original_filename||'relevé')}</td>
+      <td style="white-space:nowrap">${s.storage_path?`<a href="#" onclick="openDoc('${esc(s.storage_path)}');return false">📄 Ouvrir</a>`:'—'} ${canEdit()?`<button class="btn ghost small" onclick="delStatement('${s.id}')" title="Supprimer le PDF">🗑</button>`:''}</td>`;
+    body.appendChild(tr);
+  });
+  if(!(STATEMENTS||[]).length) body.innerHTML='<tr><td colspan="4" class="empty">Aucun relevé PDF importé.</td></tr>';
+}
+async function delStatement(id){ if(!confirm('Supprimer ce PDF de relevé ? (les lignes déjà importées sont conservées)')) return;
+  const s=(STATEMENTS||[]).find(x=>x.id===id); if(s&&s.storage_path) await db.storage.from('compta-documents').remove([s.storage_path]);
+  const {error}=await db.from('compta_bank_statements').delete().eq('id',id);
+  toast(error?('Erreur : '+error.message):'Relevé supprimé.'); reloadData();
 }
 
 /* ================= TVA ================= */
