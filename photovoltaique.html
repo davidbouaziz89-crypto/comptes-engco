@@ -1787,7 +1787,7 @@ async function openPlanningConf(){
 }
 async function placeConfRdv(dateISO,heure){
   if(!canEdit('telepro')){ toast('Réservé au télépro / admin'); return; }
-  if(await updLead({rdv_conf_date:dateISO,rdv_conf_heure:heure},'Rappel placé le '+new Date(dateISO+'T00:00:00').toLocaleDateString('fr-FR')+' à '+heure)){
+  if(await updLead({rdv_conf_date:dateISO,rdv_conf_heure:heure,rdv_conf_notif:null},'Rappel placé le '+new Date(dateISO+'T00:00:00').toLocaleDateString('fr-FR')+' à '+heure)){
     renderPlanningConf(); if(!document.getElementById('lead-suivi').classList.contains('hidden')) renderSuivi();
   }
 }
@@ -1839,7 +1839,7 @@ async function placeComRdv(dateISO,heure){
   const others=LEADS.filter(l=>l.owner_commercial===planComActive && l.rdv_date && l.rdv_date.slice(0,10)===dateISO && l.id!==curLead.id).length;
   if(others>=4){ toast('Déjà 4 RDV ce jour pour ce commercial (maximum atteint).'); return; }
   const com=PROFILES.find(p=>p.id===planComActive);
-  if(await updLead({owner_commercial:planComActive,rdv_date:dateISO,rdv_heure:heure},'RDV placé pour '+(com?(com.nom||com.email):'')+' le '+new Date(dateISO+'T00:00:00').toLocaleDateString('fr-FR')+' à '+heure)){
+  if(await updLead({owner_commercial:planComActive,rdv_date:dateISO,rdv_heure:heure,rdv_notif:null},'RDV placé pour '+(com?(com.nom||com.email):'')+' le '+new Date(dateISO+'T00:00:00').toLocaleDateString('fr-FR')+' à '+heure)){
     renderPlanning(); if(!document.getElementById('lead-suivi').classList.contains('hidden')) renderSuivi();
   }
 }
