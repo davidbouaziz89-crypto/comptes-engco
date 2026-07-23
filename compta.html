@@ -202,7 +202,9 @@
       <div class="filterbar">
         <div class="field"><label>Mois</label><input type="month" id="tx-fmonth" onchange="renderTx()"></div>
         <div class="field"><label>Statut</label><select id="tx-fstatus" onchange="renderTx()"><option value="">Tous</option><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
-        <div class="field" style="max-width:320px"><label>Recherche</label><input type="text" id="tx-search" placeholder="libellé, tiers…" oninput="renderTx()"></div>
+        <div class="field"><label>Catégorie</label><select id="tx-fcat" onchange="renderTx()"><option value="">Toutes</option></select></div>
+        <div class="field"><label>Tiers</label><select id="tx-ftiers" onchange="renderTx()"><option value="">Tous</option></select></div>
+        <div class="field" style="max-width:240px"><label>Recherche</label><input type="text" id="tx-search" placeholder="libellé, tiers…" oninput="renderTx()"></div>
       </div>
       <div class="table-wrap"><table>
         <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Tiers</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th></th></tr></thead>
@@ -345,6 +347,26 @@
     </form>
     <div class="preview" id="map-preview" style="margin-top:12px"></div>
     <div style="margin-top:16px;text-align:right"><button class="btn" onclick="runReleveImport()">Importer les lignes</button></div>
+  </div>
+</div>
+
+<!-- MODALE ÉDITION D'UNE LIGNE -->
+<div id="tx-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:560px">
+    <div class="modal-head"><h3>✏️ Modifier la ligne</h3><button class="btn ghost small" onclick="closeTxEdit()">✕</button></div>
+    <form class="row" onsubmit="saveTxEdit(event)">
+      <div class="field"><label>Date</label><input type="date" id="te-date"></div>
+      <div class="field" style="min-width:200px"><label>Libellé</label><input type="text" id="te-label"></div>
+      <div class="field"><label>Catégorie</label><select id="te-cat"></select></div>
+      <div class="field"><label>Tiers (client / fournisseur)</label><input type="text" id="te-tiers"></div>
+      <div class="field"><label>Montant (€, signé)</label><input type="number" step="0.01" id="te-montant"></div>
+      <div class="field"><label>TVA %</label><input type="number" step="0.01" id="te-tva"></div>
+      <div class="field"><label>Statut</label><select id="te-status"><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
+    </form>
+    <div style="margin-top:16px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn ghost" type="button" onclick="closeTxEdit()">Annuler</button>
+      <button class="btn" type="button" onclick="saveTxEdit(event)">💾 Enregistrer</button>
+    </div>
   </div>
 </div>
 
@@ -496,7 +518,10 @@ function showTab(t){
     const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
   });
   if(t==='dashboard') renderDashboard();
+  if(t==='releves') renderTx();
+  if(t==='factures') renderInvoices();
   if(t==='tva') renderTva();
+  if(t==='parametres') renderCats();
 }
 function showAdminTab(t){
   if(!IS_ADMIN) return;
@@ -584,25 +609,60 @@ async function addTx(e){ e.preventDefault(); if(!canEdit()) return;
   if(error){ toast('Erreur : '+error.message); return; }
   e.target.reset(); document.getElementById('t-preview').innerHTML='—'; toast('Ligne ajoutée.'); reloadData();
 }
+function txCompanyCats(){ return CATS.filter(c=>c.company_id===CO.id||c.company_id==null); }
+function fillTxFilters(){
+  const fc=document.getElementById('tx-fcat'); if(fc){ const cur=fc.value;
+    fc.innerHTML='<option value="">Toutes</option><option value="__none__">⏳ À classer (sans catégorie)</option>'+
+      txCompanyCats().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join(''); fc.value=cur; }
+  const ft=document.getElementById('tx-ftiers'); if(ft){ const cur=ft.value;
+    const tiers=[...new Set(TX.map(t=>t.counterparty).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    ft.innerHTML='<option value="">Tous</option>'+tiers.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); ft.value=cur; }
+}
 function renderTx(){
+  fillTxFilters();
   const m=document.getElementById('tx-fmonth').value, st=document.getElementById('tx-fstatus').value;
+  const fc=document.getElementById('tx-fcat').value, ft=document.getElementById('tx-ftiers').value;
   const q=(document.getElementById('tx-search').value||'').toLowerCase();
-  let rows=TX.filter(t=>(!m||(t.op_date||'').slice(0,7)===m)&&(!st||t.status===st)&&
-    (!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)));
+  let rows=TX.filter(t=>(!m||(t.op_date||'').slice(0,7)===m)&&(!st||t.status===st)
+    &&(!fc||(fc==='__none__'?!t.category_id:t.category_id===fc))
+    &&(!ft||(t.counterparty||'')===ft)
+    &&(!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)));
   const body=document.getElementById('tx-body'); body.innerHTML='';
   rows.forEach(t=>{
     const tr=document.createElement('tr');
-    const catSel=canEdit()?`<select onchange="setTxCat('${t.id}',this.value)"><option value="">—</option>`+
-      CATS.map(c=>`<option value="${c.id}"${c.id===t.category_id?' selected':''}>${esc(c.name)}</option>`).join('')+`</select>`
-      :esc(catName(t.category_id));
-    const tiers=canEdit()?`<input value="${esc(t.counterparty||'')}" style="min-width:120px" onchange="setTxField('${t.id}','counterparty',this.value)">`:esc(t.counterparty||'—');
-    tr.innerHTML=`<td>${t.op_date||''}</td><td>${esc(t.label)}</td><td>${catSel}</td><td>${tiers}</td>
+    const catTxt=t.category_id?esc(catName(t.category_id)):'<span class="badge b-wip">à classer</span>';
+    tr.innerHTML=`<td>${t.op_date||''}</td><td>${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
-      <td>${canEdit()?`<button class="btn ghost small" onclick="delTx('${t.id}')">🗑</button>`:''}</td>`;
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openTxEdit('${t.id}')" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
   if(!rows.length) body.innerHTML='<tr><td colspan="8" class="empty">Aucune ligne.</td></tr>';
+}
+let editingTxId=null;
+function openTxEdit(id){ const t=TX.find(x=>x.id===id); if(!t) return; editingTxId=id;
+  document.getElementById('te-date').value=t.op_date||'';
+  document.getElementById('te-label').value=t.label||'';
+  document.getElementById('te-cat').innerHTML='<option value="">— à classer —</option>'+
+    txCompanyCats().map(c=>`<option value="${c.id}"${c.id===t.category_id?' selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('te-tiers').value=t.counterparty||'';
+  document.getElementById('te-montant').value=t.amount;
+  document.getElementById('te-tva').value=(t.vat_rate!=null)?t.vat_rate:'';
+  document.getElementById('te-status').value=t.status||'a_classer';
+  document.getElementById('tx-modal').classList.remove('hidden');
+}
+function closeTxEdit(){ editingTxId=null; document.getElementById('tx-modal').classList.add('hidden'); }
+async function saveTxEdit(e){ if(e&&e.preventDefault)e.preventDefault(); if(!editingTxId) return;
+  const catId=document.getElementById('te-cat').value||null;
+  const amount=parseFloat(document.getElementById('te-montant').value)||0;
+  let rate=parseFloat(document.getElementById('te-tva').value); if(isNaN(rate)) rate=null;
+  const ttc=Math.abs(amount); const tva=(rate)?Math.round(ttc*rate/(100+rate)*100)/100:(rate===0?0:null);
+  const rec={ op_date:document.getElementById('te-date').value||null, label:document.getElementById('te-label').value.trim()||'(sans libellé)',
+    category_id:catId, counterparty:document.getElementById('te-tiers').value.trim()||null,
+    amount:amount, vat_rate:rate, vat_amount:tva, status:document.getElementById('te-status').value };
+  const {error}=await db.from('compta_transactions').update(rec).eq('id',editingTxId);
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('✔ Modification enregistrée.'); closeTxEdit(); reloadData();
 }
 async function setTxCat(id,cid){
   const c=catById(cid);
@@ -868,7 +928,7 @@ function renderCats(){
       <td>${canEdit()?`<button class="btn ghost small" onclick="delCat('${c.id}')">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
-  if(!own.length) body.innerHTML='<tr><td colspan="5" class="empty">Aucune catégorie propre. Importe les modèles par défaut.</td></tr>';
+  if(!own.length) body.innerHTML='<tr><td colspan="5" class="empty">Aucune catégorie pour cette société. Clique sur « 📋 Importer les catégories par défaut » ci-dessus, ou ajoute-les toi-même.</td></tr>';
 }
 async function delCat(id){ if(!confirm('Supprimer cette catégorie ?')) return;
   const {error}=await db.from('compta_categories').delete().eq('id',id);
