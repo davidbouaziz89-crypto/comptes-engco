@@ -224,6 +224,7 @@
   <button data-tab="releves" onclick="showTab('releves')">🏦 Relevés</button>
   <button data-tab="factures" onclick="showTab('factures')">📁 Factures</button>
   <button data-tab="tiers" onclick="showTab('tiers')">🤝 Tiers</button>
+  <button data-tab="restaurant" onclick="showTab('restaurant')">🍽️ Restaurant</button>
   <button data-tab="tva" onclick="showTab('tva')">🧮 TVA</button>
   <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
 </nav>
@@ -380,6 +381,23 @@
     </section>
   </div>
 
+  <!-- RESTAURANT (repas d'affaires) -->
+  <div id="tab-restaurant" class="hidden">
+    <section class="panel">
+      <h2>🍽️ Repas d'affaires (restaurant)</h2>
+      <div class="hint">Chaque frais classé dans une catégorie « restaurant » apparaît ici automatiquement (relevés + factures). Note avec qui tu étais et le nombre de repas (couverts) pour justifier la déductibilité.</div>
+      <div class="filterbar" style="margin-top:4px">
+        <div class="field"><label>Mois</label><input type="month" id="resto-fmonth" onchange="renderResto()"></div>
+        <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="resto-search" placeholder="restaurant, convive…" oninput="renderResto()"></div>
+      </div>
+      <div id="resto-cards" class="grid cards" style="margin:12px 0"></div>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Date</th><th>Source</th><th>Restaurant</th><th class="num">Montant</th><th>Convives (avec qui ?)</th><th class="num">Nb repas</th></tr></thead>
+        <tbody id="resto-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
   <!-- TVA -->
   <div id="tab-tva" class="hidden">
     <section class="panel">
@@ -398,7 +416,6 @@
       <div class="params-menu" id="params-menu">
         <button data-psec="categories" class="active" onclick="showParam('categories')">🏷️ Catégories de la société</button>
         <button data-psec="tiers" onclick="showParam('tiers')">🤝 Tiers (clients / fournisseurs)</button>
-        <button data-psec="resto" onclick="showParam('resto')">🍽️ Repas d'affaires (restaurant)</button>
         <button data-psec="societes" id="pm-societes" style="display:none" onclick="showParam('societes')">🏢 Sociétés</button>
         <button data-psec="users" id="pm-users" style="display:none" onclick="showParam('users')">👥 Utilisateurs &amp; accès</button>
       </div>
@@ -442,22 +459,6 @@
             <div class="table-wrap"><table class="compact">
               <thead><tr><th>Tiers</th><th>Catégorie</th><th>Source</th><th class="num">Opérations</th><th class="num">Encaissé</th><th class="num">Payé</th><th></th></tr></thead>
               <tbody id="tiers-reg-body"></tbody>
-            </table></div>
-          </section>
-        </div>
-
-        <div class="ps" id="ps-resto" style="display:none">
-          <section class="panel">
-            <h2>🍽️ Repas d'affaires (restaurant)</h2>
-            <div class="hint">Chaque frais classé dans une catégorie « restaurant » apparaît ici automatiquement (relevés + factures). Note avec qui tu étais et le nombre de repas (couverts) pour justifier la déductibilité.</div>
-            <div class="filterbar" style="margin-top:4px">
-              <div class="field"><label>Mois</label><input type="month" id="resto-fmonth" onchange="renderResto()"></div>
-              <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="resto-search" placeholder="restaurant, convive…" oninput="renderResto()"></div>
-            </div>
-            <div id="resto-cards" class="grid cards" style="margin:12px 0"></div>
-            <div class="table-wrap"><table class="compact">
-              <thead><tr><th>Date</th><th>Source</th><th>Restaurant</th><th class="num">Montant</th><th>Convives (avec qui ?)</th><th class="num">Nb repas</th></tr></thead>
-              <tbody id="resto-body"></tbody>
             </table></div>
           </section>
         </div>
@@ -888,13 +889,14 @@ function startApp(){
 let CURRENT_PARAM='categories';
 function showTab(t){
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dashboard','releves','factures','tiers','tva','parametres'].forEach(x=>{
+  ['dashboard','releves','factures','tiers','restaurant','tva','parametres'].forEach(x=>{
     const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
   });
   if(t==='dashboard') renderDashboard();
   if(t==='releves'){ renderTx(); renderStatements(); }
   if(t==='factures') renderInvoices();
   if(t==='tiers') renderTiersTab();
+  if(t==='restaurant') renderResto();
   if(t==='tva') renderTva();
   if(t==='parametres') showParam(CURRENT_PARAM);
 }
@@ -902,10 +904,9 @@ function showParam(sec){
   if((sec==='societes'||sec==='users') && !IS_ADMIN) sec='categories';
   CURRENT_PARAM=sec;
   document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.psec===sec));
-  ['categories','tiers','resto','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
+  ['categories','tiers','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
   if(sec==='categories') renderCats();
   if(sec==='tiers') renderTiersRegistry();
-  if(sec==='resto') renderResto();
   if(sec==='societes') renderCompanies();
   if(sec==='users') renderUsers();
 }
