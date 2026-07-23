@@ -230,7 +230,7 @@
   <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">📊 Tableau de bord</button>
   <button data-tab="releves" onclick="showTab('releves')">🏦 Relevés</button>
   <button data-tab="factures" onclick="showTab('factures')">📁 Factures</button>
-  <button data-tab="tiers" onclick="showTab('tiers')">🤝 Tiers</button>
+  <button data-tab="tiers" onclick="showTab('tiers')">🤝 Clients / Fournisseurs</button>
   <button data-tab="restaurant" onclick="showTab('restaurant')">🍽️ Restaurant</button>
   <button data-tab="tva" onclick="showTab('tva')">🧮 TVA</button>
   <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
@@ -260,7 +260,7 @@
       <h2 style="margin:0 0 4px">📄 Factures à rapprocher</h2>
       <div class="hint">Ces factures ne sont pas encore reliées à leur paiement sur le relevé. Clique « Relier » pour retrouver le paiement (le logiciel cherche aussi dans tes autres sociétés).</div>
       <div class="table-wrap"><table class="compact">
-        <thead><tr><th>Date</th><th>Sens</th><th>Tiers</th><th>Catégorie</th><th class="num">TTC</th><th>Statut</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Sens</th><th>Client / Fournisseur</th><th>Catégorie</th><th class="num">TTC</th><th>Statut</th><th></th></tr></thead>
         <tbody id="db-inv-body"></tbody>
       </table></div>
     </section>
@@ -271,7 +271,7 @@
       </div>
       <div class="hint">Pour chaque paiement du mois : sa catégorie, le client/fournisseur, si la facture est déposée et si le paiement est vérifié (rapproché).</div>
       <div class="table-wrap"><table class="compact">
-        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Tiers</th><th class="num">Montant</th><th>Facture</th><th>Vérifié</th></tr></thead>
+        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="num">Montant</th><th>Facture</th><th>Vérifié</th></tr></thead>
         <tbody id="db-body"></tbody>
       </table></div>
     </section>
@@ -294,7 +294,7 @@
         <div class="field"><label>Sens</label><select id="t-sens" onchange="txPreview()"><option value="-1">Débit (sortie)</option><option value="1">Crédit (entrée)</option></select></div>
         <div class="field"><label>Montant (€ TTC)</label><input type="number" step="0.01" id="t-montant" placeholder="0.00" required oninput="txPreview()"></div>
         <div class="field"><label>Catégorie</label><select id="t-cat" onchange="txPreview()"></select></div>
-        <div class="field"><label>Tiers (client / fournisseur)</label><input type="text" id="t-tiers" placeholder="ex. Phone GS"></div>
+        <div class="field"><label>Client / Fournisseur</label><input type="text" id="t-tiers" placeholder="ex. Phone GS"></div>
         <div class="field"><label>TVA %</label><input type="number" step="0.01" id="t-tva" placeholder="20" oninput="txPreview()"></div>
         <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
       </form>
@@ -307,11 +307,11 @@
         <div class="field"><label>Mois</label><input type="month" id="tx-fmonth" onchange="renderTx()"></div>
         <div class="field"><label>Statut</label><select id="tx-fstatus" onchange="renderTx()"><option value="">Tous</option><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
         <div class="field"><label>Catégorie</label><select id="tx-fcat" onchange="renderTx()"><option value="">Toutes</option></select></div>
-        <div class="field"><label>Tiers</label><select id="tx-ftiers" onchange="renderTx()"><option value="">Tous</option></select></div>
-        <div class="field" style="max-width:240px"><label>Recherche</label><input type="text" id="tx-search" placeholder="libellé, tiers…" oninput="renderTx()"></div>
+        <div class="field"><label>Client / Fournisseur</label><select id="tx-ftiers" onchange="renderTx()"><option value="">Tous</option></select></div>
+        <div class="field" style="max-width:240px"><label>Recherche</label><input type="text" id="tx-search" placeholder="libellé, client…" oninput="renderTx()"></div>
       </div>
       <div class="table-wrap"><table class="compact">
-        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Tiers</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th></th></tr></thead>
         <tbody id="tx-body"></tbody>
       </table></div>
     </section>
@@ -333,7 +333,7 @@
       <div class="hint">Dépose le PDF ou la photo, saisis les infos, et rapproche-la d'une ligne du relevé (le paiement correspondant).</div>
       <form class="row" onsubmit="addInvoice(event)">
         <div class="field"><label>Sens</label><select id="i-dir"><option value="achat">Achat (fournisseur)</option><option value="vente">Vente (client)</option></select></div>
-        <div class="field" style="min-width:180px"><label>Tiers (fournisseur / client)</label><input type="text" id="i-tiers" list="tiers-list" placeholder="ex. DHL Express" required><datalist id="tiers-list"></datalist></div>
+        <div class="field" style="min-width:180px"><label>Client / Fournisseur</label><input type="text" id="i-tiers" list="tiers-list" placeholder="ex. DHL Express" required><datalist id="tiers-list"></datalist></div>
         <div class="field" style="min-width:170px"><label>Catégorie</label><select id="i-cat" onchange="onInvCatChange()"><option value="">— à choisir —</option></select><div class="hint" id="i-cat-note" style="margin-top:3px"></div></div>
         <div class="field"><label>N° facture</label><input type="text" id="i-num" placeholder="facultatif"></div>
         <div class="field"><label>Date</label><input type="date" id="i-date"></div>
@@ -369,10 +369,10 @@
         <div class="field"><label>Fournisseur / client</label><select id="inv-ftiers" onchange="renderInvoices()"><option value="">Tous</option></select></div>
         <div class="field"><label>Sens</label><select id="inv-fdir" onchange="renderInvoices()"><option value="">Tous</option><option value="achat">Achats</option><option value="vente">Ventes</option></select></div>
         <div class="field"><label>Rapprochement</label><select id="inv-fmatch" onchange="renderInvoices()"><option value="">Tous</option><option value="rapproche">✅ Rapprochées</option><option value="partiel">⏳ Partielles</option><option value="a_rapprocher">⏳ En attente</option></select></div>
-        <div class="field" style="max-width:200px"><label>Recherche</label><input type="text" id="inv-search" placeholder="tiers, n°…" oninput="renderInvoices()"></div>
+        <div class="field" style="max-width:200px"><label>Recherche</label><input type="text" id="inv-search" placeholder="client, n°…" oninput="renderInvoices()"></div>
       </div>
       <div class="table-wrap"><table class="compact">
-        <thead><tr><th>Date</th><th>Sens</th><th>Tiers</th><th>Catégorie</th><th>N°</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th>Paiement lié</th><th>Fichier</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Sens</th><th>Client / Fournisseur</th><th>Catégorie</th><th>N°</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th>Paiement lié</th><th>Fichier</th><th></th></tr></thead>
         <tbody id="inv-body"></tbody>
       </table></div>
     </section>
@@ -381,10 +381,10 @@
   <!-- TIERS (analyse par tiers) -->
   <div id="tab-tiers" class="hidden">
     <section class="panel">
-      <h2>🤝 Suivi d'un tiers</h2>
+      <h2>🤝 Suivi d'un client / fournisseur</h2>
       <div class="hint">Choisis un client ou fournisseur pour voir tout ce que tu as encaissé / payé avec lui, mois par mois.</div>
       <div class="filterbar">
-        <div class="field" style="min-width:280px"><label>Tiers</label><select id="ti-select" onchange="renderTiersTab()"><option value="">— choisir —</option></select></div>
+        <div class="field" style="min-width:280px"><label>Client / Fournisseur</label><select id="ti-select" onchange="renderTiersTab()"><option value="">— choisir —</option></select></div>
       </div>
       <div id="ti-cards" class="grid cards" style="margin-top:16px"></div>
       <div id="ti-detail"></div>
@@ -425,7 +425,7 @@
     <div class="params-layout">
       <div class="params-menu" id="params-menu">
         <button data-psec="categories" class="active" onclick="showParam('categories')">🏷️ Catégories de la société</button>
-        <button data-psec="tiers" onclick="showParam('tiers')">🤝 Tiers (clients / fournisseurs)</button>
+        <button data-psec="tiers" onclick="showParam('tiers')">🤝 Clients / Fournisseurs</button>
         <button data-psec="societes" id="pm-societes" style="display:none" onclick="showParam('societes')">🏢 Sociétés</button>
         <button data-psec="users" id="pm-users" style="display:none" onclick="showParam('users')">👥 Utilisateurs &amp; accès</button>
       </div>
@@ -455,19 +455,19 @@
 
         <div class="ps" id="ps-tiers" style="display:none">
           <section class="panel canedit">
-            <h2>🤝 Tiers (clients / fournisseurs)</h2>
-            <div class="hint">Cette liste s'enrichit toute seule : chaque tiers que tu saisis ou que l'IA détecte à l'import y apparaît, avec sa provenance. Tu peux aussi en ajouter à la main.</div>
+            <h2>🤝 Clients / Fournisseurs</h2>
+            <div class="hint">Cette liste s'enrichit toute seule : chaque client / fournisseur que tu saisis ou que l'IA détecte à l'import y apparaît, avec sa provenance. Tu peux aussi en ajouter à la main.</div>
             <form class="row" onsubmit="addTiersManual(event)">
-              <div class="field" style="min-width:220px"><label>Nouveau tiers</label><input type="text" id="ti-new" placeholder="ex. DHL Express" required></div>
+              <div class="field" style="min-width:220px"><label>Nouveau client / fournisseur</label><input type="text" id="ti-new" placeholder="ex. DHL Express" required></div>
               <div class="field" style="min-width:180px"><label>Catégorie</label><select id="ti-cat"><option value="">— catégorie —</option></select></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
             </form>
             <div class="filterbar" style="margin-top:12px">
-              <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="ti-search" placeholder="nom du tiers…" oninput="renderTiersRegistry()"></div>
+              <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="ti-search" placeholder="nom…" oninput="renderTiersRegistry()"></div>
               <div class="field"><label>Source</label><select id="ti-fsource" onchange="renderTiersRegistry()"><option value="">Toutes</option><option value="manuel">Manuel</option><option value="ia">IA</option><option value="auto">Détecté</option></select></div>
             </div>
             <div class="table-wrap"><table class="compact">
-              <thead><tr><th>Tiers</th><th>Catégorie</th><th>Source</th><th class="num">Opérations</th><th class="num">Encaissé</th><th class="num">Payé</th><th></th></tr></thead>
+              <thead><tr><th>Client / Fournisseur</th><th>Catégorie</th><th>Source</th><th class="num">Opérations</th><th class="num">Encaissé</th><th class="num">Payé</th><th></th></tr></thead>
               <tbody id="tiers-reg-body"></tbody>
             </table></div>
           </section>
@@ -549,7 +549,7 @@
     <div class="field"><label>Date</label><input type="date" id="te-date"></div>
     <div class="field" style="min-width:200px"><label>Libellé</label><input type="text" id="te-label"></div>
     <div class="field"><label>Catégorie</label><select id="te-cat"></select></div>
-    <div class="field"><label>Tiers (client / fournisseur)</label><input type="text" id="te-tiers"></div>
+    <div class="field"><label>Client / Fournisseur</label><input type="text" id="te-tiers"></div>
     <div class="field"><label>Montant (€, signé)</label><input type="number" step="0.01" id="te-montant"></div>
     <div class="field"><label>TVA %</label><input type="number" step="0.01" id="te-tva"></div>
     <div class="field"><label>Statut</label><select id="te-status"><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
@@ -593,7 +593,7 @@
     <div class="filterbar" style="margin:8px 0 4px">
       <div class="field" style="max-width:150px"><label>Mois</label><input type="month" id="pp-month" onchange="renderPayPick()"></div>
       <div class="field" style="max-width:170px"><label>Sens</label><select id="pp-sens" onchange="renderPayPick()"><option value="">Tous</option><option value="deb">Débits (sorties)</option><option value="cred">Crédits (entrées)</option></select></div>
-      <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="pp-search" placeholder="libellé, tiers, montant…" oninput="renderPayPick()"></div>
+      <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="pp-search" placeholder="libellé, client, montant…" oninput="renderPayPick()"></div>
       <label class="chk" style="align-self:flex-end;white-space:nowrap"><input type="checkbox" id="pp-onlyfree" checked onchange="renderPayPick()" style="width:auto"> Masquer les lignes déjà reliées</label>
     </div>
     <div id="pp-body" style="max-height:52vh;overflow:auto;margin-top:6px"></div>
@@ -688,7 +688,7 @@ function renderTiersRegistry(){
       <td>${tiersSourceBadge(t.source)}</td><td class="num">${s.count}</td>
       <td class="num val-good">${s.inn?euro(s.inn):'—'}</td><td class="num val-bad">${s.out?euro(s.out):'—'}</td>
       <td>${(canEdit()&&t.inTable)?`<button class="btn danger small" onclick="deleteTiers('${esc(t.key)}')">🗑</button>`:''}</td></tr>`;
-  }).join('')||'<tr><td colspan="7" class="empty">Aucun tiers pour le moment. Ils apparaîtront ici automatiquement à mesure que tu saisis ou importes.</td></tr>';
+  }).join('')||'<tr><td colspan="7" class="empty">Aucun client / fournisseur pour le moment. Ils apparaîtront ici automatiquement à mesure que tu saisis ou importes.</td></tr>';
 }
 async function addTiersManual(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const inp=document.getElementById('ti-new'); const nm=(inp.value||'').trim(); if(nm.length<2){ toast('Nom trop court.'); return; }
@@ -696,7 +696,7 @@ async function addTiersManual(e){ if(e&&e.preventDefault)e.preventDefault(); if(
   const key=tiersKey(nm); const existed=TIERS.some(t=>t.name_key===key);
   await registerTiers(nm,'manuel',catId);
   if(catId&&existed) await setTiersCat(key,catId);   // applique la catégorie même si le tiers existait déjà
-  inp.value=''; if(catSel) catSel.value=''; toast('Tiers ajouté.'); renderTiersRegistry(); fillTiersSelect();
+  inp.value=''; if(catSel) catSel.value=''; toast('Client / fournisseur ajouté.'); renderTiersRegistry(); fillTiersSelect();
 }
 async function setTiersCat(key,catId){ if(!canEdit()) return;
   const t=allTiers().find(x=>x.key===key); if(!t) return;
@@ -705,14 +705,14 @@ async function setTiersCat(key,catId){ if(!canEdit()) return;
   if(error){ toast('Erreur : '+error.message); return; }
   const ex=TIERS.find(x=>x.name_key===key);
   if(ex){ ex.category_id=catId||null; } else { TIERS.push({...rec,source:'manuel'}); }
-  toast('Catégorie du tiers enregistrée.'); renderTiersRegistry();
+  toast('Catégorie enregistrée.'); renderTiersRegistry();
 }
 async function deleteTiers(key){ if(!canEdit()) return;
   const t=TIERS.find(x=>x.name_key===key); if(!t){ return; }
   if(!confirm('Retirer « '+t.name+' » du registre ? (les mouvements liés ne sont pas supprimés)')) return;
   const {error}=await db.from('compta_tiers').delete().eq('company_id',CO.id).eq('name_key',key);
   if(error){ toast('Erreur : '+error.message); return; }
-  TIERS=TIERS.filter(x=>x.name_key!==key); toast('Tiers retiré.'); renderTiersRegistry(); fillTiersSelect();
+  TIERS=TIERS.filter(x=>x.name_key!==key); toast('Client / fournisseur retiré.'); renderTiersRegistry(); fillTiersSelect();
 }
 
 /* ---------- Registre RESTAURANT (repas d'affaires) ---------- */
@@ -770,7 +770,7 @@ function renderTiersTab(){
   const key=document.getElementById('ti-select')?.value||'';
   const cards=document.getElementById('ti-cards'), detail=document.getElementById('ti-detail');
   if(!cards||!detail) return;
-  if(!key){ cards.innerHTML=''; detail.innerHTML='<div class="empty" style="padding:24px 0">Sélectionne un tiers ci-dessus pour voir son suivi.</div>'; return; }
+  if(!key){ cards.innerHTML=''; detail.innerHTML='<div class="empty" style="padding:24px 0">Sélectionne un client / fournisseur ci-dessus pour voir son suivi.</div>'; return; }
   const s=tiersStats(key); const net=s.inn-s.out;
   cards.innerHTML=`
     <div class="card"><div class="label">Opérations</div><div class="value">${s.count}</div><div class="label" style="margin:6px 0 0">${s.invCount} facture(s)</div></div>
@@ -1226,7 +1226,7 @@ function openIAReleve(lines){
   const body=document.getElementById('ia-body');
   let tot=0; lines.forEach(l=>tot+=Number(l.amount)||0);
   body.innerHTML=`<div class="hint" style="margin-bottom:10px"><b>${lines.length}</b> lignes lues · solde ${euro(tot)}. Vérifie, puis importe (tout part en « à classer » ou pré-classé selon la catégorie suggérée).</div>`+
-    `<div class="table-wrap" style="max-height:46vh;overflow:auto"><table><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie suggérée</th><th>Tiers</th><th class="num">Montant</th></tr></thead><tbody>`+
+    `<div class="table-wrap" style="max-height:46vh;overflow:auto"><table><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie suggérée</th><th>Client / Fournisseur</th><th class="num">Montant</th></tr></thead><tbody>`+
     lines.map(l=>{ const c=CATS.find(x=>x.id===l.suggested_category_id); return `<tr><td>${esc(l.op_date||'')}</td><td>${esc(l.label||'')}</td><td>${c?esc(c.name):'<span class="badge b-wip">à classer</span>'}</td><td>${esc(l.counterparty||'—')}</td><td class="num">${euro(l.amount)}</td></tr>`; }).join('')+
     `</tbody></table></div>`;
   document.getElementById('ia-modal').classList.remove('hidden');
@@ -1546,7 +1546,7 @@ function renderPayPick(){
 }
 function pickPay(id){ setPayPick(id); closePayPick(); const box=document.getElementById('i-match'); if(id&&box) box.innerHTML=''; }
 async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
-  const tiers=document.getElementById('i-tiers').value.trim(); if(!tiers){ toast('Indique le tiers.'); return; }
+  const tiers=document.getElementById('i-tiers').value.trim(); if(!tiers){ toast('Indique le client / fournisseur.'); return; }
   let ht=parseFloat(document.getElementById('i-ht').value); let rate=parseFloat(document.getElementById('i-tva').value);
   let ttc=parseFloat(document.getElementById('i-ttc').value);
   if((isNaN(ttc)||!ttc)&&!isNaN(ht)) ttc=ht*(1+(rate||0)/100);
@@ -1592,7 +1592,7 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
   document.getElementById('i-tva').value='20'; const ic=document.getElementById('i-cat'); if(ic){ic.value='';ic.classList.remove('needcat');} const cn=document.getElementById('i-cat-note'); if(cn) cn.innerHTML=''; onInvCatChange();
   setPayPick(''); const mb=document.getElementById('i-match'); if(mb) mb.innerHTML='';
   const fn=document.getElementById('i-filename'); if(fn)fn.textContent=''; INVOICE_FILE=null;
-  document.getElementById('i-preview').innerHTML='—'; toast('Facture enregistrée.'+(catId?' Catégorie mémorisée pour ce tiers.':'')); reloadData();
+  document.getElementById('i-preview').innerHTML='—'; toast('Facture enregistrée.'+(catId?' Catégorie mémorisée pour ce client / fournisseur.':'')); reloadData();
 }
 function fillInvFilters(){
   const yr=document.getElementById('inv-fyear'); if(yr){ const cur=yr.value; const years=[...new Set(INVOICES.map(i=>(i.invoice_date||'').slice(0,4)).filter(Boolean))].sort().reverse(); yr.innerHTML='<option value="">Toutes</option>'+years.map(y=>`<option>${y}</option>`).join(''); yr.value=cur; }
