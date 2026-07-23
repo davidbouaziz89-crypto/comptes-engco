@@ -82,6 +82,24 @@
   .card.good .value{color:var(--good)}
   .card.bad::before{opacity:.9;background:linear-gradient(135deg,var(--danger),#f43f5e)}
   .val-good{color:var(--good)}.val-bad{color:var(--bad)}
+  /* --- KPI dashboard (compteurs animés + pastille icône) --- */
+  .kpi{padding:18px 18px 16px 20px}
+  .kpi::before{opacity:.95;background:var(--kc,var(--grad-accent))}
+  .kpi .k-ic{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:20px;background:color-mix(in srgb,var(--kc,var(--accent)) 18%,transparent);color:var(--kc,var(--accent));border:1px solid color-mix(in srgb,var(--kc,var(--accent)) 38%,transparent)}
+  .kpi .value{color:var(--kc,var(--txt))}
+  .kpi .k-sub{color:var(--muted);font-size:11.5px;margin-top:7px;font-weight:500}
+  .kpi.pulse{animation:kpipulse 2.6s ease-in-out infinite}
+  @keyframes kpipulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--kc,var(--accent)) 0%,transparent)}50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--kc,var(--accent)) 14%,transparent)}}
+  /* --- Zone graphes --- */
+  .charts{display:grid;grid-template-columns:1fr 1.35fr;gap:16px;margin-top:18px}
+  @media(max-width:860px){.charts{grid-template-columns:1fr}}
+  .chart-card{background:linear-gradient(165deg,var(--panel),color-mix(in srgb,var(--panel2) 70%,var(--panel)));border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+  .chart-card h2{margin:0 0 2px;font-size:16px;font-family:var(--font-display);font-weight:600;letter-spacing:-.2px}
+  .chart-card .hint{color:var(--muted);font-size:12.5px;margin-bottom:6px}
+  .chart-box{position:relative;height:270px;margin-top:10px}
+  .chart-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;transform:translateY(-6px)}
+  .chart-center .cc-val{font-family:var(--font-mono);font-size:21px;font-weight:800;letter-spacing:-.5px}
+  .chart-center .cc-lab{color:var(--muted);font-size:11.5px;margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
   section.panel{background:linear-gradient(165deg,var(--panel),color-mix(in srgb,var(--panel2) 70%,var(--panel)));border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-top:18px;box-shadow:var(--shadow)}
   section.panel h2{margin:0 0 4px;font-size:18px;font-family:var(--font-display);font-weight:600;letter-spacing:-.2px}
   section.panel .hint{color:var(--muted);font-size:13px;margin-bottom:16px}
@@ -216,6 +234,20 @@
   <!-- DASHBOARD -->
   <div id="tab-dashboard">
     <div class="grid cards" id="db-cards"></div>
+    <div class="charts">
+      <div class="chart-card">
+        <h2>🍩 Dépenses par catégorie</h2>
+        <div class="hint" id="dc-sub">Mois en cours</div>
+        <div class="chart-box"><canvas id="ch-cats"></canvas>
+          <div class="chart-center"><div class="cc-val" id="cc-cats">—</div><div class="cc-lab">dépensé</div></div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h2>📈 Flux des 6 derniers mois</h2>
+        <div class="hint">Entrées vs sorties, par mois</div>
+        <div class="chart-box"><canvas id="ch-flux"></canvas></div>
+      </div>
+    </div>
     <section class="panel" id="db-torappro" style="display:none;border-left:4px solid var(--danger)">
       <h2 style="margin:0 0 4px">📄 Factures à rapprocher</h2>
       <div class="hint">Ces factures ne sont pas encore reliées à leur paiement sur le relevé. Clique « Relier » pour retrouver le paiement (le logiciel cherche aussi dans tes autres sociétés).</div>
@@ -561,13 +593,14 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
 const SUPABASE_URL = "https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ---------- Thème ---------- */
-function toggleTheme(){ const light=document.documentElement.getAttribute('data-theme')!=='light'; if(light) document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme'); try{ localStorage.setItem('pfp-theme',light?'light':'dark'); }catch(e){} updateThemeBtn(); }
+function toggleTheme(){ const light=document.documentElement.getAttribute('data-theme')!=='light'; if(light) document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme'); try{ localStorage.setItem('pfp-theme',light?'light':'dark'); }catch(e){} updateThemeBtn(); if(CO&&!document.getElementById('tab-dashboard').classList.contains('hidden')) renderDashCharts(); }
 function updateThemeBtn(){ const b=document.getElementById('theme-btn'); if(b) b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☀️':'🌙'; }
 updateThemeBtn();
 
@@ -913,7 +946,59 @@ function onInvCatChange(){ const resto=catIsRestaurant(document.getElementById('
 function catById(id){ return CATS.find(c=>c.id===id); }
 function catName(id){ const c=catById(id); return c?c.name:'—'; }
 
-/* ================= DASHBOARD ================= */
+/* ================= DASHBOARD (compteurs animés + graphes) ================= */
+function prefersReduced(){ try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
+function countUp(el){ if(!el) return; const target=parseFloat(el.dataset.n)||0; const unit=el.dataset.unit||'eur';
+  const f=v=> unit==='int'? String(Math.round(v)) : euro(v);
+  if(prefersReduced()){ el.textContent=f(target); return; }
+  const dur=760; let t0=null;
+  function tick(now){ if(t0==null)t0=now; const p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,3); el.textContent=f(target*e); if(p<1) requestAnimationFrame(tick); }
+  requestAnimationFrame(tick); }
+function animateKpis(){ document.querySelectorAll('#db-cards .value[data-n]').forEach(countUp); }
+function kpiCard(ic,color,label,value,unit,sub,pulse){
+  return `<div class="card kpi${pulse?' pulse':''}" style="--kc:${color}">
+    <div class="k-ic">${ic}</div><div class="label">${label}</div>
+    <div class="value" data-n="${value}" data-unit="${unit||'eur'}">${unit==='int'?value:euro(value)}</div>
+    ${sub?`<div class="k-sub">${sub}</div>`:''}</div>`; }
+
+let CHARTS={};
+function mkChart(id,cfg){ if(typeof Chart==='undefined') return; if(CHARTS[id]) CHARTS[id].destroy(); const el=document.getElementById(id); if(!el) return; CHARTS[id]=new Chart(el,cfg); }
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888'; }
+const CAT_PALETTE=['#38bdf8','#a3e635','#a78bfa','#fbbf24','#fb7185','#34d399','#f472b6','#60a5fa','#facc15','#c084fc','#2dd4bf','#fca5a5'];
+const MFR=['','janv','févr','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'];
+function renderDashCharts(){
+  if(typeof Chart==='undefined'||!CO) return;
+  const tc={muted:cssVar('--muted'),line:cssVar('--line'),panel:cssVar('--panel'),good:cssVar('--good'),bad:cssVar('--bad')};
+  Chart.defaults.color=tc.muted; Chart.defaults.font.family='Inter, system-ui, sans-serif';
+  const m=document.getElementById('db-month').value;
+  // Camembert : dépenses (sorties) par catégorie
+  const byCat={}; let totalOut=0;
+  TX.filter(t=>(!m||(t.op_date||'').slice(0,7)===m)&&Number(t.amount)<0).forEach(t=>{ const k=t.category_id||'__none__'; const v=Math.abs(Number(t.amount)||0); byCat[k]=(byCat[k]||0)+v; totalOut+=v; });
+  const ent=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  const ccv=document.getElementById('cc-cats'); if(ccv) ccv.textContent=euro(totalOut);
+  const dsub=document.getElementById('dc-sub'); if(dsub) dsub.textContent=m?('Mois '+m):'Toutes périodes';
+  if(!ent.length){ if(CHARTS['ch-cats']){CHARTS['ch-cats'].destroy(); delete CHARTS['ch-cats'];} }
+  else mkChart('ch-cats',{type:'doughnut',
+    data:{labels:ent.map(([k])=>k==='__none__'?'Non classé':catName(k)),
+      datasets:[{data:ent.map(([,v])=>v),backgroundColor:ent.map((_,i)=>CAT_PALETTE[i%CAT_PALETTE.length]),borderColor:tc.panel,borderWidth:3,hoverOffset:7}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'66%',
+      plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,pointStyle:'circle',font:{size:12}}},
+        tooltip:{callbacks:{label:c=>' '+c.label+' : '+euro(c.parsed)}}},animation:{animateScale:true,duration:700}}});
+  // Barres : entrées / sorties sur 6 mois glissants
+  const base=m||ymNow(); let [by,bm]=base.split('-').map(Number); const months=[];
+  for(let i=5;i>=0;i--){ let mm=bm-i,yy=by; while(mm<=0){mm+=12;yy--;} months.push(yy+'-'+String(mm).padStart(2,'0')); }
+  const inn=months.map(()=>0), out=months.map(()=>0);
+  TX.forEach(t=>{ const idx=months.indexOf((t.op_date||'').slice(0,7)); if(idx<0) return; const a=Number(t.amount)||0; if(a>0) inn[idx]+=a; else out[idx]+=Math.abs(a); });
+  mkChart('ch-flux',{type:'bar',
+    data:{labels:months.map(mk=>{const p=mk.split('-');return MFR[parseInt(p[1],10)]+' '+p[0].slice(2);}),
+      datasets:[{label:'Entrées',data:inn,backgroundColor:tc.good,borderRadius:6,maxBarThickness:26},
+                {label:'Sorties',data:out,backgroundColor:tc.bad,borderRadius:6,maxBarThickness:26}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:14}},
+        tooltip:{callbacks:{label:c=>' '+c.dataset.label+' : '+euro(c.parsed.y)}}},
+      scales:{x:{grid:{display:false}},y:{grid:{color:tc.line},ticks:{callback:v=>euro(v)}}},animation:{duration:650}}});
+}
+
 function renderDashboard(){
   const m=document.getElementById('db-month').value;
   const rows=TX.filter(t=>!m||(t.op_date||'').slice(0,7)===m);
@@ -938,14 +1023,14 @@ function renderDashboard(){
   const cards=document.getElementById('db-cards');
   const solde=entrees-sorties, tvaNette=tvaColl-tvaRec;
   const toRappro=INVOICES.filter(i=>invMatchState(i)!=='rapproche').length;
-  cards.innerHTML=`
-    <div class="card good"><div class="label">↗ Entrées du mois</div><div class="value val-good">${euro(entrees)}</div></div>
-    <div class="card bad"><div class="label">↘ Sorties du mois</div><div class="value val-bad">${euro(sorties)}</div></div>
-    <div class="card ${solde>=0?'good':'bad'}"><div class="label">Solde du mois</div><div class="value ${solde>=0?'val-good':'val-bad'}">${euro(solde)}</div></div>
-    <div class="card"><div class="label">TVA nette du mois</div><div class="value">${euro(tvaNette)}</div><div class="label" style="margin:6px 0 0">collectée ${euro(tvaColl)} · récup. ${euro(tvaRec)}</div></div>
-    <div class="card ${aClasser?'bad':'good'}"><div class="label">⏳ Lignes à classer</div><div class="value ${aClasser?'val-bad':'val-good'}">${aClasser}</div></div>
-    <div class="card ${toRappro?'bad':'good'}"><div class="label">📄 Factures à rapprocher</div><div class="value ${toRappro?'val-bad':'val-good'}">${toRappro}</div></div>`;
-  renderDashInvoices();
+  cards.innerHTML=
+    kpiCard('↗','var(--good)','Entrées du mois',entrees)+
+    kpiCard('↘','var(--danger)','Sorties du mois',sorties)+
+    kpiCard('💰',solde>=0?'var(--good)':'var(--danger)','Solde du mois',solde)+
+    kpiCard('🧮','var(--accent3)','TVA nette du mois',tvaNette,'eur','collectée '+euro(tvaColl)+' · récup. '+euro(tvaRec))+
+    kpiCard('⏳',aClasser?'var(--warm)':'var(--good)','Lignes à classer',aClasser,'int',aClasser?'à catégoriser':'tout est classé')+
+    kpiCard('📄',toRappro?'var(--danger)':'var(--good)','Factures à rapprocher',toRappro,'int',toRappro?'à relier au relevé':'tout est rapproché',!!toRappro);
+  animateKpis(); renderDashCharts(); renderDashInvoices();
 }
 // Liste des factures pas encore (totalement) reliées à un paiement — toutes périodes.
 function renderDashInvoices(){
