@@ -11,6 +11,32 @@ self.addEventListener('activate', (e) => {
   })());
 });
 
+/* ---- Notifications push ---- */
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
+  const title = d.title || 'ProFormationPlus';
+  const opts = {
+    body: d.body || '',
+    icon: d.icon || '/icons/portal-192.png',
+    badge: d.badge || '/icons/portal-192.png',
+    data: { url: d.url || '/' },
+    tag: d.tag || undefined,
+    renotify: !!d.tag,
+  };
+  e.waitUntil(self.registration.showNotification(title, opts));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) { if (c.url.indexOf(url) !== -1 && 'focus' in c) return c.focus(); }
+    if (self.clients.openWindow) return self.clients.openWindow(url);
+  })());
+});
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;                 // laisse passer POST/PUT (Supabase, uploads)
