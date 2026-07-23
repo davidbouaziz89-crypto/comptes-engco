@@ -115,6 +115,14 @@
   .cat-menu .cmini{color:var(--muted);font-size:12px;white-space:nowrap}
   .cat-content{flex:1;min-width:300px}
   @media(max-width:760px){.cat-menu{flex-basis:100%;max-height:none}}
+  /* Paramètres : menu latéral gauche (Catégories / Sociétés / Utilisateurs) */
+  .params-layout{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-top:4px}
+  .params-menu{flex:0 0 250px;display:flex;flex-direction:column;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .params-menu button{background:transparent;border:1px solid transparent;color:var(--muted);text-align:left;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  .params-menu button:hover{color:var(--txt)}
+  .params-menu button.active{background:var(--panel2);color:var(--txt);border-color:var(--line)}
+  .params-content{flex:1;min-width:300px}
+  @media(max-width:760px){.params-menu{flex-basis:100%;flex-direction:row;flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -160,11 +168,7 @@
   <button data-tab="releves" onclick="showTab('releves')">🏦 Relevés</button>
   <button data-tab="factures" onclick="showTab('factures')">📁 Factures</button>
   <button data-tab="tva" onclick="showTab('tva')">🧮 TVA</button>
-  <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Catégories</button>
-</nav>
-<nav id="adminnav" style="display:none">
-  <button data-admtab="societes" onclick="showAdminTab('societes')">🏢 Sociétés</button>
-  <button data-admtab="users" onclick="showAdminTab('users')">👥 Utilisateurs & accès</button>
+  <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
 </nav>
 
 <main id="app" style="display:none">
@@ -294,79 +298,84 @@
     </section>
   </div>
 
-  <!-- CATÉGORIES -->
+  <!-- PARAMÈTRES (menu latéral : Catégories / Sociétés / Utilisateurs) -->
   <div id="tab-parametres" class="hidden">
-    <section class="panel canedit">
-      <h2>⚙️ Catégories de la société</h2>
-      <div class="hint">Clique une catégorie à gauche pour la <b>modifier</b>, ou crée-en une nouvelle. Coche « TVA récupérable » si sa TVA est déductible.</div>
-      <div style="margin:8px 0"><button class="btn ghost small" onclick="importDefaultCats()">📋 Importer les catégories par défaut</button></div>
-      <div class="cat-layout">
-        <div class="cat-menu" id="cat-menu"></div>
-        <div class="cat-content">
-          <form class="row" onsubmit="saveCat(event)">
-            <div class="field"><label>Nom</label><input type="text" id="c-nom" placeholder="ex. Téléphonie" required></div>
-            <div class="field"><label>Type de flux</label><select id="c-flow"><option value="achat">Achat</option><option value="vente">Vente</option><option value="both">Les deux</option></select></div>
-            <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="c-tva" placeholder="20"></div>
-            <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-recup" checked> TVA récupérable</label></div>
-          </form>
-          <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <button class="btn" id="c-savebtn" onclick="saveCat(event)">+ Ajouter</button>
-            <button class="btn ghost" id="c-cancelbtn" style="display:none" onclick="newCat()">Annuler</button>
-            <button class="btn danger" id="c-delbtn" style="display:none;margin-left:auto" onclick="delCatEditing()">🗑 Supprimer</button>
-          </div>
-          <div class="preview" id="c-msg" style="display:none;margin-top:10px"></div>
-        </div>
+    <div class="params-layout">
+      <div class="params-menu" id="params-menu">
+        <button data-psec="categories" class="active" onclick="showParam('categories')">🏷️ Catégories de la société</button>
+        <button data-psec="societes" id="pm-societes" style="display:none" onclick="showParam('societes')">🏢 Sociétés</button>
+        <button data-psec="users" id="pm-users" style="display:none" onclick="showParam('users')">👥 Utilisateurs &amp; accès</button>
       </div>
-    </section>
-  </div>
+      <div class="params-content">
 
-  <!-- ADMIN : SOCIÉTÉS -->
-  <div id="tab-societes" class="hidden">
-    <section class="panel">
-      <h2 id="soc-title">Créer une société</h2>
-      <form class="row" onsubmit="saveCompany(event)">
-        <div class="field" style="min-width:200px"><label>Nom</label><input type="text" id="soc-nom" required></div>
-        <div class="field"><label>Logo (marque)</label><select id="soc-logo" onchange="onSocLogo()"><option value="">— aucun —</option></select></div>
-        <div class="field"><label>Couleur</label><input type="color" id="soc-color" value="#3b82f6" style="height:42px;padding:4px"></div>
-        <div class="field"><label>SIREN</label><input type="text" id="soc-siren" placeholder="facultatif"></div>
-        <div class="field"><label>Régime TVA</label><select id="soc-regime"><option value="reel_mensuel">Réel mensuel</option><option value="reel_trimestriel">Réel trimestriel</option><option value="franchise">Franchise en base (pas de TVA)</option></select></div>
-        <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="soc-tva" value="20"></div>
-        <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="soc-savebtn">+ Créer</button> <button class="btn ghost" type="button" id="soc-cancel" style="display:none" onclick="cancelEditCompany()">Annuler</button></div>
-      </form>
-      <div class="preview" id="soc-msg"></div>
-    </section>
-    <section class="panel">
-      <h2>Sociétés</h2>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Nom</th><th>SIREN</th><th>Régime TVA</th><th class="num">TVA %</th><th>Comptables / secrétaires</th><th></th></tr></thead>
-        <tbody id="soc-body"></tbody>
-      </table></div>
-    </section>
-  </div>
-
-  <!-- ADMIN : UTILISATEURS -->
-  <div id="tab-users" class="hidden">
-    <section class="panel">
-      <h2 id="u-title">Créer un utilisateur</h2>
-      <div class="hint">La personne se connecte avec cet email + mot de passe. Choisis son rôle et les sociétés auxquelles elle a accès.</div>
-      <form class="row" onsubmit="saveUser(event)">
-        <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
-        <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères"></div>
-        <div class="field"><label>Rôle</label><select id="u-role"><option value="comptable">Comptable (lecture + téléchargement)</option><option value="secretaire">Secrétaire (saisie)</option></select></div>
-        <div class="field" id="u-companies-field" style="grid-column:1/-1"><label>Sociétés accessibles</label>
-          <div id="u-companies" style="display:flex;flex-wrap:wrap;gap:10px;padding-top:4px"></div>
+        <div class="ps" id="ps-categories">
+          <section class="panel canedit">
+            <h2>🏷️ Catégories de la société</h2>
+            <div class="hint">Ajoute, modifie (✏️) ou supprime tes catégories. « TVA % » = taux appliqué automatiquement quand tu classes une ligne dans cette catégorie.</div>
+            <div style="margin:8px 0"><button class="btn ghost small" onclick="importDefaultCats()">📋 Importer les catégories par défaut</button></div>
+            <form class="row" onsubmit="saveCat(event)">
+              <div class="field"><label>Nom</label><input type="text" id="c-nom" placeholder="ex. Téléphonie" required></div>
+              <div class="field"><label>Type de flux</label><select id="c-flow"><option value="achat">Achat</option><option value="vente">Vente</option><option value="both">Les deux</option></select></div>
+              <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="c-tva" placeholder="20"></div>
+              <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-recup" checked> TVA récupérable</label></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" id="c-savebtn" type="submit">+ Ajouter</button> <button class="btn ghost" type="button" id="c-cancelbtn" style="display:none" onclick="newCat()">Annuler</button></div>
+            </form>
+            <div class="table-wrap"><table class="compact">
+              <thead><tr><th>Catégorie</th><th>Flux</th><th class="num">TVA %</th><th>Récupérable</th><th></th></tr></thead>
+              <tbody id="cats-body"></tbody>
+            </table></div>
+          </section>
         </div>
-        <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="u-submit">+ Créer</button></div>
-      </form>
-      <div class="preview" id="u-msg"></div>
-    </section>
-    <section class="panel">
-      <h2>Utilisateurs & accès</h2>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Email</th><th>Rôle</th><th>Accès sociétés</th><th></th></tr></thead>
-        <tbody id="users-body"></tbody>
-      </table></div>
-    </section>
+
+        <div class="ps" id="ps-societes" style="display:none">
+          <section class="panel">
+            <h2 id="soc-title">Créer une société</h2>
+            <form class="row" onsubmit="saveCompany(event)">
+              <div class="field" style="min-width:200px"><label>Nom</label><input type="text" id="soc-nom" required></div>
+              <div class="field"><label>Logo (marque)</label><select id="soc-logo" onchange="onSocLogo()"><option value="">— aucun —</option></select></div>
+              <div class="field"><label>Couleur</label><input type="color" id="soc-color" value="#3b82f6" style="height:42px;padding:4px"></div>
+              <div class="field"><label>SIREN</label><input type="text" id="soc-siren" placeholder="facultatif"></div>
+              <div class="field"><label>Régime TVA</label><select id="soc-regime"><option value="reel_mensuel">Réel mensuel</option><option value="reel_trimestriel">Réel trimestriel</option><option value="franchise">Franchise en base (pas de TVA)</option></select></div>
+              <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="soc-tva" value="20"></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="soc-savebtn">+ Créer</button> <button class="btn ghost" type="button" id="soc-cancel" style="display:none" onclick="cancelEditCompany()">Annuler</button></div>
+            </form>
+            <div class="preview" id="soc-msg"></div>
+          </section>
+          <section class="panel">
+            <h2>Sociétés</h2>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Nom</th><th>SIREN</th><th>Régime TVA</th><th class="num">TVA %</th><th>Comptables / secrétaires</th><th></th></tr></thead>
+              <tbody id="soc-body"></tbody>
+            </table></div>
+          </section>
+        </div>
+
+        <div class="ps" id="ps-users" style="display:none">
+          <section class="panel">
+            <h2 id="u-title">Créer un utilisateur</h2>
+            <div class="hint">La personne se connecte avec cet email + mot de passe. Choisis son rôle et les sociétés auxquelles elle a accès.</div>
+            <form class="row" onsubmit="saveUser(event)">
+              <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
+              <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères"></div>
+              <div class="field"><label>Rôle</label><select id="u-role"><option value="comptable">Comptable (lecture + téléchargement)</option><option value="secretaire">Secrétaire (saisie)</option></select></div>
+              <div class="field" id="u-companies-field" style="grid-column:1/-1"><label>Sociétés accessibles</label>
+                <div id="u-companies" style="display:flex;flex-wrap:wrap;gap:10px;padding-top:4px"></div>
+              </div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="u-submit">+ Créer</button></div>
+            </form>
+            <div class="preview" id="u-msg"></div>
+          </section>
+          <section class="panel">
+            <h2>Utilisateurs &amp; accès</h2>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Email</th><th>Rôle</th><th>Accès sociétés</th><th></th></tr></thead>
+              <tbody id="users-body"></tbody>
+            </table></div>
+          </section>
+        </div>
+
+      </div>
+    </div>
   </div>
 </main>
 
@@ -505,10 +514,9 @@ async function boot(){
   MY_ACCESS = acc||[];
   const {data:cos}=await db.from('compta_companies').select('*').order('name');
   COMPANIES = cos||[];
-  if(IS_ADMIN){ document.getElementById('adminnav').style.display='flex'; }
   if(!COMPANIES.length && IS_ADMIN){
-    // Aucune société : va direct dans l'admin pour en créer une.
-    startApp(); showAdminTab('societes');
+    // Aucune société : va direct dans Paramètres > Sociétés pour en créer une.
+    startApp(); showTab('parametres'); showParam('societes');
     document.getElementById('loaderr').style.display='block';
     document.getElementById('loaderr').textContent='Bienvenue ! Commence par créer ta première société ci-dessous.';
     return;
@@ -551,34 +559,34 @@ async function selectCompany(cid){
 function startApp(){
   document.getElementById('app').style.display='block';
   document.getElementById('mainnav').style.display='flex';
+  const pms=document.getElementById('pm-societes'); if(pms) pms.style.display=IS_ADMIN?'':'none';
+  const pmu=document.getElementById('pm-users'); if(pmu) pmu.style.display=IS_ADMIN?'':'none';
   document.getElementById('db-month').value=ymNow();
   document.getElementById('tx-fmonth').value='';
   showTab('dashboard');
 }
 
 /* ---------- Navigation ---------- */
+let CURRENT_PARAM='categories';
 function showTab(t){
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  document.querySelectorAll('#adminnav button').forEach(b=>b.classList.remove('active'));
-  ['dashboard','releves','factures','tva','parametres','societes','users'].forEach(x=>{
+  ['dashboard','releves','factures','tva','parametres'].forEach(x=>{
     const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
   });
   if(t==='dashboard') renderDashboard();
   if(t==='releves'){ renderTx(); renderStatements(); }
   if(t==='factures') renderInvoices();
   if(t==='tva') renderTva();
-  if(t==='parametres') renderCats();
+  if(t==='parametres') showParam(CURRENT_PARAM);
 }
-function showAdminTab(t){
-  if(!IS_ADMIN) return;
-  document.querySelectorAll('#adminnav button').forEach(b=>b.classList.toggle('active',b.dataset.admtab===t));
-  document.querySelectorAll('#mainnav button').forEach(b=>b.classList.remove('active'));
-  ['dashboard','releves','factures','tva','parametres','societes','users'].forEach(x=>{
-    const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
-  });
-  document.getElementById('app').style.display='block';
-  if(t==='societes') renderCompanies();
-  if(t==='users') renderUsers();
+function showParam(sec){
+  if((sec==='societes'||sec==='users') && !IS_ADMIN) sec='categories';
+  CURRENT_PARAM=sec;
+  document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.psec===sec));
+  ['categories','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
+  if(sec==='categories') renderCats();
+  if(sec==='societes') renderCompanies();
+  if(sec==='users') renderUsers();
 }
 
 /* ---------- Chargement des données de la société ---------- */
@@ -1014,15 +1022,15 @@ let editingCatId=null;
 function newCat(){ editingCatId=null;
   const g=id=>document.getElementById(id);
   g('c-nom').value=''; g('c-flow').value='achat'; g('c-tva').value=''; g('c-recup').checked=true;
-  g('c-savebtn').textContent='+ Ajouter'; g('c-cancelbtn').style.display='none'; g('c-delbtn').style.display='none';
-  document.querySelectorAll('#cat-menu button').forEach(b=>b.classList.remove('active'));
+  g('c-savebtn').textContent='+ Ajouter'; g('c-cancelbtn').style.display='none';
+  renderCats();
 }
 function selectCat(id){ const c=CATS.find(x=>x.id===id); if(!c) return; editingCatId=id;
   const g=i=>document.getElementById(i);
   g('c-nom').value=c.name||''; g('c-flow').value=c.flow||'achat';
   g('c-tva').value=(c.default_vat_rate!=null)?c.default_vat_rate:''; g('c-recup').checked=c.vat_recoverable!==false;
-  g('c-savebtn').textContent='💾 Enregistrer'; g('c-cancelbtn').style.display=''; g('c-delbtn').style.display='';
-  document.querySelectorAll('#cat-menu button').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+  g('c-savebtn').textContent='💾 Enregistrer'; g('c-cancelbtn').style.display='';
+  window.scrollTo({top:0,behavior:'smooth'}); renderCats();
 }
 async function saveCat(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const name=document.getElementById('c-nom').value.trim(); if(!name){ toast('Indique un nom.'); return; }
@@ -1034,9 +1042,9 @@ async function saveCat(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdi
   if(error){ toast('Erreur : '+error.message); return; }
   toast(editingCatId?'Catégorie modifiée.':'Catégorie ajoutée.'); newCat(); reloadData();
 }
-async function delCatEditing(){ if(!editingCatId) return; if(!confirm('Supprimer cette catégorie ?')) return;
-  const {error}=await db.from('compta_categories').delete().eq('id',editingCatId);
-  if(error){ toast('Erreur : '+error.message); return; } toast('Catégorie supprimée.'); newCat(); reloadData();
+async function delCat(id){ if(!canEdit()) return; if(!confirm('Supprimer cette catégorie ?')) return;
+  const {error}=await db.from('compta_categories').delete().eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; } if(editingCatId===id) newCat(); toast('Catégorie supprimée.'); reloadData();
 }
 async function importDefaultCats(){ if(!canEdit()) return;
   const globals=CATS.filter(c=>c.company_id==null);
@@ -1048,12 +1056,13 @@ async function importDefaultCats(){ if(!canEdit()) return;
 }
 function renderCats(){
   const own=CATS.filter(c=>c.company_id===CO.id).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const menu=document.getElementById('cat-menu'); if(!menu) return; menu.innerHTML='';
-  if(!own.length){ menu.innerHTML='<div class="empty" style="padding:14px">Aucune catégorie. Importe les modèles par défaut, ou crée-en une à droite.</div>'; return; }
-  own.forEach(c=>{ const b=document.createElement('button'); b.dataset.id=c.id;
-    b.innerHTML=`<span>${esc(c.name)}</span><span class="cmini">${esc(c.flow)} · ${c.default_vat_rate!=null?c.default_vat_rate+'%':'—'}${c.vat_recoverable===false?' · non récup':''}</span>`;
-    if(c.id===editingCatId) b.classList.add('active');
-    b.onclick=()=>selectCat(c.id); menu.appendChild(b); });
+  const body=document.getElementById('cats-body'); if(!body) return; body.innerHTML='';
+  own.forEach(c=>{ const tr=document.createElement('tr'); if(c.id===editingCatId) tr.style.background='rgba(59,130,246,.12)';
+    tr.innerHTML=`<td>${esc(c.name)}</td><td><span class="pill">${esc(c.flow)}</span></td><td class="num">${c.default_vat_rate!=null?c.default_vat_rate+' %':'—'}</td>
+      <td>${c.vat_recoverable?'<span class="tick ok">✔</span>':'<span class="tick no">✗</span>'}</td>
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="selectCat('${c.id}')" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delCat('${c.id}')" title="Supprimer">🗑</button>`:''}</td>`;
+    body.appendChild(tr); });
+  if(!own.length) body.innerHTML='<tr><td colspan="5" class="empty">Aucune catégorie. Clique « 📋 Importer les catégories par défaut » ci-dessus, ou ajoute-en une.</td></tr>';
 }
 
 /* ================= ADMIN : SOCIÉTÉS ================= */
