@@ -995,14 +995,17 @@ function renderTiersTab(){
     return `<tr><td>${monthLabel(m)}</td><td class="num val-good">${b.inn?euro(b.inn):'—'}</td><td class="num val-bad">${b.out?euro(b.out):'—'}</td><td class="num ${n>=0?'val-good':'val-bad'}">${euro(n)}</td></tr>`; }).join('');
   const ops=TX.filter(t=>tiersKey(t.counterparty)===key).slice(0,40).map(t=>
     `<tr><td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td><td class="num ${t.amount>=0?'val-good':'val-bad'}">${euro(t.amount)}</td></tr>`).join('');
+  const totRow=`<tr style="font-weight:700;border-top:2px solid var(--accent)"><td>TOTAL</td><td class="num val-good">${euro(s.inn)}</td><td class="num val-bad">${euro(s.out)}</td><td class="num ${net>=0?'val-good':'val-bad'}">${euro(net)}</td></tr>`;
+  const nShown=Math.min(s.count, 40);
+  const opsTot=`<tr style="font-weight:700;border-top:2px solid var(--accent)"><td colspan="3">TOTAL ${s.count>40?`(${nShown} affichés / ${s.count})`:`(${s.count} op.)`}</td><td class="num ${net>=0?'val-good':'val-bad'}">${euro(net)}</td></tr>`;
   detail.innerHTML=`
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:8px">
       <div><h3 style="margin:10px 0 6px">Par mois</h3>
         <div class="table-wrap"><table class="compact"><thead><tr><th>Mois</th><th class="num">Encaissé</th><th class="num">Payé</th><th class="num">Net</th></tr></thead>
-        <tbody>${rowsM||'<tr><td colspan="4" class="empty">Aucun mouvement.</td></tr>'}</tbody></table></div></div>
+        <tbody>${rowsM||'<tr><td colspan="4" class="empty">Aucun mouvement.</td></tr>'}</tbody>${months.length?`<tfoot>${totRow}</tfoot>`:''}</table></div></div>
       <div><h3 style="margin:10px 0 6px">Derniers mouvements</h3>
         <div class="table-wrap"><table class="compact"><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th class="num">Montant</th></tr></thead>
-        <tbody>${ops||'<tr><td colspan="4" class="empty">Aucun mouvement.</td></tr>'}</tbody></table></div></div>
+        <tbody>${ops||'<tr><td colspan="4" class="empty">Aucun mouvement.</td></tr>'}</tbody>${s.count?`<tfoot>${opsTot}</tfoot>`:''}</table></div></div>
     </div>`;
 }
 // ===== Apprentissage : règles apprises =====
