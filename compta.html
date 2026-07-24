@@ -1473,11 +1473,11 @@ function renderTx(){
   const q=(document.getElementById('tx-search').value||'').toLowerCase();
   const acc=currentAccountId();
   const showAcc=ACCOUNTS_OK&&ACCOUNTS.length>1;
-  let rows=TX.filter(t=>periodMatch(t.op_date)&&(!st||t.status===st)
+  // Si un relevé précis est sélectionné, on ignore le filtre de période (on veut toutes ses lignes).
+  let rows=TX.filter(t=>(fstmt?t.statement_id===fstmt:periodMatch(t.op_date))&&(!st||t.status===st)
     &&(!fc||(fc==='__none__'?!t.category_id:t.category_id===fc))
     &&(!ft||(t.counterparty||'')===ft)
     &&(!acc||t.account_id===acc)
-    &&(!fstmt||t.statement_id===fstmt)
     &&(!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)));
   document.querySelectorAll('.tx-acc-col').forEach(el=>el.style.display=showAcc?'':'none');
   const colspan=showAcc?10:9;
