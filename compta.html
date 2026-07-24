@@ -356,9 +356,9 @@
 
     <section class="panel">
       <h2>📄 Relevés importés</h2>
-      <div class="hint">Les PDF de relevés importés avec l'IA, consultables à tout moment.</div>
+      <div class="hint">Chaque import (PDF ou CSV/Excel) apparaît ici. Tu peux le <b>renommer</b> (✏️), <b>voir ses lignes</b> (👁️) et, pour un PDF, l'ouvrir.</div>
       <div class="table-wrap"><table class="compact">
-        <thead><tr><th>Importé le</th><th>Mois</th><th>Fichier</th><th></th></tr></thead>
+        <thead><tr><th>Importé le</th><th>Mois</th><th>Relevé</th><th></th></tr></thead>
         <tbody id="stmt-body"></tbody>
       </table></div>
     </section>
@@ -422,8 +422,11 @@
   <div id="tab-rappro" class="hidden">
     <div id="rappro-cards" class="grid cards" style="margin-bottom:4px"></div>
     <section class="panel">
-      <h2>📄 Factures à rapprocher</h2>
-      <div class="hint">Factures pas encore (totalement) reliées à un paiement du relevé. Quand une correspondance est trouvée, clique <b>✓ Relier</b>.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 style="margin:0">📄 Factures à rapprocher</h2>
+        <button class="btn canedit" onclick="autoReconcile()" title="Relie automatiquement les factures dont le tiers/libellé a déjà été appris">⚡ Rapprocher automatiquement</button>
+      </div>
+      <div class="hint" style="margin-top:8px">Factures pas encore (totalement) reliées à un paiement du relevé. Quand une correspondance est trouvée, clique <b>✓ Relier</b>. Plus tu relies à la main, plus <b>⚡ Rapprocher automatiquement</b> fera le travail seul (il apprend tes tiers).</div>
       <div class="table-wrap"><table class="compact">
         <thead><tr><th>Date</th><th>Client / Fournisseur</th><th class="num">TTC</th><th>État</th><th>Paiement suggéré</th><th></th></tr></thead>
         <tbody id="rap-inv-body"></tbody>
@@ -963,6 +966,17 @@ function applyRule(line){ const lab=(line.label||'').toLowerCase(); const cp=(li
 async function learnRule(counterparty,label,categoryId){ if(!CO||!categoryId) return; const pattern=ruleKeyFor(counterparty,label); if(!pattern||pattern.length<3) return;
   await db.from('compta_rules').upsert({company_id:CO.id,pattern,category_id:categoryId,counterparty:counterparty||null,updated_at:new Date().toISOString()},{onConflict:'company_id,pattern'});
   const ex=RULES.find(r=>r.pattern===pattern); if(ex){ ex.category_id=categoryId; ex.counterparty=counterparty||null; } else RULES.push({pattern,category_id:categoryId,counterparty:counterparty||null}); }
+// Apprentissage du RAPPROCHEMENT : quand je relie une facture (tiers X) à une ligne de relevé,
+// on mémorise « mot-clé du libellé de la ligne → tiers X » pour reconnaître les prochaines.
+async function learnMatchRule(inv,tx){ if(!CO||!inv||!tx) return; const tiers=(inv.counterparty||'').trim(); if(!tiers) return;
+  const pattern=tiersKey(tx.counterparty)||firstKeyword(tx.label); if(!pattern||pattern.length<3) return;
+  const exist=RULES.find(r=>r.pattern===pattern); const cat=(inv.category_id||(exist&&exist.category_id)||null);
+  try{ await db.from('compta_rules').upsert({company_id:CO.id,pattern,category_id:cat,counterparty:tiers,updated_at:new Date().toISOString()},{onConflict:'company_id,pattern'}); }catch(_){}
+  if(exist){ exist.counterparty=tiers; exist.category_id=cat; } else RULES.push({pattern,category_id:cat,counterparty:tiers}); }
+// Tiers déduit d'une ligne de relevé via les règles apprises (rapprochement + catégorisation).
+function learnedTiersFor(tx){ const lab=(tx.label||'').toLowerCase(); const cp=tiersKey(tx.counterparty);
+  const r=RULES.find(x=>x.counterparty&&x.pattern&&((cp&&cp===x.pattern)||lab.includes(x.pattern)));
+  return r?tiersKey(r.counterparty):''; }
 // Logos des sociétés (fichiers dans assets/logos/<key>.png) + couleur de marque.
 const LOGO_DIR='assets/logos/';
 const LOGOS=[
@@ -1581,7 +1595,7 @@ async function findPaymentCandidates(ttc,dateISO,direction,exceptInvId,tiers){
   const tk=tiersKey(tiers);
   const scored=cands.filter(c=>!used.has(c.id)).map(c=>{
     const days=(dateISO&&c.op_date)?Math.abs((new Date(c.op_date)-new Date(dateISO))/86400000):999;
-    const tiersHit=tk&&(tiersKey(c.counterparty)===tk||(c.label||'').toLowerCase().includes(tk));
+    const tiersHit=tk&&(tiersKey(c.counterparty)===tk||(c.label||'').toLowerCase().includes(tk)||learnedTiersFor(c)===tk);
     const amtDiff=Math.abs(Math.abs(Number(c.amount)||0)-ttc);
     return {t:c,days,tiersHit,score:(tiersHit?0:1000)+days+amtDiff*10};   // même tiers d'abord, puis date, puis écart montant
   }).sort((a,b)=>a.score-b.score);
@@ -1605,6 +1619,7 @@ async function saveInvoiceLinks(invId, txs, opts){
   const status = !txs.length ? 'a_rapprocher' : (!ttc || sum>=ttc-MATCH_TOL ? 'rapproche' : 'partiel');
   await db.from('compta_invoices').update({transaction_id:txs[0]?txs[0].id:null,status}).eq('id',invId);
   for(const t of txs){ try{ await db.from('compta_transactions').update({status:'classe'}).eq('id',t.id); }catch(_){}}
+  for(const t of txs){ try{ await learnMatchRule(inv,t); }catch(_){}}   // l'IA apprend le tiers ↔ libellé
   return true;
 }
 
@@ -1659,7 +1674,7 @@ function bestLocalTxFor(inv){
   const wantSign=inv.direction==='vente'?1:-1; const tol=Math.max(MATCH_TOL,ttc*0.01); const tk=tiersKey(inv.counterparty);
   const c=TX.filter(t=>!txHasInvoice(t.id) && (wantSign<0?Number(t.amount)<0:Number(t.amount)>0) && Math.abs(Math.abs(Number(t.amount)||0)-ttc)<=tol)
     .map(t=>{ const days=(inv.invoice_date&&t.op_date)?Math.abs((new Date(t.op_date)-new Date(inv.invoice_date))/86400000):999;
-      const tiersHit=tk&&(tiersKey(t.counterparty)===tk||(t.label||'').toLowerCase().includes(tk));
+      const tiersHit=tk&&(tiersKey(t.counterparty)===tk||(t.label||'').toLowerCase().includes(tk)||learnedTiersFor(t)===tk);
       return {t,days,tiersHit,score:(tiersHit?0:1000)+days}; }).sort((a,b)=>a.score-b.score);
   return c[0]||null;
 }
@@ -1694,6 +1709,18 @@ function renderRapproTab(){
   if(cards){ const nInv=toDo.length, nTx=orphans.length;
     cards.innerHTML=`<div class="card ${nInv?'bad':'good'}"><div class="label">📄 Factures à rapprocher</div><div class="value ${nInv?'val-bad':'val-good'}">${nInv}</div></div>
       <div class="card ${nTx?'bad':'good'}"><div class="label">🏦 Paiements sans facture</div><div class="value ${nTx?'val-bad':'val-good'}">${nTx}</div></div>`; }
+}
+// Rapproche tout seul les factures dont le tiers/libellé a déjà été appris (correspondance sûre : montant + tiers).
+async function autoReconcile(){ if(!canEdit()) return;
+  const toDo=INVOICES.filter(i=>invMatchState(i)!=='rapproche');
+  const used=new Set(); let done=0;
+  for(const inv of toDo){ const best=bestLocalTxFor(inv);
+    if(best && best.tiersHit && !used.has(best.t.id)){
+      const ok=await saveInvoiceLinks(inv.id, invLinkedTx(inv).concat([best.t]), {invoice:inv});
+      if(ok){ used.add(best.t.id); done++; } }
+  }
+  toast(done?('⚡ '+done+' facture(s) rapprochée(s) automatiquement.'):'Aucun rapprochement automatique sûr trouvé — relie encore quelques-uns à la main pour que j’apprenne.');
+  if(done) await reloadData();
 }
 /* ---- Relier depuis une ligne de relevé : choisir la facture en attente ---- */
 let LINKTX=null;
@@ -2082,10 +2109,29 @@ function renderStatements(){
     const nLines=TX.filter(t=>t.statement_id===s.id).length;
     tr.innerHTML=`<td>${(s.created_at||'').slice(0,10)}</td><td>${s.period_month?String(s.period_month).slice(0,7):'—'}</td>
       <td><b>${esc(stmtLabel(s))}</b> <span class="hint">${nLines} ligne(s)${accTxt?esc(accTxt):''}</span></td>
-      <td style="white-space:nowrap">${s.storage_path?`<a href="#" onclick="openDoc('${esc(s.storage_path)}');return false">📄 Ouvrir</a>`:'—'} ${canEdit()?`<button class="btn ghost small" onclick="delStatement('${s.id}')" title="Supprimer le PDF">🗑</button>`:''}</td>`;
+      <td style="white-space:nowrap">
+        <button class="btn ghost small" onclick="viewStatementLines('${s.id}')" title="Voir uniquement les lignes de ce relevé">👁️ Voir les lignes</button>
+        ${canEdit()?`<button class="btn ghost small" onclick="renameStatement('${s.id}')" title="Renommer ce relevé">✏️ Renommer</button>`:''}
+        ${s.storage_path?`<a href="#" onclick="openDoc('${esc(s.storage_path)}');return false" style="margin:0 6px">📄 Ouvrir</a>`:''}
+        ${canEdit()?`<button class="btn ghost small" onclick="delStatement('${s.id}')" title="Supprimer ce relevé">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
-  if(!(STATEMENTS||[]).length) body.innerHTML='<tr><td colspan="4" class="empty">Aucun relevé PDF importé.</td></tr>';
+  if(!(STATEMENTS||[]).length) body.innerHTML='<tr><td colspan="4" class="empty">Aucun relevé importé. Le nom se choisit au moment de l’import (PDF ou CSV), et se modifie ici avec ✏️ Renommer.</td></tr>';
+}
+async function renameStatement(id){ if(!canEdit()) return;
+  const s=(STATEMENTS||[]).find(x=>x.id===id); if(!s) return;
+  const nm=prompt('Nom du relevé :', stmtLabel(s)); if(nm===null) return;
+  const label=(nm.trim())||null;
+  const {error}=await db.from('compta_bank_statements').update({label}).eq('id',id);
+  if(error){ toast(/label|column|colonne|schema/i.test(error.message||'')?'Lance d’abord sql/compta-releve-nom.sql.':'Erreur : '+error.message); return; }
+  s.label=label; toast('Relevé renommé.'); renderStatements(); fillTxFilters();
+}
+// Filtre la liste des lignes sur un relevé précis et y amène l'utilisateur.
+function viewStatementLines(id){
+  const fs=document.getElementById('tx-fstmt'); if(fs){ fillTxFilters(); fs.value=id; }
+  const grp=document.getElementById('tx-group'); if(grp) grp.checked=false;
+  renderTx();
+  const sec=document.getElementById('tx-body'); if(sec){ try{ sec.closest('section').scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
 }
 async function delStatement(id){ if(!confirm('Supprimer ce PDF de relevé ? (les lignes déjà importées sont conservées)')) return;
   const s=(STATEMENTS||[]).find(x=>x.id===id); if(s&&s.storage_path) await db.storage.from('compta-documents').remove([s.storage_path]);
