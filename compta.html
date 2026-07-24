@@ -743,8 +743,10 @@
     <div class="hint" id="rappro-head"></div>
     <div class="hint">Coche la (ou les) ligne(s) du relevé qui correspond(ent) à ce paiement. Pour une facture payée en 2 fois, coches-en plusieurs.</div>
     <div class="filterbar" style="margin-top:8px">
-      <div class="field" style="min-width:170px"><label>Voir les lignes du mois</label><input type="month" id="rappro-month" onchange="rapproBrowseMonth()"></div>
-      <div class="field" style="align-self:flex-end"><button class="btn ghost small" onclick="rapproSuggested()">↩︎ Revenir aux suggestions</button></div>
+      <div class="field" style="min-width:130px"><label>Mois</label><input type="month" id="rappro-month" onchange="rapproRefresh()"></div>
+      <div class="field" style="max-width:200px"><label>Recherche (libellé, tiers, montant)</label><input type="text" id="rappro-search" oninput="rapproRefresh()" placeholder="ex. CTN, 120…"></div>
+      <div class="field"><label>Trier par</label><select id="rappro-sort" onchange="rapproRefresh()"><option value="date">Date</option><option value="amount">Montant</option><option value="tiers">Client / Fournisseur</option><option value="cat">Catégorie</option></select></div>
+      <div class="field" style="align-self:flex-end"><button class="btn ghost small" onclick="rapproAll()">📋 Tout voir</button> <button class="btn ghost small" onclick="rapproSuggested()">↩︎ Suggestions</button></div>
     </div>
     <div id="rappro-body" style="max-height:42vh;overflow:auto;margin-top:8px"></div>
     <div id="rappro-warn" class="hint" style="margin-top:10px;color:var(--txt)"></div>
@@ -1773,8 +1775,10 @@ async function openRappro(invId){
   const already=invLinkedTx(inv).map(t=>({t,days:0}));
   const seen=new Set(); const list=[];
   already.concat(local).concat(other).forEach(x=>{ if(!seen.has(x.t.id)){ seen.add(x.t.id); list.push(x); } });
-  RAPPRO={invId, cands:list, suggested:list.slice(), picked:new Set(invTxIds(inv)), inv};
+  RAPPRO={invId, cands:list, suggested:list.slice(), picked:new Set(invTxIds(inv)), inv, showAll:false};
   const mi=document.getElementById('rappro-month'); if(mi) mi.value='';
+  const se=document.getElementById('rappro-search'); if(se) se.value='';
+  const so=document.getElementById('rappro-sort'); if(so) so.value='date';
   renderRappro(); document.getElementById('rappro-modal').classList.remove('hidden');
 }
 function renderRappro(){
@@ -1787,27 +1791,41 @@ function renderRappro(){
   const body=document.getElementById('rappro-body');
   if(!rows.length){ body.innerHTML='<div class="empty">Aucune ligne de relevé approchante trouvée (montant proche du TTC). Tu peux fermer et relier plus tard, ou vérifier tes relevés.</div>'; }
   else body.innerHTML=rows.map(x=>{ const t=x.t; const other=t.company_id!==CO.id; const ck=RAPPRO.picked.has(t.id);
+    const meta=[t.category_id?catName(t.category_id):'', t.counterparty||''].filter(Boolean).join(' · ');
     return `<label class="chk" style="display:flex;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line)">
       <input type="checkbox" ${ck?'checked':''} onchange="toggleRappro('${t.id}')">
-      <span style="flex:1">${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')} ${other?`<span class="badge b-wip" title="Payé avec une autre société">🏢 ${esc(coName(t.company_id))}</span>`:''}</span>
+      <span style="flex:1">${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')} ${other?`<span class="badge b-wip" title="Payé avec une autre société">🏢 ${esc(coName(t.company_id))}</span>`:''}${meta?`<br><span class="hint">${esc(meta)}</span>`:''}</span>
       <b class="num ${Number(t.amount)>=0?'val-good':'val-bad'}">${euro(t.amount)}</b></label>`; }).join('');
   const warn=document.getElementById('rappro-warn'); const comps=new Set([...RAPPRO.picked].map(id=>{ const c=RAPPRO.cands.find(x=>x.t.id===id); return c?c.t.company_id:null; }).filter(Boolean));
   const otherComp=[...comps].find(c=>c!==CO.id);
   warn.innerHTML = comps.size>1 ? '⚠️ Les lignes sélectionnées doivent appartenir à la même société.'
     : (otherComp ? `💡 Ce paiement a été fait avec <b>${esc(coName(otherComp))}</b> — la facture sera déplacée sur cette société.` : '');
 }
-// Parcourir toutes les lignes d'un mois de relevé (pas seulement les suggestions).
-function rapproBrowseMonth(){
-  const ym=(document.getElementById('rappro-month')||{}).value||''; if(!ym){ rapproSuggested(); return; }
-  const inv=RAPPRO.inv; const wantSign=inv.direction==='vente'?1:-1;
+function rapproSorter(sort){
+  if(sort==='amount') return (a,b)=>Math.abs(Number(b.t.amount)||0)-Math.abs(Number(a.t.amount)||0);
+  if(sort==='tiers') return (a,b)=>String(a.t.counterparty||a.t.label||'').localeCompare(String(b.t.counterparty||b.t.label||''));
+  if(sort==='cat') return (a,b)=>catName(a.t.category_id).localeCompare(catName(b.t.category_id));
+  return (a,b)=>String(b.t.op_date||'').localeCompare(String(a.t.op_date||'')); // date décroissante
+}
+// Reconstruit la liste des lignes candidates selon mois / recherche / tri / tout voir.
+function rapproRefresh(){
+  const inv=RAPPRO.inv; if(!inv) return; const wantSign=inv.direction==='vente'?1:-1;
+  const ym=(document.getElementById('rappro-month')||{}).value||'';
+  const q=((document.getElementById('rappro-search')||{}).value||'').toLowerCase().trim();
+  const sort=(document.getElementById('rappro-sort')||{}).value||'date';
+  if(!ym && !q && !RAPPRO.showAll){ RAPPRO.cands=(RAPPRO.suggested||[]).slice(); renderRappro(); return; }
   const used=new Set(); INVOICES.forEach(v=>{ if(v.id!==inv.id) invTxIds(v).forEach(id=>used.add(id)); });
-  const list=TX.filter(t=>(t.op_date||'').slice(0,7)===ym && (wantSign<0?Number(t.amount)<0:Number(t.amount)>0) && !used.has(t.id))
-    .sort((a,b)=>(a.op_date||'').localeCompare(b.op_date||'')).map(t=>({t,days:0}));
+  let list=TX.filter(t=>(wantSign<0?Number(t.amount)<0:Number(t.amount)>0) && !used.has(t.id)
+      && (!ym||(t.op_date||'').slice(0,7)===ym)
+      && (!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)||catName(t.category_id).toLowerCase().includes(q)||String(Math.abs(Number(t.amount)||0)).includes(q)))
+    .map(t=>({t,days:0}));
   const seen=new Set(list.map(x=>x.t.id));
-  invLinkedTx(inv).forEach(t=>{ if(!seen.has(t.id)){ list.unshift({t,days:0}); seen.add(t.id); } });
+  invLinkedTx(inv).forEach(t=>{ if(!seen.has(t.id)){ list.push({t,days:0}); seen.add(t.id); } });
+  list.sort(rapproSorter(sort));
   RAPPRO.cands=list; renderRappro();
 }
-function rapproSuggested(){ const mi=document.getElementById('rappro-month'); if(mi) mi.value=''; RAPPRO.cands=(RAPPRO.suggested||[]).slice(); renderRappro(); }
+function rapproAll(){ RAPPRO.showAll=true; rapproRefresh(); }
+function rapproSuggested(){ RAPPRO.showAll=false; const mi=document.getElementById('rappro-month'); if(mi) mi.value=''; const se=document.getElementById('rappro-search'); if(se) se.value=''; RAPPRO.cands=(RAPPRO.suggested||[]).slice(); renderRappro(); }
 function toggleRappro(id){ if(RAPPRO.picked.has(id)) RAPPRO.picked.delete(id); else RAPPRO.picked.add(id); renderRappro(); }
 function closeRappro(){ document.getElementById('rappro-modal').classList.add('hidden'); RAPPRO={invId:null,cands:[],picked:new Set()}; }
 async function confirmRappro(){
@@ -1902,16 +1920,17 @@ async function autoReconcile(){ if(!canEdit()) return;
 }
 /* ---- Relier depuis une ligne de relevé : choisir la facture en attente ---- */
 let LINKTX=null;
-let LINKTX_ALL=false;
-function linkTxToInvoice(txId){ const t=TX.find(x=>x.id===txId); if(!t){ return; } LINKTX=t; LINKTX_ALL=false;
+let LINKTX_ALL=false, LINKTX_PICKED=new Set();
+function linkTxToInvoice(txId){ const t=TX.find(x=>x.id===txId); if(!t){ return; } LINKTX=t; LINKTX_ALL=false; LINKTX_PICKED=new Set();
   const mi=document.getElementById('linktx-month'); if(mi) mi.value='';
   const se=document.getElementById('linktx-search'); if(se) se.value='';
-  document.getElementById('linktx-head').innerHTML=`Paiement : <b>${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')}</b> · <b class="val-bad">${euro(t.amount)}</b>`;
+  document.getElementById('linktx-head').innerHTML=`Paiement : <b>${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')}</b> · <b class="val-bad">${euro(t.amount)}</b><br><span class="hint">Coche <b>une ou plusieurs</b> factures couvertes par ce paiement (utile pour un prélèvement mensuel qui regroupe plusieurs factures).</span>`;
   renderLinkTxList();
   document.getElementById('linktx-modal').classList.remove('hidden');
 }
 function linkTxSuggested(){ LINKTX_ALL=false; const mi=document.getElementById('linktx-month'); if(mi) mi.value=''; const se=document.getElementById('linktx-search'); if(se) se.value=''; renderLinkTxList(); }
 function linkTxAll(){ LINKTX_ALL=true; renderLinkTxList(); }
+function toggleLinkTxPick(id){ if(LINKTX_PICKED.has(id)) LINKTX_PICKED.delete(id); else LINKTX_PICKED.add(id); renderLinkTxList(); }
 function renderLinkTxList(){
   const t=LINKTX; if(!t) return; const amt=Math.abs(Number(t.amount)||0); const tk=tiersKey(t.counterparty);
   const ym=(document.getElementById('linktx-month')||{}).value||'';
@@ -1929,13 +1948,27 @@ function renderLinkTxList(){
         return {i,diff,tiersHit,score:(tiersHit?0:1000)+diff*10}; })
       .filter(x=>x.diff<=Math.max(MATCH_TOL,amt*0.05)||x.tiersHit).sort((a,b)=>a.score-b.score).slice(0,12);
   }
+  const picked=[...LINKTX_PICKED].map(id=>INVOICES.find(i=>i.id===id)).filter(Boolean);
+  const sum=picked.reduce((s,i)=>s+Math.abs(Number(i.amount_ttc)||0),0);
+  const okSum=picked.length&&Math.abs(sum-amt)<=Math.max(MATCH_TOL,amt*0.02);
   const body=document.getElementById('linktx-body');
-  body.innerHTML=cands.length?`<div class="hint" style="margin-bottom:6px">${cands.length} facture(s)${filtered?'':' suggérée(s)'}</div>`+cands.map(x=>{ const i=x.i;
-    return `<div class="pp-row" style="display:flex;gap:10px;align-items:center;padding:9px 8px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px">
+  const summary=`<div style="position:sticky;top:0;background:var(--panel);padding:6px 0;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--line)">
+    <span class="hint">${cands.length} facture(s)${filtered?'':' suggérée(s)'}</span>
+    <span>Sélection <b>${picked.length}</b> · total <b class="${okSum?'val-good':(picked.length?'val-bad':'')}">${euro(sum)}</b> / paiement <b>${euro(amt)}</b>
+      ${picked.length?`<button class="btn small" style="margin-left:8px" onclick="doLinkTxMulti()">✔ Relier la sélection (${picked.length})</button>`:''}</span></div>`;
+  body.innerHTML=cands.length?summary+cands.map(x=>{ const i=x.i; const ck=LINKTX_PICKED.has(i.id);
+    return `<div class="pp-row${ck?' sel':''}" style="display:flex;gap:10px;align-items:center;padding:9px 8px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px">
+      <input type="checkbox" ${ck?'checked':''} onchange="toggleLinkTxPick('${i.id}')">
       <span style="flex:1"><a href="#" onclick="openInvoicePreview('${i.id}');return false"><b>${esc(i.counterparty||'—')}</b></a> <span class="hint">${esc((i.invoice_date||'').slice(0,10))} ${esc(i.invoice_number||'')}</span>${x.tiersHit?' <span class="badge b-ok">🎯 même tiers</span>':''}</span>
-      <b class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</b>
-      <button class="btn small" onclick="doLinkTx('${i.id}')">Relier</button></div>`; }).join('')
-    :(filtered?'<div class="empty">Aucune facture en attente ne correspond à ce filtre.</div>':'<div class="empty">Aucune correspondance automatique. Clique <b>📋 Tout voir</b>, choisis un mois, ou tape un nom/montant ci-dessus.</div>');
+      <b class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</b></div>`; }).join('')
+    :summary+(filtered?'<div class="empty">Aucune facture en attente ne correspond à ce filtre.</div>':'<div class="empty">Aucune correspondance automatique. Clique <b>📋 Tout voir</b>, choisis un mois, ou tape un nom/montant ci-dessus.</div>');
+}
+async function doLinkTxMulti(){ if(!LINKTX||!LINKTX_PICKED.size||!canEdit()) return;
+  const ids=[...LINKTX_PICKED]; let ok=true;
+  for(const invId of ids){ const inv=INVOICES.find(i=>i.id===invId); if(!inv) continue;
+    const r=await saveInvoiceLinks(invId, invLinkedTx(inv).concat([LINKTX]), {invoice:inv}); if(!r) ok=false; }
+  toast(ok?('✅ '+ids.length+' facture(s) reliée(s) à ce paiement.'):'Certaines liaisons ont échoué (relance sql/compta-rapprochement.sql ?).');
+  closeLinkTx(); await reloadData();
 }
 function closeLinkTx(){ document.getElementById('linktx-modal').classList.add('hidden'); LINKTX=null; }
 async function doLinkTx(invId){ if(!LINKTX) return; const inv=INVOICES.find(i=>i.id===invId); if(!inv) return;
