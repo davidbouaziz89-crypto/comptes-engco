@@ -262,6 +262,7 @@
   <button data-tab="dashboard" class="active" onclick="showTab('dashboard')">📊 Tableau de bord</button>
   <button data-tab="releves" onclick="showTab('releves')">🏦 Relevés</button>
   <button data-tab="factures" onclick="showTab('factures')">📁 Factures</button>
+  <button data-tab="rappro" onclick="showTab('rappro')">🔗 Rapprochement</button>
   <button data-tab="tiers" onclick="showTab('tiers')">🤝 Clients / Fournisseurs</button>
   <button data-tab="restaurant" onclick="showTab('restaurant')">🍽️ Restaurant</button>
   <button data-tab="tva" onclick="showTab('tva')">🧮 TVA</button>
@@ -343,10 +344,12 @@
         <div class="field"><label>Statut</label><select id="tx-fstatus" onchange="renderTx()"><option value="">Tous</option><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
         <div class="field"><label>Catégorie</label><select id="tx-fcat" onchange="renderTx()"><option value="">Toutes</option></select></div>
         <div class="field"><label>Client / Fournisseur</label><select id="tx-ftiers" onchange="renderTx()"><option value="">Tous</option></select></div>
+        <div class="field"><label>Relevé importé</label><select id="tx-fstmt" onchange="renderTx()"><option value="">Tous</option></select></div>
         <div class="field" style="max-width:240px"><label>Recherche</label><input type="text" id="tx-search" placeholder="libellé, client…" oninput="renderTx()"></div>
+        <div class="field" style="align-self:flex-end"><label class="chk"><input type="checkbox" id="tx-group" onchange="renderTx()"> Regrouper par relevé</label></div>
       </div>
       <div class="table-wrap"><table class="compact">
-        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="tx-acc-col" style="display:none">Compte</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="tx-acc-col" style="display:none">Compte</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th>Rapprochement</th><th></th></tr></thead>
         <tbody id="tx-body"></tbody>
       </table></div>
     </section>
@@ -413,6 +416,37 @@
         <tbody id="inv-body"></tbody>
       </table></div>
     </section>
+  </div>
+
+  <!-- RAPPROCHEMENT (vue d'ensemble facture ↔ relevé) -->
+  <div id="tab-rappro" class="hidden">
+    <div id="rappro-cards" class="grid cards" style="margin-bottom:4px"></div>
+    <section class="panel">
+      <h2>📄 Factures à rapprocher</h2>
+      <div class="hint">Factures pas encore (totalement) reliées à un paiement du relevé. Quand une correspondance est trouvée, clique <b>✓ Relier</b>.</div>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Date</th><th>Client / Fournisseur</th><th class="num">TTC</th><th>État</th><th>Paiement suggéré</th><th></th></tr></thead>
+        <tbody id="rap-inv-body"></tbody>
+      </table></div>
+    </section>
+    <section class="panel">
+      <h2>🏦 Paiements sans facture</h2>
+      <div class="hint">Sorties du relevé qui n'ont pas encore de facture reliée. Relie-les à une facture quand tu l'as importée.</div>
+      <div class="filterbar"><div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="rap-tx-search" placeholder="libellé, montant…" oninput="renderRapproTab()"></div></div>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Date</th><th>Libellé</th><th>Client / Fournisseur</th><th class="num">Montant</th><th></th></tr></thead>
+        <tbody id="rap-tx-body"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- Petite modale : relier une ligne de relevé à une facture en attente -->
+  <div id="linktx-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-head"><h3>🔗 Relier ce paiement à une facture</h3><button class="btn ghost small" onclick="closeLinkTx()">✕</button></div>
+      <div id="linktx-head" class="hint"></div>
+      <div id="linktx-body" style="margin-top:8px"></div>
+    </div>
   </div>
 
   <!-- TIERS (analyse par tiers) -->
@@ -585,6 +619,7 @@
   <div class="modal-card">
     <div class="modal-head"><h3>Import du relevé — vérifie les colonnes</h3><button class="btn ghost small" onclick="closeMap()">✕</button></div>
     <div class="hint">On a lu <b id="map-count">0</b> lignes. Indique quelle colonne correspond à quoi.</div>
+    <div class="field" style="margin-bottom:12px;max-width:360px"><label>Nom du relevé (facultatif)</label><input type="text" id="map-name" placeholder="ex. Amex janv. 2026"></div>
     <form class="row" style="grid-template-columns:1fr 1fr">
       <div class="field"><label>Date</label><select id="map-date"></select></div>
       <div class="field"><label>Libellé</label><select id="map-label"></select></div>
@@ -725,6 +760,7 @@ function accountForImport(){ return currentAccountId()||principalAccountId(); }
 function accName(id){ const a=ACCOUNTS.find(x=>x.id===id); return a?a.name:'—'; }
 function accIcon(t){ return t==='carte'?'💳':'🏦'; }
 function withAcc(rec){ if(ACCOUNTS_OK){ const a=accountForImport(); if(a) rec.account_id=a; } return rec; }
+function withLabel(rec,label){ if(label) rec.label=label; return rec; }
 function fillAccountSelects(){
   const el=document.getElementById('tx-account'); if(!el) return; const cur=el.value;
   el.innerHTML='<option value="">Tous les comptes</option>'+ACCOUNTS.map(a=>`<option value="${a.id}">${accIcon(a.type)} ${esc(a.name)}</option>`).join('');
@@ -838,12 +874,17 @@ async function deleteTiers(key){ if(!canEdit()) return;
 
 /* ---------- Registre RESTAURANT (repas d'affaires) ---------- */
 // Rassemble tout frais classé en catégorie restaurant : lignes de relevé + factures.
+// Un paiement (ligne de relevé) est-il déjà relié à une facture ?
+function txHasInvoice(tId){ return INVOICES.some(i=>invTxIds(i).includes(tId)); }
+function txInvoice(tId){ return INVOICES.find(i=>invTxIds(i).includes(tId)); }
 function restoRows(){
   const rows=[];
-  TX.forEach(t=>{ if(catIsRestaurant(t.category_id)) rows.push({source:'tx',id:t.id,date:t.op_date,
-    tiers:t.counterparty||t.label||'—',amount:Math.abs(Number(t.amount)||0),guests:t.guests||'',meals:t.meals}); });
+  // Le justificatif (facture) fait foi : on compte chaque facture resto une fois.
   INVOICES.forEach(i=>{ if(catIsRestaurant(i.category_id)) rows.push({source:'inv',id:i.id,date:i.invoice_date||(i.created_at||'').slice(0,10),
     tiers:i.counterparty||'—',amount:Math.abs(Number(i.amount_ttc)||0),guests:i.guests||'',meals:i.meals}); });
+  // Les lignes de relevé resto ne comptent que si elles n'ont PAS de facture reliée (sinon double comptage).
+  TX.forEach(t=>{ if(catIsRestaurant(t.category_id) && !txHasInvoice(t.id)) rows.push({source:'tx',id:t.id,date:t.op_date,
+    tiers:t.counterparty||t.label||'—',amount:Math.abs(Number(t.amount)||0),guests:t.guests||'',meals:t.meals}); });
   return rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
 }
 function renderResto(){
@@ -1062,12 +1103,13 @@ function startApp(){
 let CURRENT_PARAM='categories';
 function showTab(t){
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  ['dashboard','releves','factures','tiers','restaurant','tva','parametres'].forEach(x=>{
+  ['dashboard','releves','factures','rappro','tiers','restaurant','tva','parametres'].forEach(x=>{
     const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
   });
   if(t==='dashboard') renderDashboard();
   if(t==='releves'){ renderTx(); renderStatements(); }
   if(t==='factures') renderInvoices();
+  if(t==='rappro') renderRapproTab();
   if(t==='tiers') renderTiersTab();
   if(t==='restaurant') renderResto();
   if(t==='tva') renderTva();
@@ -1104,7 +1146,7 @@ async function reloadData(){
   const invIds=INVOICES.map(i=>i.id);
   if(invIds.length){ try{ const {data:lk}=await db.from('compta_invoice_links').select('*').in('invoice_id',invIds); LINKS=lk||[]; }catch(_){ LINKS=[]; } }
   else LINKS=[];
-  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto(); renderComptes();
+  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto(); renderComptes(); renderRapproTab();
 }
 
 function fillCatSelects(){
@@ -1262,12 +1304,18 @@ function fillTxFilters(){
   const ft=document.getElementById('tx-ftiers'); if(ft){ const cur=ft.value;
     const tiers=[...new Set(TX.map(t=>t.counterparty).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
     ft.innerHTML='<option value="">Tous</option>'+tiers.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); ft.value=cur; }
+  const fs=document.getElementById('tx-fstmt'); if(fs){ const cur=fs.value; const acc=currentAccountId();
+    const sts=(STATEMENTS||[]).filter(s=>!acc||s.account_id===acc);
+    fs.innerHTML='<option value="">Tous</option>'+sts.map(s=>`<option value="${s.id}">${esc(stmtLabel(s))}</option>`).join('');
+    fs.value=[...fs.options].some(o=>o.value===cur)?cur:''; }
 }
 function renderTx(){
   const tep=document.getElementById('tx-edit-panel'); if(tep&&tep._holder){ restoreInlineForm(tep); tep.style.display='none'; editingTxId=null; }
   fillTxFilters();
   const m=document.getElementById('tx-fmonth').value, st=document.getElementById('tx-fstatus').value;
   const fc=document.getElementById('tx-fcat').value, ft=document.getElementById('tx-ftiers').value;
+  const fstmt=(document.getElementById('tx-fstmt')||{}).value||'';
+  const group=!!(document.getElementById('tx-group')||{}).checked;
   const q=(document.getElementById('tx-search').value||'').toLowerCase();
   const acc=currentAccountId();
   const showAcc=ACCOUNTS_OK&&ACCOUNTS.length>1;
@@ -1275,20 +1323,38 @@ function renderTx(){
     &&(!fc||(fc==='__none__'?!t.category_id:t.category_id===fc))
     &&(!ft||(t.counterparty||'')===ft)
     &&(!acc||t.account_id===acc)
+    &&(!fstmt||t.statement_id===fstmt)
     &&(!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)));
   document.querySelectorAll('.tx-acc-col').forEach(el=>el.style.display=showAcc?'':'none');
+  const colspan=showAcc?10:9;
   const body=document.getElementById('tx-body'); body.innerHTML='';
-  rows.forEach(t=>{
-    const tr=document.createElement('tr');
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="${colspan}" class="empty">Aucune ligne.</td></tr>`; return; }
+  const txRowHtml=(t)=>{
     const catTxt=t.category_id?esc(catName(t.category_id)):'<span class="badge b-wip">à classer</span>';
     const accCell=showAcc?`<td class="tx-acc-col"><span class="pill">${accIcon((ACCOUNTS.find(a=>a.id===t.account_id)||{}).type)} ${esc(accName(t.account_id))}</span></td>`:'';
-    tr.innerHTML=`<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
+    const inv=txInvoice(t.id);
+    const rapp=inv
+      ? `<span class="badge b-ok" title="Reliée à la facture ${esc(inv.counterparty||'')} ${esc(inv.invoice_number||'')}">🔗 Facture liée</span>`
+      : (Number(t.amount)<0 ? `<button class="btn ghost small" title="Relier à une facture" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>` : '');
+    return `<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
+      <td>${rapp}</td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openTxEdit('${t.id}',this)" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
-    body.appendChild(tr);
-  });
-  if(!rows.length) body.innerHTML='<tr><td colspan="9" class="empty">Aucune ligne.</td></tr>';
+  };
+  const addRow=(t)=>{ const tr=document.createElement('tr'); tr.innerHTML=txRowHtml(t); body.appendChild(tr); };
+  if(group){
+    // Regroupé par relevé importé (les lignes saisies à la main → « Hors relevé »)
+    const groups=new Map(); rows.forEach(t=>{ const k=t.statement_id||'__none__'; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(t); });
+    const order=[...groups.keys()].sort((a,b)=>{ if(a==='__none__')return 1; if(b==='__none__')return -1;
+      const sa=stmtById(a),sb=stmtById(b); return String((sb&&sb.created_at)||'').localeCompare(String((sa&&sa.created_at)||'')); });
+    order.forEach(k=>{ const list=groups.get(k); const s=stmtById(k);
+      const sum=list.reduce((x,t)=>x+Number(t.amount||0),0);
+      const title=k==='__none__'?'✍️ Hors relevé (saisie manuelle)':('📄 '+stmtLabel(s));
+      const hd=document.createElement('tr'); hd.className='tx-group-row';
+      hd.innerHTML=`<td colspan="${colspan}" style="background:var(--panel2);font-weight:700"><span style="color:var(--accent)">${esc(title)}</span> <span class="hint">· ${list.length} ligne(s) · solde ${euro(sum)}</span></td>`;
+      body.appendChild(hd); list.forEach(addRow); });
+  } else rows.forEach(addRow);
 }
 // ===== Édition inline générique (reprise du pattern du CRM LED) : le formulaire s'insère sous la ligne cliquée =====
 function inlineEditAtRow(panel,btn){
@@ -1378,7 +1444,9 @@ async function importReleveIA(file){
 function openIAReleve(lines){
   const body=document.getElementById('ia-body');
   let tot=0; lines.forEach(l=>tot+=Number(l.amount)||0);
-  body.innerHTML=`<div class="hint" style="margin-bottom:10px"><b>${lines.length}</b> lignes lues · solde ${euro(tot)}. Vérifie, puis importe (tout part en « à classer » ou pré-classé selon la catégorie suggérée).</div>`+
+  const per=(lines.find(l=>l.op_date)||{}).op_date; const sugg=(accName(accountForImport())||'Relevé')+(per?' '+monthLabel(per.slice(0,7)):'');
+  body.innerHTML=`<div class="field" style="margin-bottom:12px;max-width:360px"><label>Nom du relevé (facultatif)</label><input type="text" id="ia-releve-name" value="${esc(sugg)}" placeholder="ex. Amex janv. 2026"></div>`+
+    `<div class="hint" style="margin-bottom:10px"><b>${lines.length}</b> lignes lues · solde ${euro(tot)}. Vérifie, puis importe (tout part en « à classer » ou pré-classé selon la catégorie suggérée).</div>`+
     `<div class="table-wrap" style="max-height:46vh;overflow:auto"><table><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie suggérée</th><th>Client / Fournisseur</th><th class="num">Montant</th></tr></thead><tbody>`+
     lines.map(l=>{ const c=CATS.find(x=>x.id===l.suggested_category_id); return `<tr><td>${esc(l.op_date||'')}</td><td>${esc(l.label||'')}</td><td>${c?esc(c.name):'<span class="badge b-wip">à classer</span>'}</td><td>${esc(l.counterparty||'—')}</td><td class="num">${euro(l.amount)}</td></tr>`; }).join('')+
     `</tbody></table></div>`;
@@ -1395,7 +1463,8 @@ async function runIAReleveImport(){
       const up=await db.storage.from('compta-documents').upload(sp,LAST_RELEVE_FILE,{upsert:false});
       if(!up.error){
         const per=(IA_RELEVE_LINES.find(l=>l.op_date)||{}).op_date;
-        const {data:st}=await db.from('compta_bank_statements').insert(withAcc({company_id:CO.id,original_filename:LAST_RELEVE_FILE.name,storage_path:sp,period_month:per?per.slice(0,7)+'-01':null,uploaded_by:SESSION.user.id})).select('id').single();
+        const nm=(document.getElementById('ia-releve-name')||{}).value; const label=(nm&&nm.trim())||null;
+        const {data:st}=await db.from('compta_bank_statements').insert(withAcc(withLabel({company_id:CO.id,original_filename:LAST_RELEVE_FILE.name,storage_path:sp,period_month:per?per.slice(0,7)+'-01':null,uploaded_by:SESSION.user.id},label))).select('id').single();
         if(st) statement_id=st.id;
       }
     }catch(_){}
@@ -1465,6 +1534,13 @@ async function runReleveImport(){
     return rec;
   }).filter(r=>r.amount!==0||r.label);
   recs.forEach(withAcc);
+  // Fiche relevé (pour nommer / regrouper), même sans PDF
+  try{
+    const nm=(document.getElementById('map-name')||{}).value; const label=(nm&&nm.trim())||null;
+    const per=recs.map(r=>r.op_date).filter(Boolean).sort()[0];
+    const {data:st}=await db.from('compta_bank_statements').insert(withAcc(withLabel({company_id:CO.id,original_filename:label||'Relevé importé (CSV/Excel)',period_month:per?per.slice(0,7)+'-01':null,uploaded_by:SESSION.user.id},label))).select('id').single();
+    if(st){ recs.forEach(r=>r.statement_id=st.id); }
+  }catch(_){}
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur import : '+error.message); return; }
   closeMap(); toast(recs.length+' lignes importées.'); await reloadData(); proposeReverseLinks();
@@ -1487,14 +1563,13 @@ function matchBadge(st){ return st==='rapproche'?'<span class="badge b-ok">✅ R
 function txUsedByOther(tId,exceptInvId){ return INVOICES.some(i=>i.id!==exceptInvId&&invTxIds(i).includes(tId)); }
 
 // Recherche du/des paiement(s) correspondant(s), dans la société courante ET les autres (admin/multi-sociétés).
-async function findPaymentCandidates(ttc,dateISO,direction,exceptInvId){
+async function findPaymentCandidates(ttc,dateISO,direction,exceptInvId,tiers){
   ttc=Math.abs(Number(ttc)||0); if(!ttc) return {local:[],other:[]};
   const wantSign = direction==='vente' ? 1 : -1;   // achat → débit (négatif) ; vente → crédit (positif)
-  const tol=Math.max(MATCH_TOL, ttc*0.005);
+  const tol=Math.max(MATCH_TOL, ttc*0.01);          // 1% (frais, arrondis) pour rater moins de correspondances
   const lo = wantSign<0 ? -(ttc+tol) : (ttc-tol);
   const hi = wantSign<0 ? -(ttc-tol) : (ttc+tol);
-  let cands=[]; try{ const {data}=await db.from('compta_transactions').select('id,company_id,op_date,label,amount').gte('amount',lo).lte('amount',hi); cands=data||[]; }catch(_){ cands=[]; }
-  // exclure les lignes déjà reliées (via transaction_id ou table de liens)
+  let cands=[]; try{ const {data}=await db.from('compta_transactions').select('id,company_id,op_date,label,amount,counterparty').gte('amount',lo).lte('amount',hi); cands=data||[]; }catch(_){ cands=[]; }
   const ids=cands.map(c=>c.id); const used=new Set();
   if(ids.length){ try{
     const [{data:lk},{data:iv}]=await Promise.all([
@@ -1503,9 +1578,13 @@ async function findPaymentCandidates(ttc,dateISO,direction,exceptInvId){
     (lk||[]).forEach(x=>{ if(x.invoice_id!==exceptInvId) used.add(x.transaction_id); });
     (iv||[]).forEach(x=>{ if(x.transaction_id&&x.id!==exceptInvId) used.add(x.transaction_id); });
   }catch(_){}}
-  const scored=cands.filter(c=>!used.has(c.id)).map(c=>({t:c,
-    days:(dateISO&&c.op_date)?Math.abs((new Date(c.op_date)-new Date(dateISO))/86400000):999}))
-    .sort((a,b)=>a.days-b.days);
+  const tk=tiersKey(tiers);
+  const scored=cands.filter(c=>!used.has(c.id)).map(c=>{
+    const days=(dateISO&&c.op_date)?Math.abs((new Date(c.op_date)-new Date(dateISO))/86400000):999;
+    const tiersHit=tk&&(tiersKey(c.counterparty)===tk||(c.label||'').toLowerCase().includes(tk));
+    const amtDiff=Math.abs(Math.abs(Number(c.amount)||0)-ttc);
+    return {t:c,days,tiersHit,score:(tiersHit?0:1000)+days+amtDiff*10};   // même tiers d'abord, puis date, puis écart montant
+  }).sort((a,b)=>a.score-b.score);
   return { local:scored.filter(x=>x.t.company_id===CO.id), other:scored.filter(x=>x.t.company_id!==CO.id) };
 }
 
@@ -1534,7 +1613,7 @@ let RAPPRO={invId:null,cands:[],picked:new Set()};
 async function openRappro(invId){
   const inv=INVOICES.find(i=>i.id===invId); if(!inv){ toast('Facture introuvable.'); return; }
   toast('Recherche des paiements correspondants…');
-  const {local,other}=await findPaymentCandidates(inv.amount_ttc,inv.invoice_date,inv.direction,invId);
+  const {local,other}=await findPaymentCandidates(inv.amount_ttc,inv.invoice_date,inv.direction,invId,inv.counterparty);
   // ajoute les lignes déjà reliées (pour pouvoir les décocher) + pré-coche
   const already=invLinkedTx(inv).map(t=>({t,days:0}));
   const seen=new Set(); const list=[];
@@ -1571,6 +1650,76 @@ async function confirmRappro(){
   const ok=await saveInvoiceLinks(RAPPRO.invId, txs, {moveToCompany:move, invoice:RAPPRO.inv});
   if(ok){ toast(move?('Facture déplacée sur '+coName(move)+' et rapprochée.'):(txs.length?'Facture rapprochée.':'Liens retirés.')); }
   closeRappro(); reloadData();
+}
+
+/* ================= ONGLET RAPPROCHEMENT (vue d'ensemble) ================= */
+// Meilleure ligne de relevé (dans la société courante, déjà chargée) pour une facture donnée.
+function bestLocalTxFor(inv){
+  const ttc=Math.abs(Number(inv.amount_ttc)||0); if(!ttc) return null;
+  const wantSign=inv.direction==='vente'?1:-1; const tol=Math.max(MATCH_TOL,ttc*0.01); const tk=tiersKey(inv.counterparty);
+  const c=TX.filter(t=>!txHasInvoice(t.id) && (wantSign<0?Number(t.amount)<0:Number(t.amount)>0) && Math.abs(Math.abs(Number(t.amount)||0)-ttc)<=tol)
+    .map(t=>{ const days=(inv.invoice_date&&t.op_date)?Math.abs((new Date(t.op_date)-new Date(inv.invoice_date))/86400000):999;
+      const tiersHit=tk&&(tiersKey(t.counterparty)===tk||(t.label||'').toLowerCase().includes(tk));
+      return {t,days,tiersHit,score:(tiersHit?0:1000)+days}; }).sort((a,b)=>a.score-b.score);
+  return c[0]||null;
+}
+async function quickLinkInvTx(invId,txId){ if(!canEdit()) return;
+  const inv=INVOICES.find(i=>i.id===invId), tx=TX.find(t=>t.id===txId); if(!inv||!tx) return;
+  const txs=invLinkedTx(inv).concat([tx]);
+  const ok=await saveInvoiceLinks(invId,txs,{invoice:inv});
+  if(ok){ toast('✅ Facture rapprochée.'); await reloadData(); }
+}
+function renderRapproTab(){
+  const invBody=document.getElementById('rap-inv-body'); if(!invBody) return;
+  const toDo=INVOICES.filter(i=>invMatchState(i)!=='rapproche')
+    .sort((a,b)=>(b.invoice_date||b.created_at||'').localeCompare(a.invoice_date||a.created_at||''));
+  invBody.innerHTML=toDo.map(i=>{ const stt=invMatchState(i); const best=bestLocalTxFor(i);
+    const sugg=best?`<span class="${best.tiersHit?'val-good':''}">≈ ${esc((best.t.op_date||'').slice(0,10))} · ${esc((best.t.label||'').slice(0,28))} · <b>${euro(best.t.amount)}</b>${best.tiersHit?' 🎯':''}</span>`:'<span class="hint">aucune ligne trouvée</span>';
+    const act=canEdit()?(best?`<button class="btn small" onclick="quickLinkInvTx('${i.id}','${best.t.id}')">✓ Relier</button> `:'')+`<button class="btn ghost small" onclick="openRappro('${i.id}')">Choisir…</button>`:'';
+    return `<tr><td>${esc((i.invoice_date||'').slice(0,10))}</td><td class="lbl" title="${esc(i.counterparty||'')}">${esc(i.counterparty||'—')}</td>
+      <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td><td>${matchBadge(stt)}</td><td>${sugg}</td><td style="white-space:nowrap">${act}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" class="empty">🎉 Toutes les factures sont rapprochées.</td></tr>';
+
+  const q=(document.getElementById('rap-tx-search')?.value||'').toLowerCase().trim();
+  const txBody=document.getElementById('rap-tx-body');
+  const orphans=TX.filter(t=>Number(t.amount)<0 && !txHasInvoice(t.id))
+    .filter(t=>!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)||String(Math.abs(t.amount)).includes(q))
+    .sort((a,b)=>(b.op_date||'').localeCompare(a.op_date||''));
+  txBody.innerHTML=orphans.map(t=>`<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td>
+    <td>${esc(t.counterparty||'—')}</td><td class="num val-bad">${euro(t.amount)}</td>
+    <td>${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')">🔗 Relier à une facture</button>`:''}</td></tr>`).join('')
+    ||'<tr><td colspan="5" class="empty">Aucun paiement en attente de facture.</td></tr>';
+
+  const cards=document.getElementById('rappro-cards');
+  if(cards){ const nInv=toDo.length, nTx=orphans.length;
+    cards.innerHTML=`<div class="card ${nInv?'bad':'good'}"><div class="label">📄 Factures à rapprocher</div><div class="value ${nInv?'val-bad':'val-good'}">${nInv}</div></div>
+      <div class="card ${nTx?'bad':'good'}"><div class="label">🏦 Paiements sans facture</div><div class="value ${nTx?'val-bad':'val-good'}">${nTx}</div></div>`; }
+}
+/* ---- Relier depuis une ligne de relevé : choisir la facture en attente ---- */
+let LINKTX=null;
+function linkTxToInvoice(txId){ const t=TX.find(x=>x.id===txId); if(!t){ return; } LINKTX=t;
+  const amt=Math.abs(Number(t.amount)||0); const tk=tiersKey(t.counterparty);
+  const cands=INVOICES.filter(i=>invMatchState(i)!=='rapproche' && i.amount_ttc!=null)
+    .map(i=>{ const diff=Math.abs(Math.abs(Number(i.amount_ttc)||0)-amt);
+      const tiersHit=tk&&tiersKey(i.counterparty)===tk;
+      return {i,diff,tiersHit,score:(tiersHit?0:1000)+diff*10}; })
+    .filter(x=>x.diff<=Math.max(MATCH_TOL,amt*0.05)||x.tiersHit)
+    .sort((a,b)=>a.score-b.score).slice(0,12);
+  document.getElementById('linktx-head').innerHTML=`Paiement : <b>${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')}</b> · <b class="val-bad">${euro(t.amount)}</b>`;
+  const body=document.getElementById('linktx-body');
+  body.innerHTML=cands.length?cands.map(x=>{ const i=x.i;
+    return `<div class="pp-row" style="display:flex;gap:10px;align-items:center;padding:9px 8px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px">
+      <span style="flex:1"><b>${esc(i.counterparty||'—')}</b> <span class="hint">${esc((i.invoice_date||'').slice(0,10))} ${esc(i.invoice_number||'')}</span>${x.tiersHit?' <span class="badge b-ok">🎯 même tiers</span>':''}</span>
+      <b class="num">${euro(i.amount_ttc)}</b>
+      <button class="btn small" onclick="doLinkTx('${i.id}')">Relier</button></div>`; }).join('')
+    :'<div class="empty">Aucune facture en attente ne correspond. Importe d\'abord la facture (onglet Factures), puis reviens la relier.</div>';
+  document.getElementById('linktx-modal').classList.remove('hidden');
+}
+function closeLinkTx(){ document.getElementById('linktx-modal').classList.add('hidden'); LINKTX=null; }
+async function doLinkTx(invId){ if(!LINKTX) return; const inv=INVOICES.find(i=>i.id===invId); if(!inv) return;
+  const txs=invLinkedTx(inv).concat([LINKTX]);
+  const ok=await saveInvoiceLinks(invId,txs,{invoice:inv});
+  if(ok){ toast('✅ Paiement relié à la facture.'); closeLinkTx(); await reloadData(); }
 }
 
 /* ---- Sens inverse : après import d'un relevé, proposer de relier les factures en attente ---- */
@@ -1922,14 +2071,17 @@ async function openDoc(path){
   const {data,error}=await db.storage.from('compta-documents').createSignedUrl(path,120);
   if(error){ toast('Erreur : '+error.message); return; } window.open(data.signedUrl,'_blank');
 }
+function stmtLabel(s){ return (s&&(s.label||s.original_filename))||'relevé'; }
+function stmtById(id){ return (STATEMENTS||[]).find(s=>s.id===id); }
 function renderStatements(){
   const body=document.getElementById('stmt-body'); if(!body) return; body.innerHTML='';
   const acc=currentAccountId();
   (STATEMENTS||[]).filter(s=>!acc||s.account_id===acc).forEach(s=>{
     const tr=document.createElement('tr');
     const accTxt=ACCOUNTS_OK&&ACCOUNTS.length>1?` · ${accName(s.account_id)}`:'';
+    const nLines=TX.filter(t=>t.statement_id===s.id).length;
     tr.innerHTML=`<td>${(s.created_at||'').slice(0,10)}</td><td>${s.period_month?String(s.period_month).slice(0,7):'—'}</td>
-      <td>${esc(s.original_filename||'relevé')}${accTxt?`<span class="hint" style="margin-left:6px">${esc(accTxt)}</span>`:''}</td>
+      <td><b>${esc(stmtLabel(s))}</b> <span class="hint">${nLines} ligne(s)${accTxt?esc(accTxt):''}</span></td>
       <td style="white-space:nowrap">${s.storage_path?`<a href="#" onclick="openDoc('${esc(s.storage_path)}');return false">📄 Ouvrir</a>`:'—'} ${canEdit()?`<button class="btn ghost small" onclick="delStatement('${s.id}')" title="Supprimer le PDF">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
