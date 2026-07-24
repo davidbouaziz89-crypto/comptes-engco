@@ -433,7 +433,10 @@
     <section class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <h2 style="margin:0">📄 Factures à rapprocher</h2>
-        <button class="btn canedit" onclick="autoReconcile()" title="Relie automatiquement les factures dont le tiers/libellé a déjà été appris">⚡ Rapprocher automatiquement</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost canedit" onclick="if(!proposeReverseLinks())toast('Aucune correspondance à proposer pour l’instant.')" title="Chercher les factures qui correspondent aux paiements déjà importés (montant + tiers)">🔎 Proposer les correspondances</button>
+          <button class="btn canedit" onclick="autoReconcile()" title="Relie automatiquement les factures dont le tiers/libellé a déjà été appris">⚡ Rapprocher automatiquement</button>
+        </div>
       </div>
       <div class="hint" style="margin-top:8px">Factures pas encore (totalement) reliées à un paiement du relevé. Quand une correspondance est trouvée, clique <b>✓ Relier</b>. Plus tu relies à la main, plus <b>⚡ Rapprocher automatiquement</b> fera le travail seul (il apprend tes tiers).</div>
       <div class="table-wrap"><table class="compact">
@@ -1593,7 +1596,8 @@ async function importReleveIA(file){
     const res=await callComptaIA('releve',file);
     const lines=(res&&res.lines)||[];
     if(!lines.length){ toast("Aucune ligne détectée."); return; }
-    lines.forEach(l=>{ if(!l.suggested_category_id){ const r=applyRule(l); if(r){ l.suggested_category_id=r.category_id; if(!l.counterparty&&r.counterparty) l.counterparty=r.counterparty; } } });
+    // Tes règles apprises sont PRIORITAIRES sur la suggestion de l'IA (ce que tu as corrigé une fois s'applique toujours)
+    lines.forEach(l=>{ const r=applyRule(l); if(r){ if(r.category_id) l.suggested_category_id=r.category_id; if(!l.counterparty&&r.counterparty) l.counterparty=r.counterparty; } });
     LAST_RELEVE_FILE=file; IA_RELEVE_LINES=lines; openIAReleve(lines);
   }catch(e){ alert("❌ Erreur IA (relevé) :\n\n"+e.message); }
 }
@@ -2013,11 +2017,14 @@ function proposeReverseLinks(){
   const proposals=[];
   INVOICES.filter(i=>invMatchState(i)==='a_rapprocher').forEach(i=>{
     const ttc=Math.abs(Number(i.amount_ttc)||0); if(!ttc) return;
-    const wantSign=i.direction==='vente'?1:-1;
+    const wantSign=i.direction==='vente'?1:-1; const tk=tiersKey(i.counterparty);
     const cand=TX.filter(t=>!usedTx.has(t.id) && (wantSign<0?Number(t.amount)<0:Number(t.amount)>0)
-        && Math.abs(Math.abs(Number(t.amount))-ttc)<=Math.max(MATCH_TOL,ttc*0.005))
-      .map(t=>({t,days:(i.invoice_date&&t.op_date)?Math.abs((new Date(t.op_date)-new Date(i.invoice_date))/86400000):999}))
-      .filter(x=>x.days<=MATCH_DAYS).sort((a,b)=>a.days-b.days);
+        && Math.abs(Math.abs(Number(t.amount))-ttc)<=Math.max(MATCH_TOL,ttc*0.01))
+      .map(t=>{ const days=(i.invoice_date&&t.op_date)?Math.abs((new Date(t.op_date)-new Date(i.invoice_date))/86400000):999;
+        const tiersHit=tk&&(tiersKey(t.counterparty)===tk||(t.label||'').toLowerCase().includes(tk)||learnedTiersFor(t)===tk);
+        return {t,days,tiersHit}; })
+      .filter(x=>x.tiersHit || x.days<=45)   // même tiers (même appris) OU date raisonnablement proche
+      .sort((a,b)=>((b.tiersHit?1:0)-(a.tiersHit?1:0))||(a.days-b.days));
     if(cand.length){ proposals.push({inv:i,tx:cand[0].t,picked:true}); usedTx.add(cand[0].t.id); }
   });
   if(!proposals.length) return 0;
