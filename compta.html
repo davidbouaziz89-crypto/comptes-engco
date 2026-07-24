@@ -944,7 +944,7 @@ function todayISO(){ return new Date().toISOString().slice(0,10); }
 let IA_RELEVE_LINES=[], INVOICE_FILE=null, STATEMENTS=[], LAST_RELEVE_FILE=null;
 function fileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>{ const s=String(r.result); res(s.slice(s.indexOf(',')+1)); }; r.onerror=rej; r.readAsDataURL(file); }); }
 async function callComptaIA(kind,file,silent){
-  if(!silent) showAILoader(kind==='releve'?'Lecture du relevé…':'Lecture de la facture…');
+  if(!silent){ showAILoader(kind==='releve'?'Lecture du relevé…':'Lecture de la facture…', kind==='releve'?'Extraction des opérations…':'Extraction des montants…'); startAISimProgress(); }
   try{
     const b64=await fileToB64(file);
     const cats=CATS.map(c=>({id:c.id,name:c.name,flow:c.flow}));
@@ -953,9 +953,16 @@ async function callComptaIA(kind,file,silent){
       try{ const ctx=await error.context.json(); if(ctx&&ctx.error) m=ctx.error; }catch(_){ try{ const t=await error.context.text(); if(t) m=t; }catch(__){} }
       throw new Error(m+st); }
     if(data&&data.error) throw new Error(data.error);
+    if(!silent) setAILoaderProgress(100,'Terminé ✓');
     return data.result;
-  } finally { if(!silent) hideAILoader(); }
+  } finally { if(!silent){ stopAISimProgress(); hideAILoader(); } }
 }
+/* Progression simulée pour une lecture unitaire (1 appel IA, durée inconnue) :
+   monte en douceur vers ~92 % pendant l'attente, puis 100 % à la fin. */
+let _aiProgTimer=null;
+function startAISimProgress(){ stopAISimProgress(); let pct=0; setAILoaderProgress(0);
+  _aiProgTimer=setInterval(()=>{ const remaining=92-pct; pct+=Math.max(0.5, remaining*0.07); if(pct>92) pct=92; setAILoaderProgress(pct); },200); }
+function stopAISimProgress(){ if(_aiProgTimer){ clearInterval(_aiProgTimer); _aiProgTimer=null; } }
 function askUseIA(msg){ return confirm(msg+"\n\nOK = 🪄 Lire avec l'IA (Claude)\nAnnuler = saisie manuelle"); }
 /* ---- Barre de chargement IA (futuriste) ---- */
 function showAILoader(title,sub){ const o=document.getElementById('ai-loader'); if(!o) return;
