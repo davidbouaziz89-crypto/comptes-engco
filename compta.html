@@ -910,8 +910,8 @@ async function deleteTiers(key){ if(!canEdit()) return;
 /* ---------- Registre RESTAURANT (repas d'affaires) ---------- */
 // Rassemble tout frais classé en catégorie restaurant : lignes de relevé + factures.
 // Un paiement (ligne de relevé) est-il déjà relié à une facture ?
-function txHasInvoice(tId){ return INVOICES.some(i=>invTxIds(i).includes(tId)); }
-function txInvoice(tId){ return INVOICES.find(i=>invTxIds(i).includes(tId)); }
+function txHasInvoice(tId){ return TX_INV.has(tId); }
+function txInvoice(tId){ return TX_INV.get(tId)||null; }
 // Catégorie « sans facture » (frais bancaires, salaires, mutuelle…) → ligne comptée comme justifiée.
 function catNoInvoice(catId){ const c=catById(catId); return !!(c&&c.no_invoice); }
 function txNeedsInvoice(t){ return Number(t.amount)<0 && !txHasInvoice(t.id) && !catNoInvoice(t.category_id); }
@@ -1169,9 +1169,9 @@ function fillPeriodBar(){
   const curY=ys.value;
   ys.innerHTML='<option value="">Toutes les années</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
   if(!ms.dataset.filled){ ms.innerHTML='<option value="">Tous les mois</option>'+MOIS_FR.slice(1).map((n,i)=>`<option value="${String(i+1).padStart(2,'0')}">${n}</option>`).join(''); ms.dataset.filled='1'; }
-  // 1ère fois : année en cours, tous les mois (rien de masqué par surprise)
-  ys.value=PERIOD_INIT?( [...ys.options].some(o=>o.value===curY)?curY:'' ):cy;
-  PERIOD_INIT=true;
+  // 1ère fois : mois en cours (préférence de David)
+  if(!PERIOD_INIT){ ys.value=cy; ms.value=ymNow().slice(5,7); PERIOD_INIT=true; }
+  else ys.value=[...ys.options].some(o=>o.value===curY)?curY:'';
   const pc=document.getElementById('pb-cur'); if(pc) pc.textContent='Affichage : '+periodLabel();
 }
 function applyPeriod(){ const pc=document.getElementById('pb-cur'); if(pc) pc.textContent='Affichage : '+periodLabel(); showTab(CURRENT_TAB||'dashboard'); }
@@ -1226,8 +1226,16 @@ async function reloadData(){
   const invIds=INVOICES.map(i=>i.id);
   if(invIds.length){ try{ const {data:lk}=await db.from('compta_invoice_links').select('*').in('invoice_id',invIds); LINKS=lk||[]; }catch(_){ LINKS=[]; } }
   else LINKS=[];
-  fillPeriodBar(); fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto(); renderComptes(); renderRapproTab();
+  rebuildLinkIndex();
+  // On ne rend que l'onglet affiché (les autres se calculent quand on les ouvre) → beaucoup plus rapide.
+  fillPeriodBar(); fillCatSelects();
+  showTab(CURRENT_TAB||'dashboard');
 }
+// Index txId → facture reliée (évite le O(n²) dans les rendus de lignes/rapprochement).
+let TX_INV=new Map();
+function rebuildLinkIndex(){ TX_INV=new Map(); const invById=new Map(INVOICES.map(i=>[i.id,i]));
+  INVOICES.forEach(i=>{ if(i.transaction_id) TX_INV.set(i.transaction_id,i); });
+  (LINKS||[]).forEach(l=>{ const i=invById.get(l.invoice_id); if(i) TX_INV.set(l.transaction_id,i); }); }
 
 function fillCatSelects(){
   const catOpts='<option value="">— catégorie —</option>'+txCompanyCats().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
