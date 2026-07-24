@@ -1772,14 +1772,22 @@ async function quickLinkInvTx(invId,txId){ if(!canEdit()) return;
   const ok=await saveInvoiceLinks(invId,txs,{invoice:inv});
   if(ok){ toast('✅ Facture rapprochée.'); await reloadData(); }
 }
+// Ouvre le relevé (PDF) auquel une ligne appartient, ou informe si pas de PDF.
+function openTxStatement(txId){ const t=TX.find(x=>x.id===txId); if(!t) return;
+  const s=t.statement_id?stmtById(t.statement_id):null;
+  if(s&&s.storage_path){ openDoc(s.storage_path); return; }
+  if(s){ toast('Relevé « '+stmtLabel(s)+' »'+(s.storage_path?'':' — pas de PDF joint (import CSV/Excel).')); return; }
+  toast('Cette ligne n’est rattachée à aucun relevé importé.'); }
 function renderRapproTab(){
   const invBody=document.getElementById('rap-inv-body'); if(!invBody) return;
   const toDo=INVOICES.filter(i=>invMatchState(i)!=='rapproche' && periodMatch(i.invoice_date||i.created_at))
     .sort((a,b)=>(b.invoice_date||b.created_at||'').localeCompare(a.invoice_date||a.created_at||''));
   invBody.innerHTML=toDo.map(i=>{ const stt=invMatchState(i); const best=bestLocalTxFor(i);
     const sugg=best?`<span class="${best.tiersHit?'val-good':''}">≈ ${esc((best.t.op_date||'').slice(0,10))} · <span class="fulltip" data-full="${esc(best.t.label||'')}">${esc((best.t.label||'').slice(0,28))}${(best.t.label||'').length>28?'…':''}</span> · <b>${euro(best.t.amount)}</b>${best.tiersHit?' 🎯':''}</span>`:'<span class="hint">aucune ligne trouvée</span>';
-    const act=canEdit()?(best?`<button class="btn small" onclick="quickLinkInvTx('${i.id}','${best.t.id}')">✓ Relier</button> `:'')+`<button class="btn ghost small" onclick="openRappro('${i.id}')">Choisir…</button>`:'';
-    return `<tr><td>${esc((i.invoice_date||'').slice(0,10))}</td><td class="lbl" title="${esc(i.counterparty||'')}">${esc(i.counterparty||'—')}</td>
+    const act=(canEdit()?(best?`<button class="btn small" onclick="quickLinkInvTx('${i.id}','${best.t.id}')">✓ Relier</button> `:'')+`<button class="btn ghost small" onclick="openRappro('${i.id}')">Choisir…</button> `:'')
+      +`<button class="btn ghost small" onclick="openInvoicePreview('${i.id}')" title="Aperçu de la facture">👁️</button>`
+      +(canEdit()?` <button class="btn danger small" onclick="delInvoice('${i.id}')" title="Supprimer la facture">🗑</button>`:'');
+    return `<tr><td>${esc((i.invoice_date||'').slice(0,10))}</td><td class="lbl" title="${esc(i.counterparty||'')}"><a href="#" onclick="openInvoicePreview('${i.id}');return false">${esc(i.counterparty||'—')}</a></td>
       <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td><td>${matchBadge(stt)}</td><td>${sugg}</td><td style="white-space:nowrap">${act}</td></tr>`;
   }).join('')||'<tr><td colspan="6" class="empty">🎉 Toutes les factures sont rapprochées.</td></tr>';
 
@@ -1788,9 +1796,9 @@ function renderRapproTab(){
   const orphans=TX.filter(t=>txNeedsInvoice(t)&&periodMatch(t.op_date))
     .filter(t=>!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)||String(Math.abs(t.amount)).includes(q))
     .sort((a,b)=>(b.op_date||'').localeCompare(a.op_date||''));
-  txBody.innerHTML=orphans.map(t=>`<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td>
+  txBody.innerHTML=orphans.map(t=>`<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}"><a href="#" onclick="openTxStatement('${t.id}');return false">${esc(t.label)}</a></td>
     <td>${esc(t.counterparty||'—')}</td><td class="num val-bad">${euro(t.amount)}</td>
-    <td>${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')">🔗 Relier à une facture</button>`:''}</td></tr>`).join('')
+    <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')">🔗 Relier à une facture</button> `:''}<button class="btn ghost small" onclick="openTxStatement('${t.id}')" title="Voir le relevé">📄 Relevé</button></td></tr>`).join('')
     ||'<tr><td colspan="5" class="empty">Aucun paiement en attente de facture.</td></tr>';
 
   const cards=document.getElementById('rappro-cards');
