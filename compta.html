@@ -342,7 +342,7 @@
         <div class="field"><label>Sens</label><select id="t-sens" onchange="txPreview()"><option value="-1">Débit (sortie)</option><option value="1">Crédit (entrée)</option></select></div>
         <div class="field"><label>Montant (€ TTC)</label><input type="number" step="0.01" id="t-montant" placeholder="0.00" required oninput="txPreview()"></div>
         <div class="field"><label>Catégorie</label><select id="t-cat" onchange="txPreview()"></select></div>
-        <div class="field"><label>Client / Fournisseur</label><input type="text" id="t-tiers" placeholder="ex. Phone GS"></div>
+        <div class="field"><label>Client / Fournisseur</label><input type="text" id="t-tiers" list="tiers-list" placeholder="ex. Phone GS"></div>
         <div class="field"><label>TVA %</label><input type="number" step="0.01" id="t-tva" placeholder="20" oninput="txPreview()"></div>
         <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
       </form>
@@ -656,7 +656,7 @@
     <div class="field"><label>Date</label><input type="date" id="te-date"></div>
     <div class="field" style="min-width:200px"><label>Libellé</label><input type="text" id="te-label"></div>
     <div class="field"><label>Catégorie</label><select id="te-cat"></select></div>
-    <div class="field"><label>Client / Fournisseur</label><input type="text" id="te-tiers"></div>
+    <div class="field"><label>Client / Fournisseur</label><input type="text" id="te-tiers" list="tiers-list" placeholder="commence à taper…"></div>
     <div class="field"><label>Montant (€, signé)</label><input type="number" step="0.01" id="te-montant"></div>
     <div class="field"><label>TVA %</label><input type="number" step="0.01" id="te-tva"></div>
     <div class="field"><label>Statut</label><select id="te-status"><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
@@ -1241,7 +1241,7 @@ function fillCatSelects(){
   const catOpts='<option value="">— catégorie —</option>'+txCompanyCats().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   ['t-cat','i-cat','ti-cat'].forEach(id=>{ const el=document.getElementById(id); if(el){ const cur=el.value; el.innerHTML=catOpts; el.value=cur; } });
   const itx=document.getElementById('i-tx'); if(itx) setPayPick(itx.value); // rafraîchit le libellé du bouton
-  const dl=document.getElementById('tiers-list'); if(dl){ const names=[...new Set([].concat(INVOICES.map(i=>i.counterparty),TX.map(t=>t.counterparty)).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join(''); }
+  const dl=document.getElementById('tiers-list'); if(dl){ const names=[...new Set([].concat(allTiers().map(x=>x.name),INVOICES.map(i=>i.counterparty),TX.map(t=>t.counterparty)).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); dl.innerHTML=names.map(n=>`<option value="${esc(n)}"></option>`).join(''); }
 }
 function catIsRestaurant(id){ const c=catById(id); return !!(c&&/restaurant|restau|repas/i.test(c.name||'')); }
 function onInvCatChange(){ const sel=document.getElementById('i-cat'); const v=sel?sel.value:'';
@@ -1382,7 +1382,14 @@ async function addTx(e){ e.preventDefault(); if(!canEdit()) return;
   if(rec.counterparty) await registerTiers(rec.counterparty,'manuel');
   e.target.reset(); document.getElementById('t-preview').innerHTML='—'; toast('Ligne ajoutée.'); reloadData();
 }
-function txCompanyCats(){ return CATS.filter(c=>c.company_id===CO.id||c.company_id==null); }
+function txCompanyCats(){
+  // Catégories de la société + catégories globales, dédoublonnées par nom
+  // (si une catégorie de société porte le même nom qu'une globale, on ne garde que celle de la société).
+  const mine=CATS.filter(c=>c.company_id===CO.id);
+  const mineNames=new Set(mine.map(c=>(c.name||'').toLowerCase().trim()));
+  const globals=CATS.filter(c=>c.company_id==null && !mineNames.has((c.name||'').toLowerCase().trim()));
+  return mine.concat(globals).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+}
 function fillTxFilters(){
   const fc=document.getElementById('tx-fcat'); if(fc){ const cur=fc.value;
     fc.innerHTML='<option value="">Toutes</option><option value="__none__">⏳ À classer (sans catégorie)</option>'+
