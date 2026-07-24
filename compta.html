@@ -443,7 +443,7 @@
     </section>
     <section class="panel">
       <h2>🏦 Paiements sans facture</h2>
-      <div class="hint">Sorties du relevé qui n'ont pas encore de facture reliée. Relie-les à une facture quand tu l'as importée.</div>
+      <div class="hint">Sorties du relevé sans facture reliée. Deux options : <b>🔗 Relier à une facture</b>, ou — pour un frais qui n'a jamais de facture (banque, salaires, mutuelle…) — le classer <b>🏷️ Sans facture</b> ci-dessous (il disparaît alors de cette liste).</div>
       <div class="filterbar"><div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="rap-tx-search" placeholder="libellé, montant…" oninput="renderRapproTab()"></div></div>
       <div class="table-wrap"><table class="compact">
         <thead><tr><th>Date</th><th>Libellé</th><th>Client / Fournisseur</th><th class="num">Montant</th><th></th></tr></thead>
@@ -914,6 +914,7 @@ function txInvoice(tId){ return TX_INV.get(tId)||null; }
 // Catégorie « sans facture » (frais bancaires, salaires, mutuelle…) → ligne comptée comme justifiée.
 function catNoInvoice(catId){ const c=catById(catId); return !!(c&&c.no_invoice); }
 function txNeedsInvoice(t){ return Number(t.amount)<0 && !txHasInvoice(t.id) && !catNoInvoice(t.category_id); }
+function noInvoiceCats(){ return CATS.filter(c=>c.no_invoice && (c.company_id===CO.id||c.company_id==null)).sort((a,b)=>(a.name||'').localeCompare(b.name||'')); }
 function restoRows(){
   const rows=[];
   // Le justificatif (facture) fait foi : on compte chaque facture resto une fois.
@@ -1811,9 +1812,13 @@ function renderRapproTab(){
   const orphans=TX.filter(t=>txNeedsInvoice(t)&&periodMatch(t.op_date))
     .filter(t=>!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)||String(Math.abs(t.amount)).includes(q))
     .sort((a,b)=>(b.op_date||'').localeCompare(a.op_date||''));
+  const nic=noInvoiceCats();
+  const nicSel=(t)=>{ if(!canEdit()) return '';
+    if(!nic.length) return ` <button class="btn ghost small" onclick="showTab('parametres');showParam('categories')" title="Créer une catégorie sans facture">🏷️ Créer « sans facture »</button>`;
+    return ` <select title="Classer en frais sans facture" onchange="if(this.value){setTxCat('${t.id}',this.value)}"><option value="">🏷️ Sans facture…</option>${nic.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>`; };
   txBody.innerHTML=orphans.map(t=>`<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}"><a href="#" onclick="openTxStatement('${t.id}');return false">${esc(t.label)}</a></td>
     <td>${esc(t.counterparty||'—')}</td><td class="num val-bad">${euro(t.amount)}</td>
-    <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')">🔗 Relier à une facture</button> `:''}<button class="btn ghost small" onclick="openTxStatement('${t.id}')" title="Voir le relevé">📄 Relevé</button></td></tr>`).join('')
+    <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')">🔗 Relier à une facture</button>`:''}${nicSel(t)} <button class="btn ghost small" onclick="openTxStatement('${t.id}')" title="Voir le relevé">📄 Relevé</button></td></tr>`).join('')
     ||'<tr><td colspan="5" class="empty">Aucun paiement en attente de facture.</td></tr>';
 
   const cards=document.getElementById('rappro-cards');
