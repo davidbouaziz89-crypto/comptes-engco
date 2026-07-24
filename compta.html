@@ -2365,7 +2365,7 @@ function renderStatements(){
         <button class="btn ghost small" onclick="viewStatementLines('${s.id}')" title="Voir uniquement les lignes de ce relevé">👁️ Voir les lignes</button>
         ${canEdit()?`<button class="btn ghost small" onclick="renameStatement('${s.id}')" title="Renommer ce relevé">✏️ Renommer</button>`:''}
         ${s.storage_path?`<a href="#" onclick="openDoc('${esc(s.storage_path)}');return false" style="margin:0 6px">📄 Ouvrir</a>`:''}
-        ${canEdit()?`<button class="btn ghost small" onclick="delStatement('${s.id}')" title="Supprimer ce relevé">🗑</button>`:''}</td>`;
+        ${canEdit()?`<button class="btn danger small" onclick="delStatement('${s.id}')" title="Supprimer le relevé et toutes ses lignes">🗑 Supprimer</button>`:''}</td>`;
     body.appendChild(tr);
   });
   if(!(STATEMENTS||[]).length) body.innerHTML='<tr><td colspan="4" class="empty">Aucun relevé importé. Le nom se choisit au moment de l’import (PDF ou CSV), et se modifie ici avec ✏️ Renommer.</td></tr>';
@@ -2385,10 +2385,25 @@ function viewStatementLines(id){
   renderTx();
   const sec=document.getElementById('tx-body'); if(sec){ try{ sec.closest('section').scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
 }
-async function delStatement(id){ if(!confirm('Supprimer ce PDF de relevé ? (les lignes déjà importées sont conservées)')) return;
-  const s=(STATEMENTS||[]).find(x=>x.id===id); if(s&&s.storage_path) await db.storage.from('compta-documents').remove([s.storage_path]);
-  const {error}=await db.from('compta_bank_statements').delete().eq('id',id);
-  toast(error?('Erreur : '+error.message):'Relevé supprimé.'); reloadData();
+async function delStatement(id){ if(!canEdit()) return;
+  const s=(STATEMENTS||[]).find(x=>x.id===id);
+  const txIds=TX.filter(t=>t.statement_id===id).map(t=>t.id);
+  const msg=txIds.length
+    ? 'Supprimer le relevé « '+(s?stmtLabel(s):'')+' » ET ses '+txIds.length+' ligne(s) importée(s) ?\n\n⚠️ Irréversible.'
+    : 'Supprimer le relevé « '+(s?stmtLabel(s):'')+' » ? (aucune ligne rattachée)';
+  if(!confirm(msg)) return;
+  try{
+    if(txIds.length){
+      try{ await db.from('compta_invoices').update({transaction_id:null,status:'a_rapprocher'}).in('transaction_id',txIds); }catch(_){}
+      try{ await db.from('compta_invoice_links').delete().in('transaction_id',txIds); }catch(_){}
+      const {error:eTx}=await db.from('compta_transactions').delete().eq('company_id',CO.id).eq('statement_id',id);
+      if(eTx) throw eTx;
+    }
+    if(s&&s.storage_path){ try{ await db.storage.from('compta-documents').remove([s.storage_path]); }catch(_){} }
+    const {error}=await db.from('compta_bank_statements').delete().eq('id',id);
+    if(error) throw error;
+  }catch(e){ toast('Erreur : '+(e.message||e)); return; }
+  toast('Relevé et ses lignes supprimés.'); reloadData();
 }
 
 /* ================= TVA ================= */
