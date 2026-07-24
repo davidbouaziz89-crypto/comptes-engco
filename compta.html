@@ -913,8 +913,22 @@ function txHasInvoice(tId){ return TX_INV.has(tId); }
 function txInvoice(tId){ return TX_INV.get(tId)||null; }
 // Catégorie « sans facture » (frais bancaires, salaires, mutuelle…) → ligne comptée comme justifiée.
 function catNoInvoice(catId){ const c=catById(catId); return !!(c&&c.no_invoice); }
-function txNeedsInvoice(t){ return Number(t.amount)<0 && !txHasInvoice(t.id) && !catNoInvoice(t.category_id); }
+function txSansFacture(t){ return !!(t && (t.no_invoice || catNoInvoice(t.category_id))); }
+function txNeedsInvoice(t){ return Number(t.amount)<0 && !txHasInvoice(t.id) && !txSansFacture(t); }
 function noInvoiceCats(){ return CATS.filter(c=>c.no_invoice && (c.company_id===CO.id||c.company_id==null)).sort((a,b)=>(a.name||'').localeCompare(b.name||'')); }
+// Depuis le rapprochement : classer une ligne dans une catégorie ET la marquer « sans facture ».
+async function setTxSansFacture(txId,catId){ if(!canEdit()||!catId) return;
+  const c=catById(catId); const t=TX.find(x=>x.id===txId);
+  const upd={ category_id:catId, status:'classe', no_invoice:true };
+  if(c && c.default_vat_rate!=null && t){ const ttc=Math.abs(t.amount); const rate=Number(c.default_vat_rate);
+    upd.vat_rate=rate; upd.vat_amount=rate?Math.round(ttc*rate/(100+rate)*100)/100:0; }
+  let {error}=await db.from('compta_transactions').update(upd).eq('id',txId);
+  if(error && /no_invoice|column|colonne|schema/i.test(error.message||'')){ delete upd.no_invoice;
+    ({error}=await db.from('compta_transactions').update(upd).eq('id',txId));
+    if(!error){ toast('Classé. Pour « sans facture », lance sql/compta-tx-sansfacture.sql côté Supabase.'); reloadData(); return; } }
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('✔ Ligne classée « '+(c?c.name:'')+' » — sans facture.'); reloadData();
+}
 function restoRows(){
   const rows=[];
   // Le justificatif (facture) fait foi : on compte chaque facture resto une fois.
@@ -1429,9 +1443,9 @@ function renderTx(){
     const rapp=inv
       ? `<span class="badge b-ok" title="Reliée à la facture ${esc(inv.counterparty||'')} ${esc(inv.invoice_number||'')}">🔗 Facture liée</span>`
       : (Number(t.amount)<0
-          ? (catNoInvoice(t.category_id)
-              ? '<span class="badge b-ok" title="Frais sans facture (paramétré sur la catégorie)">✔ Sans facture</span>'
-              : (canEdit()?`<button class="btn ghost small" title="Relier à une facture" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>`:'<span class="badge b-lost">Sans facture</span>'))
+          ? (txSansFacture(t)
+              ? '<span class="badge b-ok" title="Frais sans facture">✔ Sans facture</span>'
+              : (canEdit()?`<button class="btn ghost small" title="Relier à une facture" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>`:'<span class="hint">—</span>'))
           : '');
     return `<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
@@ -1819,10 +1833,9 @@ function renderRapproTab(){
   const orphans=TX.filter(t=>txNeedsInvoice(t)&&periodMatch(t.op_date))
     .filter(t=>!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)||String(Math.abs(t.amount)).includes(q))
     .sort((a,b)=>(b.op_date||'').localeCompare(a.op_date||''));
-  const nic=noInvoiceCats();
+  const allCats=txCompanyCats();
   const nicSel=(t)=>{ if(!canEdit()) return '';
-    if(!nic.length) return ` <button class="btn ghost small" onclick="showTab('parametres');showParam('categories')" title="Créer une catégorie sans facture">🏷️ Créer « sans facture »</button>`;
-    return ` <select title="Classer en frais sans facture" onchange="if(this.value){setTxCat('${t.id}',this.value)}"><option value="">🏷️ Sans facture…</option>${nic.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>`; };
+    return ` <select title="Classer cette ligne et la marquer sans facture" onchange="if(this.value){setTxSansFacture('${t.id}',this.value)}"><option value="">🚫 Sans facture : catégorie…</option>${allCats.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>`; };
   txBody.innerHTML=orphans.map(t=>`<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}"><a href="#" onclick="openTxStatement('${t.id}');return false">${esc(t.label)}</a></td>
     <td>${esc(t.counterparty||'—')}</td><td class="num val-bad">${euro(t.amount)}</td>
     <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')">🔗 Relier à une facture</button>`:''}${nicSel(t)} <button class="btn ghost small" onclick="openTxStatement('${t.id}')" title="Voir le relevé">📄 Relevé</button></td></tr>`).join('')
