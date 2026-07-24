@@ -458,8 +458,9 @@
       <div class="modal-head"><h3>🔗 Relier ce paiement à une facture</h3><button class="btn ghost small" onclick="closeLinkTx()">✕</button></div>
       <div id="linktx-head" class="hint"></div>
       <div class="filterbar" style="margin-top:8px">
-        <div class="field" style="min-width:170px"><label>Voir les factures du mois</label><input type="month" id="linktx-month" onchange="renderLinkTxList()"></div>
-        <div class="field" style="align-self:flex-end"><button class="btn ghost small" onclick="linkTxSuggested()">↩︎ Suggestions</button></div>
+        <div class="field" style="min-width:140px"><label>Mois</label><input type="month" id="linktx-month" onchange="renderLinkTxList()"></div>
+        <div class="field" style="max-width:230px"><label>Recherche (nom, n°, montant)</label><input type="text" id="linktx-search" oninput="renderLinkTxList()" placeholder="ex. DHL, 120, F-2026…"></div>
+        <div class="field" style="align-self:flex-end"><button class="btn ghost small" onclick="linkTxAll()">📋 Tout voir</button> <button class="btn ghost small" onclick="linkTxSuggested()">↩︎ Suggestions</button></div>
       </div>
       <div id="linktx-body" style="margin-top:8px"></div>
     </div>
@@ -1772,12 +1773,26 @@ async function quickLinkInvTx(invId,txId){ if(!canEdit()) return;
   const ok=await saveInvoiceLinks(invId,txs,{invoice:inv});
   if(ok){ toast('✅ Facture rapprochée.'); await reloadData(); }
 }
-// Ouvre le relevé (PDF) auquel une ligne appartient, ou informe si pas de PDF.
+// « Voir le relevé » d'une ligne : ouvre le PDF si dispo, sinon montre la ligne
+// dans l'onglet Relevés (calé sur son mois) pour la voir dans son contexte.
 function openTxStatement(txId){ const t=TX.find(x=>x.id===txId); if(!t) return;
   const s=t.statement_id?stmtById(t.statement_id):null;
   if(s&&s.storage_path){ openDoc(s.storage_path); return; }
-  if(s){ toast('Relevé « '+stmtLabel(s)+' »'+(s.storage_path?'':' — pas de PDF joint (import CSV/Excel).')); return; }
-  toast('Cette ligne n’est rattachée à aucun relevé importé.'); }
+  showTab('releves');
+  const ym=(t.op_date||'').slice(0,7);
+  if(ym){ const ys=document.getElementById('g-year'), ms=document.getElementById('g-month');
+    if(ys)ys.value=ym.slice(0,4); if(ms)ms.value=ym.slice(5,7);
+    const pc=document.getElementById('pb-cur'); if(pc) pc.textContent='Affichage : '+periodLabel(); }
+  fillTxFilters();
+  const fstmt=document.getElementById('tx-fstmt'), fsearch=document.getElementById('tx-search'),
+        fcat=document.getElementById('tx-fcat'), fstatus=document.getElementById('tx-fstatus'), ftiers=document.getElementById('tx-ftiers');
+  if(fcat)fcat.value=''; if(fstatus)fstatus.value=''; if(ftiers)ftiers.value='';
+  if(s&&fstmt){ fstmt.value=s.id; if(fsearch)fsearch.value=''; }
+  else { if(fstmt)fstmt.value=''; if(fsearch)fsearch.value=(t.label||'').slice(0,22); }
+  renderTx();
+  toast(s?('Relevé « '+stmtLabel(s)+' » — ses lignes s’affichent.'):'Voici cette ligne dans l’onglet Relevés.');
+  const sec=document.getElementById('tx-body'); if(sec){ try{ sec.closest('section').scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
+}
 function renderRapproTab(){
   const invBody=document.getElementById('rap-inv-body'); if(!invBody) return;
   const toDo=INVOICES.filter(i=>invMatchState(i)!=='rapproche' && periodMatch(i.invoice_date||i.created_at))
@@ -1820,34 +1835,40 @@ async function autoReconcile(){ if(!canEdit()) return;
 }
 /* ---- Relier depuis une ligne de relevé : choisir la facture en attente ---- */
 let LINKTX=null;
-function linkTxToInvoice(txId){ const t=TX.find(x=>x.id===txId); if(!t){ return; } LINKTX=t;
+let LINKTX_ALL=false;
+function linkTxToInvoice(txId){ const t=TX.find(x=>x.id===txId); if(!t){ return; } LINKTX=t; LINKTX_ALL=false;
   const mi=document.getElementById('linktx-month'); if(mi) mi.value='';
+  const se=document.getElementById('linktx-search'); if(se) se.value='';
   document.getElementById('linktx-head').innerHTML=`Paiement : <b>${esc((t.op_date||'').slice(0,10))} · ${esc(t.label||'')}</b> · <b class="val-bad">${euro(t.amount)}</b>`;
   renderLinkTxList();
   document.getElementById('linktx-modal').classList.remove('hidden');
 }
-function linkTxSuggested(){ const mi=document.getElementById('linktx-month'); if(mi) mi.value=''; renderLinkTxList(); }
+function linkTxSuggested(){ LINKTX_ALL=false; const mi=document.getElementById('linktx-month'); if(mi) mi.value=''; const se=document.getElementById('linktx-search'); if(se) se.value=''; renderLinkTxList(); }
+function linkTxAll(){ LINKTX_ALL=true; renderLinkTxList(); }
 function renderLinkTxList(){
   const t=LINKTX; if(!t) return; const amt=Math.abs(Number(t.amount)||0); const tk=tiersKey(t.counterparty);
   const ym=(document.getElementById('linktx-month')||{}).value||'';
-  let cands;
-  if(ym){ // toutes les factures en attente de ce mois
-    cands=INVOICES.filter(i=>invMatchState(i)!=='rapproche' && (i.invoice_date||'').slice(0,7)===ym)
+  const q=((document.getElementById('linktx-search')||{}).value||'').toLowerCase().trim();
+  const base=INVOICES.filter(i=>invMatchState(i)!=='rapproche');
+  let cands, filtered=(ym||q||LINKTX_ALL);
+  if(filtered){
+    cands=base.filter(i=>(!ym||(i.invoice_date||'').slice(0,7)===ym)
+        &&(!q||(i.counterparty||'').toLowerCase().includes(q)||(i.invoice_number||'').toLowerCase().includes(q)||String(i.amount_ttc||'').includes(q)))
       .map(i=>({i,tiersHit:tk&&tiersKey(i.counterparty)===tk}))
-      .sort((a,b)=>(a.i.invoice_date||'').localeCompare(b.i.invoice_date||''));
+      .sort((a,b)=>(b.i.invoice_date||'').localeCompare(a.i.invoice_date||''));
   } else { // suggestions : montant proche ou même tiers
-    cands=INVOICES.filter(i=>invMatchState(i)!=='rapproche' && i.amount_ttc!=null)
+    cands=base.filter(i=>i.amount_ttc!=null)
       .map(i=>{ const diff=Math.abs(Math.abs(Number(i.amount_ttc)||0)-amt); const tiersHit=tk&&tiersKey(i.counterparty)===tk;
         return {i,diff,tiersHit,score:(tiersHit?0:1000)+diff*10}; })
       .filter(x=>x.diff<=Math.max(MATCH_TOL,amt*0.05)||x.tiersHit).sort((a,b)=>a.score-b.score).slice(0,12);
   }
   const body=document.getElementById('linktx-body');
-  body.innerHTML=cands.length?cands.map(x=>{ const i=x.i;
+  body.innerHTML=cands.length?`<div class="hint" style="margin-bottom:6px">${cands.length} facture(s)${filtered?'':' suggérée(s)'}</div>`+cands.map(x=>{ const i=x.i;
     return `<div class="pp-row" style="display:flex;gap:10px;align-items:center;padding:9px 8px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px">
-      <span style="flex:1"><b>${esc(i.counterparty||'—')}</b> <span class="hint">${esc((i.invoice_date||'').slice(0,10))} ${esc(i.invoice_number||'')}</span>${x.tiersHit?' <span class="badge b-ok">🎯 même tiers</span>':''}</span>
+      <span style="flex:1"><a href="#" onclick="openInvoicePreview('${i.id}');return false"><b>${esc(i.counterparty||'—')}</b></a> <span class="hint">${esc((i.invoice_date||'').slice(0,10))} ${esc(i.invoice_number||'')}</span>${x.tiersHit?' <span class="badge b-ok">🎯 même tiers</span>':''}</span>
       <b class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</b>
       <button class="btn small" onclick="doLinkTx('${i.id}')">Relier</button></div>`; }).join('')
-    :(ym?'<div class="empty">Aucune facture en attente sur ce mois.</div>':'<div class="empty">Aucune facture en attente ne correspond. Choisis un mois ci-dessus pour parcourir, ou importe la facture puis reviens la relier.</div>');
+    :(filtered?'<div class="empty">Aucune facture en attente ne correspond à ce filtre.</div>':'<div class="empty">Aucune correspondance automatique. Clique <b>📋 Tout voir</b>, choisis un mois, ou tape un nom/montant ci-dessus.</div>');
 }
 function closeLinkTx(){ document.getElementById('linktx-modal').classList.add('hidden'); LINKTX=null; }
 async function doLinkTx(invId){ if(!LINKTX) return; const inv=INVOICES.find(i=>i.id===invId); if(!inv) return;
