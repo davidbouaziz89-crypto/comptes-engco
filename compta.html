@@ -1614,27 +1614,36 @@ function updateIALine(idx,field,value){ const l=IA_RELEVE_LINES[idx]; if(!l) ret
 function removeIALine(idx){ const nm=(document.getElementById('ia-releve-name')||{}).value;
   IA_RELEVE_LINES.splice(idx,1); openIAReleve(IA_RELEVE_LINES);
   const el=document.getElementById('ia-releve-name'); if(el&&nm!=null) el.value=nm; }
+// Doublon = une ligne déjà en base (même compte, même date, même montant, même libellé).
+function txLineDup(line){ const d=(line.op_date||''); if(!d) return false; const amt=Number(line.amount)||0; const lab=(line.label||'').toLowerCase().trim();
+  const acc=ACCOUNTS_OK?accountForImport():null;
+  return TX.some(t=> (t.op_date||'')===d && Math.abs((Number(t.amount)||0)-amt)<0.005 && (t.label||'').toLowerCase().trim()===lab && (!acc||!t.account_id||t.account_id===acc)); }
+function removeIADuplicates(){ const nm=(document.getElementById('ia-releve-name')||{}).value;
+  IA_RELEVE_LINES=IA_RELEVE_LINES.filter(l=>!txLineDup(l)); openIAReleve(IA_RELEVE_LINES);
+  const el=document.getElementById('ia-releve-name'); if(el&&nm!=null) el.value=nm; toast('Doublons retirés.'); }
 function openIAReleve(lines){
   const body=document.getElementById('ia-body');
   let tot=0; lines.forEach(l=>tot+=Number(l.amount)||0);
   const per=(lines.find(l=>l.op_date)||{}).op_date; const sugg=(accName(accountForImport())||'Relevé')+(per?' '+monthLabel(per.slice(0,7)):'');
   const catOpts=txCompanyCats().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   const canPrev=!!(LAST_RELEVE_FILE);
+  const dupCount=lines.filter(txLineDup).length;
   body.innerHTML=
     `<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
        <div class="field" style="max-width:320px;margin:0"><label>Nom du relevé (facultatif)</label><input type="text" id="ia-releve-name" value="${esc(sugg)}" placeholder="ex. Amex janv. 2026"></div>
        ${canPrev?`<button class="btn ghost small" onclick="previewReleveFile()" title="Ouvrir le document importé pour comparer">👁️ Voir le relevé (document)</button>`:''}
+       ${dupCount?`<button class="btn ghost small" onclick="removeIADuplicates()" title="Retirer les lignes déjà présentes en base">🧹 Retirer les ${dupCount} doublon(s)</button>`:''}
      </div>`+
-    `<div class="hint" style="margin-bottom:10px"><b>${lines.length}</b> lignes lues · <span id="ia-total">${iaTotalsLabel()}</span>. Corrige ce qui est faux (date, libellé, catégorie, tiers, montant), supprime une ligne inutile (ex. « paiement reçu ») avec 🗑 — l'IA <b>apprendra tes classements</b> — puis importe. <br>💡 Sur un relevé de carte (Amex…), le <b>montant est négatif</b> pour une dépense.</div>`+
+    `<div class="hint" style="margin-bottom:10px"><b>${lines.length}</b> lignes lues · <span id="ia-total">${iaTotalsLabel()}</span>.${dupCount?` <b class="val-bad">⚠️ ${dupCount} ligne(s) semblent déjà importées</b> (surlignées).`:''} Corrige ce qui est faux, supprime une ligne inutile avec 🗑 — l'IA <b>apprendra tes classements</b> — puis importe. <br>💡 Sur un relevé de carte (Amex…), le <b>montant est négatif</b> pour une dépense.</div>`+
     `<div class="table-wrap" style="max-height:48vh;overflow:auto"><table class="compact"><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="num">Montant</th><th></th></tr></thead><tbody>`+
-    lines.map((l,idx)=>`<tr>
+    lines.map((l,idx)=>{ const dup=txLineDup(l); return `<tr${dup?' style="background:color-mix(in srgb,var(--danger) 10%,transparent)"':''}>
       <td><input type="date" value="${esc(l.op_date||'')}" style="min-width:132px" onchange="updateIALine(${idx},'op_date',this.value)"></td>
-      <td><input type="text" value="${esc(l.label||'')}" style="min-width:170px" onchange="updateIALine(${idx},'label',this.value)"></td>
+      <td><input type="text" value="${esc(l.label||'')}" style="min-width:170px" onchange="updateIALine(${idx},'label',this.value)">${dup?' <span class="badge b-lost" title="Déjà en base">⚠️ doublon</span>':''}</td>
       <td><select data-ia-cat="${idx}" onchange="updateIALine(${idx},'suggested_category_id',this.value)"><option value="">— à classer —</option>${catOpts}</select></td>
       <td><input type="text" list="tiers-list" value="${esc(l.counterparty||'')}" style="min-width:150px" onchange="updateIALine(${idx},'counterparty',this.value)"></td>
       <td class="num"><input type="number" step="0.01" value="${Number(l.amount)||0}" style="max-width:110px;text-align:right" onchange="updateIALine(${idx},'amount',this.value)"></td>
       <td><button class="btn danger small" title="Retirer cette ligne" onclick="removeIALine(${idx})">🗑</button></td>
-    </tr>`).join('')+
+    </tr>`; }).join('')+
     `</tbody></table></div>`;
   lines.forEach((l,idx)=>{ const sel=body.querySelector(`select[data-ia-cat="${idx}"]`); if(sel) sel.value=l.suggested_category_id||''; });
   document.getElementById('ia-modal').classList.remove('hidden');
@@ -1710,7 +1719,7 @@ async function runReleveImport(){
   const ci=id=>{ const v=document.getElementById(id).value; return v===''?null:parseInt(v,10); };
   const cDate=ci('map-date'),cLabel=ci('map-label'),cAmt=ci('map-amount'),cDeb=ci('map-debit'),cCred=ci('map-credit');
   if(cDate==null||cLabel==null){ toast('Indique au moins Date et Libellé.'); return; }
-  const recs=IMPORT_ROWS.map(rw=>{
+  let recs=IMPORT_ROWS.map(rw=>{
     let amount=NaN;
     if(cAmt!=null) amount=parseNum(rw[cAmt]);
     else { const d=parseNum(rw[cDeb]), c=parseNum(rw[cCred]); if(!isNaN(c)&&c) amount=Math.abs(c); else if(!isNaN(d)&&d) amount=-Math.abs(d); }
@@ -1722,6 +1731,8 @@ async function runReleveImport(){
       if(cat&&cat.default_vat_rate!=null){ const rate=Number(cat.default_vat_rate); rec.vat_rate=rate; rec.vat_amount=rate?Math.round(Math.abs(rec.amount)*rate/(100+rate)*100)/100:0; } }
     return rec;
   }).filter(r=>r.amount!==0||r.label);
+  const before=recs.length; recs=recs.filter(r=>!txLineDup(r)); const skipped=before-recs.length;
+  if(!recs.length){ toast(skipped?('Toutes ces lignes ('+skipped+') sont déjà importées.'):'Aucune ligne à importer.'); return; }
   recs.forEach(withAcc);
   // Fiche relevé (pour nommer / regrouper), même sans PDF
   try{
@@ -1732,7 +1743,7 @@ async function runReleveImport(){
   }catch(_){}
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur import : '+error.message); return; }
-  closeMap(); toast(recs.length+' lignes importées.'); await reloadData(); proposeReverseLinks();
+  closeMap(); toast(recs.length+' lignes importées'+(skipped?(' · '+skipped+' doublon(s) ignoré(s)'):'.')); await reloadData(); proposeReverseLinks();
 }
 
 /* ================= RAPPROCHEMENT (facture ↔ lignes de relevé) ================= */
