@@ -1027,6 +1027,7 @@ function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.
 function euro(n){ return (Number(n)||0).toLocaleString('fr-FR',{style:'currency',currency:CO&&CO.currency||'EUR'}); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function canEdit(){ return IS_ADMIN || MY_ROLE==='secretaire'; }
+function canUseIA(){ return IS_ADMIN; }   // lecture IA des documents réservée à l'admin (maîtrise des coûts)
 function ymNow(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 // ===== IA (edge function compta-ia) =====
@@ -1325,10 +1326,10 @@ function renderDashboard(){
   const solde=entrees-sorties, tvaNette=tvaColl-tvaRec;
   const toRappro=INVOICES.filter(i=>invMatchState(i)!=='rapproche').length;
   cards.innerHTML=
-    kpiCard('↗','var(--good)','Entrées du mois',entrees)+
-    kpiCard('↘','var(--danger)','Sorties du mois',sorties)+
-    kpiCard('💰',solde>=0?'var(--good)':'var(--danger)','Solde du mois',solde)+
-    kpiCard('🧮','var(--accent3)','TVA nette du mois',tvaNette,'eur','collectée '+euro(tvaColl)+' · récup. '+euro(tvaRec))+
+    kpiCard('↗','var(--good)','Entrées',entrees,'eur',periodLabel())+
+    kpiCard('↘','var(--danger)','Sorties',sorties,'eur',periodLabel())+
+    kpiCard('💰',solde>=0?'var(--good)':'var(--danger)','Solde',solde,'eur',periodLabel())+
+    kpiCard('🧮','var(--accent3)','TVA nette',tvaNette,'eur',periodLabel()+' · coll. '+euro(tvaColl)+' · récup. '+euro(tvaRec))+
     kpiCard('⏳',aClasser?'var(--warm)':'var(--good)','Lignes à classer',aClasser,'int',aClasser?'à catégoriser':'tout est classé')+
     kpiCard('📄',toRappro?'var(--danger)':'var(--good)','Factures à rapprocher',toRappro,'int',toRappro?'à relier au relevé':'tout est rapproché',!!toRappro);
   animateKpis(); renderDashCharts(); renderDashInvoices();
@@ -1508,7 +1509,8 @@ function downloadReleveTemplate(){
 function importReleve(file){ if(!file||!canEdit()) return;
   const ext=(file.name.split('.').pop()||'').toLowerCase();
   if(['xlsx','xls','csv'].includes(ext)){ importReleveSheet(file); return; }
-  // PDF / image -> proposer l'IA
+  // PDF / image -> lecture IA (réservée à l'admin)
+  if(!canUseIA()){ toast("La lecture IA est réservée à l'administrateur. Importe un relevé CSV/Excel, ou saisis les lignes à la main."); return; }
   if(askUseIA("Relevé « "+file.name+" » — le lire avec l'IA ?")) importReleveIA(file);
   else toast("Sans IA : exporte ton relevé en CSV/Excel depuis ta banque, ou saisis les lignes à la main.");
 }
@@ -1997,12 +1999,13 @@ async function onInvoiceFilePick(inputId){
   const el=document.getElementById(inputId||'i-file'); const files=el&&el.files; if(!files||!files.length) return;
   // Plusieurs fichiers → import par lot
   if(files.length>1){ const arr=[...files]; el.value='';
-    const useIA=askUseIA(arr.length+" factures sélectionnées — les lire avec l'IA pour pré-remplir ?");
+    const useIA=canUseIA() && askUseIA(arr.length+" factures sélectionnées — les lire avec l'IA pour pré-remplir ?");
     openBatch(arr, useIA); return; }
   const f=files[0];
   INVOICE_FILE=f; INV_FROM_IA=false;
   const fn=document.getElementById('i-filename'); if(fn) fn.textContent='📎 '+f.name;
   renderDocPreview(f);   // aperçu du document (utile aussi pour la saisie manuelle)
+  if(!canUseIA()){ toast("Document joint. La lecture IA est réservée à l'administrateur — complète les champs à la main."); return; }
   if(!askUseIA("Facture « "+f.name+" » — la lire avec l'IA pour pré-remplir ?")) return;
   try{
     const r=await callComptaIA('facture',f);
