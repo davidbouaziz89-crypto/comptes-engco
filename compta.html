@@ -768,6 +768,20 @@
   </div>
 </div>
 
+<!-- Fusionner deux clients / fournisseurs (doublons) -->
+<div id="merge-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-head"><h3>🔗 Fusionner deux clients / fournisseurs</h3><button class="btn ghost small" onclick="closeMerge()">✕</button></div>
+    <div id="merge-head" class="hint"></div>
+    <div class="field" style="margin-top:12px"><label>Fusionner vers (le nom à conserver)</label><select id="merge-target"></select></div>
+    <div class="hint" style="margin-top:8px">Toutes les opérations et factures du premier seront réaffectées au nom choisi, puis le doublon sera retiré du registre.</div>
+    <div style="margin-top:16px;text-align:right;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn ghost" onclick="closeMerge()">Annuler</button>
+      <button class="btn" onclick="confirmMerge()">Fusionner</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -878,8 +892,33 @@ function renderTiersRegistry(){
       <td>${catCell}</td>
       <td>${tiersSourceBadge(t.source)}</td><td class="num">${s.count}</td>
       <td class="num val-good">${s.inn?euro(s.inn):'—'}</td><td class="num val-bad">${s.out?euro(s.out):'—'}</td>
-      <td>${(canEdit()&&t.inTable)?`<button class="btn danger small" onclick="deleteTiers('${esc(t.key)}')">🗑</button>`:''}</td></tr>`;
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openMergeTiers('${esc(t.key)}')" title="Fusionner avec un autre (même tiers)">🔗 Fusionner</button> ${t.inTable?`<button class="btn danger small" onclick="deleteTiers('${esc(t.key)}')" title="Retirer du registre">🗑</button>`:''}`:''}</td></tr>`;
   }).join('')||'<tr><td colspan="7" class="empty">Aucun client / fournisseur pour le moment. Ils apparaîtront ici automatiquement à mesure que tu saisis ou importes.</td></tr>';
+}
+/* ---- Fusion de deux tiers (doublons : ex. « 2B-COM » et « SASU 2B-COM ») ---- */
+let MERGE_SRC=null;
+function openMergeTiers(srcKey){ if(!canEdit()) return; const src=allTiers().find(t=>t.key===srcKey); if(!src) return; MERGE_SRC=src;
+  document.getElementById('merge-head').innerHTML=`À fusionner : <b>${esc(src.name)}</b> <span class="hint">(${tiersStats(src.key).count} opération(s))</span>`;
+  const sel=document.getElementById('merge-target');
+  sel.innerHTML=allTiers().filter(t=>t.key!==srcKey).map(t=>`<option value="${esc(t.key)}">${esc(t.name)}</option>`).join('');
+  document.getElementById('merge-modal').classList.remove('hidden');
+}
+function closeMerge(){ document.getElementById('merge-modal').classList.add('hidden'); MERGE_SRC=null; }
+async function confirmMerge(){ if(!MERGE_SRC||!canEdit()) return;
+  const srcKey=MERGE_SRC.key; const tgtKey=document.getElementById('merge-target').value;
+  if(!tgtKey||tgtKey===srcKey){ toast('Choisis un tiers cible.'); return; }
+  const tgt=allTiers().find(t=>t.key===tgtKey); const tgtName=tgt?tgt.name:'';
+  if(!confirm(`Fusionner « ${MERGE_SRC.name} » dans « ${tgtName} » ?\n\nToutes les opérations et factures de « ${MERGE_SRC.name} » seront réaffectées à « ${tgtName} », et « ${MERGE_SRC.name} » sera retiré du registre.`)) return;
+  const variantsTx=[...new Set(TX.filter(t=>tiersKey(t.counterparty)===srcKey).map(t=>t.counterparty).filter(Boolean))];
+  const variantsInv=[...new Set(INVOICES.filter(i=>tiersKey(i.counterparty)===srcKey).map(i=>i.counterparty).filter(Boolean))];
+  try{
+    for(const v of variantsTx){ const {error}=await db.from('compta_transactions').update({counterparty:tgtName}).eq('company_id',CO.id).eq('counterparty',v); if(error) throw error; }
+    for(const v of variantsInv){ const {error}=await db.from('compta_invoices').update({counterparty:tgtName}).eq('company_id',CO.id).eq('counterparty',v); if(error) throw error; }
+    if(MERGE_SRC.inTable){ try{ await db.from('compta_tiers').delete().eq('company_id',CO.id).eq('name_key',srcKey); }catch(_){}
+      TIERS=TIERS.filter(x=>x.name_key!==srcKey); }
+    await registerTiers(tgtName,'manuel');
+  }catch(e){ toast('Erreur fusion : '+(e.message||e)); return; }
+  toast('✔ Fusionné dans « '+tgtName+' ».'); closeMerge(); reloadData();
 }
 async function addTiersManual(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const inp=document.getElementById('ti-new'); const nm=(inp.value||'').trim(); if(nm.length<2){ toast('Nom trop court.'); return; }
