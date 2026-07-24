@@ -518,11 +518,12 @@
                 <div class="field"><label>Type de flux</label><select id="c-flow"><option value="achat">Achat</option><option value="vente">Vente</option><option value="both">Les deux</option></select></div>
                 <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="c-tva" placeholder="20"></div>
                 <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-recup" checked> TVA récupérable</label></div>
+                <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="c-noinv"> Sans facture (frais récurrents)</label></div>
                 <div class="field" style="align-self:flex-end"><button class="btn" id="c-savebtn" type="submit">+ Ajouter</button> <button class="btn ghost" type="button" id="c-cancelbtn" style="display:none" onclick="newCat()">Annuler</button></div>
               </form>
             </div>
             <div class="table-wrap"><table class="compact">
-              <thead><tr><th>Catégorie</th><th>Flux</th><th class="num">TVA %</th><th>Récupérable</th><th></th></tr></thead>
+              <thead><tr><th>Catégorie</th><th>Flux</th><th class="num">TVA %</th><th>Récupérable</th><th>Sans facture</th><th></th></tr></thead>
               <tbody id="cats-body"></tbody>
             </table></div>
           </section>
@@ -880,6 +881,9 @@ async function deleteTiers(key){ if(!canEdit()) return;
 // Un paiement (ligne de relevé) est-il déjà relié à une facture ?
 function txHasInvoice(tId){ return INVOICES.some(i=>invTxIds(i).includes(tId)); }
 function txInvoice(tId){ return INVOICES.find(i=>invTxIds(i).includes(tId)); }
+// Catégorie « sans facture » (frais bancaires, salaires, mutuelle…) → ligne comptée comme justifiée.
+function catNoInvoice(catId){ const c=catById(catId); return !!(c&&c.no_invoice); }
+function txNeedsInvoice(t){ return Number(t.amount)<0 && !txHasInvoice(t.id) && !catNoInvoice(t.category_id); }
 function restoRows(){
   const rows=[];
   // Le justificatif (facture) fait foi : on compte chaque facture resto une fois.
@@ -1246,7 +1250,7 @@ function renderDashboard(){
     const inv=INVOICES.find(i=>invTxIds(i).includes(t.id));
     const hasInv=!!inv; const verified=hasInv && t.status==='classe';
     if(t.amount>0) entrees+=Number(t.amount); else sorties+=Math.abs(Number(t.amount));
-    if(t.amount<0 && !hasInv) manque++;
+    if(txNeedsInvoice(t)) manque++;
     if(!t.category_id) aClasser++;
     const va=Number(t.vat_amount)||0;
     if(va){ if(t.amount>0) tvaColl+=va; else { const c=CATS.find(x=>x.id===t.category_id); if(!c||c.vat_recoverable!==false) tvaRec+=va; } }
@@ -1349,7 +1353,11 @@ function renderTx(){
     const inv=txInvoice(t.id);
     const rapp=inv
       ? `<span class="badge b-ok" title="Reliée à la facture ${esc(inv.counterparty||'')} ${esc(inv.invoice_number||'')}">🔗 Facture liée</span>`
-      : (Number(t.amount)<0 ? `<button class="btn ghost small" title="Relier à une facture" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>` : '');
+      : (Number(t.amount)<0
+          ? (catNoInvoice(t.category_id)
+              ? '<span class="badge b-ok" title="Frais sans facture (paramétré sur la catégorie)">✔ Sans facture</span>'
+              : `<button class="btn ghost small" title="Relier à une facture" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>`)
+          : '');
     return `<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
@@ -1697,7 +1705,7 @@ function renderRapproTab(){
 
   const q=(document.getElementById('rap-tx-search')?.value||'').toLowerCase().trim();
   const txBody=document.getElementById('rap-tx-body');
-  const orphans=TX.filter(t=>Number(t.amount)<0 && !txHasInvoice(t.id))
+  const orphans=TX.filter(t=>txNeedsInvoice(t))
     .filter(t=>!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)||String(Math.abs(t.amount)).includes(q))
     .sort((a,b)=>(b.op_date||'').localeCompare(a.op_date||''));
   txBody.innerHTML=orphans.map(t=>`<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td>
@@ -2164,7 +2172,7 @@ let editingCatId=null;
 function newCat(){ editingCatId=null;
   restoreInlineForm(document.getElementById('cat-form-panel'));
   const g=id=>document.getElementById(id);
-  g('c-nom').value=''; g('c-flow').value='achat'; g('c-tva').value=''; g('c-recup').checked=true;
+  g('c-nom').value=''; g('c-flow').value='achat'; g('c-tva').value=''; g('c-recup').checked=true; g('c-noinv').checked=false;
   g('c-savebtn').textContent='+ Ajouter'; g('c-cancelbtn').style.display='none';
   const ti=g('cat-form-title'); if(ti) ti.textContent='➕ Nouvelle catégorie';
   renderCats();
@@ -2172,7 +2180,7 @@ function newCat(){ editingCatId=null;
 function selectCat(id,btn){ const c=CATS.find(x=>x.id===id); if(!c) return; editingCatId=id;
   const g=i=>document.getElementById(i);
   g('c-nom').value=c.name||''; g('c-flow').value=c.flow||'achat';
-  g('c-tva').value=(c.default_vat_rate!=null)?c.default_vat_rate:''; g('c-recup').checked=c.vat_recoverable!==false;
+  g('c-tva').value=(c.default_vat_rate!=null)?c.default_vat_rate:''; g('c-recup').checked=c.vat_recoverable!==false; g('c-noinv').checked=!!c.no_invoice;
   g('c-savebtn').textContent='💾 Enregistrer'; g('c-cancelbtn').style.display='';
   const ti=g('cat-form-title'); if(ti) ti.textContent='✏️ Modifier la catégorie';
   const panel=g('cat-form-panel'); if(!inlineEditAtRow(panel,btn)){ window.scrollTo({top:0,behavior:'smooth'}); }
@@ -2180,10 +2188,12 @@ function selectCat(id,btn){ const c=CATS.find(x=>x.id===id); if(!c) return; edit
 async function saveCat(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
   const name=document.getElementById('c-nom').value.trim(); if(!name){ toast('Indique un nom.'); return; }
   const dv=parseFloat(document.getElementById('c-tva').value);
-  const rec={ name, flow:document.getElementById('c-flow').value, vat_recoverable:document.getElementById('c-recup').checked, default_vat_rate:isNaN(dv)?null:dv };
-  let error;
-  if(editingCatId){ ({error}=await db.from('compta_categories').update(rec).eq('id',editingCatId)); }
-  else { ({error}=await db.from('compta_categories').insert(Object.assign({company_id:CO.id},rec))); }
+  const rec={ name, flow:document.getElementById('c-flow').value, vat_recoverable:document.getElementById('c-recup').checked, default_vat_rate:isNaN(dv)?null:dv, no_invoice:document.getElementById('c-noinv').checked };
+  const write=async(payload)=>{ return editingCatId
+    ? (await db.from('compta_categories').update(payload).eq('id',editingCatId)).error
+    : (await db.from('compta_categories').insert(Object.assign({company_id:CO.id},payload))).error; };
+  let error=await write(rec);
+  if(error && /no_invoice|column|colonne/i.test(error.message||'')){ const r2={...rec}; delete r2.no_invoice; error=await write(r2); toast('Astuce : lance sql/compta-cat-sansfacture.sql pour activer « sans facture ».'); }
   if(error){ toast('Erreur : '+error.message); return; }
   toast(editingCatId?'Catégorie modifiée.':'Catégorie ajoutée.'); newCat(); reloadData();
 }
@@ -2206,9 +2216,10 @@ function renderCats(){
   own.forEach(c=>{ const tr=document.createElement('tr');
     tr.innerHTML=`<td>${esc(c.name)}</td><td><span class="pill">${esc(c.flow)}</span></td><td class="num">${c.default_vat_rate!=null?c.default_vat_rate+' %':'—'}</td>
       <td>${c.vat_recoverable?'<span class="tick ok">✔</span>':'<span class="tick no">✗</span>'}</td>
+      <td>${c.no_invoice?'<span class="badge b-ok">Sans facture</span>':'<span class="hint">—</span>'}</td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="selectCat('${c.id}',this)" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delCat('${c.id}')" title="Supprimer">🗑</button>`:''}</td>`;
     body.appendChild(tr); });
-  if(!own.length) body.innerHTML='<tr><td colspan="5" class="empty">Aucune catégorie. Clique « 📋 Importer les catégories par défaut » ci-dessus, ou ajoute-en une.</td></tr>';
+  if(!own.length) body.innerHTML='<tr><td colspan="6" class="empty">Aucune catégorie. Clique « 📋 Importer les catégories par défaut » ci-dessus, ou ajoute-en une.</td></tr>';
 }
 
 /* ================= ADMIN : SOCIÉTÉS ================= */
