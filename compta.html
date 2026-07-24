@@ -1601,11 +1601,15 @@ let RELEVE_PREVIEW_URL=null;
 function previewReleveFile(){ if(!LAST_RELEVE_FILE){ toast('Document non disponible.'); return; }
   try{ if(RELEVE_PREVIEW_URL) URL.revokeObjectURL(RELEVE_PREVIEW_URL); }catch(_){}
   RELEVE_PREVIEW_URL=URL.createObjectURL(LAST_RELEVE_FILE); window.open(RELEVE_PREVIEW_URL,'_blank'); }
+function iaTotalsLabel(){ let deb=0,cred=0; IA_RELEVE_LINES.forEach(l=>{ const a=Number(l.amount)||0; if(a<0) deb+=-a; else cred+=a; });
+  return `débits <b class="val-bad">${euro(-deb)}</b> · crédits <b class="val-good">${euro(cred)}</b> · net <b>${euro(cred-deb)}</b>`; }
 function updateIALine(idx,field,value){ const l=IA_RELEVE_LINES[idx]; if(!l) return;
-  if(field==='amount'){ l.amount=parseFloat(value)||0;
-    const tot=IA_RELEVE_LINES.reduce((s,x)=>s+(Number(x.amount)||0),0); const el=document.getElementById('ia-total'); if(el) el.textContent=euro(tot); }
+  if(field==='amount'){ l.amount=parseFloat(value)||0; const el=document.getElementById('ia-total'); if(el) el.innerHTML=iaTotalsLabel(); }
   else l[field]=(value===''?null:value);
 }
+function removeIALine(idx){ const nm=(document.getElementById('ia-releve-name')||{}).value;
+  IA_RELEVE_LINES.splice(idx,1); openIAReleve(IA_RELEVE_LINES);
+  const el=document.getElementById('ia-releve-name'); if(el&&nm!=null) el.value=nm; }
 function openIAReleve(lines){
   const body=document.getElementById('ia-body');
   let tot=0; lines.forEach(l=>tot+=Number(l.amount)||0);
@@ -1617,14 +1621,15 @@ function openIAReleve(lines){
        <div class="field" style="max-width:320px;margin:0"><label>Nom du relevé (facultatif)</label><input type="text" id="ia-releve-name" value="${esc(sugg)}" placeholder="ex. Amex janv. 2026"></div>
        ${canPrev?`<button class="btn ghost small" onclick="previewReleveFile()" title="Ouvrir le document importé pour comparer">👁️ Voir le relevé (document)</button>`:''}
      </div>`+
-    `<div class="hint" style="margin-bottom:10px"><b>${lines.length}</b> lignes lues · solde <b id="ia-total">${euro(tot)}</b>. Corrige ce qui est faux (date, libellé, catégorie, tiers, montant) — l'IA <b>apprendra tes classements</b> pour les prochains imports — puis importe.</div>`+
-    `<div class="table-wrap" style="max-height:48vh;overflow:auto"><table class="compact"><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="num">Montant</th></tr></thead><tbody>`+
+    `<div class="hint" style="margin-bottom:10px"><b>${lines.length}</b> lignes lues · <span id="ia-total">${iaTotalsLabel()}</span>. Corrige ce qui est faux (date, libellé, catégorie, tiers, montant), supprime une ligne inutile (ex. « paiement reçu ») avec 🗑 — l'IA <b>apprendra tes classements</b> — puis importe. <br>💡 Sur un relevé de carte (Amex…), le <b>montant est négatif</b> pour une dépense.</div>`+
+    `<div class="table-wrap" style="max-height:48vh;overflow:auto"><table class="compact"><thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="num">Montant</th><th></th></tr></thead><tbody>`+
     lines.map((l,idx)=>`<tr>
       <td><input type="date" value="${esc(l.op_date||'')}" style="min-width:132px" onchange="updateIALine(${idx},'op_date',this.value)"></td>
       <td><input type="text" value="${esc(l.label||'')}" style="min-width:170px" onchange="updateIALine(${idx},'label',this.value)"></td>
       <td><select data-ia-cat="${idx}" onchange="updateIALine(${idx},'suggested_category_id',this.value)"><option value="">— à classer —</option>${catOpts}</select></td>
       <td><input type="text" list="tiers-list" value="${esc(l.counterparty||'')}" style="min-width:150px" onchange="updateIALine(${idx},'counterparty',this.value)"></td>
       <td class="num"><input type="number" step="0.01" value="${Number(l.amount)||0}" style="max-width:110px;text-align:right" onchange="updateIALine(${idx},'amount',this.value)"></td>
+      <td><button class="btn danger small" title="Retirer cette ligne" onclick="removeIALine(${idx})">🗑</button></td>
     </tr>`).join('')+
     `</tbody></table></div>`;
   lines.forEach((l,idx)=>{ const sel=body.querySelector(`select[data-ia-cat="${idx}"]`); if(sel) sel.value=l.suggested_category_id||''; });
