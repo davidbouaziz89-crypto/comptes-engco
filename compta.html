@@ -312,7 +312,10 @@
   <!-- RELEVÉS -->
   <div id="tab-releves" class="hidden">
     <section class="panel canedit" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <b style="margin-right:auto">📥 Importer un relevé bancaire (CSV / Excel)</b>
+      <b style="margin-right:auto">📥 Importer un relevé bancaire (CSV / Excel / PDF)</b>
+      <div class="field" style="min-width:220px;margin:0"><label style="font-size:12px;color:var(--muted)">Compte / carte</label>
+        <select id="tx-account" onchange="onAccountChange()"><option value="">Tous les comptes</option></select></div>
+      <button class="btn ghost small" onclick="showTab('parametres');showParam('comptes')" title="Gérer les comptes et cartes">＋ carte</button>
       <button class="btn ghost small" onclick="downloadReleveTemplate()">⬇️ Modèle</button>
       <button class="btn small" onclick="document.getElementById('imp-releve').click()">⬆️ Importer un fichier</button>
       <input type="file" id="imp-releve" accept=".xlsx,.xls,.csv,.pdf,image/*" class="hidden" onchange="importReleve(this.files[0]);this.value='';">
@@ -343,7 +346,7 @@
         <div class="field" style="max-width:240px"><label>Recherche</label><input type="text" id="tx-search" placeholder="libellé, client…" oninput="renderTx()"></div>
       </div>
       <div class="table-wrap"><table class="compact">
-        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="tx-acc-col" style="display:none">Compte</th><th class="num">Montant</th><th class="num">TVA</th><th>Statut</th><th></th></tr></thead>
         <tbody id="tx-body"></tbody>
       </table></div>
     </section>
@@ -460,6 +463,7 @@
       <div class="params-menu" id="params-menu">
         <button data-psec="categories" class="active" onclick="showParam('categories')">🏷️ Catégories de la société</button>
         <button data-psec="tiers" onclick="showParam('tiers')">🤝 Clients / Fournisseurs</button>
+        <button data-psec="comptes" onclick="showParam('comptes')">💳 Comptes &amp; cartes</button>
         <button data-psec="societes" id="pm-societes" style="display:none" onclick="showParam('societes')">🏢 Sociétés</button>
         <button data-psec="users" id="pm-users" style="display:none" onclick="showParam('users')">👥 Utilisateurs &amp; accès</button>
       </div>
@@ -507,6 +511,22 @@
           </section>
         </div>
 
+        <div class="ps" id="ps-comptes" style="display:none">
+          <section class="panel canedit">
+            <h2>💳 Comptes &amp; cartes</h2>
+            <div class="hint">Le « Compte principal » est ton relevé bancaire. Ajoute une carte (Amex, carte bleue…) dès qu'elle a un relevé à part : à l'import tu choisis le compte concerné, et tout reste rattaché à la société.</div>
+            <form class="row" onsubmit="addAccount(event)">
+              <div class="field" style="min-width:220px"><label>Nom du compte / de la carte</label><input type="text" id="acc-name" placeholder="ex. Amex, Carte bleue Visa" required></div>
+              <div class="field"><label>Type</label><select id="acc-type"><option value="carte">💳 Carte</option><option value="banque">🏦 Compte bancaire</option></select></div>
+              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+            </form>
+            <div class="table-wrap"><table class="compact">
+              <thead><tr><th>Compte / carte</th><th>Type</th><th class="num">Lignes</th><th class="num">Relevés PDF</th><th></th></tr></thead>
+              <tbody id="acc-body"></tbody>
+            </table></div>
+          </section>
+        </div>
+
         <div class="ps" id="ps-societes" style="display:none">
           <section class="panel">
             <h2 id="soc-title">Créer une société</h2>
@@ -517,6 +537,7 @@
               <div class="field"><label>SIREN</label><input type="text" id="soc-siren" placeholder="facultatif"></div>
               <div class="field"><label>Régime TVA</label><select id="soc-regime"><option value="reel_mensuel">Réel mensuel</option><option value="reel_trimestriel">Réel trimestriel</option><option value="franchise">Franchise en base (pas de TVA)</option></select></div>
               <div class="field"><label>TVA % par défaut</label><input type="number" step="0.01" id="soc-tva" value="20"></div>
+              <div class="field"><label class="chk" style="margin-top:22px"><input type="checkbox" id="soc-perso"> Entité personnelle (sans TVA)</label></div>
               <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="soc-savebtn">+ Créer</button> <button class="btn ghost" type="button" id="soc-cancel" style="display:none" onclick="cancelEditCompany()">Annuler</button></div>
             </form>
             <div class="preview" id="soc-msg"></div>
@@ -695,8 +716,48 @@ updateThemeBtn();
 
 /* ---------- État global ---------- */
 let SESSION=null, IS_ADMIN=false, MY_ACCESS=[], COMPANIES=[], CO=null, MY_ROLE=null;
-let CATS=[], TX=[], INVOICES=[], RULES=[], TIERS=[], LINKS=[];
+let CATS=[], TX=[], INVOICES=[], RULES=[], TIERS=[], LINKS=[], ACCOUNTS=[], ACCOUNTS_OK=false;
 let INV_FROM_IA=false;
+/* ---------- Comptes / cartes (compte principal + Amex, CB…) ---------- */
+function principalAccountId(){ const a=ACCOUNTS.find(x=>x.type==='banque')||ACCOUNTS[0]; return a?a.id:null; }
+function currentAccountId(){ const el=document.getElementById('tx-account'); return (el&&el.value)||''; } // '' = tous les comptes
+function accountForImport(){ return currentAccountId()||principalAccountId(); }
+function accName(id){ const a=ACCOUNTS.find(x=>x.id===id); return a?a.name:'—'; }
+function accIcon(t){ return t==='carte'?'💳':'🏦'; }
+function withAcc(rec){ if(ACCOUNTS_OK){ const a=accountForImport(); if(a) rec.account_id=a; } return rec; }
+function fillAccountSelects(){
+  const el=document.getElementById('tx-account'); if(!el) return; const cur=el.value;
+  el.innerHTML='<option value="">Tous les comptes</option>'+ACCOUNTS.map(a=>`<option value="${a.id}">${accIcon(a.type)} ${esc(a.name)}</option>`).join('');
+  el.value=[...el.options].some(o=>o.value===cur)?cur:'';
+}
+function onAccountChange(){ renderTx(); renderStatements(); }
+function renderComptes(){
+  const body=document.getElementById('acc-body'); if(!body) return;
+  if(!ACCOUNTS_OK){ body.innerHTML='<tr><td colspan="5" class="empty">Fonctionnalité en attente : lance sql/compta-comptes.sql côté Supabase.</td></tr>'; return; }
+  body.innerHTML=ACCOUNTS.map(a=>{
+    const nTx=TX.filter(t=>t.account_id===a.id).length;
+    const nSt=(STATEMENTS||[]).filter(s=>s.account_id===a.id).length;
+    const isMain=a.type==='banque'&&a.name==='Compte principal';
+    return `<tr><td>${accIcon(a.type)} ${esc(a.name)}</td><td><span class="pill">${a.type==='carte'?'Carte':'Banque'}</span></td>
+      <td class="num">${nTx}</td><td class="num">${nSt}</td>
+      <td>${(canEdit()&&!isMain)?`<button class="btn danger small" onclick="delAccount('${a.id}')" title="Supprimer">🗑</button>`:'<span class="hint">—</span>'}</td></tr>`;
+  }).join('')||'<tr><td colspan="5" class="empty">Aucun compte.</td></tr>';
+}
+async function addAccount(e){ if(e&&e.preventDefault)e.preventDefault(); if(!canEdit()) return;
+  const nm=(document.getElementById('acc-name').value||'').trim(); if(nm.length<2){ toast('Nom trop court.'); return; }
+  const type=document.getElementById('acc-type').value||'carte';
+  const {error}=await db.from('compta_accounts').insert({company_id:CO.id,name:nm,type});
+  if(error){ toast(/relation|does not exist|schema cache/i.test(error.message||'')?'Lance d’abord sql/compta-comptes.sql.':'Erreur : '+error.message); return; }
+  document.getElementById('acc-name').value=''; toast('Compte ajouté.'); await reloadData(); showParam('comptes');
+}
+async function delAccount(id){ if(!canEdit()) return;
+  const a=ACCOUNTS.find(x=>x.id===id); if(!a) return;
+  const nTx=TX.filter(t=>t.account_id===id).length;
+  if(!confirm('Supprimer le compte « '+a.name+' » ?'+(nTx?'\n\nLes '+nTx+' ligne(s) rattachées ne seront plus reliées à un compte (elles ne sont pas supprimées).':''))) return;
+  const {error}=await db.from('compta_accounts').delete().eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; }
+  toast('Compte supprimé.'); await reloadData(); showParam('comptes');
+}
 /* ---------- Registre des tiers (enrichi manuel + IA) ---------- */
 function tiersKey(n){ return String(n||'').toLowerCase().trim(); }
 async function registerTiers(name,source,categoryId){
@@ -974,6 +1035,7 @@ async function selectCompany(cid){
   else document.documentElement.style.removeProperty('--accent');
   document.getElementById('btn-switch').style.display=(IS_ADMIN||COMPANIES.filter(c=>myRoleFor(c.id)).length>1)?'inline-block':'none';
   const rb=document.getElementById('role-badge'); rb.style.display='inline-block'; rb.textContent=MY_ROLE;
+  const tvaBtn=document.querySelector('#mainnav button[data-tab="tva"]'); if(tvaBtn) tvaBtn.style.display=CO.is_personal?'none':'';
   startApp();
   document.body.classList.toggle('readonly', !canEdit());
   document.querySelectorAll('.canedit').forEach(el=>el.style.display=canEdit()?'':'none');
@@ -1008,9 +1070,10 @@ function showParam(sec){
   if((sec==='societes'||sec==='users') && !IS_ADMIN) sec='categories';
   CURRENT_PARAM=sec;
   document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.psec===sec));
-  ['categories','tiers','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
+  ['categories','tiers','comptes','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
   if(sec==='categories') renderCats();
   if(sec==='tiers') renderTiersRegistry();
+  if(sec==='comptes') renderComptes();
   if(sec==='societes') renderCompanies();
   if(sec==='users') renderUsers();
 }
@@ -1019,20 +1082,22 @@ function showParam(sec){
 async function reloadData(){
   if(!CO){ if(IS_ADMIN){ renderCompanies(); } return; }
   document.getElementById('loaderr').style.display='none';
-  const [cats,tx,inv,rules,stmts,tiers]=await Promise.all([
+  const [cats,tx,inv,rules,stmts,tiers,accts]=await Promise.all([
     db.from('compta_categories').select('*').or('company_id.eq.'+CO.id+',company_id.is.null').order('name'),
     db.from('compta_transactions').select('*').eq('company_id',CO.id).order('op_date',{ascending:false}),
     db.from('compta_invoices').select('*').eq('company_id',CO.id).order('created_at',{ascending:false}),
     db.from('compta_rules').select('pattern,category_id,counterparty').eq('company_id',CO.id),
     db.from('compta_bank_statements').select('*').eq('company_id',CO.id).order('created_at',{ascending:false}),
     db.from('compta_tiers').select('*').eq('company_id',CO.id).order('name'),
+    db.from('compta_accounts').select('*').eq('company_id',CO.id).order('name'),
   ]);
   CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[]; STATEMENTS=(stmts&&stmts.data)||[]; TIERS=(tiers&&tiers.data)||[];
+  ACCOUNTS=(accts&&accts.data)||[]; ACCOUNTS_OK=!!(accts&&!accts.error); fillAccountSelects();
   // Liens facture ↔ lignes (rapprochement multi-lignes) — table optionnelle
   const invIds=INVOICES.map(i=>i.id);
   if(invIds.length){ try{ const {data:lk}=await db.from('compta_invoice_links').select('*').in('invoice_id',invIds); LINKS=lk||[]; }catch(_){ LINKS=[]; } }
   else LINKS=[];
-  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto();
+  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto(); renderComptes();
 }
 
 function fillCatSelects(){
@@ -1177,7 +1242,7 @@ async function addTx(e){ e.preventDefault(); if(!canEdit()) return;
     amount:sens*ttc, category_id:catId, counterparty:document.getElementById('t-tiers').value.trim()||null,
     vat_rate:isNaN(rate)?null:rate, vat_amount:tva?Math.round(tva*100)/100:null,
     status:catId?'classe':'a_classer', created_by:SESSION.user.id };
-  const {error}=await db.from('compta_transactions').insert(rec);
+  const {error}=await db.from('compta_transactions').insert(withAcc(rec));
   if(error){ toast('Erreur : '+error.message); return; }
   if(rec.counterparty) await registerTiers(rec.counterparty,'manuel');
   e.target.reset(); document.getElementById('t-preview').innerHTML='—'; toast('Ligne ajoutée.'); reloadData();
@@ -1197,21 +1262,26 @@ function renderTx(){
   const m=document.getElementById('tx-fmonth').value, st=document.getElementById('tx-fstatus').value;
   const fc=document.getElementById('tx-fcat').value, ft=document.getElementById('tx-ftiers').value;
   const q=(document.getElementById('tx-search').value||'').toLowerCase();
+  const acc=currentAccountId();
+  const showAcc=ACCOUNTS_OK&&ACCOUNTS.length>1;
   let rows=TX.filter(t=>(!m||(t.op_date||'').slice(0,7)===m)&&(!st||t.status===st)
     &&(!fc||(fc==='__none__'?!t.category_id:t.category_id===fc))
     &&(!ft||(t.counterparty||'')===ft)
+    &&(!acc||t.account_id===acc)
     &&(!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)));
+  document.querySelectorAll('.tx-acc-col').forEach(el=>el.style.display=showAcc?'':'none');
   const body=document.getElementById('tx-body'); body.innerHTML='';
   rows.forEach(t=>{
     const tr=document.createElement('tr');
     const catTxt=t.category_id?esc(catName(t.category_id)):'<span class="badge b-wip">à classer</span>';
-    tr.innerHTML=`<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>
+    const accCell=showAcc?`<td class="tx-acc-col"><span class="pill">${accIcon((ACCOUNTS.find(a=>a.id===t.account_id)||{}).type)} ${esc(accName(t.account_id))}</span></td>`:'';
+    tr.innerHTML=`<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openTxEdit('${t.id}',this)" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
-  if(!rows.length) body.innerHTML='<tr><td colspan="8" class="empty">Aucune ligne.</td></tr>';
+  if(!rows.length) body.innerHTML='<tr><td colspan="9" class="empty">Aucune ligne.</td></tr>';
 }
 // ===== Édition inline générique (reprise du pattern du CRM LED) : le formulaire s'insère sous la ligne cliquée =====
 function inlineEditAtRow(panel,btn){
@@ -1318,7 +1388,7 @@ async function runIAReleveImport(){
       const up=await db.storage.from('compta-documents').upload(sp,LAST_RELEVE_FILE,{upsert:false});
       if(!up.error){
         const per=(IA_RELEVE_LINES.find(l=>l.op_date)||{}).op_date;
-        const {data:st}=await db.from('compta_bank_statements').insert({company_id:CO.id,original_filename:LAST_RELEVE_FILE.name,storage_path:sp,period_month:per?per.slice(0,7)+'-01':null,uploaded_by:SESSION.user.id}).select('id').single();
+        const {data:st}=await db.from('compta_bank_statements').insert(withAcc({company_id:CO.id,original_filename:LAST_RELEVE_FILE.name,storage_path:sp,period_month:per?per.slice(0,7)+'-01':null,uploaded_by:SESSION.user.id})).select('id').single();
         if(st) statement_id=st.id;
       }
     }catch(_){}
@@ -1332,6 +1402,7 @@ async function runIAReleveImport(){
       category_id:cat?cat.id:null, counterparty:l.counterparty||null,
       vat_rate:(rate!=null&&!isNaN(rate))?rate:null, vat_amount:tva, status:cat?'classe':'a_classer', created_by:SESSION.user.id };
   });
+  recs.forEach(withAcc);
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur : '+error.message); return; }
   registerTiersMany(recs.map(r=>r.counterparty),'ia');
@@ -1386,6 +1457,7 @@ async function runReleveImport(){
       if(cat&&cat.default_vat_rate!=null){ const rate=Number(cat.default_vat_rate); rec.vat_rate=rate; rec.vat_amount=rate?Math.round(Math.abs(rec.amount)*rate/(100+rate)*100)/100:0; } }
     return rec;
   }).filter(r=>r.amount!==0||r.label);
+  recs.forEach(withAcc);
   const {error}=await db.from('compta_transactions').insert(recs);
   if(error){ toast('Erreur import : '+error.message); return; }
   closeMap(); toast(recs.length+' lignes importées.'); await reloadData(); proposeReverseLinks();
@@ -1845,10 +1917,12 @@ async function openDoc(path){
 }
 function renderStatements(){
   const body=document.getElementById('stmt-body'); if(!body) return; body.innerHTML='';
-  (STATEMENTS||[]).forEach(s=>{
+  const acc=currentAccountId();
+  (STATEMENTS||[]).filter(s=>!acc||s.account_id===acc).forEach(s=>{
     const tr=document.createElement('tr');
+    const accTxt=ACCOUNTS_OK&&ACCOUNTS.length>1?` · ${accName(s.account_id)}`:'';
     tr.innerHTML=`<td>${(s.created_at||'').slice(0,10)}</td><td>${s.period_month?String(s.period_month).slice(0,7):'—'}</td>
-      <td>${esc(s.original_filename||'relevé')}</td>
+      <td>${esc(s.original_filename||'relevé')}${accTxt?`<span class="hint" style="margin-left:6px">${esc(accTxt)}</span>`:''}</td>
       <td style="white-space:nowrap">${s.storage_path?`<a href="#" onclick="openDoc('${esc(s.storage_path)}');return false">📄 Ouvrir</a>`:'—'} ${canEdit()?`<button class="btn ghost small" onclick="delStatement('${s.id}')" title="Supprimer le PDF">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
@@ -1935,12 +2009,20 @@ function renderCats(){
 /* ================= ADMIN : SOCIÉTÉS ================= */
 let editingCompany=null;
 async function saveCompany(e){ e.preventDefault(); if(!IS_ADMIN) return;
+  const perso=document.getElementById('soc-perso').checked;
   const rec={ name:document.getElementById('soc-nom').value.trim(), siren:document.getElementById('soc-siren').value.trim()||null,
     logo_key:document.getElementById('soc-logo').value||null, color:document.getElementById('soc-color').value||null,
-    vat_regime:document.getElementById('soc-regime').value, default_vat_rate:parseFloat(document.getElementById('soc-tva').value)||20 };
+    vat_regime:perso?'franchise':document.getElementById('soc-regime').value, default_vat_rate:parseFloat(document.getElementById('soc-tva').value)||20,
+    is_personal:perso };
   let error;
-  if(editingCompany){ ({error}=await db.from('compta_companies').update(rec).eq('id',editingCompany)); }
-  else { ({error}=await db.from('compta_companies').insert(rec)); }
+  const tryWrite=async(payload)=>{
+    if(editingCompany){ return (await db.from('compta_companies').update(payload).eq('id',editingCompany)).error; }
+    const {data,error:er}=await db.from('compta_companies').insert(payload).select('id').single();
+    if(!er && data){ try{ await db.from('compta_accounts').insert({company_id:data.id,name:'Compte principal',type:'banque'}); }catch(_){} }
+    return er;
+  };
+  error=await tryWrite(rec);
+  if(error && /is_personal|column|colonne/i.test(error.message||'')){ const r2={...rec}; delete r2.is_personal; error=await tryWrite(r2); }
   if(error){ document.getElementById('soc-msg').textContent='Erreur : '+error.message; return; }
   document.getElementById('soc-msg').textContent=''; cancelEditCompany();
   const {data:cos}=await db.from('compta_companies').select('*').order('name'); COMPANIES=cos||[];
@@ -1954,11 +2036,12 @@ function cancelEditCompany(){ editingCompany=null; document.getElementById('soc-
   document.getElementById('soc-savebtn').textContent='+ Créer'; document.getElementById('soc-cancel').style.display='none';
   ['soc-nom','soc-siren'].forEach(id=>document.getElementById(id).value=''); document.getElementById('soc-tva').value='20';
   document.getElementById('soc-logo').value=''; document.getElementById('soc-color').value='#3b82f6';
-  document.getElementById('soc-regime').value='reel_mensuel'; }
+  document.getElementById('soc-regime').value='reel_mensuel'; document.getElementById('soc-perso').checked=false; }
 function editCompany(id){ const c=COMPANIES.find(x=>x.id===id); if(!c) return; editingCompany=id;
   document.getElementById('soc-nom').value=c.name; document.getElementById('soc-siren').value=c.siren||'';
   document.getElementById('soc-logo').value=c.logo_key||''; document.getElementById('soc-color').value=c.color||'#3b82f6';
   document.getElementById('soc-regime').value=c.vat_regime; document.getElementById('soc-tva').value=c.default_vat_rate;
+  document.getElementById('soc-perso').checked=!!c.is_personal;
   document.getElementById('soc-title').textContent='Modifier la société'; document.getElementById('soc-savebtn').textContent='Enregistrer';
   document.getElementById('soc-cancel').style.display='inline-block'; window.scrollTo(0,0); }
 let ACCESS_ALL=[];
