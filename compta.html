@@ -52,9 +52,7 @@
   header{padding:16px 22px;background:linear-gradient(115deg,#0a1224,#141d3a 55%,#101a36);
     border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;position:relative;overflow:hidden}
   header::after{content:"";position:absolute;inset:0;pointer-events:none;
-    background:linear-gradient(115deg,transparent 30%,rgba(56,189,248,.12),transparent 62%,rgba(167,139,250,.1),transparent 85%);
-    background-size:250% 100%;animation:aurora 14s linear infinite}
-  @keyframes aurora{0%{background-position:0% 0}100%{background-position:250% 0}}
+    background:linear-gradient(115deg,transparent 30%,rgba(56,189,248,.10),transparent 62%,rgba(167,139,250,.08),transparent 85%)}
   header h1{font-size:20px;margin:0;font-family:var(--font-display);font-weight:600;letter-spacing:-.3px;position:relative;display:flex;align-items:center;gap:6px}
   .btn{background:var(--grad-accent);color:var(--accent-ink);border:0;padding:10px 16px;border-radius:11px;cursor:pointer;font-size:14px;font-weight:600;font-family:var(--font-body);box-shadow:0 8px 20px -10px rgba(56,189,248,.7);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
   .btn:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 12px 26px -10px rgba(56,189,248,.8)}
@@ -65,7 +63,7 @@
   .btn.danger{background:transparent;border:1px solid color-mix(in srgb,var(--danger) 55%,transparent);color:var(--bad);box-shadow:none}
   .btn.danger:hover{background:color-mix(in srgb,var(--danger) 14%,transparent);border-color:var(--danger)}
   .btn:disabled{opacity:.5;cursor:default;transform:none}
-  nav{display:flex;gap:6px;padding:12px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel) 86%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:40;box-shadow:0 10px 24px -12px rgba(0,0,0,.5)}
+  nav{display:flex;gap:6px;padding:12px 22px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:40;box-shadow:0 10px 24px -12px rgba(0,0,0,.5)}
   nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:11px;cursor:pointer;font-size:15px;font-weight:600;font-family:var(--font-body);transition:color .15s ease,background .15s ease}
   nav button:hover{color:var(--txt)}
   nav button.active{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--txt);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
@@ -1266,7 +1264,7 @@ function countUp(el){ if(!el) return; const target=parseFloat(el.dataset.n)||0; 
   const dur=760; let t0=null;
   function tick(now){ if(t0==null)t0=now; const p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,3); el.textContent=f(target*e); if(p<1) requestAnimationFrame(tick); }
   requestAnimationFrame(tick); }
-function animateKpis(){ document.querySelectorAll('#db-cards .value[data-n]').forEach(countUp); }
+function animateKpis(){ /* valeurs affichées directement (plus rapide, pas d'animation de comptage) */ }
 function kpiCard(ic,color,label,value,unit,sub,pulse){
   return `<div class="card kpi${pulse?' pulse':''}" style="--kc:${color}">
     <div class="k-ic">${ic}</div><div class="label">${label}</div>
@@ -1294,7 +1292,7 @@ function renderDashCharts(){
       datasets:[{data:ent.map(([,v])=>v),backgroundColor:ent.map((_,i)=>CAT_PALETTE[i%CAT_PALETTE.length]),borderColor:tc.panel,borderWidth:3,hoverOffset:7}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'66%',
       plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,pointStyle:'circle',font:{size:12}}},
-        tooltip:{callbacks:{label:c=>' '+c.label+' : '+euro(c.parsed)}}},animation:{animateScale:true,duration:700}}});
+        tooltip:{callbacks:{label:c=>' '+c.label+' : '+euro(c.parsed)}}},animation:false}});
   // Barres : entrées / sorties sur 6 mois glissants (fin = mois choisi, sinon mois en cours)
   const base=periodYM()||ymNow(); let [by,bm]=base.split('-').map(Number); const months=[];
   for(let i=5;i>=0;i--){ let mm=bm-i,yy=by; while(mm<=0){mm+=12;yy--;} months.push(yy+'-'+String(mm).padStart(2,'0')); }
@@ -1307,7 +1305,7 @@ function renderDashCharts(){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:14}},
         tooltip:{callbacks:{label:c=>' '+c.dataset.label+' : '+euro(c.parsed.y)}}},
-      scales:{x:{grid:{display:false}},y:{grid:{color:tc.line},ticks:{callback:v=>euro(v)}}},animation:{duration:650}}});
+      scales:{x:{grid:{display:false}},y:{grid:{color:tc.line},ticks:{callback:v=>euro(v)}}},animation:false}});
 }
 
 function renderDashboard(){
