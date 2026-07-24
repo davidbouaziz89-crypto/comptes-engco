@@ -69,6 +69,9 @@
   nav button{background:transparent;border:0;color:var(--muted);padding:10px 16px;border-radius:11px;cursor:pointer;font-size:15px;font-weight:600;font-family:var(--font-body);transition:color .15s ease,background .15s ease}
   nav button:hover{color:var(--txt)}
   nav button.active{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--txt);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+  #periodbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 22px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 80%,transparent),transparent)}
+  #periodbar select{width:auto;min-width:130px}
+  #periodbar .pb-lab{font-weight:700;font-family:var(--font-display)}
   main{padding:24px 22px 40px;max-width:min(1480px,97vw);margin:0 auto}
   .grid{display:grid;gap:16px}
   .cards{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
@@ -152,7 +155,13 @@
   .filterbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;align-items:end}
   .filterbar .field{max-width:200px}
   /* Libellé tronqué : garde toutes les colonnes visibles ; détail complet au survol (title) */
-  td.lbl{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help}
+  td.lbl{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;position:relative}
+  tr:hover td.lbl{overflow:visible;white-space:normal;word-break:break-word}
+  /* Info-bulle : libellé complet au survol (rapprochement + relevés) */
+  .fulltip{position:relative;cursor:help;border-bottom:1px dotted var(--muted)}
+  .fulltip:hover::after{content:attr(data-full);position:absolute;left:0;top:100%;z-index:60;margin-top:4px;
+    background:var(--panel);border:1px solid var(--accent);border-radius:8px;padding:7px 10px;font-size:12.5px;color:var(--txt);
+    white-space:normal;min-width:180px;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
   table.compact td,table.compact th{padding:7px 10px;font-size:13px}
   table.compact tr:hover td{background:rgba(59,130,246,.10)}
   table.compact select,table.compact input{padding:5px 8px;font-size:13px}
@@ -269,6 +278,14 @@
   <button data-tab="parametres" onclick="showTab('parametres')">⚙️ Paramètres</button>
 </nav>
 
+<div id="periodbar" style="display:none">
+  <span class="pb-lab">📅 Période</span>
+  <select id="g-year" onchange="applyPeriod()"></select>
+  <select id="g-month" onchange="applyPeriod()"></select>
+  <button class="btn ghost small" onclick="resetPeriod()">Tout voir</button>
+  <span class="pb-cur hint" id="pb-cur" style="margin-left:auto"></span>
+</div>
+
 <main id="app" style="display:none">
   <div id="loaderr" class="banner"></div>
 
@@ -298,11 +315,8 @@
       </table></div>
     </section>
     <section class="panel">
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <h2 style="margin:0;flex:1">📊 Rapprochement du mois</h2>
-        <div class="field" style="max-width:180px;margin:0"><input type="month" id="db-month" onchange="renderDashboard()"></div>
-      </div>
-      <div class="hint">Pour chaque paiement du mois : sa catégorie, le client/fournisseur, si la facture est déposée et si le paiement est vérifié (rapproché).</div>
+      <h2 style="margin:0 0 4px">📊 Détail des mouvements</h2>
+      <div class="hint">Pour chaque paiement de la période choisie : sa catégorie, le client/fournisseur, si la facture est déposée et si le paiement est vérifié (rapproché).</div>
       <div class="table-wrap"><table class="compact">
         <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Fournisseur</th><th class="num">Montant</th><th>Facture</th><th>Vérifié</th></tr></thead>
         <tbody id="db-body"></tbody>
@@ -340,7 +354,6 @@
     <section class="panel">
       <h2>Lignes du relevé</h2>
       <div class="filterbar">
-        <div class="field"><label>Mois</label><input type="month" id="tx-fmonth" onchange="renderTx()"></div>
         <div class="field"><label>Statut</label><select id="tx-fstatus" onchange="renderTx()"><option value="">Tous</option><option value="a_classer">À classer</option><option value="classe">Classé</option></select></div>
         <div class="field"><label>Catégorie</label><select id="tx-fcat" onchange="renderTx()"><option value="">Toutes</option></select></div>
         <div class="field"><label>Client / Fournisseur</label><select id="tx-ftiers" onchange="renderTx()"><option value="">Tous</option></select></div>
@@ -404,8 +417,6 @@
     <section class="panel">
       <h2>Factures</h2>
       <div class="filterbar">
-        <div class="field"><label>Année</label><select id="inv-fyear" onchange="renderInvoices()"><option value="">Toutes</option></select></div>
-        <div class="field"><label>Mois</label><select id="inv-fmonth" onchange="renderInvoices()"><option value="">Tous</option><option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option><option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option><option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option><option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option></select></div>
         <div class="field"><label>Fournisseur / client</label><select id="inv-ftiers" onchange="renderInvoices()"><option value="">Tous</option></select></div>
         <div class="field"><label>Sens</label><select id="inv-fdir" onchange="renderInvoices()"><option value="">Tous</option><option value="achat">Achats</option><option value="vente">Ventes</option></select></div>
         <div class="field"><label>Rapprochement</label><select id="inv-fmatch" onchange="renderInvoices()"><option value="">Tous</option><option value="rapproche">✅ Rapprochées</option><option value="partiel">⏳ Partielles</option><option value="a_rapprocher">⏳ En attente</option></select></div>
@@ -471,7 +482,6 @@
       <h2>🍽️ Repas d'affaires (restaurant)</h2>
       <div class="hint">Chaque frais classé dans une catégorie « restaurant » apparaît ici automatiquement (relevés + factures). Note avec qui tu étais et le nombre de repas (couverts) pour justifier la déductibilité.</div>
       <div class="filterbar" style="margin-top:4px">
-        <div class="field"><label>Mois</label><input type="month" id="resto-fmonth" onchange="renderResto()"></div>
         <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="resto-search" placeholder="restaurant, convive…" oninput="renderResto()"></div>
       </div>
       <div id="resto-cards" class="grid cards" style="margin:12px 0"></div>
@@ -896,9 +906,8 @@ function restoRows(){
 }
 function renderResto(){
   const body=document.getElementById('resto-body'); if(!body) return;
-  const m=document.getElementById('resto-fmonth')?.value||'';
   const q=(document.getElementById('resto-search')?.value||'').toLowerCase().trim();
-  const rows=restoRows().filter(r=>(!m||String(r.date||'').slice(0,7)===m)&&
+  const rows=restoRows().filter(r=>periodMatch(r.date)&&
     (!q||String(r.tiers).toLowerCase().includes(q)||String(r.guests).toLowerCase().includes(q)));
   const ed=canEdit();
   body.innerHTML=rows.map(r=>{
@@ -1110,16 +1119,42 @@ async function selectCompany(cid){
 function startApp(){
   document.getElementById('app').style.display='block';
   document.getElementById('mainnav').style.display='flex';
+  document.getElementById('periodbar').style.display='flex';
   const pms=document.getElementById('pm-societes'); if(pms) pms.style.display=IS_ADMIN?'':'none';
   const pmu=document.getElementById('pm-users'); if(pmu) pmu.style.display=IS_ADMIN?'':'none';
-  document.getElementById('db-month').value=ymNow();
-  document.getElementById('tx-fmonth').value='';
   showTab('dashboard');
 }
 
+/* ---------- Période globale (Année + Mois) appliquée à tous les onglets ---------- */
+const MOIS_FR=['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+let PERIOD_INIT=false;
+function gYear(){ const e=document.getElementById('g-year'); return (e&&e.value)||''; }
+function gMonth(){ const e=document.getElementById('g-month'); return (e&&e.value)||''; }
+function periodYM(){ const y=gYear(),m=gMonth(); return (y&&m)?(y+'-'+m):''; }
+function periodMatch(dateStr){ const y=gYear(),m=gMonth(); if(!y&&!m) return true; if(!dateStr) return false;
+  const s=String(dateStr); return (!y||s.slice(0,4)===y)&&(!m||s.slice(5,7)===m); }
+function periodLabel(){ const y=gYear(),m=gMonth(); if(!y&&!m) return 'Toutes périodes'; if(y&&m) return MOIS_FR[parseInt(m,10)]+' '+y;
+  if(m) return 'Tous les '+MOIS_FR[parseInt(m,10)]; return 'Année '+y; }
+function fillPeriodBar(){
+  const ys=document.getElementById('g-year'), ms=document.getElementById('g-month'); if(!ys||!ms) return;
+  const years=[...new Set([].concat(TX.map(t=>t.op_date),INVOICES.map(i=>i.invoice_date)).filter(Boolean).map(d=>String(d).slice(0,4)))];
+  const cy=ymNow().slice(0,4); if(!years.includes(cy)) years.push(cy);
+  years.sort().reverse();
+  const curY=ys.value;
+  ys.innerHTML='<option value="">Toutes les années</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(!ms.dataset.filled){ ms.innerHTML='<option value="">Tous les mois</option>'+MOIS_FR.slice(1).map((n,i)=>`<option value="${String(i+1).padStart(2,'0')}">${n}</option>`).join(''); ms.dataset.filled='1'; }
+  // 1ère fois : année en cours, tous les mois (rien de masqué par surprise)
+  ys.value=PERIOD_INIT?( [...ys.options].some(o=>o.value===curY)?curY:'' ):cy;
+  PERIOD_INIT=true;
+  const pc=document.getElementById('pb-cur'); if(pc) pc.textContent='Affichage : '+periodLabel();
+}
+function applyPeriod(){ const pc=document.getElementById('pb-cur'); if(pc) pc.textContent='Affichage : '+periodLabel(); showTab(CURRENT_TAB||'dashboard'); }
+function resetPeriod(){ const ys=document.getElementById('g-year'),ms=document.getElementById('g-month'); if(ys)ys.value=''; if(ms)ms.value=''; applyPeriod(); }
+
 /* ---------- Navigation ---------- */
-let CURRENT_PARAM='categories';
+let CURRENT_PARAM='categories', CURRENT_TAB='dashboard';
 function showTab(t){
+  CURRENT_TAB=t;
   document.querySelectorAll('#mainnav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   ['dashboard','releves','factures','rappro','tiers','restaurant','tva','parametres'].forEach(x=>{
     const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
@@ -1164,7 +1199,7 @@ async function reloadData(){
   const invIds=INVOICES.map(i=>i.id);
   if(invIds.length){ try{ const {data:lk}=await db.from('compta_invoice_links').select('*').in('invoice_id',invIds); LINKS=lk||[]; }catch(_){ LINKS=[]; } }
   else LINKS=[];
-  fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto(); renderComptes(); renderRapproTab();
+  fillPeriodBar(); fillCatSelects(); renderDashboard(); renderTx(); renderInvoices(); renderCats(); renderTva(); renderStatements(); renderTiersRegistry(); renderTiersTab(); renderResto(); renderComptes(); renderRapproTab();
 }
 
 function fillCatSelects(){
@@ -1212,13 +1247,12 @@ function renderDashCharts(){
   if(typeof Chart==='undefined'||!CO) return;
   const tc={muted:cssVar('--muted'),line:cssVar('--line'),panel:cssVar('--panel'),good:cssVar('--good'),bad:cssVar('--bad')};
   Chart.defaults.color=tc.muted; Chart.defaults.font.family='Inter, system-ui, sans-serif';
-  const m=document.getElementById('db-month').value;
   // Camembert : dépenses (sorties) par catégorie
   const byCat={}; let totalOut=0;
-  TX.filter(t=>(!m||(t.op_date||'').slice(0,7)===m)&&Number(t.amount)<0).forEach(t=>{ const k=t.category_id||'__none__'; const v=Math.abs(Number(t.amount)||0); byCat[k]=(byCat[k]||0)+v; totalOut+=v; });
+  TX.filter(t=>periodMatch(t.op_date)&&Number(t.amount)<0).forEach(t=>{ const k=t.category_id||'__none__'; const v=Math.abs(Number(t.amount)||0); byCat[k]=(byCat[k]||0)+v; totalOut+=v; });
   const ent=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
   const ccv=document.getElementById('cc-cats'); if(ccv) ccv.textContent=euro(totalOut);
-  const dsub=document.getElementById('dc-sub'); if(dsub) dsub.textContent=m?('Mois '+m):'Toutes périodes';
+  const dsub=document.getElementById('dc-sub'); if(dsub) dsub.textContent=periodLabel();
   if(!ent.length){ if(CHARTS['ch-cats']){CHARTS['ch-cats'].destroy(); delete CHARTS['ch-cats'];} }
   else mkChart('ch-cats',{type:'doughnut',
     data:{labels:ent.map(([k])=>k==='__none__'?'Non classé':catName(k)),
@@ -1226,8 +1260,8 @@ function renderDashCharts(){
     options:{responsive:true,maintainAspectRatio:false,cutout:'66%',
       plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,pointStyle:'circle',font:{size:12}}},
         tooltip:{callbacks:{label:c=>' '+c.label+' : '+euro(c.parsed)}}},animation:{animateScale:true,duration:700}}});
-  // Barres : entrées / sorties sur 6 mois glissants
-  const base=m||ymNow(); let [by,bm]=base.split('-').map(Number); const months=[];
+  // Barres : entrées / sorties sur 6 mois glissants (fin = mois choisi, sinon mois en cours)
+  const base=periodYM()||ymNow(); let [by,bm]=base.split('-').map(Number); const months=[];
   for(let i=5;i>=0;i--){ let mm=bm-i,yy=by; while(mm<=0){mm+=12;yy--;} months.push(yy+'-'+String(mm).padStart(2,'0')); }
   const inn=months.map(()=>0), out=months.map(()=>0);
   TX.forEach(t=>{ const idx=months.indexOf((t.op_date||'').slice(0,7)); if(idx<0) return; const a=Number(t.amount)||0; if(a>0) inn[idx]+=a; else out[idx]+=Math.abs(a); });
@@ -1242,8 +1276,7 @@ function renderDashCharts(){
 }
 
 function renderDashboard(){
-  const m=document.getElementById('db-month').value;
-  const rows=TX.filter(t=>!m||(t.op_date||'').slice(0,7)===m);
+  const rows=TX.filter(t=>periodMatch(t.op_date));
   const body=document.getElementById('db-body'); body.innerHTML='';
   let entrees=0,sorties=0,manque=0,tvaColl=0,tvaRec=0,aClasser=0;
   rows.forEach(t=>{
@@ -1330,14 +1363,14 @@ function fillTxFilters(){
 function renderTx(){
   const tep=document.getElementById('tx-edit-panel'); if(tep&&tep._holder){ restoreInlineForm(tep); tep.style.display='none'; editingTxId=null; }
   fillTxFilters();
-  const m=document.getElementById('tx-fmonth').value, st=document.getElementById('tx-fstatus').value;
+  const st=document.getElementById('tx-fstatus').value;
   const fc=document.getElementById('tx-fcat').value, ft=document.getElementById('tx-ftiers').value;
   const fstmt=(document.getElementById('tx-fstmt')||{}).value||'';
   const group=!!(document.getElementById('tx-group')||{}).checked;
   const q=(document.getElementById('tx-search').value||'').toLowerCase();
   const acc=currentAccountId();
   const showAcc=ACCOUNTS_OK&&ACCOUNTS.length>1;
-  let rows=TX.filter(t=>(!m||(t.op_date||'').slice(0,7)===m)&&(!st||t.status===st)
+  let rows=TX.filter(t=>periodMatch(t.op_date)&&(!st||t.status===st)
     &&(!fc||(fc==='__none__'?!t.category_id:t.category_id===fc))
     &&(!ft||(t.counterparty||'')===ft)
     &&(!acc||t.account_id===acc)
@@ -1694,10 +1727,10 @@ async function quickLinkInvTx(invId,txId){ if(!canEdit()) return;
 }
 function renderRapproTab(){
   const invBody=document.getElementById('rap-inv-body'); if(!invBody) return;
-  const toDo=INVOICES.filter(i=>invMatchState(i)!=='rapproche')
+  const toDo=INVOICES.filter(i=>invMatchState(i)!=='rapproche' && periodMatch(i.invoice_date||i.created_at))
     .sort((a,b)=>(b.invoice_date||b.created_at||'').localeCompare(a.invoice_date||a.created_at||''));
   invBody.innerHTML=toDo.map(i=>{ const stt=invMatchState(i); const best=bestLocalTxFor(i);
-    const sugg=best?`<span class="${best.tiersHit?'val-good':''}">≈ ${esc((best.t.op_date||'').slice(0,10))} · ${esc((best.t.label||'').slice(0,28))} · <b>${euro(best.t.amount)}</b>${best.tiersHit?' 🎯':''}</span>`:'<span class="hint">aucune ligne trouvée</span>';
+    const sugg=best?`<span class="${best.tiersHit?'val-good':''}">≈ ${esc((best.t.op_date||'').slice(0,10))} · <span class="fulltip" data-full="${esc(best.t.label||'')}">${esc((best.t.label||'').slice(0,28))}${(best.t.label||'').length>28?'…':''}</span> · <b>${euro(best.t.amount)}</b>${best.tiersHit?' 🎯':''}</span>`:'<span class="hint">aucune ligne trouvée</span>';
     const act=canEdit()?(best?`<button class="btn small" onclick="quickLinkInvTx('${i.id}','${best.t.id}')">✓ Relier</button> `:'')+`<button class="btn ghost small" onclick="openRappro('${i.id}')">Choisir…</button>`:'';
     return `<tr><td>${esc((i.invoice_date||'').slice(0,10))}</td><td class="lbl" title="${esc(i.counterparty||'')}">${esc(i.counterparty||'—')}</td>
       <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td><td>${matchBadge(stt)}</td><td>${sugg}</td><td style="white-space:nowrap">${act}</td></tr>`;
@@ -1705,7 +1738,7 @@ function renderRapproTab(){
 
   const q=(document.getElementById('rap-tx-search')?.value||'').toLowerCase().trim();
   const txBody=document.getElementById('rap-tx-body');
-  const orphans=TX.filter(t=>txNeedsInvoice(t))
+  const orphans=TX.filter(t=>txNeedsInvoice(t)&&periodMatch(t.op_date))
     .filter(t=>!q||(t.label||'').toLowerCase().includes(q)||(t.counterparty||'').toLowerCase().includes(q)||String(Math.abs(t.amount)).includes(q))
     .sort((a,b)=>(b.op_date||'').localeCompare(a.op_date||''));
   txBody.innerHTML=orphans.map(t=>`<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td>
@@ -2053,16 +2086,14 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
   document.getElementById('i-preview').innerHTML='—'; toast('Facture enregistrée.'+(catId?' Catégorie mémorisée pour ce client / fournisseur.':'')); reloadData();
 }
 function fillInvFilters(){
-  const yr=document.getElementById('inv-fyear'); if(yr){ const cur=yr.value; const years=[...new Set(INVOICES.map(i=>(i.invoice_date||'').slice(0,4)).filter(Boolean))].sort().reverse(); yr.innerHTML='<option value="">Toutes</option>'+years.map(y=>`<option>${y}</option>`).join(''); yr.value=cur; }
   const ft=document.getElementById('inv-ftiers'); if(ft){ const cur=ft.value; const t=[...new Set(INVOICES.map(i=>i.counterparty).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); ft.innerHTML='<option value="">Tous</option>'+t.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); ft.value=cur; }
 }
 function renderInvoices(){
   fillInvFilters();
   const dir=document.getElementById('inv-fdir').value, mt=document.getElementById('inv-fmatch').value;
-  const yr=document.getElementById('inv-fyear').value, mo=document.getElementById('inv-fmonth').value, ftiers=document.getElementById('inv-ftiers').value;
+  const ftiers=document.getElementById('inv-ftiers').value;
   const q=(document.getElementById('inv-search').value||'').toLowerCase();
-  let rows=INVOICES.filter(i=>(!dir||i.direction===dir)&&(!mt||i.status===mt)
-    &&(!yr||(i.invoice_date||'').slice(0,4)===yr)&&(!mo||(i.invoice_date||'').slice(5,7)===mo)
+  let rows=INVOICES.filter(i=>periodMatch(i.invoice_date)&&(!dir||i.direction===dir)&&(!mt||i.status===mt)
     &&(!ftiers||(i.counterparty||'')===ftiers)
     &&(!q||(i.counterparty||'').toLowerCase().includes(q)||(i.invoice_number||'').toLowerCase().includes(q)));
   rows.sort((a,b)=>(b.invoice_date||'').localeCompare(a.invoice_date||''));
@@ -2157,7 +2188,7 @@ function renderTva(){
     else { const c=catById(t.category_id); if(!c||c.vat_recoverable!==false) map[m].ded+=v; }
   });
   const body=document.getElementById('tva-body'); body.innerHTML='';
-  Object.keys(map).sort().reverse().forEach(m=>{
+  Object.keys(map).filter(m=>periodMatch(m+'-01')).sort().reverse().forEach(m=>{
     const {coll,ded}=map[m]; const net=coll-ded;
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${m}</td><td class="num">${euro(coll)}</td><td class="num">${euro(ded)}</td>
