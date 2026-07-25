@@ -1940,7 +1940,7 @@ function renderRapproTab(){
     .sort((a,b)=>(b.op_date||'').localeCompare(a.op_date||''));
   const allCats=txCompanyCats();
   const nicSel=(t)=>{ if(!canEdit()) return '';
-    return ` <select title="Classer cette ligne et la marquer sans facture" onchange="if(this.value){setTxSansFacture('${t.id}',this.value)}"><option value="">🚫 Sans facture : catégorie…</option>${allCats.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>`; };
+    return ` <select title="Classer cette ligne et la marquer sans facture" style="width:auto;max-width:210px;vertical-align:middle" onchange="if(this.value){setTxSansFacture('${t.id}',this.value)}"><option value="">🚫 Sans facture : catégorie…</option>${allCats.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>`; };
   txBody.innerHTML=orphans.map(t=>`<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}"><a href="#" onclick="openTxStatement('${t.id}');return false">${esc(t.label)}</a></td>
     <td>${esc(t.counterparty||'—')}</td><td class="num val-bad">${euro(t.amount)}</td>
     <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')">🔗 Relier à une facture</button>`:''}${nicSel(t)} <button class="btn ghost small" onclick="openTxStatement('${t.id}')" title="Voir le relevé">📄 Relevé</button></td></tr>`).join('')
