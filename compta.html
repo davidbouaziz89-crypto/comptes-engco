@@ -2170,20 +2170,22 @@ async function sniffFileType(file){
   return 'application/pdf'; // par défaut : on tente le PDF
 }
 function extForType(t){ return {'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','image/gif':'gif','image/webp':'webp'}[t]||'pdf'; }
-// type effectif du fichier (déclaré, sinon détecté par le contenu)
-async function effectiveType(file){ return file.type||await sniffFileType(file); }
+// type effectif : on détecte par le contenu si le type est absent OU générique (octet-stream, sans '/')
+async function effectiveType(file){ const t=(file.type||'').toLowerCase();
+  if(!t || t==='application/octet-stream' || t==='application/download' || t==='binary/octet-stream' || t.indexOf('/')<0) return await sniffFileType(file);
+  return file.type; }
 
 async function renderDocPreview(file){ const box=document.getElementById('i-docpreview'); if(!box) return;
   if(DOCPREVIEW_URL){ try{ URL.revokeObjectURL(DOCPREVIEW_URL); }catch(_){} DOCPREVIEW_URL=null; }
   if(!file){ box.style.display='none'; box.innerHTML=''; return; }
   const type=await effectiveType(file); const isImg=type.startsWith('image/');
-  const blob=file.type?file:file.slice(0,file.size,type);   // force le bon type MIME si absent
+  const blob=file.slice(0,file.size,type);   // re-type TOUJOURS avec le bon MIME
   DOCPREVIEW_URL=URL.createObjectURL(blob);
   box.style.display='';
   box.innerHTML=`<div class="dp-head"><span>📄 Aperçu — <b>${esc(file.name)}</b></span>
     <span style="display:flex;gap:6px"><button type="button" class="btn ghost small" onclick="window.open(DOCPREVIEW_URL,'_blank')">Ouvrir en grand</button>
     <button type="button" class="btn ghost small" onclick="clearDocPreview()">Retirer</button></span></div>`+
-    (isImg?`<img src="${DOCPREVIEW_URL}" class="dp-img" alt="aperçu">`:`<iframe src="${DOCPREVIEW_URL}#toolbar=1" class="dp-frame" title="aperçu"></iframe>`);
+    (isImg?`<img src="${DOCPREVIEW_URL}" class="dp-img" alt="aperçu">`:`<embed src="${DOCPREVIEW_URL}" type="application/pdf" class="dp-frame">`);
 }
 function clearDocPreview(){ INVOICE_FILE=null; renderDocPreview(null); const fn=document.getElementById('i-filename'); if(fn) fn.textContent=''; }
 
