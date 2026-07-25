@@ -111,8 +111,9 @@
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
   td.num,.card .value{font-variant-numeric:tabular-nums}
   .table-wrap{overflow-x:auto;margin-top:16px}
-  table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
-  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:normal;vertical-align:top}
+  td.num,th.num,th,td.dt,th.dt{white-space:nowrap}
   th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
   td.num,th.num{text-align:right}
   td a{color:var(--accent);text-decoration:none;font-weight:600} td a:hover{text-decoration:underline}
@@ -153,7 +154,7 @@
   .filterbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;align-items:end}
   .filterbar .field{max-width:200px}
   /* Libellé tronqué : garde toutes les colonnes visibles ; détail complet au survol (title) */
-  td.lbl{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;position:relative}
+  td.lbl{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;position:relative}
   tr:hover td.lbl{overflow:visible;white-space:normal;word-break:break-word}
   /* Info-bulle : libellé complet au survol (rapprochement + relevés) */
   .fulltip{position:relative;cursor:help;border-bottom:1px dotted var(--muted)}
@@ -992,7 +993,7 @@ function renderResto(){
   body.innerHTML=rows.map(r=>{
     const guestCell=ed?`<input type="text" value="${esc(r.guests)}" placeholder="ex. M. Durand (client X)" style="min-width:220px" onchange="setRestoField('${r.source}','${r.id}','guests',this.value)">`:esc(r.guests||'—');
     const mealCell=ed?`<input type="number" min="0" step="1" value="${r.meals!=null?r.meals:''}" placeholder="—" style="max-width:90px;text-align:right" onchange="setRestoField('${r.source}','${r.id}','meals',this.value)">`:(r.meals!=null?r.meals:'—');
-    return `<tr><td>${(r.date||'').slice(0,10)}</td>
+    return `<tr><td class="dt">${(r.date||'').slice(0,10)}</td>
       <td>${r.source==='inv'?'<span class="pill">📄 Facture</span>':'<span class="pill">🏦 Relevé</span>'}</td>
       <td class="lbl" title="${esc(r.tiers)}">${esc(r.tiers)}</td>
       <td class="num val-bad">${euro(r.amount)}</td>
@@ -1038,7 +1039,7 @@ function renderTiersTab(){
   const rowsM=months.map(m=>{ const b=s.byMonth[m]; const n=b.inn-b.out;
     return `<tr><td>${monthLabel(m)}</td><td class="num val-good">${b.inn?euro(b.inn):'—'}</td><td class="num val-bad">${b.out?euro(b.out):'—'}</td><td class="num ${n>=0?'val-good':'val-bad'}">${euro(n)}</td></tr>`; }).join('');
   const ops=TX.filter(t=>tiersKey(t.counterparty)===key).slice(0,40).map(t=>
-    `<tr><td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td><td class="num ${t.amount>=0?'val-good':'val-bad'}">${euro(t.amount)}</td></tr>`).join('');
+    `<tr><td class="dt">${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td><td class="num ${t.amount>=0?'val-good':'val-bad'}">${euro(t.amount)}</td></tr>`).join('');
   const totRow=`<tr style="font-weight:700;border-top:2px solid var(--accent)"><td>TOTAL</td><td class="num val-good">${euro(s.inn)}</td><td class="num val-bad">${euro(s.out)}</td><td class="num ${net>=0?'val-good':'val-bad'}">${euro(net)}</td></tr>`;
   const nShown=Math.min(s.count, 40);
   const opsTot=`<tr style="font-weight:700;border-top:2px solid var(--accent)"><td colspan="3">TOTAL ${s.count>40?`(${nShown} affichés / ${s.count})`:`(${s.count} op.)`}</td><td class="num ${net>=0?'val-good':'val-bad'}">${euro(net)}</td></tr>`;
@@ -1384,7 +1385,7 @@ function renderDashboard(){
     const va=Number(t.vat_amount)||0;
     if(va){ if(t.amount>0) tvaColl+=va; else { const c=CATS.find(x=>x.id===t.category_id); if(!c||c.vat_recoverable!==false) tvaRec+=va; } }
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td>
+    tr.innerHTML=`<td class="dt">${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td>
       <td>${esc(t.counterparty||'—')}</td><td class="num">${euro(t.amount)}</td>
       <td>${hasInv?'<span class="tick ok">✔</span>':'<span class="tick no">✗</span>'}</td>
       <td>${verified?'<span class="badge b-ok">Vérifié</span>':(hasInv?'<span class="badge b-wip">À classer</span>':'<span class="badge b-lost">Non</span>')}</td>`;
@@ -1412,7 +1413,7 @@ function renderDashInvoices(){
   if(!list.length){ wrap.style.display='none'; body.innerHTML=''; return; }
   wrap.style.display='';
   body.innerHTML=list.map(i=>{ const st=invMatchState(i); const sum=invLinkedSum(i); const ttc=Math.abs(Number(i.amount_ttc)||0);
-    return `<tr><td>${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
+    return `<tr><td class="dt">${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
       <td class="lbl" title="${esc(i.counterparty||'')}">${esc(i.counterparty||'')}</td>
       <td>${esc(catName(i.category_id))}</td>
       <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td>
@@ -1494,7 +1495,7 @@ function renderTx(){
               ? '<span class="badge b-ok" title="Frais sans facture">✔ Sans facture</span>'
               : (canEdit()?`<button class="btn ghost small" title="Relier à une facture" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>`:'<span class="hint">—</span>'))
           : '');
-    return `<td>${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
+    return `<td class="dt">${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
       <td>${rapp}</td>
@@ -2341,7 +2342,7 @@ function renderInvoices(){
     const stn=invStatementNames(i);
     const linkTxt=linked.length?`<div class="hint" style="margin-top:3px">${linked.map(t=>esc((t.op_date||'').slice(0,10))+' · '+euro(t.amount)).join('<br>')}${stn.length?'<br>📄 '+esc(stn.join(', ')):''}</div>`:'';
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
+    tr.innerHTML=`<td class="dt">${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
       <td><a href="#" onclick="openInvoicePreview('${i.id}');return false" title="Voir l'aperçu">${esc(i.counterparty||'—')}</a></td><td>${catTxt}${guestsBadge}</td><td>${esc(i.invoice_number||'—')}</td>
       <td class="num">${i.amount_ht!=null?euro(i.amount_ht):'—'}</td><td class="num">${i.vat_amount!=null?euro(i.vat_amount):'—'}</td>
       <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td>
@@ -2406,7 +2407,7 @@ function renderStatements(){
     const tr=document.createElement('tr');
     const accTxt=ACCOUNTS_OK&&ACCOUNTS.length>1?` · ${accName(s.account_id)}`:'';
     const nLines=TX.filter(t=>t.statement_id===s.id).length;
-    tr.innerHTML=`<td>${(s.created_at||'').slice(0,10)}</td><td>${s.period_month?String(s.period_month).slice(0,7):'—'}</td>
+    tr.innerHTML=`<td class="dt">${(s.created_at||'').slice(0,10)}</td><td>${s.period_month?String(s.period_month).slice(0,7):'—'}</td>
       <td><b>${esc(stmtLabel(s))}</b> <span class="hint">${nLines} ligne(s)${accTxt?esc(accTxt):''}</span></td>
       <td style="white-space:nowrap">
         <button class="btn ghost small" onclick="viewStatementLines('${s.id}')" title="Voir uniquement les lignes de ce relevé">👁️ Voir les lignes</button>
@@ -2466,7 +2467,7 @@ function renderTva(){
   Object.keys(map).filter(m=>periodMatch(m+'-01')).sort().reverse().forEach(m=>{
     const {coll,ded}=map[m]; const net=coll-ded;
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${m}</td><td class="num">${euro(coll)}</td><td class="num">${euro(ded)}</td>
+    tr.innerHTML=`<td class="dt">${m}</td><td class="num">${euro(coll)}</td><td class="num">${euro(ded)}</td>
       <td class="num">${euro(net)}</td><td>${net>=0?'<span class="badge b-lost">À payer</span>':'<span class="badge b-ok">Crédit de TVA</span>'}</td>`;
     body.appendChild(tr);
   });
