@@ -114,7 +114,8 @@
   .lead-head{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
   .lead-wrap{max-width:1760px;margin:0 auto;padding:20px}
   .bcards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;position:sticky;top:66px;z-index:4;background:var(--bg);padding:8px 0}
-  @media(max-width:880px){.bcards{position:static;padding:0;grid-template-columns:1fr 1fr}}
+  .bcards.no-marge{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:880px){.bcards,.bcards.no-marge{position:static;padding:0;grid-template-columns:1fr 1fr}}
   /* Carte marge : popover de détail au survol */
   .marge-card{overflow:visible!important;cursor:help}
   .marge-pop{position:absolute;top:calc(100% + 8px);left:0;min-width:280px;max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;z-index:30;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .16s var(--ease),transform .16s var(--ease)}
@@ -128,6 +129,16 @@
   .bcard .b-lab{color:var(--muted);font-size:12px}
   .bcard .b-val{font-size:20px;font-weight:800;margin-top:4px}
   .lead-body{display:grid;grid-template-columns:380px 1fr;gap:18px}
+  .lv-info-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .lv-chev{display:none}
+  /* Mobile : sur une fiche, l'étape passe en premier ; les infos client se replient */
+  @media(max-width:880px){
+    .lv-info-head{cursor:pointer;user-select:none;margin-bottom:0}
+    .lv-chev{display:inline-block;color:var(--muted);font-size:12px;transition:transform .18s var(--ease)}
+    #lv-info-card:not(.collapsed) .lv-chev{transform:rotate(90deg)}
+    #lv-info-card:not(.collapsed) .lv-info-head{margin-bottom:12px}
+    #lv-info-card.collapsed #lv-info-body{display:none}
+  }
   @media(max-width:880px){.lead-body{grid-template-columns:1fr}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
   .card h3{margin:0 0 6px;font-size:15px}
@@ -786,11 +797,13 @@
     </div>
     <div class="lead-body">
       <!-- GAUCHE : infos client -->
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="card collapsed" id="lv-info-card">
+        <div class="lv-info-head" onclick="toggleInfoCard()">
           <span class="pill" style="background:var(--accent);color:#241500" id="lv-num">Client</span>
           <span style="font-weight:600">Informations client</span>
+          <span class="lv-chev" style="margin-left:auto">▸</span>
         </div>
+        <div id="lv-info-body">
         <h3 id="lv-name" style="margin:0 0 12px">—</h3>
         <label>Civilité</label><select id="lv-civilite"><option value="">—</option><option>M.</option><option>Mme</option></select>
         <div class="grid2">
@@ -816,6 +829,7 @@
         <div style="display:flex;justify-content:flex-end;margin-top:12px">
           <button class="btn" id="lv-save" onclick="saveLeadInfo()">💾 Enregistrer</button>
         </div>
+        </div><!-- /lv-info-body -->
       </div>
       <!-- DROITE : suivi / documents / commentaires -->
       <div class="card">
@@ -1185,6 +1199,7 @@ async function openLead(id){
   g('doc-upbtn').classList.toggle('hidden',false);
   RV_EDIT=new Set();
   renderQuick(); renderBudgetCards(); renderStatuts(); animateBudgetCards();
+  const _ic=document.getElementById('lv-info-card'); if(_ic) _ic.classList.add('collapsed');
   showLeadTab('suivi');
   document.getElementById('lead-view').classList.remove('hidden'); window.scrollTo(0,0);
 }
@@ -1200,7 +1215,7 @@ function renderBudgetCards(){
   const l=curLead, st=stageOf(l.stage), m=leadMarge(l), see=canSeeMarge();
   document.getElementById('bc-stage').innerHTML=`<span class="pill" style="background:${st.color}22;color:${st.color}">${st.label}</span>`;
   const bca=document.getElementById('bc-ca'); bca.dataset.n=m.caHT; bca.dataset.fmt='eur'; bca.textContent=eur(m.caHT);
-  const grid=document.getElementById('bcards'); if(grid) grid.style.gridTemplateColumns='repeat('+(see?3:2)+',1fr)';
+  const grid=document.getElementById('bcards'); if(grid) grid.classList.toggle('no-marge',!see);
   const mc=document.getElementById('bc-marge-card'); if(mc) mc.style.display=see?'':'none';
   if(see){
     const bm=document.getElementById('bc-marge'); bm.dataset.n=m.marge; bm.dataset.fmt='eur'; bm.textContent=eur(m.marge); bm.style.color=m.marge<0?'var(--bad)':'';
@@ -1212,6 +1227,7 @@ function renderBudgetCards(){
       <div class="mp-sep"></div><div class="mp-row total"><span>= Marge</span><b style="color:${m.marge<0?'var(--bad)':'var(--good)'}">${eur(m.marge)}</b></div>`;
   }
 }
+function toggleInfoCard(){ const c=document.getElementById('lv-info-card'); if(c) c.classList.toggle('collapsed'); }
 function animateBudgetCards(){
   const l=curLead; if(!l) return;
   countUp(document.getElementById('bc-ca'));
