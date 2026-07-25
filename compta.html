@@ -446,8 +446,8 @@
       </table></div>
     </section>
     <section class="panel">
-      <h2>🏦 Paiements sans facture</h2>
-      <div class="hint">Sorties du relevé sans facture reliée. Deux options : <b>🔗 Relier à une facture</b>, ou — pour un frais qui n'a jamais de facture (banque, salaires, mutuelle…) — le classer <b>🏷️ Sans facture</b> ci-dessous (il disparaît alors de cette liste).</div>
+      <h2>🧾 Lignes sans facture (à justifier)</h2>
+      <div class="hint">Lignes du relevé (dépenses <b>et</b> encaissements) sans facture reliée. Deux options : <b>🔗 Relier à une facture</b> (achat ou vente), ou — pour ce qui n'a jamais de facture (banque, salaires, mutuelle, virement interne…) — le classer <b>🏷️ Sans facture</b> ci-dessous (il disparaît alors de cette liste).</div>
       <div class="filterbar"><div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="rap-tx-search" placeholder="libellé, montant…" oninput="renderRapproTab()"></div></div>
       <div class="table-wrap"><table class="compact">
         <thead><tr><th>Date</th><th>Libellé</th><th>Client / Fournisseur</th><th class="num">Montant</th><th></th></tr></thead>
@@ -996,7 +996,7 @@ function invoicesForTx(txId){ return INVOICES.filter(i=>invTxIds(i).includes(txI
 function txInvoiceSum(txId){ return invoicesForTx(txId).reduce((s,i)=>s+Math.abs(Number(i.amount_ttc)||0),0); }
 function txCovered(t){ const amt=Math.abs(Number(t.amount)||0); if(!amt) return true; return txInvoiceSum(t.id)>=amt-MATCH_TOL; }
 // « Sans facture à compléter » : sortie non couverte (aucune facture OU total des factures < montant du prélèvement)
-function txNeedsInvoice(t){ return Number(t.amount)<0 && !txSansFacture(t) && !txCovered(t); }
+function txNeedsInvoice(t){ return Number(t.amount)!==0 && !txSansFacture(t) && !txCovered(t); }
 function noInvoiceCats(){ return CATS.filter(c=>c.no_invoice && (c.company_id===CO.id||c.company_id==null)).sort((a,b)=>(a.name||'').localeCompare(b.name||'')); }
 // Depuis le rapprochement : classer une ligne dans une catégorie ET la marquer « sans facture ».
 async function setTxSansFacture(txId,catId){ if(!canEdit()||!catId) return;
@@ -1532,10 +1532,10 @@ function renderTx(){
     const invs=invoicesForTx(t.id); const inv=invs[0]||txInvoice(t.id);
     const rapp=inv
       ? `<span class="badge b-ok" style="cursor:pointer;text-decoration:underline dotted" title="Cliquer pour voir la facture liée" onclick="openTxInvoices('${t.id}')">🔗 ${invs.length>1?(invs.length+' factures liées'):'Facture liée'}</span>`
-      : (Number(t.amount)<0
+      : (Number(t.amount)!==0
           ? (txSansFacture(t)
-              ? '<span class="badge b-ok" title="Frais sans facture">✔ Sans facture</span>'
-              : (canEdit()?`<button class="btn ghost small" title="Relier à une facture" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>`:'<span class="hint">—</span>'))
+              ? '<span class="badge b-ok" title="Sans facture (justifié)">✔ Sans facture</span>'
+              : (canEdit()?`<button class="btn ghost small" title="Relier à une facture (${Number(t.amount)>0?'vente':'achat'})" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>`:'<span class="hint">—</span>'))
           : '');
     return `<td class="dt">${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
       <td class="num">${euroC(t.amount)}</td><td class="num">${t.vat_amount!=null?euroC(t.vat_amount):'—'}</td>
@@ -2037,7 +2037,7 @@ function renderRapproTab(){
   const cards=document.getElementById('rappro-cards');
   if(cards){ const nInv=toDo.length, nTx=orphans.length;
     cards.innerHTML=`<div class="card ${nInv?'bad':'good'}"><div class="label">📄 Factures à rapprocher</div><div class="value ${nInv?'val-bad':'val-good'}">${nInv}</div></div>
-      <div class="card ${nTx?'bad':'good'}"><div class="label">🏦 Paiements sans facture</div><div class="value ${nTx?'val-bad':'val-good'}">${nTx}</div></div>`; }
+      <div class="card ${nTx?'bad':'good'}"><div class="label">🧾 Lignes sans facture</div><div class="value ${nTx?'val-bad':'val-good'}">${nTx}</div></div>`; }
 }
 // Rapproche tout seul les factures dont le tiers/libellé a déjà été appris (correspondance sûre : montant + tiers).
 async function autoReconcile(){ if(!canEdit()) return;
