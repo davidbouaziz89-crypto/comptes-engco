@@ -1529,9 +1529,9 @@ function renderTx(){
   const txRowHtml=(t)=>{
     const catTxt=t.category_id?esc(catName(t.category_id)):'<span class="badge b-wip">à classer</span>';
     const accCell=showAcc?`<td class="tx-acc-col"><span class="pill">${accIcon((ACCOUNTS.find(a=>a.id===t.account_id)||{}).type)} ${esc(accName(t.account_id))}</span></td>`:'';
-    const inv=txInvoice(t.id);
+    const invs=invoicesForTx(t.id); const inv=invs[0]||txInvoice(t.id);
     const rapp=inv
-      ? `<span class="badge b-ok" title="Reliée à la facture ${esc(inv.counterparty||'')} ${esc(inv.invoice_number||'')}">🔗 Facture liée</span>`
+      ? `<span class="badge b-ok" style="cursor:pointer;text-decoration:underline dotted" title="Cliquer pour voir la facture liée" onclick="openTxInvoices('${t.id}')">🔗 ${invs.length>1?(invs.length+' factures liées'):'Facture liée'}</span>`
       : (Number(t.amount)<0
           ? (txSansFacture(t)
               ? '<span class="badge b-ok" title="Frais sans facture">✔ Sans facture</span>'
@@ -2475,6 +2475,10 @@ function matchSelect(i){
 function invStatementNames(inv){ const names=[...new Set(invLinkedTx(inv).map(t=>t.statement_id).filter(Boolean).map(id=>stmtLabel(stmtById(id))))]; return names; }
 /* ---- Aperçu d'une facture (image / PDF) ---- */
 let INVPREV={id:null,url:null};
+// Ouvre l'aperçu de la facture liée à un paiement (la 1re s'il y en a plusieurs)
+function openTxInvoices(txId){ const invs=invoicesForTx(txId); if(!invs.length){ toast('Aucune facture liée.'); return; }
+  if(invs.length>1) toast(invs.length+' factures liées — ouverture de la 1re (les autres sont dans l’onglet Factures).');
+  openInvoicePreview(invs[0].id); }
 async function openInvoicePreview(invId){
   const i=INVOICES.find(x=>x.id===invId); if(!i){ toast('Facture introuvable.'); return; }
   INVPREV={id:invId,url:null};
@@ -2491,7 +2495,7 @@ async function openInvoicePreview(invId){
   if(error||!data){ body.innerHTML='<div class="empty">Aperçu indisponible.</div>'; dl.style.display='none'; return; }
   INVPREV.url=data.signedUrl; dl.style.display='';
   const isImg=/\.(png|jpe?g|gif|webp|heic)$/i.test(i.storage_path)||/^image\//.test(i.original_filename||'');
-  body.innerHTML=isImg?`<img src="${data.signedUrl}" class="dp-img" alt="aperçu">`:`<iframe src="${data.signedUrl}#toolbar=1" class="dp-frame" title="aperçu"></iframe>`;
+  body.innerHTML=isImg?`<img src="${data.signedUrl}" class="dp-img" alt="aperçu">`:`<embed src="${data.signedUrl}" type="application/pdf" class="dp-frame">`;
 }
 function closeInvoicePreview(){ document.getElementById('invprev-modal').classList.add('hidden'); INVPREV={id:null,url:null}; }
 function invPreviewDownload(){ if(INVPREV.url) window.open(INVPREV.url,'_blank'); }
