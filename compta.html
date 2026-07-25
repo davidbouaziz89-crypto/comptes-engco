@@ -401,7 +401,7 @@
             <button type="button" class="btn small" onclick="document.getElementById('i-file').click()">⬆️ Choisir un/des fichier(s)</button>
             <button type="button" class="btn small ghost" onclick="document.getElementById('i-scan').click()">📷 Scanner</button>
           </div>
-          <input type="file" id="i-file" accept="image/*,.pdf" multiple class="hidden" onchange="onInvoiceFilePick('i-file')">
+          <input type="file" id="i-file" multiple class="hidden" onchange="onInvoiceFilePick('i-file')">
           <input type="file" id="i-scan" accept="image/*" capture="environment" class="hidden" onchange="onInvoiceFilePick('i-scan')">
           <div id="i-filename" class="hint" style="margin-top:4px"></div>
         </div>
