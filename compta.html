@@ -2417,7 +2417,10 @@ function renderInvoices(){
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openInvoiceEdit('${i.id}',this)" title="Modifier la facture">✏️</button> <button class="btn ghost small" onclick="delInvoice('${i.id}')" title="Supprimer">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
-  if(!rows.length) body.innerHTML='<tr><td colspan="11" class="empty">Aucune facture.</td></tr>';
+  if(!rows.length){ const per=(gYear()||gMonth());
+    body.innerHTML=per
+      ? `<tr><td colspan="11" class="empty">Aucune facture sur « ${esc(periodLabel())} ». <button class="btn small" onclick="resetPeriod()">📋 Tout voir</button></td></tr>`
+      : '<tr><td colspan="11" class="empty">Aucune facture.</td></tr>'; }
 }
 function matchSelect(i){
   return `<select onchange="matchInvoice('${i.id}',this.value)"><option value="">— rapprocher —</option>`+
