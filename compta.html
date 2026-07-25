@@ -518,6 +518,7 @@
         <button data-psec="categories" class="active" onclick="showParam('categories')">🏷️ Catégories de la société</button>
         <button data-psec="tiers" onclick="showParam('tiers')">🤝 Clients / Fournisseurs</button>
         <button data-psec="comptes" onclick="showParam('comptes')">💳 Comptes &amp; cartes</button>
+        <button data-psec="corbeille" onclick="showParam('corbeille')">🗑️ Corbeille</button>
         <button data-psec="societes" id="pm-societes" style="display:none" onclick="showParam('societes')">🏢 Sociétés</button>
         <button data-psec="users" id="pm-users" style="display:none" onclick="showParam('users')">👥 Utilisateurs &amp; accès</button>
       </div>
@@ -626,6 +627,17 @@
             <div class="table-wrap"><table>
               <thead><tr><th>Email</th><th>Rôle</th><th>Accès sociétés</th><th></th></tr></thead>
               <tbody id="users-body"></tbody>
+            </table></div>
+          </section>
+        </div>
+
+        <div class="ps" id="ps-corbeille" style="display:none">
+          <section class="panel">
+            <h2>🗑️ Corbeille</h2>
+            <div class="hint">Les factures supprimées sont conservées ici <b>30 jours</b>, puis supprimées définitivement automatiquement. Tu peux les restaurer ou les supprimer tout de suite.</div>
+            <div class="table-wrap"><table class="compact">
+              <thead><tr><th>Supprimée le</th><th>Sens</th><th>Client / Fournisseur</th><th>N°</th><th class="num">TTC</th><th>Purge dans</th><th></th></tr></thead>
+              <tbody id="trash-body"></tbody>
             </table></div>
           </section>
         </div>
@@ -826,7 +838,7 @@ updateThemeBtn();
 
 /* ---------- État global ---------- */
 let SESSION=null, IS_ADMIN=false, MY_ACCESS=[], COMPANIES=[], CO=null, MY_ROLE=null;
-let CATS=[], TX=[], INVOICES=[], RULES=[], TIERS=[], LINKS=[], ACCOUNTS=[], ACCOUNTS_OK=false;
+let CATS=[], TX=[], INVOICES=[], RULES=[], TIERS=[], LINKS=[], ACCOUNTS=[], ACCOUNTS_OK=false, DELETED_INVOICES=[];
 let INV_FROM_IA=false;
 /* ---------- Comptes / cartes (compte principal + Amex, CB…) ---------- */
 function principalAccountId(){ const a=ACCOUNTS.find(x=>x.type==='banque')||ACCOUNTS[0]; return a?a.id:null; }
@@ -1286,10 +1298,11 @@ function showParam(sec){
   if((sec==='societes'||sec==='users') && !IS_ADMIN) sec='categories';
   CURRENT_PARAM=sec;
   document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.psec===sec));
-  ['categories','tiers','comptes','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
+  ['categories','tiers','comptes','corbeille','societes','users'].forEach(x=>{ const el=document.getElementById('ps-'+x); if(el) el.style.display=(x===sec)?'':'none'; });
   if(sec==='categories') renderCats();
   if(sec==='tiers') renderTiersRegistry();
   if(sec==='comptes') renderComptes();
+  if(sec==='corbeille') renderTrash();
   if(sec==='societes') renderCompanies();
   if(sec==='users') renderUsers();
 }
@@ -1307,7 +1320,8 @@ async function reloadData(){
     db.from('compta_tiers').select('*').eq('company_id',CO.id).order('name'),
     db.from('compta_accounts').select('*').eq('company_id',CO.id).order('name'),
   ]);
-  CATS=cats.data||[]; TX=tx.data||[]; INVOICES=inv.data||[]; RULES=(rules&&rules.data)||[]; STATEMENTS=(stmts&&stmts.data)||[]; TIERS=(tiers&&tiers.data)||[];
+  CATS=cats.data||[]; TX=tx.data||[]; const _allInv=inv.data||[]; INVOICES=_allInv.filter(i=>!i.deleted_at); DELETED_INVOICES=_allInv.filter(i=>i.deleted_at); RULES=(rules&&rules.data)||[]; STATEMENTS=(stmts&&stmts.data)||[]; TIERS=(tiers&&tiers.data)||[];
+  purgeOldTrash();
   ACCOUNTS=(accts&&accts.data)||[]; ACCOUNTS_OK=!!(accts&&!accts.error); fillAccountSelects();
   // Liens facture ↔ lignes (rapprochement multi-lignes) — table optionnelle
   const invIds=INVOICES.map(i=>i.id);
@@ -2465,11 +2479,42 @@ async function matchInvoice(id,txId){
   await db.from('compta_transactions').update({status:'classe'}).eq('id',txId);
   toast('Facture rapprochée.'); reloadData();
 }
-async function delInvoice(id){ if(!confirm('Supprimer cette facture ?')) return;
-  const inv=INVOICES.find(x=>x.id===id);
-  if(inv&&inv.storage_path) await db.storage.from('compta-documents').remove([inv.storage_path]);
+async function delInvoice(id){ if(!confirm('Mettre cette facture à la corbeille ?\n(récupérable pendant 30 jours)')) return;
+  let {error}=await db.from('compta_invoices').update({deleted_at:new Date().toISOString()}).eq('id',id);
+  if(error && /deleted_at|column|colonne|schema/i.test(error.message||'')){ // colonne pas encore créée → suppression définitive (ancien comportement)
+    const inv=INVOICES.find(x=>x.id===id); if(inv&&inv.storage_path) await db.storage.from('compta-documents').remove([inv.storage_path]);
+    ({error}=await db.from('compta_invoices').delete().eq('id',id));
+    toast(error?('Erreur : '+error.message):'Supprimé (corbeille indispo : exécute sql/compta-corbeille.sql).'); reloadData(); return; }
+  toast(error?('Erreur : '+error.message):'🗑️ Facture mise à la corbeille (récupérable 30 j).'); reloadData();
+}
+/* ---- Corbeille (suppression douce + purge 30 jours) ---- */
+const TRASH_DAYS=30;
+function trashLeft(delAt){ const age=(Date.now()-new Date(delAt).getTime())/86400000; return Math.max(0,Math.ceil(TRASH_DAYS-age)); }
+function renderTrash(){ const body=document.getElementById('trash-body'); if(!body) return;
+  const list=(DELETED_INVOICES||[]).slice().sort((a,b)=>String(b.deleted_at).localeCompare(String(a.deleted_at)));
+  if(!list.length){ body.innerHTML='<tr><td colspan="7" class="empty">Corbeille vide.</td></tr>'; return; }
+  body.innerHTML=list.map(i=>{ const left=trashLeft(i.deleted_at);
+    return `<tr><td class="dt">${esc((i.deleted_at||'').slice(0,10))}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
+      <td>${esc(i.counterparty||'—')}</td><td>${esc(i.invoice_number||'—')}</td><td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td>
+      <td>${left>0?left+' j':'<span class="val-bad">bientôt</span>'}</td>
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="restoreInvoice('${i.id}')" title="Restaurer">♻️ Restaurer</button> <button class="btn danger small" onclick="purgeInvoice('${i.id}')" title="Supprimer définitivement">🗑 Définitif</button>`:''}</td></tr>`;
+  }).join('');
+}
+async function restoreInvoice(id){ if(!canEdit()) return;
+  const {error}=await db.from('compta_invoices').update({deleted_at:null}).eq('id',id);
+  toast(error?('Erreur : '+error.message):'♻️ Facture restaurée.'); reloadData();
+}
+async function purgeInvoice(id){ if(!canEdit()) return; if(!confirm('Supprimer DÉFINITIVEMENT cette facture ? (irréversible)')) return;
+  const inv=(DELETED_INVOICES||[]).find(x=>x.id===id);
+  if(inv&&inv.storage_path){ try{ await db.storage.from('compta-documents').remove([inv.storage_path]); }catch(_){} }
   const {error}=await db.from('compta_invoices').delete().eq('id',id);
-  toast(error?('Erreur : '+error.message):'Supprimé.'); reloadData();
+  toast(error?('Erreur : '+error.message):'Supprimé définitivement.'); reloadData();
+}
+async function purgeOldTrash(){ // purge auto des factures en corbeille depuis > 30 jours
+  const old=(DELETED_INVOICES||[]).filter(i=>trashLeft(i.deleted_at)<=0); if(!old.length) return;
+  for(const inv of old){ if(inv.storage_path){ try{ await db.storage.from('compta-documents').remove([inv.storage_path]); }catch(_){} }
+    try{ await db.from('compta_invoices').delete().eq('id',inv.id); }catch(_){} }
+  DELETED_INVOICES=DELETED_INVOICES.filter(i=>trashLeft(i.deleted_at)>0);
 }
 async function openDoc(path){
   const {data,error}=await db.storage.from('compta-documents').createSignedUrl(path,120);
