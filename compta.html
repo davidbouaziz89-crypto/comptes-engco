@@ -1520,7 +1520,7 @@ function renderTx(){
       <td class="num">${euro(t.amount)}</td><td class="num">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
       <td>${rapp}</td>
-      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openTxEdit('${t.id}',this)" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')" title="Relier une ou plusieurs factures à ce paiement">🔗</button> <button class="btn ghost small" onclick="openTxEdit('${t.id}',this)" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
   };
   const addRow=(t)=>{ const tr=document.createElement('tr'); tr.innerHTML=txRowHtml(t); body.appendChild(tr); };
   if(group){
