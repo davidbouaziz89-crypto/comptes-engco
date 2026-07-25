@@ -671,6 +671,27 @@
   </div>
 </div>
 
+<div id="inv-edit-panel" class="panel" style="display:none">
+  <div style="margin-bottom:6px"><b>✏️ Modifier la facture</b></div>
+  <form class="row" onsubmit="saveInvoiceEdit(event)">
+    <div class="field"><label>Sens</label><select id="ie-dir"><option value="achat">Achat (fournisseur)</option><option value="vente">Vente (client)</option></select></div>
+    <div class="field" style="min-width:180px"><label>Client / Fournisseur</label><input type="text" id="ie-tiers" list="tiers-list" placeholder="commence à taper…"></div>
+    <div class="field"><label>Catégorie</label><select id="ie-cat" onchange="onIeCatChange()"><option value="">— à choisir —</option></select></div>
+    <div class="field"><label>N° facture</label><input type="text" id="ie-num"></div>
+    <div class="field"><label>Date</label><input type="date" id="ie-date"></div>
+    <div class="field"><label>Montant HT (€)</label><input type="number" step="0.01" id="ie-ht" oninput="iePreview()"></div>
+    <div class="field"><label>TVA %</label><input type="number" step="0.01" id="ie-tva" oninput="iePreview()"></div>
+    <div class="field"><label>Montant TTC (€)</label><input type="number" step="0.01" id="ie-ttc" placeholder="auto si vide" oninput="iePreview()"></div>
+    <div class="field" id="ie-guests-field" style="display:none;min-width:220px"><label>🍽️ Invités (restaurant)</label><input type="text" id="ie-guests"></div>
+    <div class="field" id="ie-meals-field" style="display:none;max-width:120px"><label>Nb repas</label><input type="number" min="0" step="1" id="ie-meals"></div>
+  </form>
+  <div class="preview" id="ie-preview" style="margin-top:8px"></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn ghost" type="button" onclick="closeInvoiceEdit()">Annuler</button>
+    <button class="btn" type="button" onclick="saveInvoiceEdit(event)">💾 Enregistrer</button>
+  </div>
+</div>
+
 <!-- MODALE VÉRIF IA RELEVÉ -->
 <div id="ia-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:820px">
@@ -1559,6 +1580,50 @@ async function saveTxEdit(e){ if(e&&e.preventDefault)e.preventDefault(); if(!edi
   if(catId){ try{ await learnRule(rec.counterparty, rec.label, catId); }catch(_){} }
   toast('✔ Enregistré'+(catId?' — l’IA a mémorisé ce classement.':'.')); closeTxEdit(); reloadData();
 }
+/* ---- Édition d'une facture (inline sous la ligne) ---- */
+let editingInvId=null;
+function onIeCatChange(){ const resto=catIsRestaurant(document.getElementById('ie-cat').value);
+  const g=document.getElementById('ie-guests-field'); if(g) g.style.display=resto?'':'none';
+  const m=document.getElementById('ie-meals-field'); if(m) m.style.display=resto?'':'none'; }
+function iePreview(){ let ht=parseFloat(document.getElementById('ie-ht').value)||0; let rate=parseFloat(document.getElementById('ie-tva').value)||0;
+  let ttc=parseFloat(document.getElementById('ie-ttc').value); if(isNaN(ttc)||!ttc){ ttc=ht*(1+rate/100); } const tva=ttc-ht;
+  document.getElementById('ie-preview').innerHTML=ht?`HT <b>${euro(ht)}</b> · TVA <b>${euro(tva)}</b> · TTC <b>${euro(ttc)}</b>`:'—'; }
+function openInvoiceEdit(id,btn){ const i=INVOICES.find(x=>x.id===id); if(!i) return; editingInvId=id;
+  document.getElementById('ie-dir').value=i.direction||'achat';
+  document.getElementById('ie-tiers').value=i.counterparty||'';
+  document.getElementById('ie-cat').innerHTML='<option value="">— à choisir —</option>'+txCompanyCats().map(c=>`<option value="${c.id}"${c.id===i.category_id?' selected':''}>${esc(c.name)}</option>`).join('');
+  document.getElementById('ie-num').value=i.invoice_number||'';
+  document.getElementById('ie-date').value=i.invoice_date||'';
+  document.getElementById('ie-ht').value=(i.amount_ht!=null?i.amount_ht:'');
+  document.getElementById('ie-tva').value=(i.vat_rate!=null?i.vat_rate:'');
+  document.getElementById('ie-ttc').value=(i.amount_ttc!=null?i.amount_ttc:'');
+  document.getElementById('ie-guests').value=i.guests||'';
+  document.getElementById('ie-meals').value=(i.meals!=null?i.meals:'');
+  onIeCatChange(); iePreview();
+  const panel=document.getElementById('inv-edit-panel');
+  if(!inlineEditAtRow(panel,btn)){ panel.style.display=''; }
+}
+function closeInvoiceEdit(){ editingInvId=null; const p=document.getElementById('inv-edit-panel'); restoreInlineForm(p); p.style.display='none'; }
+async function saveInvoiceEdit(e){ if(e&&e.preventDefault)e.preventDefault(); if(!editingInvId||!canEdit()) return;
+  const tiers=document.getElementById('ie-tiers').value.trim(); if(!tiers){ toast('Indique le client / fournisseur.'); return; }
+  let ht=parseFloat(document.getElementById('ie-ht').value), rate=parseFloat(document.getElementById('ie-tva').value), ttc=parseFloat(document.getElementById('ie-ttc').value);
+  if((isNaN(ttc)||!ttc)&&!isNaN(ht)) ttc=ht*(1+(rate||0)/100);
+  if(isNaN(ht)&&!isNaN(ttc)&&rate) ht=ttc/(1+rate/100);
+  const tva=(!isNaN(ttc)&&!isNaN(ht))?(ttc-ht):null;
+  const catId=document.getElementById('ie-cat').value||null;
+  const guests=catIsRestaurant(catId)?(document.getElementById('ie-guests').value.trim()||null):null;
+  const mealsRaw=catIsRestaurant(catId)?parseInt(document.getElementById('ie-meals').value,10):NaN;
+  const rec={ direction:document.getElementById('ie-dir').value, counterparty:tiers, invoice_number:document.getElementById('ie-num').value.trim()||null,
+    invoice_date:document.getElementById('ie-date').value||null, amount_ht:isNaN(ht)?null:Math.round(ht*100)/100,
+    vat_rate:isNaN(rate)?null:rate, vat_amount:tva!=null?Math.round(tva*100)/100:null, amount_ttc:isNaN(ttc)?null:Math.round(ttc*100)/100,
+    category_id:catId, guests, meals:isNaN(mealsRaw)?null:mealsRaw };
+  let {error}=await db.from('compta_invoices').update(rec).eq('id',editingInvId);
+  if(error && /category_id|guests|meals|column|colonne/i.test(error.message||'')){ const r2={...rec}; delete r2.category_id; delete r2.guests; delete r2.meals; ({error}=await db.from('compta_invoices').update(r2).eq('id',editingInvId)); }
+  if(error){ toast('Erreur : '+error.message); return; }
+  await registerTiers(tiers,'manuel');
+  if(catId){ try{ await learnRule(tiers, tiers, catId); }catch(_){} }
+  toast('✔ Facture modifiée.'); closeInvoiceEdit(); reloadData();
+}
 async function setTxCat(id,cid){
   const c=catById(cid);
   const upd={ category_id:cid||null, status:cid?'classe':'a_classer' };
@@ -2325,6 +2390,7 @@ function fillInvFilters(){
   const ft=document.getElementById('inv-ftiers'); if(ft){ const cur=ft.value; const t=[...new Set(INVOICES.map(i=>i.counterparty).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); ft.innerHTML='<option value="">Tous</option>'+t.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); ft.value=cur; }
 }
 function renderInvoices(){
+  const iep=document.getElementById('inv-edit-panel'); if(iep&&iep._holder){ restoreInlineForm(iep); iep.style.display='none'; editingInvId=null; }
   fillInvFilters();
   const dir=document.getElementById('inv-fdir').value, mt=document.getElementById('inv-fmatch').value;
   const ftiers=document.getElementById('inv-ftiers').value;
@@ -2348,7 +2414,7 @@ function renderInvoices(){
       <td class="num">${i.amount_ttc!=null?euro(i.amount_ttc):'—'}</td>
       <td>${matchBadge(st)}${linkTxt}${canEdit()?`<div style="margin-top:3px"><button class="btn ghost small" onclick="openRappro('${i.id}')">🔗 Relier</button></div>`:''}</td>
       <td><button class="btn ghost small" onclick="openInvoicePreview('${i.id}')" title="Aperçu">👁️ Aperçu</button></td>
-      <td>${canEdit()?`<button class="btn ghost small" onclick="delInvoice('${i.id}')">🗑</button>`:''}</td>`;
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openInvoiceEdit('${i.id}',this)" title="Modifier la facture">✏️</button> <button class="btn ghost small" onclick="delInvoice('${i.id}')" title="Supprimer">🗑</button>`:''}</td>`;
     body.appendChild(tr);
   });
   if(!rows.length) body.innerHTML='<tr><td colspan="11" class="empty">Aucune facture.</td></tr>';
