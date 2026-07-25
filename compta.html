@@ -418,7 +418,7 @@
       <div class="filterbar">
         <div class="field"><label>Fournisseur / client</label><select id="inv-ftiers" onchange="renderInvoices()"><option value="">Tous</option></select></div>
         <div class="field"><label>Sens</label><select id="inv-fdir" onchange="renderInvoices()"><option value="">Tous</option><option value="achat">Achats</option><option value="vente">Ventes</option></select></div>
-        <div class="field"><label>Rapprochement</label><select id="inv-fmatch" onchange="renderInvoices()"><option value="">Tous</option><option value="rapproche">✅ Rapprochées</option><option value="partiel">⏳ Partielles</option><option value="a_rapprocher">⏳ En attente</option></select></div>
+        <div class="field"><label>Statut</label><select id="inv-fmatch" onchange="renderInvoices()"><option value="">Toutes</option><option value="rapproche">✅ Reliées</option><option value="partiel">⏳ Partiellement reliées</option><option value="a_rapprocher">⛔ Non reliées</option></select></div>
         <div class="field" style="max-width:200px"><label>Recherche</label><input type="text" id="inv-search" placeholder="client, n°…" oninput="renderInvoices()"></div>
       </div>
       <div class="table-wrap"><table class="compact">
@@ -2329,7 +2329,7 @@ function renderInvoices(){
   const dir=document.getElementById('inv-fdir').value, mt=document.getElementById('inv-fmatch').value;
   const ftiers=document.getElementById('inv-ftiers').value;
   const q=(document.getElementById('inv-search').value||'').toLowerCase();
-  let rows=INVOICES.filter(i=>periodMatch(i.invoice_date)&&(!dir||i.direction===dir)&&(!mt||i.status===mt)
+  let rows=INVOICES.filter(i=>periodMatch(i.invoice_date)&&(!dir||i.direction===dir)&&(!mt||invMatchState(i)===mt)
     &&(!ftiers||(i.counterparty||'')===ftiers)
     &&(!q||(i.counterparty||'').toLowerCase().includes(q)||(i.invoice_number||'').toLowerCase().includes(q)));
   rows.sort((a,b)=>(b.invoice_date||'').localeCompare(a.invoice_date||''));
