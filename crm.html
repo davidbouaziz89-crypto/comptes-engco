@@ -114,6 +114,15 @@
   .bcard .b-lab{color:var(--muted);font-size:13px}
   .bcard .b-val{font-size:24px;font-weight:800;margin-top:4px}
   .lead-body{display:grid;grid-template-columns:380px 1fr;gap:18px}
+  .lv-info-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .lv-chev{display:none}
+  @media(max-width:880px){
+    .lv-info-head{cursor:pointer;user-select:none;margin-bottom:0}
+    .lv-chev{display:inline-block;color:var(--muted);font-size:12px;transition:transform .18s var(--ease)}
+    #lv-info-card:not(.collapsed) .lv-chev{transform:rotate(90deg)}
+    #lv-info-card:not(.collapsed) .lv-info-head{margin-bottom:12px}
+    #lv-info-card.collapsed #lv-info-body{display:none}
+  }
   @media(max-width:880px){.lead-body{grid-template-columns:1fr}}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
   .card h3{margin:0 0 6px;font-size:15px}
@@ -579,11 +588,13 @@
     </div>
     <div class="lead-body">
       <!-- GAUCHE -->
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="card collapsed" id="lv-info-card">
+        <div class="lv-info-head" onclick="toggleInfoCard()">
           <span class="pill" style="background:var(--accent);color:#fff" id="lv-num">Lead</span>
           <span style="font-weight:600">Information client</span>
+          <span class="lv-chev" style="margin-left:auto">▸</span>
         </div>
+        <div id="lv-info-body">
         <h3 id="lv-name" style="margin:0 0 12px">—</h3>
         <label>Prénom</label><input id="lv-prenom">
         <label>Nom</label><input id="lv-nom">
@@ -598,6 +609,7 @@
         <div style="display:flex;justify-content:flex-end;margin-top:12px">
           <button class="btn" id="lv-save" onclick="saveLeadInfo()">💾 Enregistrer</button>
         </div>
+        </div><!-- /lv-info-body -->
       </div>
       <!-- DROITE -->
       <div class="card">
@@ -817,6 +829,7 @@ async function openLead(id){
   document.getElementById('lead-view').classList.remove('hidden'); window.scrollTo(0,0);
   await loadLeadFormations(id);   // met à jour cartes budget + étape
   animateBudgetCards();
+  const _ic=document.getElementById('lv-info-card'); if(_ic) _ic.classList.add('collapsed');
   loadActivities(id);
   renderLeadRdvs();
 }
@@ -880,6 +893,7 @@ function renderBudgetCards(){
   const card=document.getElementById('bc-restant-card'); if(card) card.style.setProperty('--kc',rest<0?'var(--bad)':'var(--good)');
 }
 function animateBudgetCards(){ ['bc-montant','bc-formations','bc-restant'].forEach(id=>countUp(document.getElementById(id))); }
+function toggleInfoCard(){ const c=document.getElementById('lv-info-card'); if(c) c.classList.toggle('collapsed'); }
 
 /* Étapes / parcours */
 /* Rendu koneckt : étapes en cartes progressives décroissantes */
