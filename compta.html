@@ -1136,8 +1136,9 @@ async function callComptaIA(kind,file,silent){
   if(!silent){ showAILoader(kind==='releve'?'Lecture du relevé…':'Lecture de la facture…', kind==='releve'?'Extraction des opérations…':'Extraction des montants…'); startAISimProgress(); }
   try{
     const b64=await fileToB64(file);
+    const mime=await effectiveType(file);
     const cats=CATS.map(c=>({id:c.id,name:c.name,flow:c.flow}));
-    const {data,error}=await db.functions.invoke('compta-ia',{body:{kind,company_id:CO.id,company_name:(CO&&CO.name)||'',filename:file.name,mime:file.type||'application/pdf',data:b64,categories:cats}});
+    const {data,error}=await db.functions.invoke('compta-ia',{body:{kind,company_id:CO.id,company_name:(CO&&CO.name)||'',filename:file.name,mime,data:b64,categories:cats}});
     if(error){ let m=error.message||'Erreur IA'; let st=''; try{ st=error.context&&error.context.status?(' [HTTP '+error.context.status+']'):''; }catch(_){}
       try{ const ctx=await error.context.json(); if(ctx&&ctx.error) m=ctx.error; }catch(_){ try{ const t=await error.context.text(); if(t) m=t; }catch(__){} }
       throw new Error(m+st); }
@@ -2156,10 +2157,28 @@ function invPreview(){
 
 /* ---- Aperçu du document déposé ---- */
 let DOCPREVIEW_URL=null;
-function renderDocPreview(file){ const box=document.getElementById('i-docpreview'); if(!box) return;
+// Détecte le vrai type d'un fichier par ses 1ers octets (utile pour les fichiers sans extension)
+async function sniffFileType(file){
+  try{ const buf=new Uint8Array(await file.slice(0,12).arrayBuffer());
+    const h=[...buf.slice(0,4)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    if(h.startsWith('25504446')) return 'application/pdf';   // %PDF
+    if(h.startsWith('ffd8ff'))    return 'image/jpeg';
+    if(h.startsWith('89504e47'))  return 'image/png';
+    if(h.startsWith('47494638'))  return 'image/gif';
+    if(buf[0]===0x52&&buf[1]===0x49&&buf[2]===0x46&&buf[3]===0x46) return 'image/webp'; // RIFF..WEBP
+  }catch(_){}
+  return 'application/pdf'; // par défaut : on tente le PDF
+}
+function extForType(t){ return {'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','image/gif':'gif','image/webp':'webp'}[t]||'pdf'; }
+// type effectif du fichier (déclaré, sinon détecté par le contenu)
+async function effectiveType(file){ return file.type||await sniffFileType(file); }
+
+async function renderDocPreview(file){ const box=document.getElementById('i-docpreview'); if(!box) return;
   if(DOCPREVIEW_URL){ try{ URL.revokeObjectURL(DOCPREVIEW_URL); }catch(_){} DOCPREVIEW_URL=null; }
   if(!file){ box.style.display='none'; box.innerHTML=''; return; }
-  DOCPREVIEW_URL=URL.createObjectURL(file); const isImg=(file.type||'').startsWith('image/');
+  const type=await effectiveType(file); const isImg=type.startsWith('image/');
+  const blob=file.type?file:file.slice(0,file.size,type);   // force le bon type MIME si absent
+  DOCPREVIEW_URL=URL.createObjectURL(blob);
   box.style.display='';
   box.innerHTML=`<div class="dp-head"><span>📄 Aperçu — <b>${esc(file.name)}</b></span>
     <span style="display:flex;gap:6px"><button type="button" class="btn ghost small" onclick="window.open(DOCPREVIEW_URL,'_blank')">Ouvrir en grand</button>
@@ -2252,8 +2271,8 @@ async function saveOneInvoice(b){
   const guests=catIsRestaurant(catId)?(b.guests||null):null;
   const meals=catIsRestaurant(catId)?(b.meals!=null?b.meals:null):null;
   let storage_path=null, original_filename=null;
-  if(b.file){ const ext=(b.file.name.split('.').pop()||'bin'); storage_path=`${CO.id}/invoices/${crypto.randomUUID()}.${ext}`; original_filename=b.file.name;
-    const up=await db.storage.from('compta-documents').upload(storage_path,b.file,{upsert:false}); if(up.error) return false; }
+  if(b.file){ const ctype=await effectiveType(b.file); const ext=b.file.type?(b.file.name.split('.').pop()||'bin'):extForType(ctype); storage_path=`${CO.id}/invoices/${crypto.randomUUID()}.${ext}`; original_filename=b.file.name;
+    const up=await db.storage.from('compta-documents').upload(storage_path,b.file,{upsert:false,contentType:ctype}); if(up.error) return false; }
   const rec={ company_id:CO.id, direction:b.dir||'achat', counterparty:tiers, invoice_number:(b.num||'').trim()||null, invoice_date:b.date||null,
     amount_ht:isNaN(ht)?null:Math.round(ht*100)/100, vat_rate:isNaN(rate)?null:rate, vat_amount:tva!=null?Math.round(tva*100)/100:null,
     amount_ttc:isNaN(ttc)?null:Math.round(ttc*100)/100, category_id:catId, guests, meals, storage_path, original_filename, transaction_id:null, status:'a_rapprocher', uploaded_by:SESSION.user.id };
@@ -2375,9 +2394,9 @@ async function addInvoice(e){ if(e&&e.preventDefault)e.preventDefault(); if(!can
   const file=INVOICE_FILE;
   let storage_path=null, original_filename=null;
   if(file){
-    const ext=(file.name.split('.').pop()||'bin');
+    const ctype=await effectiveType(file); const ext=file.type?(file.name.split('.').pop()||'bin'):extForType(ctype);
     storage_path=`${CO.id}/invoices/${crypto.randomUUID()}.${ext}`; original_filename=file.name;
-    const up=await db.storage.from('compta-documents').upload(storage_path,file,{upsert:false});
+    const up=await db.storage.from('compta-documents').upload(storage_path,file,{upsert:false,contentType:ctype});
     if(up.error){ toast('Upload échoué : '+up.error.message); return; }
   }
   const rec={ company_id:CO.id, direction:document.getElementById('i-dir').value, counterparty:tiers,
