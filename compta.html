@@ -175,7 +175,7 @@
   select.needcat{border-color:var(--warm)!important;animation:needpulse 1.5s ease-in-out infinite}
   @keyframes needpulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--warm) 0%,transparent)}50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--warm) 24%,transparent)}}
   /* --- Barre de chargement IA (futuriste) --- */
-  .ai-overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:300;padding:20px}
+  .ai-overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:460;padding:20px}
   .ai-overlay.hidden{display:none!important}
   .ai-box{background:linear-gradient(165deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:20px;padding:28px 30px;width:min(430px,92vw);box-shadow:0 30px 80px -30px rgba(0,0,0,.8);text-align:center;position:relative;overflow:hidden}
   .ai-box::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 80px at 50% 0,color-mix(in srgb,var(--accent) 20%,transparent),transparent 70%);pointer-events:none}
@@ -313,6 +313,41 @@
   .combo-item:hover,.combo-item.active{ background:color-mix(in srgb,var(--accent) 16%,transparent); }
   .combo-item.sel{ color:var(--accent); font-weight:600; }
   .combo-empty{ padding:12px; color:var(--muted); text-align:center; font-style:italic; }
+
+  /* ============ Bouton Scanner (FAB) + Assistant mobile ============ */
+  #scan-fab{ position:fixed; right:18px; bottom:20px; z-index:150; height:60px; padding:0 22px 0 20px; border-radius:34px; border:0; cursor:pointer;
+    background:var(--grad-accent); color:#fff; font-size:16px; font-weight:800; letter-spacing:.2px; display:none; align-items:center; gap:10px;
+    box-shadow:0 16px 38px -12px color-mix(in srgb,var(--accent) 90%,transparent), inset 0 1px 0 rgba(255,255,255,.35); animation:fabpulse 3s ease-in-out infinite; }
+  #scan-fab.show{ display:inline-flex; }
+  #scan-fab .fi{ font-size:24px; }
+  @keyframes fabpulse{ 0%,100%{ box-shadow:0 16px 38px -12px color-mix(in srgb,var(--accent) 90%,transparent) } 50%{ box-shadow:0 16px 44px -10px color-mix(in srgb,var(--accent) 100%,transparent), 0 0 0 6px color-mix(in srgb,var(--accent) 14%,transparent) } }
+  #scanwiz{ position:fixed; inset:0; z-index:400; background:var(--bg); display:flex; flex-direction:column; }
+  #scanwiz.hidden{ display:none!important; }
+  #scanwiz::before{ content:""; position:absolute; inset:0; z-index:-1; background:radial-gradient(70% 40% at 50% 0,color-mix(in srgb,var(--accent) 16%,transparent),transparent 70%); pointer-events:none; }
+  .sw-top{ display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); }
+  .sw-top h3{ margin:0; font-family:var(--font-display); font-size:18px; flex:1; letter-spacing:-.3px; }
+  .sw-prog{ display:flex; gap:6px; padding:14px 18px 0; }
+  .sw-dot{ height:5px; flex:1; border-radius:5px; background:var(--panel2); transition:background .3s; }
+  .sw-dot.on{ background:var(--grad-accent); }
+  .sw-body{ flex:1; overflow:hidden; position:relative; }
+  .sw-slide{ position:absolute; inset:0; overflow-y:auto; overflow-x:hidden; padding:24px 18px; display:flex; flex-direction:column; justify-content:center; gap:16px; max-width:560px; margin:0 auto; width:100%; }
+  .sw-slide.sw-in{ animation:swIn .34s cubic-bezier(.3,0,.2,1); }
+  .sw-slide.sw-inL{ animation:swInL .34s cubic-bezier(.3,0,.2,1); }
+  @keyframes swIn{ from{ transform:translateX(40px); opacity:0 } to{ transform:none; opacity:1 } }
+  @keyframes swInL{ from{ transform:translateX(-40px); opacity:0 } to{ transform:none; opacity:1 } }
+  .sw-q{ font-family:var(--font-display); font-size:23px; font-weight:700; letter-spacing:-.4px; line-height:1.2; overflow-wrap:break-word; }
+  .sw-hint2{ color:var(--muted); font-size:14.5px; margin-top:-6px; }
+  .sw-input{ font-size:22px!important; padding:16px!important; border-radius:15px!important; }
+  .sw-big{ display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; }
+  .sw-choice{ flex:1; min-width:130px; padding:24px 18px; border-radius:18px; border:1px solid var(--line); background:linear-gradient(160deg,var(--panel),var(--panel2)); color:var(--txt); font-size:19px; font-weight:800; cursor:pointer; text-align:center; line-height:1.3; }
+  .sw-choice.sel{ border-color:var(--accent); box-shadow:var(--glow); }
+  .sw-nav{ display:flex; gap:12px; padding:16px 18px calc(16px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+  .sw-nav .btn{ flex:1; padding:17px; font-size:16px; }
+  .sw-pages{ display:flex; gap:10px; flex-wrap:wrap; }
+  .sw-page{ width:88px; height:116px; border-radius:12px; overflow:hidden; border:1px solid var(--line); position:relative; box-shadow:var(--shadow); }
+  .sw-page img{ width:100%; height:100%; object-fit:cover; }
+  .sw-page b{ position:absolute; top:3px; left:6px; font-size:12px; color:#fff; text-shadow:0 1px 4px #000; font-weight:800; }
+  .sw-page .rm{ position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%; border:0; background:rgba(0,0,0,.55); color:#fff; cursor:pointer; font-size:13px; }
 
   /* ============ COCKPIT NÉON v2.1 — plus marqué (identité forte) ============ */
   :root{ --radius:20px; }
@@ -945,11 +980,22 @@
   </div>
 </div>
 
+<!-- Bouton flottant Scanner + Assistant mobile -->
+<button id="scan-fab" onclick="openScanWiz()" title="Scanner une facture"><span class="fi">📸</span> Scanner</button>
+<div id="scanwiz" class="hidden">
+  <div class="sw-top"><button class="btn ghost small" onclick="closeScanWiz()">✕</button><h3 id="sw-title">Scanner une facture</h3></div>
+  <div class="sw-prog" id="sw-prog"></div>
+  <div class="sw-body"><div id="sw-track"></div></div>
+  <div class="sw-nav" id="sw-nav"></div>
+  <input type="file" id="sw-cam" accept="image/*" capture="environment" class="hidden" onchange="swAddPage(this.files[0]);this.value='';">
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 const SUPABASE_URL = "https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
@@ -1427,6 +1473,7 @@ function startApp(){
   const pmu=document.getElementById('pm-users'); if(pmu) pmu.style.display=IS_ADMIN?'':'none';
   applyRoleTabs();
   const vis=visibleTabs(); showTab(vis.includes('dashboard')?'dashboard':vis[0]);
+  const fab=document.getElementById('scan-fab'); if(fab) fab.classList.toggle('show', canEdit());
 }
 
 /* ---------- Période globale (Année + Mois) appliquée à tous les onglets ---------- */
@@ -2485,6 +2532,101 @@ async function saveOneInvoice(b){
   await registerTiers(tiers, b.fromIA?'ia':'manuel');
   if(catId){ try{ await learnRule(tiers, tiers, catId); }catch(_){} }
   return true;
+}
+
+/* ================= ASSISTANT MOBILE : Scanner → PDF → questions ================= */
+let WIZ=null;
+const WIZ_STEPS=['dir','tiers','cat','montant','date','recap'];
+function openScanWiz(){ if(!CO){ toast('Choisis d’abord une société.'); return; } if(!canEdit()){ toast('Lecture seule.'); return; }
+  WIZ={ pages:[], file:null, step:'capture', idx:0, dir:'next',
+    data:{dir:'achat',tiers:'',num:'',date:'',ht:'',rate:20,ttc:'',catId:'',guests:'',meals:null,fromIA:false} };
+  document.getElementById('scanwiz').classList.remove('hidden'); renderWiz();
+  setTimeout(()=>document.getElementById('sw-cam').click(),150);
+}
+function closeScanWiz(){ document.getElementById('scanwiz').classList.add('hidden');
+  if(WIZ) WIZ.pages.forEach(p=>{ try{URL.revokeObjectURL(p.url);}catch(_){}}); WIZ=null; }
+function swAddPage(file){ if(!file||!WIZ) return; WIZ.pages.push({file,url:URL.createObjectURL(file)}); renderWiz(); }
+function swRemovePage(i){ if(!WIZ) return; try{URL.revokeObjectURL(WIZ.pages[i].url);}catch(_){}; WIZ.pages.splice(i,1); renderWiz(); }
+function renderWiz(){
+  if(!WIZ) return;
+  const track=document.getElementById('sw-track'), nav=document.getElementById('sw-nav'), prog=document.getElementById('sw-prog'), title=document.getElementById('sw-title');
+  const anim = WIZ.dir==='prev' ? 'sw-inL' : 'sw-in';
+  if(WIZ.step==='capture'){ title.textContent='Scanner le document'; prog.innerHTML='';
+    track.innerHTML=`<div class="sw-slide ${anim}"><div class="sw-q">📸 Scanne ta facture</div>
+      <div class="sw-hint2">Prends une photo par page. Tu peux en ajouter plusieurs, puis on en fait un seul PDF.</div>
+      <div class="sw-pages">${WIZ.pages.map((p,i)=>`<div class="sw-page"><img src="${p.url}"><b>${i+1}</b><button class="rm" onclick="swRemovePage(${i})">✕</button></div>`).join('')||'<div class="sw-hint2">Aucune page pour l’instant.</div>'}</div></div>`;
+    nav.innerHTML=`<button class="btn ghost" onclick="document.getElementById('sw-cam').click()">📷 ${WIZ.pages.length?'Ajouter une page':'Prendre la photo'}</button>`+
+      (WIZ.pages.length?`<button class="btn" onclick="swValidate()">✅ Valider (${WIZ.pages.length})</button>`:'');
+    return;
+  }
+  if(WIZ.step==='reading'){ title.textContent='Lecture…'; prog.innerHTML='';
+    track.innerHTML=`<div class="sw-slide"><div class="sw-q">🪄 L’IA lit ton document…</div><div class="sw-hint2">Quelques secondes, on pré-remplit tout.</div><div class="ai-track" style="margin-top:10px"><div class="ai-fill" style="display:none"></div></div></div>`;
+    nav.innerHTML=''; return;
+  }
+  const key=WIZ_STEPS[WIZ.idx]; title.textContent='Nouvelle facture';
+  prog.innerHTML=WIZ_STEPS.map((_,i)=>`<div class="sw-dot ${i<=WIZ.idx?'on':''}"></div>`).join('');
+  track.innerHTML=`<div class="sw-slide ${anim}">${swSlide(key)}</div>`;
+  nav.innerHTML=(WIZ.idx>0?`<button class="btn ghost" onclick="wizPrev()">◀︎ Précédent</button>`:`<button class="btn ghost" onclick="wizToCapture()">◀︎ Scan</button>`)+
+    (key==='recap'?`<button class="btn" onclick="wizSave()">✔ Enregistrer</button>`:`<button class="btn" onclick="wizNext()">Suivant ▶︎</button>`);
+  setTimeout(()=>{ const el=track.querySelector('.sw-input'); if(el&&el.focus&&key!=='dir'&&key!=='recap') el.focus(); },60);
+}
+function swSlide(key){ const d=WIZ.data;
+  if(key==='dir') return `<div class="sw-q">C’est un achat ou une vente ?</div><div class="sw-hint2">Achat = tu paies un fournisseur. Vente = un client te paie.</div>
+    <div class="sw-big"><button class="sw-choice ${d.dir==='achat'?'sel':''}" onclick="WIZ.data.dir='achat';renderWiz()">🛒 Achat<br><span class="sw-hint2">fournisseur</span></button>
+      <button class="sw-choice ${d.dir==='vente'?'sel':''}" onclick="WIZ.data.dir='vente';renderWiz()">💶 Vente<br><span class="sw-hint2">client</span></button></div>`;
+  if(key==='tiers') return `<div class="sw-q">${d.dir==='vente'?'Quel client ?':'Quel fournisseur ?'}</div>
+    <input class="sw-input" value="${esc(d.tiers)}" list="tiers-list" placeholder="ex. DHL Express" oninput="WIZ.data.tiers=this.value">`;
+  if(key==='cat') return `<div class="sw-q">Dans quelle catégorie ?</div><div class="sw-hint2">Tape pour filtrer si la liste est longue.</div>
+    <select class="sw-input" onchange="WIZ.data.catId=this.value">${'<option value="">— choisir —</option>'+txCompanyCats().map(c=>`<option value="${c.id}" ${c.id===d.catId?'selected':''}>${esc(c.name)}</option>`).join('')}</select>`;
+  if(key==='montant') return `<div class="sw-q">Montant TTC ?</div><div class="sw-hint2">Ce qui a été payé. Le HT se calcule tout seul.</div>
+    <input class="sw-input" type="number" inputmode="decimal" value="${d.ttc}" placeholder="0,00 €" oninput="WIZ.data.ttc=this.value">
+    <div style="display:flex;gap:10px"><input class="sw-input" style="font-size:16px!important" type="number" inputmode="decimal" value="${d.rate}" placeholder="TVA %" oninput="WIZ.data.rate=this.value"><input class="sw-input" style="font-size:16px!important" type="number" inputmode="decimal" value="${d.ht}" placeholder="HT € (option)" oninput="WIZ.data.ht=this.value"></div>`;
+  if(key==='date') return `<div class="sw-q">Date de la facture ?</div><input class="sw-input" type="date" value="${d.date||''}" onchange="WIZ.data.date=this.value">`;
+  if(key==='recap'){ const cat=(txCompanyCats().find(c=>c.id===d.catId)||{}).name||'—';
+    return `<div class="sw-q">On récapitule 👇</div>
+      <div class="preview" style="font-size:15px;line-height:2">
+        <b>${d.dir==='vente'?'Vente':'Achat'}</b> · <b>${esc(d.tiers||'—')}</b><br>
+        Catégorie : <b>${esc(cat)}</b><br>Date : <b>${esc(d.date||'—')}</b><br>
+        Montant TTC : <b>${d.ttc?euro(d.ttc):'—'}</b> · TVA ${d.rate||0}%<br>
+        📄 <b>PDF scanné — ${WIZ.pages.length} page${WIZ.pages.length>1?'s':''}</b></div>`; }
+  return '';
+}
+function wizNext(){ if(WIZ.idx<WIZ_STEPS.length-1){ WIZ.dir='next'; WIZ.idx++; renderWiz(); } }
+function wizPrev(){ if(WIZ.idx>0){ WIZ.dir='prev'; WIZ.idx--; renderWiz(); } }
+function wizToCapture(){ WIZ.dir='prev'; WIZ.step='capture'; renderWiz(); }
+async function imagesToPdf(files){
+  if(!window.jspdf||!window.jspdf.jsPDF) return files[0]; // fallback : 1re image si jsPDF absent
+  const { jsPDF }=window.jspdf; const pdf=new jsPDF({unit:'pt',format:'a4'});
+  for(let i=0;i<files.length;i++){ const durl=await fileToDataUrl(files[i]); const img=await loadImg(durl);
+    const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+    const ratio=Math.min((pw-24)/img.width,(ph-24)/img.height); const w=img.width*ratio, h=img.height*ratio;
+    if(i>0) pdf.addPage(); const fmt=(files[i].type||'').indexOf('png')>=0?'PNG':'JPEG';
+    pdf.addImage(durl, fmt, (pw-w)/2, (ph-h)/2, w, h); }
+  return new File([pdf.output('blob')], 'scan-facture.pdf', {type:'application/pdf'});
+}
+function fileToDataUrl(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f); }); }
+function loadImg(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; }); }
+async function swValidate(){ if(!WIZ||!WIZ.pages.length) return;
+  WIZ.step='reading'; renderWiz();
+  try{ WIZ.file=await imagesToPdf(WIZ.pages.map(p=>p.file)); }catch(e){ WIZ.file=WIZ.pages[0].file; }
+  try{ const r=await callComptaIA('facture',WIZ.file,true); const d=WIZ.data;
+    d.dir=r.direction||'achat'; d.tiers=r.counterparty||''; d.num=r.invoice_number||''; d.date=r.invoice_date||'';
+    d.ht=(r.amount_ht!=null?r.amount_ht:''); d.rate=(r.vat_rate!=null?r.vat_rate:20); d.ttc=(r.amount_ttc!=null?r.amount_ttc:'');
+    d.guests=r.guests||''; d.meals=(r.meals!=null?r.meals:null);
+    const ru=applyRule({label:d.tiers,counterparty:d.tiers});
+    d.catId=(ru&&ru.category_id)?ru.category_id:((r.suggested_category_id&&txCompanyCats().some(c=>c.id===r.suggested_category_id))?r.suggested_category_id:'');
+    d.fromIA=true;
+  }catch(e){ toast('IA indisponible — remplis à la main.'); }
+  WIZ.step='form'; WIZ.idx=0; WIZ.dir='next'; renderWiz();
+}
+async function wizSave(){ if(!WIZ) return; const d=WIZ.data;
+  if(!(d.tiers||'').trim()){ toast('Indique le client / fournisseur.'); WIZ.idx=WIZ_STEPS.indexOf('tiers'); renderWiz(); return; }
+  showAILoader('Enregistrement…','On sauvegarde ta facture');
+  const row={ file:WIZ.file, name:'scan-facture.pdf', dir:d.dir, tiers:d.tiers, num:d.num, date:d.date, ht:d.ht, rate:d.rate, ttc:d.ttc, catId:d.catId, guests:d.guests, meals:d.meals, fromIA:d.fromIA };
+  let ok=false; try{ ok=await saveOneInvoice(row); }catch(e){}
+  hideAILoader();
+  if(ok){ toast('✅ Facture scannée et enregistrée.'); closeScanWiz(); await reloadData(); try{ proposeReverseLinks(); }catch(_){}}
+  else toast('Erreur à l’enregistrement — réessaie.');
 }
 async function onInvoiceFilePick(inputId){
   if(!canEdit()) return;
