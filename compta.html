@@ -1598,8 +1598,10 @@ async function saveTxEdit(e){ if(e&&e.preventDefault)e.preventDefault(); if(!edi
   const {error}=await db.from('compta_transactions').update(rec).eq('id',editingTxId);
   if(error){ toast('Erreur : '+error.message); return; }
   if(rec.counterparty) await registerTiers(rec.counterparty,'manuel');
-  if(catId){ try{ await learnRule(rec.counterparty, rec.label, catId); }catch(_){} }
-  toast('✔ Enregistré'+(catId?' — l’IA a mémorisé ce classement.':'.')); closeTxEdit(); reloadData();
+  const tEdited=TX.find(x=>x.id===editingTxId); if(tEdited){ tEdited.category_id=catId; tEdited.counterparty=rec.counterparty; tEdited.label=rec.label; }
+  let extra=0;
+  if(catId){ try{ await learnRule(rec.counterparty, rec.label, catId); }catch(_){} extra=await propagateCat(tEdited||{id:editingTxId,counterparty:rec.counterparty,label:rec.label,amount}, catId); }
+  toast('✔ Enregistré'+(extra?(' · appliqué à '+extra+' autre(s) ligne(s) au même nom'):'')+(catId?' · classement mémorisé':'')+'.'); closeTxEdit(); reloadData();
 }
 /* ---- Édition d'une facture (inline sous la ligne) ---- */
 let editingInvId=null;
@@ -1645,6 +1647,21 @@ async function saveInvoiceEdit(e){ if(e&&e.preventDefault)e.preventDefault(); if
   if(catId){ try{ await learnRule(tiers, tiers, catId); }catch(_){} }
   toast('✔ Facture modifiée.'); closeInvoiceEdit(); reloadData();
 }
+// Applique une catégorie à toutes les AUTRES lignes non classées portant le même nom (tiers/libellé)
+async function propagateCat(t, catId){
+  if(!t||!catId) return 0;
+  const key=ruleKeyFor(t.counterparty, t.label); if(!key||key.length<3) return 0;
+  const c=catById(catId);
+  const targets=TX.filter(x=>x.id!==t.id && !x.category_id && ruleKeyFor(x.counterparty,x.label)===key);
+  let n=0;
+  for(const x of targets){ const upd={ category_id:catId, status:'classe' };
+    if(c && c.default_vat_rate!=null){ const ttc=Math.abs(x.amount); const rate=Number(c.default_vat_rate);
+      upd.vat_rate=rate; upd.vat_amount=rate?Math.round(ttc*rate/(100+rate)*100)/100:0; }
+    const {error}=await db.from('compta_transactions').update(upd).eq('id',x.id);
+    if(!error){ n++; x.category_id=catId; x.status='classe'; if(upd.vat_amount!=null){ x.vat_rate=upd.vat_rate; x.vat_amount=upd.vat_amount; } }
+  }
+  return n;
+}
 async function setTxCat(id,cid){
   const c=catById(cid);
   const upd={ category_id:cid||null, status:cid?'classe':'a_classer' };
@@ -1652,7 +1669,12 @@ async function setTxCat(id,cid){
   if(c && c.default_vat_rate!=null && t){ const ttc=Math.abs(t.amount); const rate=Number(c.default_vat_rate);
     upd.vat_rate=rate; upd.vat_amount=rate?Math.round(ttc*rate/(100+rate)*100)/100:0; }
   const {error}=await db.from('compta_transactions').update(upd).eq('id',id);
-  if(error){ toast('Erreur : '+error.message); return; } toast('Catégorie enregistrée.'); reloadData();
+  if(error){ toast('Erreur : '+error.message); return; }
+  if(t){ t.category_id=cid||null; t.status=cid?'classe':'a_classer'; }
+  let extra=0;
+  if(cid && t){ try{ await learnRule(t.counterparty, t.label, cid); }catch(_){} extra=await propagateCat(t, cid); }
+  toast('Catégorie enregistrée'+(extra?(' · appliquée à '+extra+' autre(s) ligne(s) au même nom'):'')+(cid?' · l’IA a mémorisé ce classement':'')+'.');
+  reloadData();
 }
 async function setTxField(id,field,val){
   const {error}=await db.from('compta_transactions').update({[field]:val||null}).eq('id',id);
