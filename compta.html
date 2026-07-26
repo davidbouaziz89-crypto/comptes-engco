@@ -599,9 +599,26 @@
 
   <!-- TIERS (analyse par tiers) -->
   <div id="tab-tiers" class="hidden">
+    <section class="panel canedit">
+      <h2>🤝 Tous mes clients / fournisseurs</h2>
+      <div class="hint">La liste complète. Chaque client / fournisseur saisi ou détecté par l'IA y apparaît. Tu peux en <b>ajouter</b>, <b>fusionner deux doublons</b> (bouton 🔗 sur une ligne), ou cliquer un nom pour voir son suivi détaillé plus bas.</div>
+      <form class="row" onsubmit="addTiersManual(event)">
+        <div class="field" style="min-width:220px"><label>Nouveau client / fournisseur</label><input type="text" id="ti-new" placeholder="ex. DHL Express" required></div>
+        <div class="field" style="min-width:180px"><label>Catégorie</label><select id="ti-cat"><option value="">— catégorie —</option></select></div>
+        <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
+      </form>
+      <div class="filterbar" style="margin-top:12px">
+        <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="ti-search" placeholder="nom…" oninput="renderTiersRegistry()"></div>
+        <div class="field"><label>Source</label><select id="ti-fsource" onchange="renderTiersRegistry()"><option value="">Toutes</option><option value="manuel">Manuel</option><option value="ia">IA</option><option value="auto">Détecté</option></select></div>
+      </div>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Client / Fournisseur</th><th>Catégorie</th><th>Source</th><th class="num">Opérations</th><th class="num">Encaissé</th><th class="num">Payé</th><th></th></tr></thead>
+        <tbody id="tiers-reg-body"></tbody>
+      </table></div>
+    </section>
     <section class="panel">
-      <h2>🤝 Suivi d'un client / fournisseur</h2>
-      <div class="hint">Choisis un client ou fournisseur pour voir tout ce que tu as encaissé / payé avec lui, mois par mois.</div>
+      <h2>🔎 Suivi d'un client / fournisseur</h2>
+      <div class="hint">Choisis-en un (ou clique un nom ci-dessus) pour voir tout ce que tu as encaissé / payé avec lui, mois par mois.</div>
       <div class="filterbar">
         <div class="field" style="min-width:280px"><label>Client / Fournisseur</label><select id="ti-select" onchange="renderTiersTab()"><option value="">— choisir —</option></select></div>
       </div>
@@ -643,7 +660,6 @@
     <div class="params-layout">
       <div class="params-menu" id="params-menu">
         <button data-psec="categories" class="active" onclick="showParam('categories')">🏷️ Catégories de la société</button>
-        <button data-psec="tiers" onclick="showParam('tiers')">🤝 Clients / Fournisseurs</button>
         <button data-psec="comptes" onclick="showParam('comptes')">💳 Comptes &amp; cartes</button>
         <button data-psec="corbeille" onclick="showParam('corbeille')">🗑️ Corbeille</button>
         <button data-psec="societes" id="pm-societes" style="display:none" onclick="showParam('societes')">🏢 Sociétés</button>
@@ -674,25 +690,6 @@
           </section>
         </div>
 
-        <div class="ps" id="ps-tiers" style="display:none">
-          <section class="panel canedit">
-            <h2>🤝 Clients / Fournisseurs</h2>
-            <div class="hint">Cette liste s'enrichit toute seule : chaque client / fournisseur que tu saisis ou que l'IA détecte à l'import y apparaît, avec sa provenance. Tu peux aussi en ajouter à la main.</div>
-            <form class="row" onsubmit="addTiersManual(event)">
-              <div class="field" style="min-width:220px"><label>Nouveau client / fournisseur</label><input type="text" id="ti-new" placeholder="ex. DHL Express" required></div>
-              <div class="field" style="min-width:180px"><label>Catégorie</label><select id="ti-cat"><option value="">— catégorie —</option></select></div>
-              <div class="field" style="align-self:flex-end"><button class="btn" type="submit">+ Ajouter</button></div>
-            </form>
-            <div class="filterbar" style="margin-top:12px">
-              <div class="field" style="max-width:260px"><label>Recherche</label><input type="text" id="ti-search" placeholder="nom…" oninput="renderTiersRegistry()"></div>
-              <div class="field"><label>Source</label><select id="ti-fsource" onchange="renderTiersRegistry()"><option value="">Toutes</option><option value="manuel">Manuel</option><option value="ia">IA</option><option value="auto">Détecté</option></select></div>
-            </div>
-            <div class="table-wrap"><table class="compact">
-              <thead><tr><th>Client / Fournisseur</th><th>Catégorie</th><th>Source</th><th class="num">Opérations</th><th class="num">Encaissé</th><th class="num">Payé</th><th></th></tr></thead>
-              <tbody id="tiers-reg-body"></tbody>
-            </table></div>
-          </section>
-        </div>
 
         <div class="ps" id="ps-comptes" style="display:none">
           <section class="panel canedit">
@@ -1471,12 +1468,13 @@ function showTab(t){
   if(t==='releves'){ renderTx(); renderStatements(); }
   if(t==='factures') renderInvoices();
   if(t==='rappro') renderRapproTab();
-  if(t==='tiers') renderTiersTab();
+  if(t==='tiers'){ fillTiersSelect(); renderTiersRegistry(); renderTiersTab(); }
   if(t==='restaurant') renderResto();
   if(t==='tva') renderTva();
   if(t==='parametres') showParam(CURRENT_PARAM);
 }
 function showParam(sec){
+  if(sec==='tiers') sec='categories';   // les clients/fournisseurs ont leur propre onglet désormais
   if((sec==='societes'||sec==='users') && !IS_ADMIN) sec='categories';
   CURRENT_PARAM=sec;
   document.querySelectorAll('#params-menu button').forEach(b=>b.classList.toggle('active',b.dataset.psec===sec));
