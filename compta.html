@@ -1057,7 +1057,7 @@ function renderTiersRegistry(){
     return `<tr><td class="lbl" title="${esc(t.name)}"><a href="#" onclick="openTiersFor('${esc(t.key)}');return false">${esc(t.name)}</a></td>
       <td>${catCell}</td>
       <td>${tiersSourceBadge(t.source)}</td><td class="num">${s.count}</td>
-      <td class="num val-good">${s.inn?euroC(s.inn):'—'}</td><td class="num val-bad">${s.out?euroC(s.out):'—'}</td>
+      <td class="num val-good">${s.inn?euro(s.inn):'—'}</td><td class="num val-bad">${s.out?euro(s.out):'—'}</td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openMergeTiers('${esc(t.key)}')" title="Fusionner avec un autre (même tiers)">🔗 Fusionner</button> ${t.inTable?`<button class="btn danger small" onclick="deleteTiers('${esc(t.key)}')" title="Retirer du registre">🗑</button>`:''}`:''}</td></tr>`;
   }).join('')||'<tr><td colspan="7" class="empty">Aucun client / fournisseur pour le moment. Ils apparaîtront ici automatiquement à mesure que tu saisis ou importes.</td></tr>';
 }
@@ -1160,7 +1160,7 @@ function renderResto(){
     return `<tr><td class="dt">${(r.date||'').slice(0,10)}</td>
       <td>${r.source==='inv'?'<span class="pill">📄 Facture</span>':'<span class="pill">🏦 Relevé</span>'}</td>
       <td class="lbl" title="${esc(r.tiers)}">${esc(r.tiers)}</td>
-      <td class="num val-bad">${euroC(r.amount)}</td>
+      <td class="num val-bad">${euro(r.amount)}</td>
       <td>${guestCell}</td><td class="num">${mealCell}</td></tr>`;
   }).join('')||'<tr><td colspan="6" class="empty">Aucun frais restaurant. Classe un frais dans une catégorie « restaurant » et il apparaîtra ici.</td></tr>';
   const totAmount=rows.reduce((s,r)=>s+r.amount,0);
@@ -1196,17 +1196,17 @@ function renderTiersTab(){
   const s=tiersStats(key); const net=s.inn-s.out;
   cards.innerHTML=`
     <div class="card"><div class="label">Opérations</div><div class="value">${s.count}</div><div class="label" style="margin:6px 0 0">${s.invCount} facture(s)</div></div>
-    <div class="card good"><div class="label">↗ Total encaissé</div><div class="value val-good">${euroC(s.inn)}</div></div>
-    <div class="card bad"><div class="label">↘ Total payé</div><div class="value val-bad">${euroC(s.out)}</div></div>
-    <div class="card ${net>=0?'good':'bad'}"><div class="label">Solde net</div><div class="value ${net>=0?'val-good':'val-bad'}">${euroC(net)}</div></div>`;
+    <div class="card good"><div class="label">↗ Total encaissé</div><div class="value val-good">${euro(s.inn)}</div></div>
+    <div class="card bad"><div class="label">↘ Total payé</div><div class="value val-bad">${euro(s.out)}</div></div>
+    <div class="card ${net>=0?'good':'bad'}"><div class="label">Solde net</div><div class="value ${net>=0?'val-good':'val-bad'}">${euro(net)}</div></div>`;
   const months=Object.keys(s.byMonth).sort().reverse();
   const rowsM=months.map(m=>{ const b=s.byMonth[m]; const n=b.inn-b.out;
-    return `<tr><td>${monthLabel(m)}</td><td class="num val-good">${b.inn?euroC(b.inn):'—'}</td><td class="num val-bad">${b.out?euroC(b.out):'—'}</td><td class="num ${n>=0?'val-good':'val-bad'}">${euroC(n)}</td></tr>`; }).join('');
+    return `<tr><td>${monthLabel(m)}</td><td class="num val-good">${b.inn?euro(b.inn):'—'}</td><td class="num val-bad">${b.out?euro(b.out):'—'}</td><td class="num ${n>=0?'val-good':'val-bad'}">${euro(n)}</td></tr>`; }).join('');
   const ops=TX.filter(t=>tiersKey(t.counterparty)===key).slice(0,40).map(t=>
     `<tr><td class="dt">${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td><td class="num ${t.amount>=0?'val-good':'val-bad'}">${euroC(t.amount)}</td></tr>`).join('');
-  const totRow=`<tr style="font-weight:700;border-top:2px solid var(--accent)"><td>TOTAL</td><td class="num val-good">${euroC(s.inn)}</td><td class="num val-bad">${euroC(s.out)}</td><td class="num ${net>=0?'val-good':'val-bad'}">${euroC(net)}</td></tr>`;
+  const totRow=`<tr style="font-weight:700;border-top:2px solid var(--accent)"><td>TOTAL</td><td class="num val-good">${euro(s.inn)}</td><td class="num val-bad">${euro(s.out)}</td><td class="num ${net>=0?'val-good':'val-bad'}">${euro(net)}</td></tr>`;
   const nShown=Math.min(s.count, 40);
-  const opsTot=`<tr style="font-weight:700;border-top:2px solid var(--accent)"><td colspan="3">TOTAL ${s.count>40?`(${nShown} affichés / ${s.count})`:`(${s.count} op.)`}</td><td class="num ${net>=0?'val-good':'val-bad'}">${euroC(net)}</td></tr>`;
+  const opsTot=`<tr style="font-weight:700;border-top:2px solid var(--accent)"><td colspan="3">TOTAL ${s.count>40?`(${nShown} affichés / ${s.count})`:`(${s.count} op.)`}</td><td class="num ${net>=0?'val-good':'val-bad'}">${euro(net)}</td></tr>`;
   detail.innerHTML=`
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:8px">
       <div><h3 style="margin:10px 0 6px">Par mois</h3>
@@ -1252,7 +1252,9 @@ function logoMeta(k){ return LOGOS.find(x=>x.key===k)||null; }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(window._tt); window._tt=setTimeout(()=>t.style.display='none',3000); }
 function euro(n){ return (Number(n)||0).toLocaleString('fr-FR',{style:'currency',currency:CO&&CO.currency||'EUR'}); }
 // Montant coloré selon le signe : vert si positif, rouge si négatif
-function euroC(n){ n=Number(n)||0; if(n>0) return '<span class="val-good">'+euro(n)+'</span>'; if(n<0) return '<span class="val-bad">'+euro(n)+'</span>'; return euro(n); }
+function euro(n){ n=Number(n)||0; if(n>0) return '<span class="val-good">'+euro(n)+'</span>'; if(n<0) return '<span class="val-bad">'+euro(n)+'</span>'; return euro(n); }
+// Montant d'une facture coloré par NATURE : vente/encaissement = vert, achat/frais = rouge
+function euroInv(n,direction){ if(n==null||isNaN(Number(n))) return '—'; const c=(direction==='vente')?'val-good':'val-bad'; return '<span class="'+c+'">'+euro(Math.abs(Number(n)))+'</span>'; }
 
 /* ============ Sélecteur avec recherche pour les longs menus déroulants ============ */
 /* Délégué : tout <select> d'au moins 8 options s'ouvre en liste filtrable. Aucune modif des call sites. */
@@ -1267,9 +1269,20 @@ function euroC(n){ n=Number(n)||0; if(n>0) return '<span class="val-good">'+euro
     document.addEventListener('mousedown',e=>{ if(pop && !pop.classList.contains('hidden') && !pop.contains(e.target) && e.target!==sel) close(); });
     window.addEventListener('scroll',e=>{ if(pop && !pop.classList.contains('hidden') && !pop.contains(e.target)) close(); },true);
   }
-  function openFor(s){ ensure(); sel=s; active=-1; const r=s.getBoundingClientRect();
-    pop.style.left=Math.min(r.left,window.innerWidth-460)+'px'; pop.style.top=(r.bottom+5)+'px'; pop.style.minWidth=r.width+'px';
-    pop.classList.remove('hidden'); const si=pop.querySelector('.combo-search'); si.value=''; render(); setTimeout(()=>si.focus(),0);
+  function openFor(s){ ensure(); sel=s; active=-1;
+    pop.classList.remove('hidden');
+    const r=s.getBoundingClientRect(), vw=window.innerWidth, vh=window.innerHeight;
+    const w=Math.min(Math.max(r.width,220),440);
+    pop.style.left=Math.max(8,Math.min(r.left, vw-w-8))+'px'; pop.style.minWidth=r.width+'px';
+    const below=vh-r.bottom-12, above=r.top-12; const list=pop.querySelector('.combo-list');
+    if(below>=220 || below>=above){ // assez de place en bas → ouvrir vers le bas
+      pop.style.top=(r.bottom+5)+'px'; pop.style.bottom='auto';
+      list.style.maxHeight=Math.max(140,Math.min(320,below-72))+'px';
+    } else { // pas de place → ouvrir vers le haut
+      pop.style.bottom=(vh-r.top+5)+'px'; pop.style.top='auto';
+      list.style.maxHeight=Math.max(140,Math.min(320,above-72))+'px';
+    }
+    const si=pop.querySelector('.combo-search'); si.value=''; render(); setTimeout(()=>si.focus(),0);
   }
   function items(){ return [...pop.querySelectorAll('.combo-item')]; }
   function render(){ if(!sel) return; const q=(pop.querySelector('.combo-search').value||'').toLowerCase();
@@ -1624,7 +1637,7 @@ function renderDashInvoices(){
     return `<tr><td class="dt">${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
       <td class="lbl" title="${esc(i.counterparty||'')}">${esc(i.counterparty||'')}</td>
       <td>${esc(catName(i.category_id))}</td>
-      <td class="num">${i.amount_ttc!=null?euroC(i.amount_ttc):'—'}</td>
+      <td class="num">${i.amount_ttc!=null?euroInv(i.amount_ttc,i.direction):'—'}</td>
       <td>${matchBadge(st)}${st==='partiel'?`<div class="hint">${euroC(sum)} / ${euroC(ttc)}</div>`:''}</td>
       <td>${canEdit()?`<button class="btn small" onclick="openRappro('${i.id}')">🔗 Relier</button>`:''}</td></tr>`;
   }).join('');
@@ -2204,7 +2217,7 @@ function renderRapproTab(){
       +`<button class="btn ghost small" onclick="openInvoicePreview('${i.id}')" title="Aperçu de la facture">👁️</button>`
       +(canEdit()?` <button class="btn danger small" onclick="delInvoice('${i.id}')" title="Supprimer la facture">🗑</button>`:'');
     return `<tr><td>${esc((i.invoice_date||'').slice(0,10))}</td><td class="lbl" title="${esc(i.counterparty||'')}"><a href="#" onclick="openInvoicePreview('${i.id}');return false">${esc(i.counterparty||'—')}</a></td>
-      <td class="num">${i.amount_ttc!=null?euroC(i.amount_ttc):'—'}</td><td>${matchBadge(stt)}</td><td>${sugg}</td><td style="white-space:nowrap">${act}</td></tr>`;
+      <td class="num">${i.amount_ttc!=null?euroInv(i.amount_ttc,i.direction):'—'}</td><td>${matchBadge(stt)}</td><td>${sugg}</td><td style="white-space:nowrap">${act}</td></tr>`;
   }).join('')||'<tr><td colspan="6" class="empty">🎉 Toutes les factures sont rapprochées.</td></tr>';
 
   const q=(document.getElementById('rap-tx-search')?.value||'').toLowerCase().trim();
@@ -2283,7 +2296,7 @@ function renderLinkTxList(){
     return `<div class="pp-row${ck?' sel':''}" style="display:flex;gap:10px;align-items:center;padding:9px 8px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px">
       <input type="checkbox" ${ck?'checked':''} onchange="toggleLinkTxPick('${i.id}')">
       <span style="flex:1"><a href="#" onclick="openInvoicePreview('${i.id}');return false"><b>${esc(i.counterparty||'—')}</b></a> <span class="hint">${esc((i.invoice_date||'').slice(0,10))} ${esc(i.invoice_number||'')}</span>${x.tiersHit?' <span class="badge b-ok">🎯 même tiers</span>':''}</span>
-      <b class="num">${i.amount_ttc!=null?euroC(i.amount_ttc):'—'}</b></div>`; }).join('')
+      <b class="num">${i.amount_ttc!=null?euroInv(i.amount_ttc,i.direction):'—'}</b></div>`; }).join('')
     :summary+(filtered?'<div class="empty">Aucune facture en attente ne correspond à ce filtre.</div>':'<div class="empty">Aucune correspondance automatique. Clique <b>📋 Tout voir</b>, choisis un mois, ou tape un nom/montant ci-dessus.</div>');
 }
 async function doLinkTxMulti(){ if(!LINKTX||!LINKTX_PICKED.size||!canEdit()) return;
@@ -2643,8 +2656,8 @@ function renderInvoices(){
     const tr=document.createElement('tr');
     tr.innerHTML=`<td class="dt">${i.invoice_date||''}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
       <td><a href="#" onclick="openInvoicePreview('${i.id}');return false" title="Voir l'aperçu">${esc(i.counterparty||'—')}</a></td><td>${catTxt}${guestsBadge}</td><td>${esc(i.invoice_number||'—')}</td>
-      <td class="num">${i.amount_ht!=null?euroC(i.amount_ht):'—'}</td><td class="num">${i.vat_amount!=null?euroC(i.vat_amount):'—'}</td>
-      <td class="num">${i.amount_ttc!=null?euroC(i.amount_ttc):'—'}</td>
+      <td class="num">${i.amount_ht!=null?euroInv(i.amount_ht,i.direction):'—'}</td><td class="num">${i.vat_amount!=null?euroInv(i.vat_amount,i.direction):'—'}</td>
+      <td class="num">${i.amount_ttc!=null?euroInv(i.amount_ttc,i.direction):'—'}</td>
       <td>${matchBadge(st)}${linkTxt}${canEdit()?`<div style="margin-top:3px"><button class="btn ghost small" onclick="openRappro('${i.id}')">🔗 Relier</button></div>`:''}</td>
       <td><button class="btn ghost small" onclick="openInvoicePreview('${i.id}')" title="Aperçu">👁️ Aperçu</button></td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openInvoiceEdit('${i.id}',this)" title="Modifier la facture">✏️</button> <button class="btn ghost small" onclick="delInvoice('${i.id}')" title="Supprimer">🗑</button>`:''}</td>`;
@@ -2672,7 +2685,7 @@ async function openInvoicePreview(invId){
   INVPREV={id:invId,url:null};
   const st=invMatchState(i); const stn=invStatementNames(i);
   const meta=[`<b>${esc(i.counterparty||'—')}</b>`, i.invoice_number?('N° '+esc(i.invoice_number)):'', i.invoice_date?esc(i.invoice_date):'',
-    i.amount_ttc!=null?('TTC '+euroC(i.amount_ttc)):'', matchBadge(st),
+    i.amount_ttc!=null?('TTC '+euroInv(i.amount_ttc,i.direction)):'', matchBadge(st),
     st==='rapproche'&&stn.length?('sur le relevé « '+esc(stn.join(', '))+' »'):''].filter(Boolean).join(' · ');
   document.getElementById('invprev-meta').innerHTML=meta;
   const body=document.getElementById('invprev-body'); const dl=document.getElementById('invprev-dl');
@@ -2710,7 +2723,7 @@ function renderTrash(){ const body=document.getElementById('trash-body'); if(!bo
   if(!list.length){ body.innerHTML='<tr><td colspan="7" class="empty">Corbeille vide.</td></tr>'; return; }
   body.innerHTML=list.map(i=>{ const left=trashLeft(i.deleted_at);
     return `<tr><td class="dt">${esc((i.deleted_at||'').slice(0,10))}</td><td><span class="pill">${i.direction==='vente'?'Vente':'Achat'}</span></td>
-      <td>${esc(i.counterparty||'—')}</td><td>${esc(i.invoice_number||'—')}</td><td class="num">${i.amount_ttc!=null?euroC(i.amount_ttc):'—'}</td>
+      <td>${esc(i.counterparty||'—')}</td><td>${esc(i.invoice_number||'—')}</td><td class="num">${i.amount_ttc!=null?euroInv(i.amount_ttc,i.direction):'—'}</td>
       <td>${left>0?left+' j':'<span class="val-bad">bientôt</span>'}</td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="restoreInvoice('${i.id}')" title="Restaurer">♻️ Restaurer</button> <button class="btn danger small" onclick="purgeInvoice('${i.id}')" title="Supprimer définitivement">🗑 Définitif</button>`:''}</td></tr>`;
   }).join('');
@@ -2805,7 +2818,7 @@ function renderTva(){
     const {coll,ded}=map[m]; const net=coll-ded;
     const tr=document.createElement('tr');
     tr.innerHTML=`<td class="dt">${m}</td><td class="num">${euroC(coll)}</td><td class="num">${euroC(ded)}</td>
-      <td class="num">${euroC(net)}</td><td>${net>=0?'<span class="badge b-lost">À payer</span>':'<span class="badge b-ok">Crédit de TVA</span>'}</td>`;
+      <td class="num">${euro(net)}</td><td>${net>=0?'<span class="badge b-lost">À payer</span>':'<span class="badge b-ok">Crédit de TVA</span>'}</td>`;
     body.appendChild(tr);
   });
   if(!Object.keys(map).length) body.innerHTML='<tr><td colspan="5" class="empty">Pas encore de TVA calculée.</td></tr>';
