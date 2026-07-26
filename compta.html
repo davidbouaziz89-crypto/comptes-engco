@@ -94,7 +94,7 @@
   /* --- Zone graphes --- */
   .charts{display:grid;grid-template-columns:1fr 1.35fr;gap:16px;margin-top:18px}
   @media(max-width:860px){.charts{grid-template-columns:1fr}}
-  .chart-card{background:linear-gradient(165deg,var(--panel),color-mix(in srgb,var(--panel2) 70%,var(--panel)));border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+  .chart-card{background:linear-gradient(165deg,var(--panel),color-mix(in srgb,var(--panel2) 70%,var(--panel)));border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
   .chart-card h2{margin:0 0 2px;font-size:16px;font-family:var(--font-display);font-weight:600;letter-spacing:-.2px}
   .chart-card .hint{color:var(--muted);font-size:12.5px;margin-bottom:6px}
   .chart-box{position:relative;height:270px;margin-top:10px}
@@ -313,6 +313,46 @@
   .combo-item:hover,.combo-item.active{ background:color-mix(in srgb,var(--accent) 16%,transparent); }
   .combo-item.sel{ color:var(--accent); font-weight:600; }
   .combo-empty{ padding:12px; color:var(--muted); text-align:center; font-style:italic; }
+
+  /* ============ COCKPIT NÉON v2.1 — plus marqué (identité forte) ============ */
+  :root{ --radius:20px; }
+  /* Bandeau lumineux tout en haut de l'app */
+  body::before{ background:
+      radial-gradient(70% 55% at 10% -8%, color-mix(in srgb,var(--accent) 26%,transparent), transparent 60%),
+      radial-gradient(60% 50% at 96% -4%, color-mix(in srgb,var(--accent3) 24%,transparent), transparent 60%),
+      radial-gradient(55% 45% at 60% 108%, color-mix(in srgb,var(--accent2) 14%,transparent), transparent 60%); }
+  header{ border-bottom:1px solid var(--hair); box-shadow:0 12px 40px -24px color-mix(in srgb,var(--accent) 80%,transparent); }
+  header h1{ font-size:24px; font-weight:700; letter-spacing:-.5px;
+    background:linear-gradient(115deg,var(--txt),color-mix(in srgb,var(--accent) 85%,var(--txt)) 70%,var(--accent3));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 12px color-mix(in srgb,var(--accent) 45%,transparent)); }
+  header h1 img{ -webkit-text-fill-color:initial; }
+
+  /* Nav : onglets plus présents */
+  nav{ padding:14px 22px; }
+  nav button{ font-size:15px; padding:11px 18px; border-radius:13px; }
+
+  /* KPI : GROS chiffres, cartes plus généreuses */
+  main{ padding-top:26px; }
+  .cards{ gap:18px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+  .card{ border-radius:20px; padding:22px 22px 20px; }
+  .card::before{ width:4px; }
+  .kpi .k-ic{ width:46px; height:46px; font-size:23px; border-radius:15px; }
+  .kpi .label{ font-size:13px; text-transform:uppercase; letter-spacing:.6px; opacity:.85; }
+  .kpi .value{ font-size:38px; font-weight:800; letter-spacing:-1px; line-height:1.05; margin-top:2px; }
+  .kpi .k-sub{ font-size:12px; }
+
+  /* Panneaux : verre + halo de bord plus visibles, coins plus arrondis */
+  section.panel, .chart-card, .modal-card{ border-radius:20px; border-color:color-mix(in srgb,var(--accent) 16%,var(--line)); }
+  section.panel::after, .chart-card::after{ opacity:.8; padding:1.2px;
+    background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 60%,transparent),transparent 34%,transparent 66%,color-mix(in srgb,var(--accent3) 55%,transparent)); }
+  section.panel h2, .chart-card h2{ font-size:20px; letter-spacing:-.3px; }
+
+  /* Boutons principaux plus « néon » */
+  .btn{ border-radius:13px; font-weight:700; letter-spacing:.2px; box-shadow:0 12px 30px -12px color-mix(in srgb,var(--accent) 85%,transparent), inset 0 1px 0 rgba(255,255,255,.3); }
+
+  /* Tables : en-tête plus contrasté */
+  thead th{ font-size:11.5px; letter-spacing:.6px; color:color-mix(in srgb,var(--accent) 45%,var(--muted)); }
 </style>
 </head>
 <body>
