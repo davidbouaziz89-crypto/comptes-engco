@@ -302,6 +302,17 @@
   .toast{ background:color-mix(in srgb,var(--panel) 82%,transparent); backdrop-filter:blur(12px); border:1px solid color-mix(in srgb,var(--accent) 40%,transparent); box-shadow:0 14px 44px -14px color-mix(in srgb,var(--accent) 60%,transparent); }
   *{ scrollbar-width:thin; scrollbar-color:color-mix(in srgb,var(--accent) 40%,transparent) transparent; }
   *::-webkit-scrollbar{ width:9px; height:9px; } *::-webkit-scrollbar-thumb{ background:color-mix(in srgb,var(--accent) 34%,transparent); border-radius:9px; } *::-webkit-scrollbar-track{ background:transparent; }
+
+  /* Sélecteur avec recherche (remplace les longs menus déroulants) */
+  .combo-pop{ position:fixed; z-index:500; background:color-mix(in srgb,var(--panel) 93%,transparent); backdrop-filter:blur(16px) saturate(1.2);
+    border:1px solid var(--hair); border-radius:13px; box-shadow:0 24px 56px -18px rgba(0,0,0,.85), 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent); padding:9px; width:max-content; max-width:min(92vw,440px); }
+  .combo-pop.hidden{ display:none!important; }
+  .combo-search{ width:100%; margin-bottom:7px; }
+  .combo-list{ max-height:min(46vh,320px); overflow:auto; }
+  .combo-item{ padding:8px 10px; border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .combo-item:hover,.combo-item.active{ background:color-mix(in srgb,var(--accent) 16%,transparent); }
+  .combo-item.sel{ color:var(--accent); font-weight:600; }
+  .combo-empty{ padding:12px; color:var(--muted); text-align:center; font-style:italic; }
 </style>
 </head>
 <body>
@@ -1202,6 +1213,45 @@ function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.
 function euro(n){ return (Number(n)||0).toLocaleString('fr-FR',{style:'currency',currency:CO&&CO.currency||'EUR'}); }
 // Montant coloré selon le signe : vert si positif, rouge si négatif
 function euroC(n){ n=Number(n)||0; if(n>0) return '<span class="val-good">'+euro(n)+'</span>'; if(n<0) return '<span class="val-bad">'+euro(n)+'</span>'; return euro(n); }
+
+/* ============ Sélecteur avec recherche pour les longs menus déroulants ============ */
+/* Délégué : tout <select> d'au moins 8 options s'ouvre en liste filtrable. Aucune modif des call sites. */
+(function(){
+  let pop=null, sel=null, active=-1;
+  function ensure(){ if(pop) return;
+    pop=document.createElement('div'); pop.className='combo-pop hidden';
+    pop.innerHTML='<input class="combo-search" placeholder="Rechercher…" autocomplete="off"><div class="combo-list"></div>';
+    document.body.appendChild(pop);
+    pop.querySelector('.combo-search').addEventListener('input',render);
+    pop.querySelector('.combo-search').addEventListener('keydown',onKey);
+    document.addEventListener('mousedown',e=>{ if(pop && !pop.classList.contains('hidden') && !pop.contains(e.target) && e.target!==sel) close(); });
+    window.addEventListener('scroll',e=>{ if(pop && !pop.classList.contains('hidden') && !pop.contains(e.target)) close(); },true);
+  }
+  function openFor(s){ ensure(); sel=s; active=-1; const r=s.getBoundingClientRect();
+    pop.style.left=Math.min(r.left,window.innerWidth-460)+'px'; pop.style.top=(r.bottom+5)+'px'; pop.style.minWidth=r.width+'px';
+    pop.classList.remove('hidden'); const si=pop.querySelector('.combo-search'); si.value=''; render(); setTimeout(()=>si.focus(),0);
+  }
+  function items(){ return [...pop.querySelectorAll('.combo-item')]; }
+  function render(){ if(!sel) return; const q=(pop.querySelector('.combo-search').value||'').toLowerCase();
+    const opts=[...sel.options].filter(o=>o.text.toLowerCase().includes(q));
+    pop.querySelector('.combo-list').innerHTML = opts.length
+      ? opts.map(o=>`<div class="combo-item${o.value===sel.value?' sel':''}" data-v="${(o.value||'').replace(/"/g,'&quot;')}">${(o.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`).join('')
+      : '<div class="combo-empty">Aucun résultat</div>';
+    items().forEach(it=>it.addEventListener('mousedown',ev=>{ ev.preventDefault(); pick(it.getAttribute('data-v')); }));
+    active=-1;
+  }
+  function onKey(e){ const its=items(); if(e.key==='ArrowDown'){ e.preventDefault(); active=Math.min(active+1,its.length-1); paint(its); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); active=Math.max(active-1,0); paint(its); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(its[active]) pick(its[active].getAttribute('data-v')); else if(its[0]) pick(its[0].getAttribute('data-v')); }
+    else if(e.key==='Escape'){ close(); } }
+  function paint(its){ its.forEach((it,i)=>it.classList.toggle('active',i===active)); if(its[active]) its[active].scrollIntoView({block:'nearest'}); }
+  function pick(v){ if(sel){ sel.value=v; sel.dispatchEvent(new Event('change',{bubbles:true})); } close(); }
+  function close(){ if(pop) pop.classList.add('hidden'); sel=null; }
+  document.addEventListener('mousedown',function(e){
+    const s=e.target && e.target.closest ? e.target.closest('select') : null;
+    if(s && !s.multiple && !s.disabled && s.options.length>=8){ e.preventDefault(); e.stopPropagation(); s.blur&&s.blur(); openFor(s); }
+  }, true);
+})();
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function canEdit(){ return IS_ADMIN || MY_ROLE==='secretaire'; }
 function canUseIA(){ return IS_ADMIN; }   // lecture IA des documents réservée à l'admin (maîtrise des coûts)
