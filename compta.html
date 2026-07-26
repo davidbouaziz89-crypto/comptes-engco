@@ -226,6 +226,82 @@
   /* Édition inline : le formulaire s'insère sous la ligne cliquée (comme le CRM) */
   tr.inline-edit-row>td{padding:0;background:transparent}
   tr.inline-edit-row .panel{margin:6px 0;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+
+  /* ============================================================
+     COCKPIT NÉON v2 — refonte premium (couche d'élévation)
+     ============================================================ */
+  :root{ --radius:18px; --hair:color-mix(in srgb,var(--accent) 24%,var(--line)); }
+  /* Fond : aurore animée + grille fine en perspective */
+  body::before{ animation:auroraMove 26s ease-in-out infinite alternate; }
+  @keyframes auroraMove{ 0%{transform:translate3d(0,0,0) scale(1)} 100%{transform:translate3d(0,-3%,0) scale(1.1)} }
+  body::after{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.6;
+    background-image:linear-gradient(color-mix(in srgb,var(--accent) 7%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--accent) 7%,transparent) 1px,transparent 1px);
+    background-size:46px 46px; -webkit-mask:radial-gradient(130% 90% at 50% -10%,#000,transparent 72%); mask:radial-gradient(130% 90% at 50% -10%,#000,transparent 72%); }
+  :root[data-theme="light"] body::after{opacity:.3}
+  @media(prefers-reduced-motion:reduce){ body::before{animation:none} }
+
+  /* Header & nav : verre dépoli */
+  header{ backdrop-filter:blur(12px) saturate(1.15); }
+  nav{ background:color-mix(in srgb,var(--panel) 68%,transparent); backdrop-filter:blur(16px) saturate(1.2); }
+  nav button{ position:relative; }
+  nav button.active{ color:#fff; background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 24%,transparent),color-mix(in srgb,var(--accent3) 16%,transparent));
+    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent), 0 10px 26px -12px color-mix(in srgb,var(--accent) 75%,transparent); }
+  nav button.active::after{ content:""; position:absolute; left:14px; right:14px; bottom:4px; height:2px; border-radius:2px;
+    background:linear-gradient(90deg,var(--accent),var(--accent3)); box-shadow:0 0 10px var(--accent); }
+  :root[data-theme="light"] nav button.active{ color:var(--txt); }
+
+  /* Panneaux & cartes : verre + liseré dégradé + halo profond */
+  section.panel, .chart-card, .modal-card{ backdrop-filter:blur(9px);
+    box-shadow:0 26px 64px -32px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.05); }
+  section.panel::after, .chart-card::after{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none; opacity:.55;
+    background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 45%,transparent),transparent 38%,transparent 62%,color-mix(in srgb,var(--accent3) 40%,transparent));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; }
+  section.panel{ position:relative; }
+  section.panel h2{ font-size:19px; display:flex; align-items:center; gap:9px; }
+  section.panel h2::before{ content:""; width:4px; height:18px; border-radius:3px; background:linear-gradient(180deg,var(--accent),var(--accent3)); box-shadow:0 0 10px -1px var(--accent); }
+
+  /* KPI : valeur en dégradé, pastille lumineuse, halo d'angle */
+  .card{ backdrop-filter:blur(9px); }
+  .kpi{ position:relative; overflow:hidden; }
+  .kpi .value{ font-size:28px; background:linear-gradient(180deg,var(--txt),color-mix(in srgb,var(--kc,var(--accent)) 62%,var(--txt))); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .kpi .k-ic{ box-shadow:0 0 20px -4px color-mix(in srgb,var(--kc,var(--accent)) 75%,transparent); }
+  .kpi::after{ content:""; position:absolute; right:-34px; top:-34px; width:130px; height:130px; border-radius:50%;
+    background:radial-gradient(circle,color-mix(in srgb,var(--kc,var(--accent)) 22%,transparent),transparent 70%); pointer-events:none; }
+
+  /* Boutons : reflet balayant + glow */
+  .btn{ position:relative; overflow:hidden; box-shadow:0 10px 26px -12px color-mix(in srgb,var(--accent) 75%,transparent), inset 0 1px 0 rgba(255,255,255,.22); }
+  .btn:not(.ghost):not(.danger)::after{ content:""; position:absolute; inset:0; background:linear-gradient(120deg,transparent 32%,rgba(255,255,255,.4),transparent 60%); transform:translateX(-130%); transition:transform .55s ease; }
+  .btn:not(.ghost):not(.danger):hover::after{ transform:translateX(130%); }
+  .btn.ghost{ background:color-mix(in srgb,var(--panel2) 65%,transparent); backdrop-filter:blur(6px); }
+  .btn.ghost:hover{ box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent), 0 8px 20px -10px color-mix(in srgb,var(--accent) 55%,transparent); transform:translateY(-1px); }
+
+  /* Tables : conteneur vitré, en-tête collant, hover néon, lignes fines */
+  .table-wrap{ border:1px solid var(--line); border-radius:14px; background:color-mix(in srgb,var(--panel) 35%,transparent); }
+  table{ font-size:14px; }
+  thead th{ position:sticky; top:0; z-index:1; background:color-mix(in srgb,var(--panel2) 90%,transparent); backdrop-filter:blur(8px); border-bottom:1px solid var(--hair); }
+  th,td{ border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent); }
+  tbody tr{ transition:background .12s ease; }
+  tbody tr:hover td{ background:color-mix(in srgb,var(--accent) 8%,transparent); }
+  tbody tr:last-child td{ border-bottom:0; }
+
+  /* Champs : verre, focus néon, chevron custom sur les selects */
+  input,select,textarea{ background:color-mix(in srgb,var(--panel2) 72%,transparent); backdrop-filter:blur(4px); }
+  input:focus,select:focus,textarea:focus{ box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent), 0 0 20px -6px color-mix(in srgb,var(--accent) 70%,transparent); }
+  select{ appearance:none; -webkit-appearance:none; padding-right:32px;
+    background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+    background-position:calc(100% - 17px) 55%,calc(100% - 12px) 55%; background-size:5px 5px,5px 5px; background-repeat:no-repeat; }
+
+  /* Badges & pills néon */
+  .badge{ box-shadow:0 0 12px -5px currentColor; letter-spacing:.2px; }
+  .b-ok{ background:color-mix(in srgb,#22c55e 16%,transparent); color:#86efac; border-color:color-mix(in srgb,#22c55e 45%,transparent); }
+  .b-wip{ background:color-mix(in srgb,var(--warm) 15%,transparent); color:#fdba74; border-color:color-mix(in srgb,var(--warm) 45%,transparent); }
+  .b-lost{ background:color-mix(in srgb,var(--danger) 15%,transparent); color:#fca5a5; border-color:color-mix(in srgb,var(--danger) 45%,transparent); }
+  .pill{ background:color-mix(in srgb,var(--panel2) 70%,transparent); border-color:color-mix(in srgb,var(--accent) 20%,var(--line)); }
+
+  /* Toast néon + scrollbars fines */
+  .toast{ background:color-mix(in srgb,var(--panel) 82%,transparent); backdrop-filter:blur(12px); border:1px solid color-mix(in srgb,var(--accent) 40%,transparent); box-shadow:0 14px 44px -14px color-mix(in srgb,var(--accent) 60%,transparent); }
+  *{ scrollbar-width:thin; scrollbar-color:color-mix(in srgb,var(--accent) 40%,transparent) transparent; }
+  *::-webkit-scrollbar{ width:9px; height:9px; } *::-webkit-scrollbar-thumb{ background:color-mix(in srgb,var(--accent) 34%,transparent); border-radius:9px; } *::-webkit-scrollbar-track{ background:transparent; }
 </style>
 </head>
 <body>
