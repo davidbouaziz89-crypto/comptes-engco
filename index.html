@@ -1317,7 +1317,7 @@ async function afterAuth(session){
 }
 function isAdminUser(){ return MY_MEMBERSHIPS.some(m=>m.role==='admin'); }
 function myProjectKeys(){ return isAdminUser() ? Object.keys(PROJECTS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>PROJECTS[k]); }
-function myToolKeys(){ return isAdminUser() ? Object.keys(EXTERNAL_TOOLS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>EXTERNAL_TOOLS[k]); }
+function myToolKeys(){ const base = isAdminUser() ? Object.keys(EXTERNAL_TOOLS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>EXTERNAL_TOOLS[k]); if(!base.includes('zeste')) base.unshift('zeste'); return base; }
 function openTool(k){ const t=EXTERNAL_TOOLS[k]; if(!t||!t.url) return; if(t.internal) location.href=t.url; else window.open(t.url,'_blank','noopener'); }
 function showProjectPicker(){
   const list=document.getElementById('projpick-list');
