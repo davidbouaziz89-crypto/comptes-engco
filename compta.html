@@ -130,8 +130,10 @@
   .preview b{color:var(--txt)}
   .banner{background:#3b2f0b;border:1px solid #b4830f;color:#fde68a;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;display:none}
   .empty{color:var(--muted);padding:22px;text-align:center;font-style:italic}
-  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16233f;border:1px solid #2f6b43;color:#eaf1ff;font-weight:600;
-    padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.4);display:none;z-index:200}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f2a1c;border:1px solid #3a7a52;color:#eafff3;font-weight:600;
+    padding:13px 20px;border-radius:12px;font-size:14.5px;box-shadow:0 14px 36px rgba(0,0,0,.5);display:none;z-index:400;
+    max-width:min(720px,92vw);text-align:center;line-height:1.4;white-space:pre-wrap}
+  .toast.toast-err{background:#3a1414;border-color:#c0453f;color:#ffe0e0}
   .hidden{display:none!important}
   .modal-overlay{position:fixed;inset:0;background:rgba(4,8,20,.62);display:flex;align-items:center;justify-content:center;z-index:120;padding:20px}
   .modal-overlay.hidden{display:none!important}
@@ -1292,7 +1294,11 @@ const LOGOS=[
 ];
 function logoUrl(k){ if(!k) return ''; const m=LOGOS.find(x=>x.key===k); return LOGO_DIR+((m&&m.file)||k+'.png'); }
 function logoMeta(k){ return LOGOS.find(x=>x.key===k)||null; }
-function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(window._tt); window._tt=setTimeout(()=>t.style.display='none',3000); }
+function toast(m,type){ const t=document.getElementById('toast'); t.textContent=m;
+  const isErr = type==='error' || /erreur|échou|echou|invalide|impossible|refus/i.test(String(m));
+  t.className='toast'+(isErr?' toast-err':'');
+  t.style.display='block'; clearTimeout(window._tt);
+  window._tt=setTimeout(()=>t.style.display='none', isErr?9000:3000); }
 function euro(n){ return (Number(n)||0).toLocaleString('fr-FR',{style:'currency',currency:CO&&CO.currency||'EUR'}); }
 // Montant coloré selon le signe : vert si positif, rouge si négatif
 function euro(n){ n=Number(n)||0; if(n>0) return '<span class="val-good">'+euro(n)+'</span>'; if(n<0) return '<span class="val-bad">'+euro(n)+'</span>'; return euro(n); }
