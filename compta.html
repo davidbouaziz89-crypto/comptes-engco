@@ -547,7 +547,7 @@
       <div class="hint">Dépose le PDF ou la photo, saisis les infos, et rapproche-la d'une ligne du relevé (le paiement correspondant).</div>
       <form class="row" onsubmit="addInvoice(event)">
         <div class="field"><label>Sens</label><select id="i-dir"><option value="achat">Achat (fournisseur)</option><option value="vente">Vente (client)</option></select></div>
-        <div class="field" style="min-width:180px"><label>Client / Fournisseur</label><input type="text" id="i-tiers" list="tiers-list" placeholder="ex. DHL Express" required><datalist id="tiers-list"></datalist></div>
+        <div class="field" style="min-width:180px"><label>Client / Fournisseur</label><input type="text" id="i-tiers" list="tiers-list" placeholder="ex. DHL Express" required oninput="onInvTiersCat()" onchange="onInvTiersCat()"><datalist id="tiers-list"></datalist></div>
         <div class="field" style="min-width:170px"><label>Catégorie</label><select id="i-cat" onchange="onInvCatChange()"><option value="">— à choisir —</option></select></div>
         <div class="field"><label>N° facture</label><input type="text" id="i-num" placeholder="facultatif"></div>
         <div class="field"><label>Date</label><input type="date" id="i-date"></div>
@@ -1614,6 +1614,22 @@ function onInvCatChange(){ const sel=document.getElementById('i-cat'); const v=s
     const tiers=(document.getElementById('i-tiers').value||'').trim();
     if(note) note.innerHTML='💡 sera mémorisée'+(tiers?(' pour <b>'+esc(tiers)+'</b>'):'');
   } else if(note && !sel.classList.contains('needcat')){ note.innerHTML=''; } }
+// Choix du tiers sur une facture → pré-remplit la catégorie si on la connaît (registre, règle apprise, historique).
+function onInvTiersCat(){
+  const ic=document.getElementById('i-cat'); if(!ic || ic.value) return;   // ne pas écraser un choix déjà fait
+  const name=(document.getElementById('i-tiers').value||'').trim(); if(name.length<2) return;
+  const key=tiersKey(name);
+  let catId=null;
+  const reg=TIERS.find(t=>t.name_key===key); if(reg&&reg.category_id) catId=reg.category_id;              // 1) catégorie du registre
+  if(!catId){ const r=applyRule({label:name,counterparty:name}); if(r&&r.category_id) catId=r.category_id; } // 2) règle apprise
+  if(!catId){ const inv=INVOICES.find(i=>tiersKey(i.counterparty)===key&&i.category_id); if(inv) catId=inv.category_id; } // 3) facture précédente
+  if(!catId){ const t=TX.find(x=>tiersKey(x.counterparty)===key&&x.category_id); if(t) catId=t.category_id; }            // 4) ligne de relevé
+  if(!catId) return;
+  // map vers l'option visible (les catégories sont dédoublonnées par nom)
+  const wantName=(catName(catId)||'').toLowerCase();
+  const opt=txCompanyCats().find(c=>c.id===catId) || txCompanyCats().find(c=>(c.name||'').toLowerCase()===wantName);
+  if(opt){ ic.value=opt.id; onInvCatChange(); }
+}
 
 /* ---------- Catégorie helpers ---------- */
 function catById(id){ return CATS.find(c=>c.id===id); }
