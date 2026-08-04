@@ -514,6 +514,8 @@
       <div class="preview" id="t-preview"></div>
     </section>
 
+    <section class="panel" id="audit-panel" style="display:none;border-left:4px solid var(--warm)"></section>
+
     <section class="panel">
       <h2>Lignes du relevé</h2>
       <div class="filterbar">
@@ -1545,7 +1547,7 @@ function showTab(t){
     const el=document.getElementById('tab-'+x); if(el) el.classList.toggle('hidden',x!==t);
   });
   if(t==='dashboard') renderDashboard();
-  if(t==='releves'){ renderTx(); renderStatements(); }
+  if(t==='releves'){ renderTx(); renderStatements(); renderSignAudit(); }
   if(t==='factures') renderInvoices();
   if(t==='rappro') renderRapproTab();
   if(t==='tiers'){ fillTiersSelect(); renderTiersRegistry(); renderTiersTab(); }
@@ -2941,6 +2943,38 @@ async function openDoc(path){
 }
 function stmtLabel(s){ return (s&&(s.label||s.original_filename))||'relevé'; }
 function stmtById(id){ return (STATEMENTS||[]).find(s=>s.id===id); }
+/* ---- Audit des signes : lignes qui vont à contre-sens des autres du même tiers ---- */
+function signAudit(){
+  const byT={};
+  TX.forEach(t=>{ const k=tiersKey(t.counterparty); if(!k) return;
+    const g=(byT[k]=byT[k]||{pos:[],neg:[],name:t.counterparty}); const a=Number(t.amount)||0;
+    if(a>0) g.pos.push(t); else if(a<0) g.neg.push(t); });
+  const suspects=[];
+  Object.values(byT).forEach(g=>{ if(g.pos.length&&g.neg.length){
+    const total=g.pos.length+g.neg.length;
+    const minority=g.pos.length<=g.neg.length?g.pos:g.neg;
+    if(minority.length/total<=0.4) minority.forEach(t=>suspects.push({t,name:g.name,majNeg:g.neg.length>g.pos.length}));
+  }});
+  return suspects.sort((a,b)=>Math.abs(Number(b.t.amount)||0)-Math.abs(Number(a.t.amount)||0));
+}
+function renderSignAudit(){
+  const box=document.getElementById('audit-panel'); if(!box) return;
+  const sus=signAudit();
+  if(!sus.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='';
+  box.innerHTML=`<h2 style="margin:0 0 4px">⚠️ Signes à vérifier (${sus.length})</h2>
+    <div class="hint">Ces lignes vont <b>à contre-sens</b> des autres opérations du même tiers → candidates à une erreur de signe (débit/crédit) lue par l'IA. Vérifie sur le relevé, et corrige le signe si besoin.</div>
+    <div class="table-wrap"><table class="compact"><thead><tr><th>Date</th><th>Libellé</th><th>Client / Fournisseur</th><th class="num">Montant actuel</th><th>Les autres du tiers</th><th></th></tr></thead><tbody>`+
+    sus.map(x=>{ const t=x.t; return `<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(t.name||'')}</td>
+      <td class="num">${euroC(t.amount)}</td><td>${x.majNeg?'plutôt des <b class="val-bad">sorties</b>':'plutôt des <b class="val-good">entrées</b>'}</td>
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn small" onclick="flipTxSign('${t.id}')" title="Inverser le signe">🔁 Passer en ${Number(t.amount)>0?'négatif':'positif'}</button> <button class="btn ghost small" onclick="openTxStatement('${t.id}')" title="Voir le relevé">📄</button>`:''}</td></tr>`;
+    }).join('')+`</tbody></table></div>`;
+}
+async function flipTxSign(id){ if(!canEdit()) return; const t=TX.find(x=>x.id===id); if(!t) return;
+  if(!confirm('Passer cette ligne de '+euro(t.amount)+' à '+euro(-Number(t.amount))+' ?\n\n('+esc(t.label||'')+')')) return;
+  const {error}=await db.from('compta_transactions').update({amount:-Number(t.amount)}).eq('id',id);
+  if(error){ toast('Erreur : '+error.message); return; } toast('✔ Signe corrigé.'); reloadData();
+}
 function renderStatements(){
   const body=document.getElementById('stmt-body'); if(!body) return; body.innerHTML='';
   const acc=currentAccountId();
