@@ -100,6 +100,14 @@ Deno.serve(async (req: Request) => {
         const { error: iErr } = await admin.from("app_memberships").insert(rows);
         if (iErr) return json({ error: iErr.message }, 400);
       }
+      // Pointage lit profiles (pas app_memberships) : on synchronise la fiche employe.
+      const ptMem = memberships.find((m: { project_key: string }) => m.project_key === "pointage");
+      if (ptMem) {
+        const ptRole = (ptMem as { role: string }).role === "manager" ? "manager" : "user";
+        await admin.from("profiles").upsert({
+          id: target, email, full_name: body.nom || null, role: ptRole, is_active: true,
+        }, { onConflict: "id" });
+      }
       const password = body.password || "";
       if (password) {
         if (String(password).length < 6) return json({ error: "Mot de passe trop court (6 caractères minimum)" }, 400);

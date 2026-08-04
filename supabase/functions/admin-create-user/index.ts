@@ -111,6 +111,16 @@ Deno.serve(async (req: Request) => {
       }, { onConflict: "id" });
     }
 
+    // Pointage : crée aussi la fiche profiles (Pointage lit profiles, pas app_memberships),
+    // pour qu'un employé créé depuis le portail central soit reconnu par le logiciel Pointage.
+    const ptMem = memberships.find((m: {project_key:string}) => m.project_key === "pointage");
+    if (ptMem) {
+      const ptRole = (ptMem as {role:string}).role === "manager" ? "manager" : "user";
+      await admin.from("profiles").upsert({
+        id: userId, email, full_name: body.nom || null, role: ptRole, is_active: true,
+      }, { onConflict: "id" });
+    }
+
     return json({ ok: true, email, id: userId, linked });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
