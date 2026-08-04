@@ -2698,6 +2698,63 @@ async function wizSave(){ if(!WIZ) return; const d=WIZ.data;
   if(ok){ toast('✅ Facture scannée et enregistrée.'); closeScanWiz(); await reloadData(); try{ proposeReverseLinks(); }catch(_){}}
   else toast('Erreur à l’enregistrement — réessaie.');
 }
+/* ================= LECTURE LOCALE D'UNE FACTURE (sans crédit IA) =================
+   PDF avec texte → pdf.js (instantané, gratuit). Photo / scan → OCR local (Tesseract).
+   Puis heuristiques pour deviner fournisseur / date / n° / montant TTC / TVA. Approximatif. */
+let _pdfjsP=null, _tessP=null;
+function ensurePdfJs(){ if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib); if(_pdfjsP) return _pdfjsP;
+  _pdfjsP=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){} res(window.pdfjsLib); };
+    s.onerror=()=>rej(new Error('pdf.js indisponible')); document.head.appendChild(s); });
+  return _pdfjsP; }
+function ensureTesseract(){ if(window.Tesseract) return Promise.resolve(window.Tesseract); if(_tessP) return _tessP;
+  _tessP=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload=()=>res(window.Tesseract); s.onerror=()=>rej(new Error('OCR indisponible')); document.head.appendChild(s); });
+  return _tessP; }
+async function pdfExtractText(file){ const lib=await ensurePdfJs(); const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  let txt=''; const n=Math.min(pdf.numPages,3);
+  for(let p=1;p<=n;p++){ const page=await pdf.getPage(p); const c=await page.getTextContent(); txt+=c.items.map(it=>it.str).join(' ')+'\n'; }
+  return txt; }
+async function pdfFirstPageCanvas(file){ const lib=await ensurePdfJs(); const pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const page=await pdf.getPage(1); const base=page.getViewport({scale:1}); const scale=base.width*2>2200?2200/base.width:2;
+  const vp=page.getViewport({scale}); const cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+  await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; return cv; }
+async function ocrText(source){ const T=await ensureTesseract(); const {data}=await T.recognize(source,'fra'); return (data&&data.text)||''; }
+function _amtToNum(s){ s=String(s).replace(/\s/g,''); if(/,\d{2}$/.test(s)) s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/,/g,''); const n=parseFloat(s.replace(/[^0-9.\-]/g,'')); return isNaN(n)?null:n; }
+function parseInvoiceText(text){
+  const T=String(text||'').replace(/ /g,' '); const low=T.toLowerCase(); const out={};
+  let m=T.match(/(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})/); if(m) out.date=m[3]+'-'+m[2]+'-'+m[1];
+  else { m=T.match(/(\d{4})-(\d{2})-(\d{2})/); if(m) out.date=m[1]+'-'+m[2]+'-'+m[3]; }
+  m=T.match(/facture\s*(?:n[°ºo]|num[eé]ro|#)?\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9\-\/]{2,})/i); if(m) out.num=m[1];
+  const near=(kw)=>{ const re=new RegExp(kw+'[^0-9]{0,40}(\\d[\\d \\.]*[.,]\\d{2})','i'); const mm=T.match(re); return mm?_amtToNum(mm[1]):null; };
+  out.ttc = near('net\\s*[àa]\\s*payer') || near('total\\s*t\\.?\\s*t\\.?\\s*c') || near('montant\\s*(?:d[ûu]|ttc)') || near('total\\s*ttc') || near('\\bttc\\b') || near('total\\s*[àa]\\s*payer');
+  out.tva = near('(?:montant\\s*(?:de\\s*)?)?t\\.?\\s*v\\.?\\s*a');
+  const rm=T.match(/(\d{1,2}(?:[.,]\d)?)\s*%/); if(rm) out.rate=Number(rm[1].replace(',','.'));
+  if(out.ttc==null){ const all=(T.match(/\d[\d \.]*[.,]\d{2}/g)||[]).map(_amtToNum).filter(x=>x!=null&&x<1e7); if(all.length) out.ttc=Math.max(...all); }
+  const known=[...new Set([].concat(allTiers().map(t=>t.name),INVOICES.map(i=>i.counterparty)).filter(Boolean))].sort((a,b)=>b.length-a.length);
+  const hit=known.find(n=>String(n).length>=3 && low.includes(String(n).toLowerCase())); if(hit) out.fournisseur=hit;
+  return out;
+}
+async function readInvoiceLocal(file){
+  if(!file) return; showAILoader('🔍 Lecture locale (sans IA)…','Extraction du texte…'); startAISimProgress&&startAISimProgress();
+  try{
+    const isPdf=(file.type||'').includes('pdf')||/\.pdf$/i.test(file.name); let text='';
+    if(isPdf){ text=await pdfExtractText(file);
+      if((text||'').replace(/\s/g,'').length<20){ setAILoader&&setAILoader('PDF scanné → reconnaissance (OCR local)…'); const cv=await pdfFirstPageCanvas(file); text=await ocrText(cv); } }
+    else { setAILoader&&setAILoader('Image → reconnaissance (OCR local)…'); text=await ocrText(file); }
+    const r=parseInvoiceText(text);
+    if(r.fournisseur){ const it=document.getElementById('i-tiers'); if(it){ it.value=r.fournisseur; onInvTiersCat&&onInvTiersCat(); } }
+    if(r.num){ const e=document.getElementById('i-num'); if(e) e.value=r.num; }
+    if(r.date){ const e=document.getElementById('i-date'); if(e) e.value=r.date; }
+    if(r.ttc!=null){ const e=document.getElementById('i-ttc'); if(e) e.value=r.ttc; }
+    if(r.rate!=null){ const e=document.getElementById('i-tva'); if(e) e.value=r.rate; }
+    if(r.tva!=null && r.ttc!=null){ const e=document.getElementById('i-ht'); if(e) e.value=Math.round((r.ttc-r.tva)*100)/100; }
+    invPreview&&invPreview();
+    const got=[r.fournisseur&&'fournisseur',r.date&&'date',r.ttc!=null&&'montant',r.num&&'n°'].filter(Boolean);
+    toast(got.length?('🔍 Lu localement (sans IA) : '+got.join(', ')+'. Vérifie/complète puis enregistre.'):'Lecture locale : peu d’infos trouvées, complète à la main.');
+  }catch(e){ toast('Lecture locale impossible ('+(e.message||e)+'). Saisis à la main, ou utilise l’IA.'); }
+  finally{ stopAISimProgress&&stopAISimProgress(); hideAILoader&&hideAILoader(); }
+}
 async function onInvoiceFilePick(inputId){
   if(!canEdit()) return;
   const el=document.getElementById(inputId||'i-file'); const files=el&&el.files; if(!files||!files.length) return;
@@ -2709,8 +2766,8 @@ async function onInvoiceFilePick(inputId){
   INVOICE_FILE=f; INV_FROM_IA=false;
   const fn=document.getElementById('i-filename'); if(fn) fn.textContent='📎 '+f.name;
   renderDocPreview(f);   // aperçu du document (utile aussi pour la saisie manuelle)
-  if(!canUseIA()){ toast("Document joint. La lecture IA est réservée à l'administrateur — complète les champs à la main."); return; }
-  if(!askUseIA("Facture « "+f.name+" » — la lire avec l'IA pour pré-remplir ?")) return;
+  if(!canUseIA()){ readInvoiceLocal(f); return; }   // non-admin → lecture locale gratuite
+  if(!confirm("Facture « "+f.name+" » :\n\nOK = 🪄 Lire avec l'IA (utilise un crédit — pour les factures difficiles)\nAnnuler = 🔍 Lecture rapide LOCALE (sans crédit IA)")){ readInvoiceLocal(f); return; }
   try{
     const r=await callComptaIA('facture',f);
     if(r.direction) document.getElementById('i-dir').value=r.direction;
