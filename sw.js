@@ -1,5 +1,5 @@
 /* ProFormationPlus — Service Worker (réseau d'abord, cache de secours hors-ligne) */
-const CACHE = 'pfp-v1';
+const CACHE = 'pfp-v2';
 
 self.addEventListener('install', (e) => { self.skipWaiting(); });
 
@@ -45,7 +45,8 @@ self.addEventListener('fetch', (e) => {
 
   e.respondWith((async () => {
     try {
-      const res = await fetch(req);                  // réseau d'abord → toujours la dernière version en ligne
+      // pour les pages (navigation) on court-circuite le cache HTTP du navigateur → vraiment la dernière version
+      const res = await fetch(req, req.mode === 'navigate' ? { cache: 'reload' } : undefined);
       if (res && res.ok) {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
