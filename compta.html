@@ -301,7 +301,7 @@
   .pill{ background:color-mix(in srgb,var(--panel2) 70%,transparent); border-color:color-mix(in srgb,var(--accent) 20%,var(--line)); }
 
   /* Toast néon + scrollbars fines */
-  .toast{ background:color-mix(in srgb,var(--panel) 82%,transparent); backdrop-filter:blur(12px); border:1px solid color-mix(in srgb,var(--accent) 40%,transparent); box-shadow:0 14px 44px -14px color-mix(in srgb,var(--accent) 60%,transparent); }
+  .toast{ background:#12243a; color:#eaf3ff; border:1px solid color-mix(in srgb,var(--accent) 45%,transparent); box-shadow:0 14px 44px -14px rgba(0,0,0,.6); }
   *{ scrollbar-width:thin; scrollbar-color:color-mix(in srgb,var(--accent) 40%,transparent) transparent; }
   *::-webkit-scrollbar{ width:9px; height:9px; } *::-webkit-scrollbar-thumb{ background:color-mix(in srgb,var(--accent) 34%,transparent); border-radius:9px; } *::-webkit-scrollbar-track{ background:transparent; }
 
@@ -992,6 +992,15 @@
   <input type="file" id="sw-cam" accept="image/*" capture="environment" class="hidden" onchange="swAddPage(this.files[0]);this.value='';">
 </div>
 
+<!-- Détail encaissé/payé d'un tiers (lignes de relevé + factures) -->
+<div id="tiersamt-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:760px">
+    <div class="modal-head"><h3 id="tiersamt-title">Détail</h3><button class="btn ghost small" onclick="closeTiersAmount()">✕</button></div>
+    <div id="tiersamt-body"></div>
+    <div style="margin-top:14px;text-align:right"><button class="btn ghost" onclick="closeTiersAmount()">Fermer</button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1089,6 +1098,24 @@ function tiersSourceBadge(s){
   if(s==='manuel') return '<span class="badge b-ok">✍️ Manuel</span>';
   return '<span class="pill">Détecté</span>';
 }
+// Détail d'un montant Encaissé/Payé d'un tiers : lignes de relevé + facture reliée.
+function openTiersAmount(key,dir){
+  const tiers=allTiers().find(t=>t.key===key); const name=tiers?tiers.name:key; const wantPos=(dir==='in');
+  const lines=TX.filter(t=>tiersKey(t.counterparty)===key && (wantPos?Number(t.amount)>0:Number(t.amount)<0))
+    .sort((a,b)=>String(b.op_date||'').localeCompare(String(a.op_date||'')));
+  const tot=lines.reduce((s,t)=>s+Math.abs(Number(t.amount)||0),0);
+  document.getElementById('tiersamt-title').innerHTML=`${wantPos?'↗ Encaissé':'↘ Payé'} — <b>${esc(name)}</b> · <b>${euro(tot)}</b> · ${lines.length} ligne(s)`;
+  const body=document.getElementById('tiersamt-body');
+  body.innerHTML=lines.length?`<div class="table-wrap" style="max-height:56vh;overflow:auto"><table class="compact">
+    <thead><tr><th>Date</th><th>Libellé (relevé)</th><th>Catégorie</th><th>Facture reliée</th><th class="num">Montant</th></tr></thead><tbody>`+
+    lines.map(t=>{ const inv=txInvoice(t.id);
+      const facCell=inv?`<a href="#" onclick="openInvoicePreview('${inv.id}');return false">📄 ${esc(inv.counterparty||'')} ${esc(inv.invoice_number||'—')}</a>`:'<span class="hint">— aucune —</span>';
+      return `<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td><td>${facCell}</td><td class="num">${euroC(t.amount)}</td></tr>`;
+    }).join('')+`</tbody></table></div>`
+    :'<div class="empty">Aucune ligne de relevé pour ce montant.</div>';
+  document.getElementById('tiersamt-modal').classList.remove('hidden');
+}
+function closeTiersAmount(){ document.getElementById('tiersamt-modal').classList.add('hidden'); }
 function renderTiersRegistry(){
   const body=document.getElementById('tiers-reg-body'); if(!body) return;
   const q=(document.getElementById('ti-search')?.value||'').toLowerCase().trim();
@@ -1102,7 +1129,7 @@ function renderTiersRegistry(){
     return `<tr><td class="lbl" title="${esc(t.name)}"><a href="#" onclick="openTiersFor('${esc(t.key)}');return false">${esc(t.name)}</a></td>
       <td>${catCell}</td>
       <td>${tiersSourceBadge(t.source)}</td><td class="num">${s.count}</td>
-      <td class="num val-good">${s.inn?euro(s.inn):'—'}</td><td class="num val-bad">${s.out?euro(s.out):'—'}</td>
+      <td class="num val-good">${s.inn?`<a href="#" title="Voir les lignes encaissées" onclick="openTiersAmount('${esc(t.key)}','in');return false">${euro(s.inn)}</a>`:'—'}</td><td class="num val-bad">${s.out?`<a href="#" title="Voir les lignes payées" onclick="openTiersAmount('${esc(t.key)}','out');return false">${euro(s.out)}</a>`:'—'}</td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="openMergeTiers('${esc(t.key)}')" title="Fusionner avec un autre (même tiers)">🔗 Fusionner</button> ${t.inTable?`<button class="btn danger small" onclick="deleteTiers('${esc(t.key)}')" title="Retirer du registre">🗑</button>`:''}`:''}</td></tr>`;
   }).join('')||'<tr><td colspan="7" class="empty">Aucun client / fournisseur pour le moment. Ils apparaîtront ici automatiquement à mesure que tu saisis ou importes.</td></tr>';
 }
