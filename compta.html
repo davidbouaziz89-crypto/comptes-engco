@@ -1500,8 +1500,8 @@ function fillPeriodBar(){
   const curY=ys.value;
   ys.innerHTML='<option value="">Toutes les années</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
   if(!ms.dataset.filled){ ms.innerHTML='<option value="">Tous les mois</option>'+MOIS_FR.slice(1).map((n,i)=>`<option value="${String(i+1).padStart(2,'0')}">${n}</option>`).join(''); ms.dataset.filled='1'; }
-  // 1ère fois : mois en cours (préférence de David)
-  if(!PERIOD_INIT){ ys.value=cy; ms.value=ymNow().slice(5,7); PERIOD_INIT=true; }
+  // 1ère fois : année en cours, TOUS les mois (on voit tout l'historique — plus de "données disparues")
+  if(!PERIOD_INIT){ ys.value=cy; ms.value=''; PERIOD_INIT=true; }
   else ys.value=[...ys.options].some(o=>o.value===curY)?curY:'';
   const pc=document.getElementById('pb-cur'); if(pc) pc.textContent='Affichage : '+periodLabel();
 }
