@@ -109,12 +109,20 @@ Deno.serve(async (req) => {
       : { type: "document", source: { type: "base64", media_type: "application/pdf", data: dataB64 } };
 
     const instruction = kind === "releve"
-      ? `Tu es un assistant comptable. Analyse ce relevé bancaire et extrais TOUTES les lignes d'opérations.
-Pour chaque ligne : date (AAAA-MM-JJ), libellé exact, montant signé (négatif = débit/sortie, positif = crédit/entrée).
-Si tu identifies clairement le client/fournisseur, indique-le dans counterparty, sinon null.
+      ? `Tu es un assistant comptable méticuleux. Analyse ce relevé bancaire (ou relevé de carte) et extrais TOUTES les lignes d'opérations.
+
+RÈGLE CAPITALE — LE SIGNE DU MONTANT (c'est le point le plus important, ne te trompe jamais dessus) :
+- Montant NÉGATIF = argent qui SORT du compte (débit / dépense / virement émis / prélèvement / paiement par carte / retrait / frais).
+- Montant POSITIF = argent qui ENTRE sur le compte (crédit / encaissement / virement reçu / remboursement).
+- Détermine le signe D'ABORD d'après la COLONNE où se trouve le montant sur le relevé (colonne Débit vs colonne Crédit), ou d'après le sens qui fait baisser/monter le solde — et JAMAIS uniquement d'après le libellé.
+- ATTENTION PIÈGE : un même libellé (ex. « VIR SEPA SASU 2B-COM ») peut être un DÉBIT un mois et un CRÉDIT un autre mois. Ne devine pas selon le nom : regarde la colonne / le sens réel sur CE relevé précis.
+- Repères FR (la colonne du relevé prime toujours) : « VIR SEPA ÉMIS / VIR EMIS / VIREMENT EN FAVEUR DE », « PRLV / PRELEVEMENT », « PAIEMENT CB / CARTE », « FRAIS », « COTISATION », « ECHEANCE / REMBOURSEMENT PRET » → en général DÉBITS (négatif). « VIR RECU / VIREMENT REÇU / VIR SEPA RECU / REMISE / ENCAISSEMENT / REMBOURSEMENT reçu » → CRÉDITS (positif).
+- Relevé de CARTE (Amex, Visa…) : chaque achat = NÉGATIF. Une ligne du type « PRELEVEMENT/REGLEMENT AUTOMATIQUE … CR » ou « paiement reçu / merci » = le règlement du relevé précédent = POSITIF, et ce N'EST PAS une dépense.
+
+Pour chaque ligne : date (AAAA-MM-JJ), libellé exact, montant signé selon la règle ci-dessus, et le client/fournisseur dans counterparty si identifiable (sinon null).
 Propose la catégorie la plus adaptée parmi cette liste (utilise son id exact), ou null si tu n'es pas sûr :
 ${catList}
-N'invente aucune ligne. Ne renvoie que ce qui figure réellement sur le relevé.`
+N'invente aucune ligne. Ne renvoie que ce qui figure réellement sur le relevé. En cas de doute sur le signe d'une ligne, relis la colonne débit/crédit avant de trancher.`
       : `Tu es un assistant comptable qui tient la comptabilité de la société ${companyName ? `« ${companyName} »` : "de l'utilisateur"}. Analyse cette facture.
 
 RÈGLE CLÉ sur le TIERS (counterparty) et le SENS (direction) :
