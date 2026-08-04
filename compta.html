@@ -1112,12 +1112,29 @@ function openTiersAmount(key,dir){
     <thead><tr><th>Date</th><th>Libellé (relevé)</th><th>Catégorie</th><th>Facture reliée</th><th class="num">Montant</th></tr></thead><tbody>`+
     lines.map(t=>{ const inv=txInvoice(t.id);
       const facCell=inv?`<a href="#" onclick="openInvoicePreview('${inv.id}');return false">📄 ${esc(inv.counterparty||'')} ${esc(inv.invoice_number||'—')}</a>`:'<span class="hint">— aucune —</span>';
-      return `<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td><td>${facCell}</td><td class="num">${euroC(t.amount)}</td></tr>`;
+      return `<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(catName(t.category_id))}</td><td>${facCell}</td><td class="num"><a href="#" title="Ouvrir dans les relevés pour modifier" onclick="goToTxLine('${t.id}');return false">${euroC(t.amount)} ✏️</a></td></tr>`;
     }).join('')+`</tbody></table></div>`
     :'<div class="empty">Aucune ligne de relevé pour ce montant.</div>';
   document.getElementById('tiersamt-modal').classList.remove('hidden');
 }
 function closeTiersAmount(){ document.getElementById('tiersamt-modal').classList.add('hidden'); }
+// Ouvre une ligne de relevé précise dans l'onglet Relevés, en édition, pour la modifier.
+function goToTxLine(txId){ const t=TX.find(x=>x.id===txId); if(!t) return;
+  closeTiersAmount(); closeInvoicePreview&&closeInvoicePreview(); showTab('releves');
+  const ym=(t.op_date||'').slice(0,7);
+  if(ym){ const ys=document.getElementById('g-year'),ms=document.getElementById('g-month');
+    if(ys)ys.value=ym.slice(0,4); if(ms)ms.value=ym.slice(5,7);
+    const pc=document.getElementById('pb-cur'); if(pc) pc.textContent='Affichage : '+periodLabel(); }
+  const g=id=>document.getElementById(id);
+  ['tx-fcat','tx-fstatus','tx-ftiers','tx-fstmt'].forEach(id=>{ const e=g(id); if(e) e.value=''; });
+  const grp=g('tx-group'); if(grp) grp.checked=false;
+  const se=g('tx-search'); if(se) se.value=(t.counterparty||t.label||'');
+  renderTx();
+  setTimeout(()=>{ const btn=document.querySelector(`#tx-body button[onclick*="openTxEdit('${txId}'"]`);
+    if(btn){ try{ btn.closest('tr').scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} openTxEdit(txId,btn); }
+    else { const sec=g('tx-body'); if(sec){ try{ sec.closest('section').scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} } }
+  }, 80);
+}
 function renderTiersRegistry(){
   const body=document.getElementById('tiers-reg-body'); if(!body) return;
   const q=(document.getElementById('ti-search')?.value||'').toLowerCase().trim();
