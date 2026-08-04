@@ -11,7 +11,7 @@ function json(obj: unknown, status = 200) {
 }
 
 // Cles de projet/outil valides : projets comptes (led, velo) + outils externes.
-const VALID_KEYS = ["led", "velo", "docucrm", "crmformation", "pointage", "crmpv", "compta"];
+const VALID_KEYS = ["led", "velo", "zeste", "docucrm", "crmformation", "pointage", "crmpv", "notelia", "compta"];
 // Rôles propres à chaque logiciel (hors 'admin', global). Les projets compta (led/velo/docucrm)
 // utilisent les rôles configurables d'app_roles.
 const CRM_ROLES: Record<string, string[]> = {
