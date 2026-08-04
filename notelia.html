@@ -956,22 +956,14 @@ function showProjectPicker(){
   if(keys.length===1 && tools.length===0){ enterProject(keys[0]); return; }
   let html=keys.map(k=>`<button class="projbtn" onclick="enterProject('${k}')"><span class="ic">${PROJECTS[k].icon}</span>${PROJECTS[k].nom}</button>`).join('');
   tools.forEach(k=>{ const t=EXTERNAL_TOOLS[k]; html+=`<button class="projbtn" onclick="openTool('${k}')"><span class="ic">${t.icon}</span>${t.nom}</button>`; });
-  if(isAdminUser()){ html+=`<button class="projbtn" onclick="openAdminUsers()"><span class="ic">👥</span>Utilisateurs</button>`; }
+  if(isAdminUser()){ html+=`<button class="projbtn" onclick="location.href='./index.html#users'"><span class="ic">👥</span>Utilisateurs</button>`; }
   list.innerHTML=html;
   document.getElementById('projpick').style.display='flex';
 }
-function openAdminUsers(){ openAdminConsole('users'); }
-async function openAdminConsole(which){
-  ADMIN_MODE=true; PROJ=null; CURRENT_ROLE='admin'; applyPermClasses();
-  document.getElementById('projpick').style.display='none';
-  document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">Admin</span>';
-  document.getElementById('btn-changeproj').style.display='';
-  document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='none');
-  document.getElementById('adminnav').style.display='flex';
-  await loadRolesCfg();
-  renderProjectRolesGrid();
-  showAdminTab(which||'users');
-}
+// Gestion des utilisateurs centralisée : elle se fait désormais UNIQUEMENT dans le portail
+// Multi-projets → onglet Utilisateurs. On y redirige au lieu d'ouvrir une console interne.
+function openAdminUsers(){ location.href='./index.html#users'; }
+async function openAdminConsole(which){ location.href='./index.html#'+(which==='roles'?'roles':'users'); }
 function showAdminTab(which){
   document.getElementById('proj-label').innerHTML = (which==='roles')?'🏷️ Rôles':'🛠️ Gestion des utilisateurs';
   document.querySelectorAll('#adminnav button').forEach(b=>b.classList.toggle('active',b.dataset.admtab===which));

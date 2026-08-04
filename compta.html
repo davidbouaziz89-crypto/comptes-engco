@@ -772,25 +772,14 @@
 
         <div class="ps" id="ps-users" style="display:none">
           <section class="panel">
-            <h2 id="u-title">Créer un utilisateur</h2>
-            <div class="hint">La personne se connecte avec cet email + mot de passe. Choisis son rôle et les sociétés auxquelles elle a accès.</div>
-            <form class="row" onsubmit="saveUser(event)">
-              <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
-              <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères"></div>
-              <div class="field"><label>Rôle</label><select id="u-role"><option value="comptable">Comptable (lecture + téléchargement)</option><option value="secretaire">Secrétaire (saisie)</option></select></div>
-              <div class="field" id="u-companies-field" style="grid-column:1/-1"><label>Sociétés accessibles</label>
-                <div id="u-companies" style="display:flex;flex-wrap:wrap;gap:10px;padding-top:4px"></div>
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:6px 2px">
+              <div style="font-size:34px;line-height:1">🛡️</div>
+              <div style="flex:1;min-width:220px">
+                <h2 style="margin:0 0 4px">Gestion centralisée des utilisateurs</h2>
+                <div class="hint" style="margin:0">La création et la gestion des accès se font désormais dans le portail <b>Multi-projets → onglet Utilisateurs</b>. Cet écran a été retiré ici pour éviter les doublons et garder une seule source de vérité.</div>
               </div>
-              <div class="field" style="align-self:flex-end"><button class="btn" type="submit" id="u-submit">+ Créer</button></div>
-            </form>
-            <div class="preview" id="u-msg"></div>
-          </section>
-          <section class="panel">
-            <h2>Utilisateurs &amp; accès</h2>
-            <div class="table-wrap"><table>
-              <thead><tr><th>Email</th><th>Rôle</th><th>Accès sociétés</th><th></th></tr></thead>
-              <tbody id="users-body"></tbody>
-            </table></div>
+              <a class="btn" href="./index.html#users" style="text-decoration:none;white-space:nowrap">Ouvrir la gestion →</a>
+            </div>
           </section>
         </div>
 

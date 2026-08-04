@@ -129,7 +129,7 @@
     <div id="tab-employes" class="hidden"><section class="panel">
       <div class="row" style="margin-bottom:12px"><input class="search" id="emp-search" placeholder="🔎 Rechercher…" oninput="renderEmployes()">
       <select id="emp-fstatus" class="field" style="max-width:150px" onchange="renderEmployes()"><option value="active">Actifs</option><option value="archived">Archivés</option><option value="all">Tous</option></select>
-      <span class="hint" id="emp-count"></span><span class="spacer" style="margin-left:auto"></span><button class="btn small" id="btn-newemp" onclick="openNewEmp()">➕ Nouvel employé</button></div>
+      <span class="hint" id="emp-count"></span><span class="spacer" style="margin-left:auto"></span><a class="btn small" id="btn-newemp" href="./index.html#users" style="text-decoration:none" title="La création se fait dans le portail Multi-projets → Utilisateurs">➕ Créer via le portail</a></div>
       <div class="table-wrap"><table id="emp-table"></table></div></section></div>
 
     <div id="tab-pointages" class="hidden"><section class="panel">
@@ -637,23 +637,11 @@ function renderEmployes(){
       <td>${esc(e.type_horaire||'')}</td><td>${e.status==='active'?'<span class="pill" style="background:var(--good)22;color:var(--good)">Actif</span>':(e.status==='archived'?'<span class="pill" style="background:var(--muted)22;color:var(--muted)">Archivé</span>':esc(e.status||''))}</td>
       <td class="num">${e.taux_horaire!=null?eur(e.taux_horaire):(e.salaire_global!=null?eur(e.salaire_global):'—')}</td></tr>`).join('')||'<tr><td class="empty" colspan="7">Aucun employé</td></tr>');
 }
-function openNewEmp(){
-  document.getElementById('ne-email').value='';document.getElementById('ne-first').value='';document.getElementById('ne-last').value='';document.getElementById('ne-pass').value='TimeGuard2026!';document.getElementById('ne-msg').textContent='';
-  const teams=(MYROLE==='manager')?EQUIPES.filter(q=>MANAGED_TEAMS.includes(q.id)):EQUIPES;
-  document.getElementById('ne-equipe').innerHTML='<option value="">— Aucune —</option>'+teams.map(q=>`<option value="${q.id}">${esc(q.nom||q.nom_societe||'')}</option>`).join('');
-  document.getElementById('newemp-modal').classList.remove('hidden');
-}
+// Création de compte centralisée : elle se fait uniquement dans le portail Multi-projets → Utilisateurs.
+function openNewEmp(){ location.href='./index.html#users'; }
 function closeNewEmp(){document.getElementById('newemp-modal').classList.add('hidden');}
-async function createEmployee(){
-  const email=gv('ne-email').toLowerCase();const msg=document.getElementById('ne-msg');
-  if(!email){msg.textContent='Email requis.';return;}
-  const btn=document.getElementById('ne-go');btn.disabled=true;msg.textContent='Création en cours…';
-  const {data,error}=await sb.functions.invoke('pointage-create-employee',{body:{email,first_name:gv('ne-first'),last_name:gv('ne-last'),equipe_id:gv('ne-equipe')||null,password:gv('ne-pass')||'TimeGuard2026!',role:'employee'}});
-  btn.disabled=false;
-  if(error||(data&&data.error)){msg.textContent='Erreur : '+((data&&data.error)||error.message);return;}
-  closeNewEmp();toast('Employé créé ✓ (mot de passe : '+(data.temp_password||'')+')');
-  await loadAll();renderEmployes();
-}
+// Neutralisé : la création de compte se fait dans le portail Multi-projets → Utilisateurs.
+async function createEmployee(){ location.href='./index.html#users'; }
 async function toggleArchive(id,ns){
   if(!confirm(ns==='archived'?'Archiver cet employé ? Il n\'apparaîtra plus dans les listes actives.':'Réactiver cet employé ?'))return;
   const {error}=await db.from('employees').update({status:ns}).eq('id',id);
@@ -1178,18 +1166,8 @@ function renderAccessParam(){
      ${(!mgrs.length&&!cpts.length)?'<tr><td class="empty" colspan="5">Aucun manager ni comptable</td></tr>':''}
    </table></div>`;
 }
-async function createRoleUser(){
-  const role=gv('ra-role'),email=gv('ra-email').toLowerCase(),first=gv('ra-first'),last=gv('ra-last'),pass=gv('ra-pass')||'TimeGuard2026!';
-  const teams=[...document.querySelectorAll('.ra-team:checked')].map(x=>x.value);
-  const msg=document.getElementById('ra-msg');
-  if(!email){msg.textContent='Email requis.';return;}
-  if(!teams.length){msg.textContent='Choisis au moins une équipe.';return;}
-  msg.textContent='Création…';
-  const {data,error}=await sb.functions.invoke('pointage-create-employee',{body:{email,first_name:first,last_name:last,password:pass,role,team_ids:teams}});
-  if(error||(data&&data.error)){msg.textContent='Erreur : '+((data&&data.error)||error.message);return;}
-  msg.textContent='';toast('Accès créé ✓ (mot de passe : '+(data.temp_password||pass)+')');
-  await loadAll();renderParams();
-}
+// Neutralisé : la création de compte (manager/comptable) se fait dans le portail Multi-projets → Utilisateurs.
+async function createRoleUser(){ const msg=document.getElementById('ra-msg'); if(msg) msg.textContent='La création se fait dans le portail Multi-projets → Utilisateurs.'; location.href='./index.html#users'; }
 async function delRoleUser(uid,role){
   if(!confirm('Retirer cet accès ? Le compte de connexion restera mais perdra ses droits.'))return;
   if(role==='manager')await db.from('manager_teams').delete().eq('user_id',uid);

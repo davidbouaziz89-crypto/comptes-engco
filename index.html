@@ -1344,6 +1344,9 @@ async function afterAuth(session){
   document.getElementById('user-email').innerHTML=(session.user.email||'');
   if(!MY_MEMBERSHIPS.length){ document.getElementById('projpick').style.display='flex'; document.getElementById('projpick-list').innerHTML=''; document.getElementById('projpick-msg').textContent="Aucun accès n'a été configuré pour ce compte. Contacte l'administrateur."; return; }
   showProjectPicker();
+  // Lien direct depuis un logiciel (encart « Gestion centralisée ») : ouvre l'admin voulu.
+  const h=(location.hash||'').replace('#','');
+  if((h==='users'||h==='roles') && isAdminUser()){ openAdminConsole(h); }
 }
 function isAdminUser(){ return MY_MEMBERSHIPS.some(m=>m.role==='admin'); }
 function myProjectKeys(){ return isAdminUser() ? Object.keys(PROJECTS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>PROJECTS[k]); }
