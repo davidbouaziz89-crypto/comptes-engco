@@ -295,9 +295,9 @@
 
   /* Badges & pills néon */
   .badge{ box-shadow:0 0 12px -5px currentColor; letter-spacing:.2px; }
-  .b-ok{ background:color-mix(in srgb,#22c55e 16%,transparent); color:#86efac; border-color:color-mix(in srgb,#22c55e 45%,transparent); }
-  .b-wip{ background:color-mix(in srgb,var(--warm) 15%,transparent); color:#fdba74; border-color:color-mix(in srgb,var(--warm) 45%,transparent); }
-  .b-lost{ background:color-mix(in srgb,var(--danger) 15%,transparent); color:#fca5a5; border-color:color-mix(in srgb,var(--danger) 45%,transparent); }
+  .b-ok{ background:#16a34a; color:#fff; border-color:transparent; }
+  .b-wip{ background:#e08a00; color:#fff; border-color:transparent; }
+  .b-lost{ background:#dc2626; color:#fff; border-color:transparent; }
   .pill{ background:color-mix(in srgb,var(--panel2) 70%,transparent); border-color:color-mix(in srgb,var(--accent) 20%,var(--line)); }
 
   /* Toast néon + scrollbars fines */
@@ -1832,7 +1832,7 @@ function renderTx(){
               : (canEdit()?`<button class="btn ghost small" title="Relier à une facture (${Number(t.amount)>0?'vente':'achat'})" onclick="linkTxToInvoice('${t.id}')">🔗 Relier</button>`:'<span class="hint">—</span>'))
           : '');
     return `<td class="dt">${(t.op_date||'').slice(0,10)}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${catTxt}</td><td>${esc(t.counterparty||'—')}</td>${accCell}
-      <td class="num">${euroC(t.amount)}</td><td class="num">${t.vat_amount!=null?euroC(t.vat_amount):'—'}</td>
+      <td class="num">${euroC(t.amount)}</td><td class="num" style="color:var(--muted)">${t.vat_amount!=null?euro(t.vat_amount):'—'}</td>
       <td><span class="badge ${t.status==='classe'?'b-ok':'b-wip'}">${t.status==='classe'?'Classé':'À classer'}</span></td>
       <td>${rapp}</td>
       <td style="white-space:nowrap">${canEdit()?`<button class="btn ghost small" onclick="linkTxToInvoice('${t.id}')" title="Relier une ou plusieurs factures à ce paiement">🔗</button> <button class="btn ghost small" onclick="openTxEdit('${t.id}',this)" title="Modifier">✏️</button> <button class="btn ghost small" onclick="delTx('${t.id}')" title="Supprimer">🗑</button>`:''}</td>`;
