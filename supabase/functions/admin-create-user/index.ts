@@ -10,6 +10,20 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// deno-lint-ignore no-explicit-any
+async function findUserByEmail(admin: any, email: string) {
+  const target = email.toLowerCase();
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error || !data) return null;
+    const users = data.users || [];
+    const u = users.find((x: { email?: string }) => (x.email || "").toLowerCase() === target);
+    if (u) return u;
+    if (users.length < 1000) break;
+  }
+  return null;
+}
+
 // Cles de projet/outil valides : projets comptes (led, velo) + outils externes.
 const VALID_KEYS = ["led", "velo", "zeste", "docucrm", "crmformation", "pointage", "crmpv", "notelia", "compta"];
 // Rôles propres à chaque logiciel (hors 'admin', global). Les projets compta (led/velo/docucrm)
@@ -59,15 +73,31 @@ Deno.serve(async (req: Request) => {
     const callerIsAdmin = (callerMems || []).some((m: { role: string }) => m.role === "admin");
     if (!callerIsAdmin) return json({ error: "Réservé à l'administrateur" }, 403);
 
+    // Cree le compte auth. S'il existe deja (souvent cree par un logiciel interne comme
+    // Notelia/CRM), on ne renvoie PAS d'erreur : on rattache ce compte au portail central,
+    // pour que TOUS les utilisateurs soient gerables depuis ici.
+    let userId: string;
+    let linked = false;
     const { data: created, error: cErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
-    if (cErr || !created?.user) return json({ error: cErr?.message || "Création impossible" }, 400);
+    if (created?.user) {
+      userId = created.user.id;
+    } else {
+      const existing = await findUserByEmail(admin, email);
+      if (!existing) return json({ error: cErr?.message || "Création impossible" }, 400);
+      userId = existing.id;
+      linked = true;
+      // Met a jour le mot de passe fourni pour le compte rattache.
+      if (password) await admin.auth.admin.updateUserById(userId, { password, email_confirm: true });
+    }
 
+    // Remplace les acces de cet utilisateur par ceux definis ici (source de verite = portail).
+    await admin.from("app_memberships").delete().eq("user_id", userId);
     const rows = memberships.map((m: {project_key:string; role:string; regie_name?:string}) => ({
-      user_id: created.user.id, project_key: m.project_key, role: m.role,
+      user_id: userId, project_key: m.project_key, role: m.role,
       regie_name: m.regie_name || null, email,
     }));
     const { error: e2 } = await admin.from("app_memberships").insert(rows);
-    if (e2) { await admin.auth.admin.deleteUser(created.user.id); return json({ error: e2.message }, 400); }
+    if (e2) { if (!linked) await admin.auth.admin.deleteUser(userId); return json({ error: e2.message }, 400); }
 
     // CRM Photovoltaïque : crée directement le profil (nom, rôles multiples, adresse) sans attendre la 1re connexion.
     const pvMem = memberships.find((m: {project_key:string}) => m.project_key === "crmpv");
@@ -75,13 +105,13 @@ Deno.serve(async (req: Request) => {
       const prof = body.profile || {};
       const roles = Array.isArray(body.roles) ? body.roles : [];
       await admin.from("pv_profiles").upsert({
-        id: created.user.id, email, nom: body.nom || null, role: (pvMem as {role:string}).role,
+        id: userId, email, nom: body.nom || null, role: (pvMem as {role:string}).role,
         roles, actif: true,
         adresse: prof.adresse || null, code_postal: prof.code_postal || null, ville: prof.ville || null,
       }, { onConflict: "id" });
     }
 
-    return json({ ok: true, email, id: created.user.id });
+    return json({ ok: true, email, id: userId, linked });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
   }

@@ -37,6 +37,36 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const action = body.action;
+
+    if (action === "list") {
+      // Liste TOUS les comptes auth + leurs acces (meme ceux crees par un logiciel interne),
+      // pour que la gestion des utilisateurs soit vraiment centralisee dans le portail.
+      const usersMap: Record<string, {
+        user_id: string; email: string; created_at: string | null;
+        last_sign_in_at: string | null; mems: unknown[];
+      }> = {};
+      for (let page = 1; page <= 20; page++) {
+        const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (error || !data) break;
+        const users = data.users || [];
+        for (const u of users) {
+          usersMap[u.id] = {
+            user_id: u.id, email: u.email || "",
+            created_at: u.created_at ?? null, last_sign_in_at: u.last_sign_in_at ?? null, mems: [],
+          };
+        }
+        if (users.length < 1000) break;
+      }
+      const { data: mems } = await admin.from("app_memberships").select("user_id, email, project_key, role, regie_name");
+      for (const m of (mems || [])) {
+        if (!usersMap[m.user_id]) {
+          usersMap[m.user_id] = { user_id: m.user_id, email: m.email || "", created_at: null, last_sign_in_at: null, mems: [] };
+        }
+        usersMap[m.user_id].mems.push(m);
+      }
+      return json({ ok: true, users: Object.values(usersMap) });
+    }
+
     const target = (body.user_id || "").trim();
     if (!target) return json({ error: "Utilisateur manquant" }, 400);
 
