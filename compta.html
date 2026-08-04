@@ -376,7 +376,7 @@
   .card::before{ width:4px; }
   .kpi .k-ic{ width:46px; height:46px; font-size:23px; border-radius:15px; }
   .kpi .label{ font-size:13px; text-transform:uppercase; letter-spacing:.6px; opacity:.85; }
-  .kpi .value{ font-size:38px; font-weight:800; letter-spacing:-1px; line-height:1.05; margin-top:2px; }
+  .kpi .value{ font-size:28px; font-weight:800; letter-spacing:-.4px; line-height:1.12; margin-top:4px; padding-right:52px; overflow-wrap:anywhere; }
   .kpi .k-sub{ font-size:12px; }
 
   /* Panneaux : verre + halo de bord plus visibles, coins plus arrondis */
@@ -1616,15 +1616,17 @@ function renderDashCharts(){
   if(typeof Chart==='undefined'||!CO) return;
   const tc={muted:cssVar('--muted'),line:cssVar('--line'),panel:cssVar('--panel'),good:cssVar('--good'),bad:cssVar('--bad')};
   Chart.defaults.color=tc.muted; Chart.defaults.font.family='Inter, system-ui, sans-serif';
-  // Camembert : dépenses (sorties) par catégorie
+  // Camembert : dépenses (sorties) par catégorie — regroupé par NOM (fusionne les doublons global/société)
   const byCat={}; let totalOut=0;
-  TX.filter(t=>periodMatch(t.op_date)&&Number(t.amount)<0).forEach(t=>{ const k=t.category_id||'__none__'; const v=Math.abs(Number(t.amount)||0); byCat[k]=(byCat[k]||0)+v; totalOut+=v; });
-  const ent=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  TX.filter(t=>periodMatch(t.op_date)&&Number(t.amount)<0).forEach(t=>{ const name=t.category_id?catName(t.category_id):'Non classé'; const v=Math.abs(Number(t.amount)||0); byCat[name]=(byCat[name]||0)+v; totalOut+=v; });
+  let ent=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  // Limite la légende : top 10 + « Autres » (évite une légende qui déborde)
+  if(ent.length>11){ const top=ent.slice(0,10); const rest=ent.slice(10).reduce((s,[,v])=>s+v,0); top.push(['Autres',rest]); ent=top; }
   const ccv=document.getElementById('cc-cats'); if(ccv) ccv.textContent=euro(totalOut);
   const dsub=document.getElementById('dc-sub'); if(dsub) dsub.textContent=periodLabel();
   if(!ent.length){ if(CHARTS['ch-cats']){CHARTS['ch-cats'].destroy(); delete CHARTS['ch-cats'];} }
   else mkChart('ch-cats',{type:'doughnut',
-    data:{labels:ent.map(([k])=>k==='__none__'?'Non classé':catName(k)),
+    data:{labels:ent.map(([name])=>name),
       datasets:[{data:ent.map(([,v])=>v),backgroundColor:ent.map((_,i)=>CAT_PALETTE[i%CAT_PALETTE.length]),borderColor:tc.panel,borderWidth:3,hoverOffset:7}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'66%',
       plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,pointStyle:'circle',font:{size:12}}},
