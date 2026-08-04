@@ -1301,7 +1301,7 @@ function toast(m,type){ const t=document.getElementById('toast'); t.textContent=
   window._tt=setTimeout(()=>t.style.display='none', isErr?9000:3000); }
 function euro(n){ return (Number(n)||0).toLocaleString('fr-FR',{style:'currency',currency:CO&&CO.currency||'EUR'}); }
 // Montant coloré selon le signe : vert si positif, rouge si négatif
-function euro(n){ n=Number(n)||0; if(n>0) return '<span class="val-good">'+euro(n)+'</span>'; if(n<0) return '<span class="val-bad">'+euro(n)+'</span>'; return euro(n); }
+function euroC(n){ n=Number(n)||0; if(n>0) return '<span class="val-good">'+euro(n)+'</span>'; if(n<0) return '<span class="val-bad">'+euro(n)+'</span>'; return euro(n); }
 // Montant d'une facture coloré par NATURE : vente/encaissement = vert, achat/frais = rouge
 function euroInv(n,direction){ if(n==null||isNaN(Number(n))) return '—'; const c=(direction==='vente')?'val-good':'val-bad'; return '<span class="'+c+'">'+euro(Math.abs(Number(n)))+'</span>'; }
 
