@@ -2961,9 +2961,17 @@ async function openDoc(path){
 function stmtLabel(s){ return (s&&(s.label||s.original_filename))||'relevé'; }
 function stmtById(id){ return (STATEMENTS||[]).find(s=>s.id===id); }
 /* ---- Audit des signes : lignes qui vont à contre-sens des autres du même tiers ---- */
+let SIGN_DISMISSED=new Set();   // secours session si la colonne sign_ok n'existe pas encore
+function signOk(t){ return !!(t && (t.sign_ok || SIGN_DISMISSED.has(t.id))); }
+async function markSignOk(id){ if(!canEdit()) return; const t=TX.find(x=>x.id===id); if(!t) return;
+  const {error}=await db.from('compta_transactions').update({sign_ok:true}).eq('id',id);
+  if(error && /sign_ok|column|colonne|schema/i.test(error.message||'')){ SIGN_DISMISSED.add(id); toast('Gardé tel quel (pour un marquage permanent, lance sql/compta-signe-ok.sql).'); renderSignAudit(); return; }
+  if(error){ toast('Erreur : '+error.message); return; }
+  t.sign_ok=true; toast('✔ Ligne validée (gardée telle quelle).'); renderSignAudit();
+}
 function signAudit(){
   const byT={};
-  TX.forEach(t=>{ const k=tiersKey(t.counterparty); if(!k) return;
+  TX.forEach(t=>{ if(signOk(t)) return; const k=tiersKey(t.counterparty); if(!k) return;
     const g=(byT[k]=byT[k]||{pos:[],neg:[],name:t.counterparty}); const a=Number(t.amount)||0;
     if(a>0) g.pos.push(t); else if(a<0) g.neg.push(t); });
   const suspects=[];
@@ -2984,7 +2992,7 @@ function renderSignAudit(){
     <div class="table-wrap"><table class="compact"><thead><tr><th>Date</th><th>Libellé</th><th>Client / Fournisseur</th><th class="num">Montant actuel</th><th>Les autres du tiers</th><th></th></tr></thead><tbody>`+
     sus.map(x=>{ const t=x.t; return `<tr><td>${esc((t.op_date||'').slice(0,10))}</td><td class="lbl" title="${esc(t.label)}">${esc(t.label)}</td><td>${esc(t.name||'')}</td>
       <td class="num">${euroC(t.amount)}</td><td>${x.majNeg?'plutôt des <b class="val-bad">sorties</b>':'plutôt des <b class="val-good">entrées</b>'}</td>
-      <td style="white-space:nowrap">${canEdit()?`<button class="btn small" onclick="flipTxSign('${t.id}')" title="Inverser le signe">🔁 Passer en ${Number(t.amount)>0?'négatif':'positif'}</button> <button class="btn ghost small" onclick="openTxStatement('${t.id}')" title="Voir le relevé">📄</button>`:''}</td></tr>`;
+      <td style="white-space:nowrap">${canEdit()?`<button class="btn small" onclick="flipTxSign('${t.id}')" title="Inverser le signe">🔁 Passer en ${Number(t.amount)>0?'négatif':'positif'}</button> <button class="btn ghost small" onclick="markSignOk('${t.id}')" title="C'est correct, ne plus signaler">✓ Garder tel quel</button> <button class="btn ghost small" onclick="openTxStatement('${t.id}')" title="Voir le relevé">📄</button>`:''}</td></tr>`;
     }).join('')+`</tbody></table></div>`;
 }
 async function flipTxSign(id){ if(!canEdit()) return; const t=TX.find(x=>x.id===id); if(!t) return;
