@@ -108,6 +108,7 @@ Deno.serve(async (req) => {
     const perNet = cadence.map((c: { network: string; per_week: number }) => `- ${c.network} : ${c.per_week} post(s)`).join("\n");
     const ed = edit || {};
     const editorialBlock = [
+      ed.summary ? `La société : ${ed.summary}` : null,
       ed.tone ? `Ton : ${ed.tone}` : null,
       ed.audience ? `Cible : ${ed.audience}` : null,
       ed.topics ? `Thèmes à couvrir : ${ed.topics}` : null,
