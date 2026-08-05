@@ -80,6 +80,26 @@ const ART_SCHEMA = {
   required: ["style", "prompt", "headline", "alt"],
 };
 
+// Mode « visuel designé » : pas de photo générée, l'IA conçoit la mise en page
+// et l'app la dessine au pixel près. C'est ce qui donne un rendu d'agence.
+const DESIGN_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    layout: {
+      type: "string",
+      enum: ["statement", "stat", "split"],
+      description: "statement = une affirmation forte ; stat = un chiffre qui frappe ; split = promesse + preuve",
+    },
+    kicker: { type: "string", description: "Surtitre très court en MAJUSCULES, 2 à 4 mots (ex. GÉNÉRATION DE LEADS)" },
+    headline: { type: "string", description: "L'accroche principale, 4 à 8 mots, percutante. Pas de point final." },
+    subline: { type: "string", description: "Une phrase de soutien, 8 à 16 mots, concrète." },
+    stat: { type: "string", description: "Le chiffre choc, très court (ex. « 3× », « 48 h », « +120 »). Vide si layout ≠ stat." },
+    stat_label: { type: "string", description: "Ce que mesure le chiffre, 2 à 5 mots. Vide si layout ≠ stat." },
+  },
+  required: ["layout", "kicker", "headline", "subline", "stat", "stat_label"],
+};
+
 function tryParseJson(s: string): unknown {
   try { return JSON.parse(s); } catch (_) { /* continue */ }
   const t = s.trim().replace(/^```(?:json)?/i, "").replace(/```\s*$/i, "").trim();
@@ -89,10 +109,10 @@ function tryParseJson(s: string): unknown {
 }
 
 // Appelle Claude, en retombant sur un modèle éprouvé si le modèle demandé n'existe pas sur la clé.
-async function callClaude(apiKey: string, model: string, instruction: string) {
+async function callClaude(apiKey: string, model: string, instruction: string, schema: unknown = ART_SCHEMA) {
   const body = {
     max_tokens: 2000,
-    output_config: { format: { type: "json_schema", schema: ART_SCHEMA } },
+    output_config: { format: { type: "json_schema", schema } },
     messages: [{ role: "user", content: [{ type: "text", text: instruction }] }],
   };
   for (const m of [model, "claude-opus-4-8"]) {
@@ -197,6 +217,46 @@ Deno.serve(async (req) => {
     const { data: edit } = await admin.from("mkt_editorial").select("*").eq("company_id", post.company_id).maybeSingle();
 
     await admin.from("mkt_posts").update({ image_status: "pending", image_error: null }).eq("id", postId);
+
+    // ---- Mode « visuel designé » : l'IA conçoit, l'app dessine. Aucune image générée. ----
+    if (body.mode === "design") {
+      const ed2 = edit || {};
+      const brief = `Tu es directeur artistique pour « ${company.name} »${company.activity ? ` (${company.activity})` : ""}.
+Conçois un visuel de marque, typographique, pour ce post ${post.network}.
+
+${[ed2.summary && `La société : ${ed2.summary}`, ed2.tone && `Ton : ${ed2.tone}`, ed2.audience && `Cible : ${ed2.audience}`].filter(Boolean).join("\n") || "Reste sobre et professionnel."}
+
+Texte du post :
+"""${(post.body || "").slice(0, 1200)}"""
+
+Choisis la mise en page la plus juste et écris les textes, en français :
+- « statement » quand le post porte une affirmation forte ou une promesse.
+- « stat » quand le post contient (ou permet d'extraire honnêtement) un chiffre marquant. N'invente jamais un chiffre absent du post.
+- « split » quand il y a une promesse et une preuve à opposer.
+Textes courts, concrets, sans superlatif creux, sans jargon, sans emoji. L'accroche doit se lire en une seconde.`;
+
+      const outD = await callClaude(anthropicKey, artModel, brief, DESIGN_SCHEMA);
+      const tbD = (outD.content || []).find((b: { type: string }) => b.type === "text");
+      const spec = tbD ? tryParseJson(String(tbD.text || "")) as Record<string, string> : null;
+      if (!spec || !spec.headline) throw new Error("Conception illisible. Réessaie.");
+
+      await logUsage(admin, {
+        owner: uid, company_id: post.company_id, source: "design", agent: "designer",
+        provider: "anthropic", model: outD.model || artModel,
+        input_tokens: outD.usage?.input_tokens || 0,
+        output_tokens: outD.usage?.output_tokens || 0,
+        cache_read_tokens: outD.usage?.cache_read_input_tokens || 0,
+        cost_usd: claudeCost(outD.model || artModel, outD.usage || null),
+      });
+
+      await admin.from("mkt_posts").update({
+        image_headline: spec.headline, image_style: "designé",
+        image_alt: spec.subline || null, image_status: "pending",
+        updated_at: new Date().toISOString(),
+      }).eq("id", postId);
+
+      return json({ ok: true, mode: "design", post_id: postId, design: spec, network: post.network });
+    }
 
     // 3) Directeur artistique : choix du style + consigne visuelle
     const ed = edit || {};

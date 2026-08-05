@@ -113,28 +113,33 @@ Deno.serve(async (req) => {
     const mime = imgRes.headers.get("content-type") || "image/png";
     const b64 = encodeBase64(new Uint8Array(await imgRes.arrayBuffer()));
 
-    const payload = {
-      instances: [{
-        prompt: videoPrompt(agent),
-        image: { inlineData: { mimeType: mime, data: b64 } },
-      }],
-      parameters: { numberOfVideos: 1, resolution: "720p" },
-    };
+    // La forme du champ image change selon le modèle Veo : on essaie les deux connues.
+    const imageShapes = [
+      { bytesBase64Encoded: b64, mimeType: mime },
+      { inlineData: { mimeType: mime, data: b64 } },
+    ];
 
     let started: { name?: string } | null = null, lastErr = "";
+    outer:
     for (const m of [model, "veo-3.1-generate-preview"]) {
-      const res = await fetch(`${BASE}/models/${m}:predictLongRunning`, {
-        method: "POST",
-        headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const txt = await res.text();
-      if (res.ok) { started = JSON.parse(txt); break; }
-      lastErr = txt;
-      console.error("VEO_START_ERROR", m, res.status, txt.slice(0, 800));
-      if (res.status === 404 || res.status === 400) continue;
-      if (res.status === 429) return json({ error: "Quota vidéo Google atteint. Vérifie ta facturation." }, 502);
-      return json({ error: "Lancement impossible (" + res.status + ") : " + txt.slice(0, 200) }, 502);
+      for (const image of imageShapes) {
+        const res = await fetch(`${BASE}/models/${m}:predictLongRunning`, {
+          method: "POST",
+          headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instances: [{ prompt: videoPrompt(agent), image }],
+            parameters: { numberOfVideos: 1, resolution: "720p" },
+          }),
+        });
+        const txt = await res.text();
+        if (res.ok) { started = JSON.parse(txt); break outer; }
+        lastErr = txt;
+        console.error("VEO_START_ERROR", m, res.status, txt.slice(0, 800));
+        if (res.status === 400) continue;          // forme refusée : variante suivante
+        if (res.status === 404) break;             // modèle inconnu : modèle suivant
+        if (res.status === 429) return json({ error: "Quota vidéo Google atteint. Vérifie ta facturation." }, 502);
+        return json({ error: "Lancement impossible (" + res.status + ") : " + txt.slice(0, 200) }, 502);
+      }
     }
     if (!started?.name) return json({ error: "Lancement impossible : " + lastErr.slice(0, 250) }, 502);
 

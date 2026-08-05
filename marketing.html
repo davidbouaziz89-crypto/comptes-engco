@@ -444,7 +444,8 @@
         <div class="row" style="align-items:center">
           <h2 style="margin:0">🗓️ Posts de la semaine</h2>
           <div style="flex:0 0 auto;display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn ghost" id="redoBtn">↻ Tout refaire</button>
+            <button class="btn ghost" id="designBtn">🖌️ Visuels designés</button>
+            <button class="btn ghost" id="redoBtn">↻ Tout refaire (photo)</button>
             <button class="btn ghost" id="imagesBtn">🎨 Créer les visuels manquants</button>
             <button class="btn" id="generateBtn">✨ Générer la semaine</button>
           </div>
@@ -563,7 +564,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v7 · bandeau blanc';
+const APP_VERSION='v8 · visuels designés';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1082,13 +1083,145 @@ async function composeVisual(postId,companyId,imageUrl,headline){
   }catch(e){ console.warn('Composition impossible :',e.message); return null; }
 }
 
+// ================= VISUELS DESIGNÉS =================
+// Aucune photo générée : l'IA choisit la mise en page et écrit les textes,
+// l'app dessine tout au pixel près. C'est ce qui donne un rendu d'agence.
+function hex2rgb(h){ const m=/^#?([0-9a-f]{6})$/i.exec(h||''); if(!m) return [124,92,255];
+  const n=parseInt(m[1],16); return [n>>16&255,n>>8&255,n&255]; }
+function mixHex(a,b,t){ const A=hex2rgb(a),B=hex2rgb(b);
+  return '#'+[0,1,2].map(i=>Math.round(A[i]+(B[i]-A[i])*t).toString(16).padStart(2,'0')).join(''); }
+function fitText(ctx,text,maxW,startPx,minPx,weight,maxLines){
+  let size=startPx,lines=[];
+  for(;;){
+    ctx.font=`${weight} ${size}px "Space Grotesk","Segoe UI",sans-serif`;
+    lines=wrapLines(ctx,text,maxW);
+    const wide=lines.some(l=>ctx.measureText(l).width>maxW);
+    if((!wide&&lines.length<=maxLines)||size<=minPx) break;
+    size=Math.round(size*0.94);
+  }
+  return {size,lines};
+}
+async function renderDesign(postId,companyId,network,spec){
+  try{
+    if(document.fonts&&document.fonts.load){
+      await document.fonts.load('700 90px "Space Grotesk"');
+      await document.fonts.load('500 40px "Inter"');
+    }
+    const portrait=network==='instagram';
+    const W=portrait?1080:1200, H=portrait?1350:675;
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+    const ctx=cv.getContext('2d');
+
+    const accent=brandColor();
+    const deep=mixHex(accent,'#080b12',0.74);
+    const mid=mixHex(accent,'#080b12',0.38);
+
+    // Fond : dégradé diagonal profond + formes douces, jamais plat.
+    const g=ctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,mid); g.addColorStop(1,deep);
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.save();
+    ctx.globalAlpha=.09; ctx.fillStyle='#ffffff';
+    ctx.beginPath(); ctx.arc(W*0.86,H*0.14,W*0.30,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=.07; ctx.fillStyle=accent;
+    ctx.beginPath(); ctx.arc(W*0.10,H*0.86,W*0.34,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha=.18; ctx.strokeStyle='#ffffff'; ctx.lineWidth=Math.max(2,W*0.0022);
+    ctx.beginPath(); ctx.arc(W*0.86,H*0.14,W*0.38,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+
+    // Bandeau blanc en pied : même langage que les visuels photo.
+    const bandH=Math.round(portrait?H*0.155:H*0.20);
+    const bandY=H-bandH;
+    ctx.fillStyle='#ffffff'; ctx.fillRect(0,bandY,W,bandH);
+    const rule=Math.max(3,Math.round(bandH*0.04));
+    ctx.fillStyle=accent; ctx.fillRect(0,H-rule,W,rule);
+
+    const co=COMPANIES.find(c=>c.id===companyId);
+    const m=Math.round(W*0.072);
+    if(co&&co.logo_url){
+      try{
+        const logo=await loadImg(absUrl(co.logo_url));
+        const lh=Math.round(bandH*0.44);
+        const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
+        ctx.drawImage(logo,W-m-lw,bandY+Math.round((bandH-rule-lh)/2),lw,lh);
+      }catch(e){ console.warn('logo illisible',e.message); }
+    }
+    ctx.fillStyle='#111820';
+    ctx.textBaseline='middle';
+    ctx.font=`700 ${Math.round(bandH*0.20)}px "Space Grotesk",sans-serif`;
+    ctx.fillText(co?co.name:'', m, bandY+(bandH-rule)/2);
+
+    // Contenu
+    const maxW=W-m*2;
+    let y=Math.round(H*0.16);
+    ctx.textBaseline='top';
+
+    if(spec.kicker){
+      ctx.font=`700 ${Math.round(W*0.026)}px "Space Grotesk",sans-serif`;
+      ctx.fillStyle=mixHex(accent,'#ffffff',0.55);
+      const k=String(spec.kicker).toUpperCase();
+      let x=m;
+      for(const ch of k){ ctx.fillText(ch,x,y); x+=ctx.measureText(ch).width+W*0.004; }
+      y+=Math.round(W*0.055);
+    }
+
+    if(spec.layout==='stat'&&spec.stat){
+      const st=fitText(ctx,String(spec.stat),maxW,Math.round(W*0.26),Math.round(W*0.12),'700',1);
+      ctx.font=`700 ${st.size}px "Space Grotesk",sans-serif`;
+      ctx.fillStyle='#ffffff';
+      ctx.fillText(st.lines[0],m,y);
+      y+=Math.round(st.size*1.02);
+      if(spec.stat_label){
+        ctx.font=`600 ${Math.round(W*0.032)}px "Inter",sans-serif`;
+        ctx.fillStyle=mixHex(accent,'#ffffff',0.7);
+        ctx.fillText(String(spec.stat_label),m,y);
+        y+=Math.round(W*0.062);
+      }
+    }
+
+    const hl=fitText(ctx,spec.headline,maxW,Math.round(W*(portrait?0.095:0.078)),Math.round(W*0.042),'700',3);
+    ctx.font=`700 ${hl.size}px "Space Grotesk",sans-serif`;
+    ctx.fillStyle='#ffffff';
+    const lh=Math.round(hl.size*1.12);
+    hl.lines.forEach((l,i)=>ctx.fillText(l,m,y+i*lh));
+    y+=hl.lines.length*lh+Math.round(W*0.028);
+
+    // Filet de marque entre l'accroche et la phrase de soutien
+    ctx.fillStyle=accent;
+    ctx.fillRect(m,y,Math.round(W*0.10),Math.max(4,Math.round(W*0.006)));
+    y+=Math.round(W*0.038);
+
+    if(spec.subline){
+      const sub=fitText(ctx,spec.subline,Math.round(maxW*0.92),Math.round(W*0.036),Math.round(W*0.024),'500',3);
+      ctx.font=`500 ${sub.size}px "Inter",sans-serif`;
+      ctx.fillStyle='rgba(255,255,255,.82)';
+      const slh=Math.round(sub.size*1.42);
+      sub.lines.forEach((l,i)=>ctx.fillText(l,m,y+i*slh));
+    }
+
+    const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
+    if(!blob) return null;
+    const path=`${companyId}/${postId}-design-${Date.now()}.png`;
+    const {error}=await db.storage.from('mkt-images').upload(path,blob,{contentType:'image/png',upsert:true});
+    if(error) throw new Error(error.message);
+    const url=db.storage.from('mkt-images').getPublicUrl(path).data.publicUrl;
+    await db.from('mkt_posts').update({image_url:url,image_status:'ready'}).eq('id',postId);
+    return url;
+  }catch(e){
+    await db.from('mkt_posts').update({image_status:'error',image_error:'Rendu impossible : '+e.message}).eq('id',postId);
+    return null;
+  }
+}
+
 // ---- Visuels : agent Directeur artistique ----
-async function callImageAgent(postId){
+async function callImageAgent(postId,mode){
   const {data:{session}}=await db.auth.getSession();
   const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-image',{
     method:'POST',
     headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
-    body:JSON.stringify({post_id:postId})
+    body:JSON.stringify(mode?{post_id:postId,mode}:{post_id:postId})
   });
   const out=await res.json().catch(()=>({error:'réponse illisible'}));
   if(!res.ok||out.error) throw new Error(out.error||('erreur '+res.status));
@@ -1124,25 +1257,39 @@ function imgZone(p){
   return `<div class="post-img" data-img="${p.id}">
     <div class="img-foot"><span class="img-tag">Aucun visuel pour l'instant</span><button class="btn small act-img">🎨 Créer le visuel</button></div></div>`;
 }
-async function runImageQueue(ids){
+async function runImageQueue(ids,mode){
   if(!ids.length || IMG_RUNNING) return;
   IMG_RUNNING=true; el('imagesBtn').disabled=true; el('generateBtn').disabled=true;
   let ok=0, ko=0;
   for(let i=0;i<ids.length;i++){
     setAgent('designer', ids.length>1?`🎨 Visuel ${i+1}/${ids.length}`:'🎨 Création du visuel','busy');
     patchImage(ids[i],{image_status:'pending'});
-    try{ const out=await callImageAgent(ids[i]);
-      patchImage(ids[i],{image_status:'ready',image_url:out.image_url,image_style:out.style,image_alt:out.alt}); ok++;
+    try{
       const p=POSTS.find(x=>x.id===ids[i]);
       const cid=p?p.company_id:(CURRENT_COMPANY&&CURRENT_COMPANY.id);
-      patchImage(ids[i],{image_headline:out.headline||''});
-      const branded=await composeVisual(ids[i],cid,out.image_url,out.headline||'');
-      if(branded) patchImage(ids[i],{image_url:branded});
+      const out=await callImageAgent(ids[i],mode);
+      if(out.mode==='design'){
+        const url=await renderDesign(ids[i],cid,out.network,out.design);
+        if(!url) throw new Error('rendu impossible');
+        patchImage(ids[i],{image_status:'ready',image_url:url,image_style:'designé',
+          image_headline:out.design.headline,image_alt:out.design.subline}); ok++;
+      }else{
+        patchImage(ids[i],{image_status:'ready',image_url:out.image_url,image_style:out.style,
+          image_alt:out.alt,image_headline:out.headline||''}); ok++;
+        const branded=await composeVisual(ids[i],cid,out.image_url,out.headline||'');
+        if(branded) patchImage(ids[i],{image_url:branded});
+      }
     }catch(e){ patchImage(ids[i],{image_status:'error',image_error:e.message}); ko++; }
   }
   setAgent('designer', ko? `⚠️ ${ok} créé(s), ${ko} en échec` : `✅ ${ok} visuel(s) créé(s)`, ko&&!ok?'err':'done');
   IMG_RUNNING=false; el('imagesBtn').disabled=false; el('generateBtn').disabled=false; refreshCost();
 }
+el('designBtn').onclick=()=>{
+  const ids=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
+  if(!ids.length) return;
+  if(!confirm(`Concevoir ${ids.length} visuel(s) designé(s) ?\n\nAucune photo générée : l'IA compose la mise en page et l'app la dessine. Environ ${(ids.length*0.03).toFixed(2)} $, quelques secondes par visuel.`)) return;
+  runImageQueue(ids,'design');
+};
 el('redoBtn').onclick=()=>{
   const ids=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
   if(!ids.length) return;
