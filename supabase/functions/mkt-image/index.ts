@@ -36,7 +36,8 @@ async function logUsage(admin: { from: (t: string) => { insert: (r: unknown) => 
 const IMAGE_PRICE_USD = 0.04; // estimation par image ; le quota gratuit Google n'est pas déduit
 
 // Format d'image le plus performant selon le réseau.
-const RATIO: Record<string, string> = { linkedin: "16:9", facebook: "16:9", instagram: "4:5" };
+// Google n'accepte qu'une liste courte de ratios : 1:1, 3:4, 4:3, 9:16, 16:9.
+const RATIO: Record<string, string> = { linkedin: "16:9", facebook: "16:9", instagram: "3:4" };
 
 const ART_SCHEMA = {
   type: "object",
@@ -87,32 +88,39 @@ async function callClaude(apiKey: string, model: string, instruction: string) {
   throw new Error("Modèle IA indisponible.");
 }
 
-// Appelle Gemini, en retombant sur le modèle précédent si besoin.
+// Le nom du réglage de format change selon la version d'API exposée par la clé.
+// On essaie les variantes connues, puis on génère sans contrainte de format :
+// mieux vaut une image au format par défaut que pas d'image du tout.
+function imageConfigs(aspectRatio: string) {
+  return [
+    { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio } } },
+    { responseModalities: ["IMAGE"], imageConfig: { aspectRatio } },
+    { responseModalities: ["IMAGE"] },
+  ];
+}
+
 async function callGemini(apiKey: string, model: string, prompt: string, aspectRatio: string) {
-  const payload = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      responseModalities: ["IMAGE"],
-      responseFormat: { image: { aspectRatio } },
-    },
-  };
+  let lastErr = "";
   for (const m of [model, "gemini-2.5-flash-image"]) {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/${m}:generateContent`,
-      {
-        method: "POST",
-        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      },
-    );
-    if (resp.ok) return await resp.json();
-    const txt = await resp.text();
-    console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 300));
-    if (m === "gemini-2.5-flash-image" || (resp.status !== 404 && resp.status !== 400)) {
+    for (const generationConfig of imageConfigs(aspectRatio)) {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/${m}:generateContent`,
+        {
+          method: "POST",
+          headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig }),
+        },
+      );
+      if (resp.ok) return await resp.json();
+      const txt = await resp.text();
+      lastErr = txt;
+      console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 300));
+      if (resp.status === 400) continue;              // réglage refusé : on tente la variante suivante
+      if (resp.status === 404) break;                 // modèle inconnu : on passe au modèle suivant
       throw new Error("Erreur image (" + resp.status + ") : " + txt.slice(0, 200));
     }
   }
-  throw new Error("Modèle d'image indisponible.");
+  throw new Error("Erreur image : " + lastErr.slice(0, 250));
 }
 
 Deno.serve(async (req) => {

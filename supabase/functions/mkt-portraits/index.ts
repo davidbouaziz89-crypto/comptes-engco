@@ -43,35 +43,45 @@ const TEAM: Record<string, { first_name: string; role: string; look: string }> =
   },
 };
 
+// Le nom du réglage de format change selon la version d'API exposée par la clé :
+// on essaie les variantes connues avant de générer sans contrainte.
+function imageConfigs() {
+  return [
+    { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio: "1:1" } } },
+    { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
+    { responseModalities: ["IMAGE"] },
+  ];
+}
+
 async function generatePortrait(apiKey: string, model: string, look: string) {
   const prompt = `${look} ${STUDIO}`;
-  const payload = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio: "1:1" } } },
-  };
+  let lastErr = "";
   for (const m of [model, "gemini-2.5-flash-image"]) {
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1/models/${m}:generateContent`, {
-      method: "POST",
-      headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (resp.ok) {
-      const gem = await resp.json();
-      const parts = gem?.candidates?.[0]?.content?.parts || [];
-      const inline = parts.find((p: { inlineData?: { data?: string } }) => p?.inlineData?.data)?.inlineData;
-      if (!inline?.data) {
-        const reason = gem?.candidates?.[0]?.finishReason || gem?.promptFeedback?.blockReason || "aucune image renvoyée";
-        throw new Error("Portrait non généré (" + reason + ").");
+    for (const generationConfig of imageConfigs()) {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1/models/${m}:generateContent`, {
+        method: "POST",
+        headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig }),
+      });
+      if (resp.ok) {
+        const gem = await resp.json();
+        const parts = gem?.candidates?.[0]?.content?.parts || [];
+        const inline = parts.find((p: { inlineData?: { data?: string } }) => p?.inlineData?.data)?.inlineData;
+        if (!inline?.data) {
+          const reason = gem?.candidates?.[0]?.finishReason || gem?.promptFeedback?.blockReason || "aucune image renvoyée";
+          throw new Error("Portrait non généré (" + reason + ").");
+        }
+        return { data: inline.data as string, mime: (inline.mimeType as string) || "image/png", model: m, prompt };
       }
-      return { data: inline.data as string, mime: (inline.mimeType as string) || "image/png", model: m, prompt };
-    }
-    const txt = await resp.text();
-    console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 300));
-    if (m === "gemini-2.5-flash-image" || (resp.status !== 404 && resp.status !== 400)) {
+      const txt = await resp.text();
+      lastErr = txt;
+      console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 300));
+      if (resp.status === 400) continue;
+      if (resp.status === 404) break;
       throw new Error("Erreur image (" + resp.status + ") : " + txt.slice(0, 200));
     }
   }
-  throw new Error("Modèle d'image indisponible.");
+  throw new Error("Erreur image : " + lastErr.slice(0, 250));
 }
 
 Deno.serve(async (req) => {
