@@ -16,6 +16,24 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// Décodage rapide, délégué au moteur : `atob` + boucle caractère par caractère
+// faisait exploser le budget CPU de la fonction sur des images de plusieurs Mo (erreur 546).
+async function b64ToBytes(b64: string, mime: string): Promise<Uint8Array> {
+  const res = await fetch(`data:${mime};base64,${b64}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+// Le corps d'une erreur 429 précise le quota en cause (palier gratuit ou payant) : on le remonte.
+function quotaDetail(txt: string): string {
+  try {
+    const j = JSON.parse(txt);
+    const det = (j?.error?.details || []).find((d: { "@type"?: string }) => String(d["@type"] || "").includes("QuotaFailure"));
+    const v = det?.violations?.[0];
+    const id = v?.quotaId || v?.quotaMetric;
+    return id ? " [" + id + "]" : "";
+  } catch (_) { return ""; }
+}
+
 // --- Suivi des frais IA (tarifs publics Anthropic, en dollars par million de tokens) ---
 const PRICE: Record<string, { i: number; o: number }> = {
   "claude-opus-5": { i: 5, o: 25 },
@@ -81,7 +99,7 @@ async function callClaude(apiKey: string, model: string, instruction: string) {
     });
     if (resp.ok) return await resp.json();
     const txt = await resp.text();
-    console.error("ANTHROPIC_ERROR", m, resp.status, txt.slice(0, 300));
+    console.error("ANTHROPIC_ERROR", m, resp.status, txt.slice(0, 1200));
     if (resp.status !== 404 && resp.status !== 400) throw new Error("Erreur IA (" + resp.status + ") : " + txt.slice(0, 200));
     if (m === "claude-opus-4-8") throw new Error("Erreur IA (" + resp.status + ") : " + txt.slice(0, 200));
   }
@@ -121,14 +139,14 @@ async function callGemini(apiKey: string, model: string, prompt: string, aspectR
       if (resp.ok) return await resp.json();
       const txt = await resp.text();
       lastErr = txt;
-      console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 300));
+      console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 1200));
       if (resp.status === 400) continue;      // réglage refusé : variante suivante
       if (resp.status === 404) break;         // modèle inconnu : modèle suivant
       if (resp.status === 429) { quota = true; break; }  // quota : un autre modèle a peut-être du crédit
       throw new Error("Erreur image (" + resp.status + ") : " + txt.slice(0, 200));
     }
   }
-  if (quota) throw new Error(QUOTA_MSG);
+  if (quota) throw new Error(QUOTA_MSG + quotaDetail(lastErr));
   throw new Error("Erreur image : " + lastErr.slice(0, 250));
 }
 
@@ -226,7 +244,7 @@ Ta mission :
     }
     const mime = inline.mimeType || "image/png";
     const ext = mime.includes("jpeg") ? "jpg" : "png";
-    const bytes = Uint8Array.from(atob(inline.data), (c) => c.charCodeAt(0));
+    const bytes = await b64ToBytes(inline.data, mime);
 
     // 5) Stockage + lien sur le post
     const path = `${post.company_id}/${post.id}-${Date.now()}.${ext}`;

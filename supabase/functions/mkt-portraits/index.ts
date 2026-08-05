@@ -17,6 +17,24 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// Décodage rapide, délégué au moteur : `atob` + boucle caractère par caractère
+// faisait exploser le budget CPU de la fonction sur des images de plusieurs Mo (erreur 546).
+async function b64ToBytes(b64: string, mime: string): Promise<Uint8Array> {
+  const res = await fetch(`data:${mime};base64,${b64}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+// Le corps d'une erreur 429 précise le quota en cause (palier gratuit ou payant) : on le remonte.
+function quotaDetail(txt: string): string {
+  try {
+    const j = JSON.parse(txt);
+    const det = (j?.error?.details || []).find((d: { "@type"?: string }) => String(d["@type"] || "").includes("QuotaFailure"));
+    const v = det?.violations?.[0];
+    const id = v?.quotaId || v?.quotaMetric;
+    return id ? " [" + id + "]" : "";
+  } catch (_) { return ""; }
+}
+
 const IMAGE_PRICE_USD = 0.04;
 
 const QUOTA_MSG =
@@ -101,14 +119,14 @@ async function generateImage(
       }
       const txt = await resp.text();
       lastErr = txt;
-      console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 300));
+      console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 1200));
       if (resp.status === 400) continue;
       if (resp.status === 404) break;
       if (resp.status === 429) { quota = true; break; }
       throw new Error("Erreur image (" + resp.status + ") : " + txt.slice(0, 200));
     }
   }
-  if (quota) throw new Error(QUOTA_MSG);
+  if (quota) throw new Error(QUOTA_MSG + quotaDetail(lastErr));
   throw new Error("Erreur image : " + lastErr.slice(0, 250));
 }
 
@@ -136,8 +154,11 @@ Deno.serve(async (req) => {
       .filter((r: { avatar_url: string | null; avatar_work1_url: string | null }) => r.avatar_url && r.avatar_work1_url)
       .map((r: { agent_key: string }) => r.agent_key));
 
-    const keys = only ? [only] : Object.keys(TEAM).filter((k) => force || !done.has(k));
-    if (!keys.length) return json({ ok: true, created: [], message: "Les avatars existent déjà." });
+    // Un seul collègue par appel : 3 images dans la même invocation suffisaient à
+    // dépasser le budget de la fonction (erreur 546). Le front enchaîne les appels.
+    const todo = only ? [only] : Object.keys(TEAM).filter((k) => force || !done.has(k));
+    const keys = todo.slice(0, 1);
+    if (!keys.length) return json({ ok: true, created: [], remaining: 0, message: "Les avatars existent déjà." });
 
     const created: unknown[] = [];
     const usage: Record<string, unknown>[] = [];
@@ -145,7 +166,7 @@ Deno.serve(async (req) => {
 
     const upload = async (key: string, tag: string, img: { data: string; mime: string }) => {
       const ext = img.mime.includes("jpeg") ? "jpg" : "png";
-      const bytes = Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0));
+      const bytes = await b64ToBytes(img.data, img.mime);
       const path = `team/${uid}/${key}-${tag}-${stamp}.${ext}`;
       const { error } = await admin.storage.from("mkt-images")
         .upload(path, bytes, { contentType: img.mime, upsert: true });
@@ -190,7 +211,7 @@ Deno.serve(async (req) => {
     }
 
     if (usage.length) await admin.from("mkt_usage").insert(usage);
-    return json({ ok: true, created });
+    return json({ ok: true, created, remaining: Math.max(0, todo.length - keys.length) });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
   }

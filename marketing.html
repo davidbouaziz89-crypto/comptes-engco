@@ -172,6 +172,25 @@
   .img-tag{font-size:12px;color:var(--muted);flex:1;min-width:120px}
   .img-fail{padding:14px;font-size:13px;color:var(--bad);text-align:center}
   .agent[data-state="busy"] .face,.agent[data-state="busy"] .initials{animation:corepulse .95s ease-in-out infinite}
+  /* Bandeau de sociétés : on clique sur le logo */
+  .copicker{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 14px;-webkit-overflow-scrolling:touch}
+  .cotile{flex:0 0 auto;width:116px;padding:14px 10px 12px;border-radius:16px;cursor:pointer;
+    background:var(--panel);border:1px solid var(--line);color:var(--txt);font-family:inherit;
+    display:flex;flex-direction:column;align-items:center;gap:9px;transition:transform .18s,border-color .18s,box-shadow .18s}
+  .cotile:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .cotile .logo{width:56px;height:56px;border-radius:14px;overflow:hidden;background:#fff;
+    display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
+  .cotile .logo img{width:100%;height:100%;object-fit:contain;padding:5px}
+  .cotile .ph{font-family:var(--font-display);font-weight:700;font-size:19px;color:var(--accent)}
+  .cotile .nm{font-size:13px;font-weight:600;line-height:1.2;max-width:100%;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cotile.on{border-color:transparent;background:var(--grad-accent);color:#fff;
+    box-shadow:0 16px 34px -20px var(--accent);transform:translateY(-2px)}
+  .cotile.on .logo{border-color:rgba(255,255,255,.5)}
+  .cotile.add{background:transparent;border-style:dashed}
+  .cotile.add .logo{background:var(--panel2);border-style:dashed}
+  .cotile.add .ph.plus{font-size:26px;color:var(--muted)}
+  .cotile.add:hover .ph.plus{color:var(--accent)}
   /* Onglets */
   .tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px;overflow-x:auto}
   .tab{flex:1;min-width:110px;padding:9px 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);
@@ -328,8 +347,6 @@
   <div id="app" class="hidden">
     <header>
       <h1>🚀 Marketing IA</h1>
-      <select id="companySel" style="max-width:220px;width:auto"></select>
-      <button class="btn ghost small" id="newCompanyBtn">+ Société</button>
       <div class="spacer"></div>
       <button class="costchip" id="costChip" title="Dépense IA aujourd'hui — cliquer pour voir le détail">💶 —</button>
       <span class="who" id="who"></span>
@@ -341,6 +358,8 @@
         <h2 style="margin-top:0">👋 Bienvenue !</h2>
         <p class="who">Ajoute ta première société avec le bouton <strong>« + Société »</strong> en haut : donne son nom et son site web, l'IA s'occupe du reste.</p>
       </div>
+
+      <div class="copicker" id="coPicker"></div>
 
       <nav class="tabs" id="tabs">
         <button class="tab on" data-tab="pilotage">🚀 Pilotage</button>
@@ -624,17 +643,31 @@ el('portraitsBtn').onclick=async()=>{
   el('teamMsg').style.color='var(--muted)';
   el('teamMsg').textContent='🎬 Studio en cours… 3 poses par personne, environ 1 min chacune.';
   AGENTS.forEach(a=>{ if(!TEAM[a.k]||!TEAM[a.k].avatar_work1_url) setAgent(a.k,'🎬 Prend la pose…','busy'); });
-  try{
-    const {data:{session}}=await db.auth.getSession();
-    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-portraits',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({})
-    });
-    const out=await res.json();
-    if(!res.ok||out.error){ el('teamMsg').style.color='var(--bad)'; el('teamMsg').textContent='Erreur : '+(out.error||res.status); }
-    else{ el('teamMsg').style.color='var(--good)'; el('teamMsg').textContent=out.created?.length?`✅ ${out.created.length} portrait(s) créé(s).`:(out.message||'Rien à faire.'); }
-  }catch(e){ el('teamMsg').style.color='var(--bad)'; el('teamMsg').textContent='Erreur réseau : '+e.message; }
+  // Un collègue par appel : 3 images dans une seule invocation dépassaient
+  // le budget de la fonction. On enchaîne, et on voit chacun arriver.
+  const todo=AGENTS.filter(a=>!(TEAM[a.k]&&TEAM[a.k].avatar_work1_url)).map(a=>a.k);
+  let ok=0, err='';
+  for(let i=0;i<todo.length;i++){
+    const k=todo[i];
+    setAgent(k,'🎬 Séance en cours…','busy');
+    el('teamMsg').style.color='var(--muted)';
+    el('teamMsg').textContent=`🎬 ${AG(k).first} passe devant la caméra… (${i+1}/${todo.length})`;
+    try{
+      const {data:{session}}=await db.auth.getSession();
+      const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-portraits',{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({agent:k})
+      });
+      const out=await res.json().catch(()=>({error:'réponse illisible'}));
+      if(!res.ok||out.error){ err=out.error||('erreur '+res.status); setAgent(k,'⚠️','err'); break; }
+      ok++;
+      await loadTeam();               // le collègue apparaît tout de suite
+      setAgent(k,'✅ Prêt','done');
+    }catch(e){ err='Erreur réseau : '+e.message; setAgent(k,'⚠️','err'); break; }
+  }
+  if(err){ el('teamMsg').style.color='var(--bad)'; el('teamMsg').textContent='Erreur : '+err; }
+  else{ el('teamMsg').style.color='var(--good)'; el('teamMsg').textContent=ok?`✅ ${ok} avatar(s) créé(s).`:'Les avatars existent déjà.'; }
   await loadTeam(); resetAgents(); refreshCost();
   btn.disabled=false;
   setTimeout(()=>el('teamMsg').textContent='',6000);
@@ -655,16 +688,29 @@ async function loadCompanies(){
   const {data,error}=await db.from('mkt_companies').select('*').order('created_at');
   if(error){ console.error(error); return; }
   COMPANIES=data||[];
-  el('companySel').innerHTML=COMPANIES.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  renderPicker();
   if(COMPANIES.length){ selectCompany(COMPANIES[0].id); }
   else { CURRENT_COMPANY=null; showCompanyPanels(false); }
 }
-el('companySel').onchange=(e)=>selectCompany(e.target.value);
+// Bandeau de sociétés : on clique sur le logo, pas sur un menu déroulant.
+function renderPicker(){
+  const cur=CURRENT_COMPANY?CURRENT_COMPANY.id:'';
+  el('coPicker').innerHTML=COMPANIES.map(c=>{
+    const visuel=c.logo_url
+      ? `<img src="${esc(c.logo_url)}" alt="${esc(c.name)}">`
+      : `<span class="ph">${esc(c.name.slice(0,2).toUpperCase())}</span>`;
+    return `<button class="cotile ${c.id===cur?'on':''}" data-co="${c.id}" title="${esc(c.name)}">
+      <span class="logo">${visuel}</span><span class="nm">${esc(c.name)}</span></button>`;
+  }).join('')+`<button class="cotile add" id="addCoTile" title="Ajouter une société">
+      <span class="logo"><span class="ph plus">+</span></span><span class="nm">Société</span></button>`;
+  el('coPicker').querySelectorAll('[data-co]').forEach(b=>b.onclick=()=>selectCompany(b.dataset.co));
+  el('addCoTile').onclick=()=>openCompanyModal(null);
+}
 function selectCompany(id){
   CURRENT_COMPANY=COMPANIES.find(c=>c.id===id)||null;
   if(!CURRENT_COMPANY){ showCompanyPanels(false); return; }
   showCompanyPanels(true);
-  el('companySel').value=id;
+  renderPicker();
   resetAgents();
   CHAT_ID=null; CHAT_MSGS=[]; CHAT_PARTS=['orchestrateur'];
   el('chatTitle').textContent='Nouvelle discussion';
@@ -690,7 +736,6 @@ function openCompanyModal(existing){
   el('coModal').classList.remove('hidden');
   el('co_name').focus();
 }
-el('newCompanyBtn').onclick=()=>openCompanyModal(null);
 el('editCompanyBtn').onclick=()=>{ if(CURRENT_COMPANY) openCompanyModal(CURRENT_COMPANY); };
 el('co_cancel').onclick=()=>el('coModal').classList.add('hidden');
 el('co_name').addEventListener('input',()=>{ if(!MODAL_EDIT_ID && !el('co_logo').value){ const s=suggestLogo(el('co_name').value); if(s) el('co_logo').value=s; } });
