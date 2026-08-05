@@ -173,10 +173,11 @@ Renvoie exactement ${totalPosts} post(s), en respectant la répartition par rés
         caption: post.caption || "",
         scheduled_at: when,
         status: "a_valider",
+        image_status: "none", // le Directeur artistique prendra le relais
       };
     });
     const { data: created, error: insErr } = await admin.from("mkt_posts").insert(rows)
-      .select("id, network, body, visual_idea, caption, scheduled_at, status");
+      .select("id, network, body, visual_idea, caption, scheduled_at, status, image_status");
     if (insErr) return json({ error: "Insertion échouée : " + insErr.message }, 500);
 
     return json({ ok: true, created: created || [], usage: out.usage || null });

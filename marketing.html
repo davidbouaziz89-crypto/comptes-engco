@@ -67,17 +67,72 @@
   .co-head{display:flex;align-items:center;gap:14px}
   .co-logo{width:56px;height:56px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:4px;flex:0 0 auto}
   .co-logo.ph{display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--panel2)}
-  /* Équipe d'agents */
-  .agents{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  .agent{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
-  .agent .a-top{display:flex;align-items:center;gap:8px;font-weight:700;font-family:var(--font-display)}
-  .agent .a-emoji{font-size:22px}
-  .agent .a-desc{color:var(--muted);font-size:12.5px;margin:6px 0 10px}
-  .agent .a-status{display:flex;align-items:center;gap:7px;font-size:13px}
+  /* Équipe d'agents — avatars vivants */
+  .agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
+  .agent{--c:var(--accent);position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:14px;overflow:hidden;transition:border-color .35s,box-shadow .35s}
+  .agent::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .45s;pointer-events:none;
+    background:radial-gradient(150px 80px at 22% -10%,color-mix(in srgb,var(--c) 26%,transparent),transparent 70%)}
+  .agent[data-state="busy"]{border-color:color-mix(in srgb,var(--c) 55%,var(--line));box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 22%,transparent),0 14px 36px -24px var(--c)}
+  .agent[data-state="busy"]::after{opacity:1}
+  .agent[data-state="done"]{--c:var(--good)}
+  .agent[data-state="err"]{--c:var(--bad)}
+  .a-head{display:flex;align-items:center;gap:11px}
+  .a-name{font-weight:700;font-family:var(--font-display);font-size:14.5px;line-height:1.2}
+  .a-desc{color:var(--muted);font-size:12px;margin-top:2px}
+  .a-status{display:flex;align-items:center;gap:7px;font-size:13px;margin-top:11px;min-height:18px}
+  .a-status .txt{color:var(--txt)}
+  /* Avatar */
+  .ava{position:relative;width:54px;height:54px;flex:0 0 auto}
+  .ava svg{width:100%;height:100%;display:block;overflow:visible}
+  .ava .emo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:19px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+  .ava .halo,.ava .ring,.ava .core,.ava .orbit{transform-box:view-box;transform-origin:27px 27px}
+  .ava .halo{fill:color-mix(in srgb,var(--c) 20%,transparent);opacity:.3}
+  .ava .core{fill:color-mix(in srgb,var(--c) 26%,var(--panel));stroke:color-mix(in srgb,var(--c) 75%,transparent);stroke-width:1.2;animation:breathe 3.6s ease-in-out infinite}
+  .ava .ring{fill:none;stroke:var(--c);stroke-width:1.5;opacity:.5;animation:spin 16s linear infinite}
+  .ava .ring2{stroke-width:1;opacity:.3;animation:spinback 20s linear infinite}
+  .ava .orbit{opacity:0;animation:spin 9s linear infinite;transition:opacity .4s}
+  .ava .sat{fill:var(--c)}
+  .agent[data-state="busy"] .ring{animation-duration:2.2s}
+  .agent[data-state="busy"] .ring2{animation-duration:1.5s}
+  .agent[data-state="busy"] .core{animation:corepulse .95s ease-in-out infinite}
+  .agent[data-state="busy"] .halo{animation:halopulse 1.7s ease-in-out infinite}
+  .agent[data-state="busy"] .orbit{opacity:1;animation-duration:1.5s}
+  .agent[data-state="done"] .halo{opacity:.45}
+  /* Points de réflexion + barre d'activité */
+  .think{display:inline-flex;gap:3px;align-items:center}
+  .think i{width:4px;height:4px;border-radius:50%;background:var(--c);animation:blink 1.15s ease-in-out infinite}
+  .think i:nth-child(2){animation-delay:.16s}
+  .think i:nth-child(3){animation-delay:.32s}
+  .a-bar{position:absolute;left:0;right:0;bottom:0;height:2px;overflow:hidden}
+  .a-bar span{display:block;height:100%;width:38%;opacity:0;transform:translateX(-110%);
+    background:linear-gradient(90deg,transparent,var(--c),transparent)}
+  .agent[data-state="busy"] .a-bar span{opacity:1;animation:sweep 1.35s linear infinite}
   .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:0 0 auto}
-  .dot.busy{background:var(--warn);animation:pulse 1s infinite}
-  .dot.done{background:var(--good)}
+  .agent[data-state="busy"] .dot{background:var(--c);box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 20%,transparent)}
+  .agent[data-state="done"] .dot{background:var(--good)}
+  .agent[data-state="err"] .dot{background:var(--bad)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes spinback{to{transform:rotate(-360deg)}}
+  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  @keyframes corepulse{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+  @keyframes halopulse{0%,100%{opacity:.28;transform:scale(.9)}50%{opacity:.65;transform:scale(1.1)}}
+  @keyframes blink{0%,100%{opacity:.22}50%{opacity:1}}
+  @keyframes sweep{to{transform:translateX(360%)}}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  @media (prefers-reduced-motion:reduce){
+    .ava *,.a-bar span,.think i,.img-skel{animation:none!important}
+  }
+  /* Visuel d'un post */
+  .post-img{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+  .post-img img{display:block;width:100%;height:auto;cursor:zoom-in}
+  .img-skel{aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    color:var(--muted);font-size:13px;text-align:center;padding:12px;
+    background:linear-gradient(100deg,var(--panel) 30%,var(--panel2) 48%,var(--panel) 66%);background-size:280% 100%;
+    animation:shine 1.5s linear infinite}
+  @keyframes shine{to{background-position:-280% 0}}
+  .img-foot{display:flex;align-items:center;gap:8px;padding:7px 9px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .img-tag{font-size:12px;color:var(--muted);flex:1;min-width:120px}
+  .img-fail{padding:14px;font-size:13px;color:var(--bad);text-align:center}
   /* Ce que l'IA a compris */
   .brand-sum{background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 12%,var(--panel2)),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:16px;font-size:15px;line-height:1.5}
   .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
@@ -177,7 +232,10 @@
       <div class="panel companyPanel">
         <div class="row" style="align-items:center">
           <h2 style="margin:0">🗓️ Posts de la semaine</h2>
-          <div style="flex:0 0 auto"><button class="btn" id="generateBtn">✨ Générer la semaine</button></div>
+          <div style="flex:0 0 auto;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn ghost" id="imagesBtn">🎨 Créer les visuels manquants</button>
+            <button class="btn" id="generateBtn">✨ Générer la semaine</button>
+          </div>
         </div>
         <div id="genMsg" class="err"></div>
         <div id="posts"></div>
@@ -191,6 +249,7 @@ const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
+let POSTS=[], IMG_RUNNING=false;
 
 const NETWORKS=[{k:'linkedin',label:'LinkedIn'},{k:'instagram',label:'Instagram'},{k:'facebook',label:'Facebook'}];
 const DAYS=[{i:1,l:'L'},{i:2,l:'M'},{i:3,l:'M'},{i:4,l:'J'},{i:5,l:'V'},{i:6,l:'S'},{i:0,l:'D'}];
@@ -205,9 +264,10 @@ const LOGOS=[
   {url:'assets/logos/vos-formateurs.png',label:'Vos Formateurs'},
 ];
 const AGENTS=[
-  {k:'analyste',emoji:'🔎',name:'Analyste de marque',desc:'lit le site et comprend la société'},
-  {k:'orchestrateur',emoji:'🧠',name:'Orchestrateur',desc:'planifie la semaine de posts'},
-  {k:'redacteur',emoji:'✍️',name:'Rédacteur',desc:'écrit les posts'},
+  {k:'analyste',emoji:'🔎',name:'Analyste de marque',desc:'lit le site et comprend la société',color:'#3fc9ff'},
+  {k:'orchestrateur',emoji:'🧠',name:'Orchestrateur',desc:'planifie la semaine de posts',color:'#7c5cff'},
+  {k:'redacteur',emoji:'✍️',name:'Rédacteur',desc:'écrit les posts',color:'#ff5ca8'},
+  {k:'designer',emoji:'🎨',name:'Directeur artistique',desc:'crée le visuel de chaque post',color:'#ffb454'},
 ];
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtDate(iso){ if(!iso) return 'non planifié'; const d=new Date(iso);
@@ -233,19 +293,37 @@ el('loginBtn').onclick=async()=>{
 el('pass').addEventListener('keydown',e=>{ if(e.key==='Enter') el('loginBtn').click(); });
 el('logoutBtn').onclick=async()=>{ await db.auth.signOut(); location.reload(); };
 
-// ---- Équipe d'agents ----
+// ---- Équipe d'agents (avatars animés) ----
+function avatarSVG(){
+  return `<svg viewBox="0 0 54 54" aria-hidden="true">
+    <circle class="halo" cx="27" cy="27" r="25"></circle>
+    <circle class="ring" cx="27" cy="27" r="24" stroke-dasharray="5 9"></circle>
+    <circle class="ring ring2" cx="27" cy="27" r="18.5" stroke-dasharray="2 7"></circle>
+    <circle class="core" cx="27" cy="27" r="13.5"></circle>
+    <g class="orbit">
+      <circle class="sat" cx="27" cy="3" r="2.6"></circle>
+      <circle class="sat" cx="27" cy="51" r="1.7"></circle>
+    </g>
+  </svg>`;
+}
 function renderAgents(){
   el('agents').innerHTML=AGENTS.map(a=>`
-    <div class="agent">
-      <div class="a-top"><span class="a-emoji">${a.emoji}</span> ${a.name}</div>
-      <div class="a-desc">${a.desc}</div>
-      <div class="a-status"><span class="dot" id="dot-${a.k}"></span><span id="st-${a.k}">Au repos</span></div>
+    <div class="agent" id="ag-${a.k}" data-state="idle" style="--c:${a.color}">
+      <div class="a-head">
+        <div class="ava">${avatarSVG()}<span class="emo">${a.emoji}</span></div>
+        <div style="min-width:0">
+          <div class="a-name">${a.name}</div>
+          <div class="a-desc">${a.desc}</div>
+        </div>
+      </div>
+      <div class="a-status"><span class="dot"></span><span class="txt" id="st-${a.k}">Au repos</span></div>
+      <div class="a-bar"><span></span></div>
     </div>`).join('');
 }
-function setAgent(k,text,state){ // state: 'idle'|'busy'|'done'
-  const st=el('st-'+k), dot=el('dot-'+k);
-  if(st) st.textContent=text;
-  if(dot) dot.className='dot'+(state==='busy'?' busy':state==='done'?' done':'');
+function setAgent(k,text,state){ // state: 'idle' | 'busy' | 'done' | 'err'
+  const card=el('ag-'+k), st=el('st-'+k);
+  if(card) card.dataset.state=state||'idle';
+  if(st) st.innerHTML=esc(text)+(state==='busy'?' <span class="think"><i></i><i></i><i></i></span>':'');
 }
 function resetAgents(){ AGENTS.forEach(a=>setAgent(a.k,'Au repos','idle')); }
 
@@ -329,14 +407,14 @@ async function analyzeBrand(){
       body:JSON.stringify({company_id:CURRENT_COMPANY.id,website:CURRENT_COMPANY.website||''})
     });
     const out=await res.json();
-    if(!res.ok||out.error){ setAgent('analyste','⚠️ '+(out.error||res.status),'idle'); }
+    if(!res.ok||out.error){ setAgent('analyste','⚠️ '+(out.error||res.status),'err'); }
     else{
       setAgent('analyste', out.site_read?'✅ A lu le site et compris la marque':'✅ A déduit la marque (site non lisible)','done');
       // recharge la fiche société (le website a pu être normalisé)
       const {data}=await db.from('mkt_companies').select('*').eq('id',CURRENT_COMPANY.id).maybeSingle();
       if(data){ CURRENT_COMPANY=data; COMPANIES=COMPANIES.map(c=>c.id===data.id?data:c); }
     }
-  }catch(e){ setAgent('analyste','⚠️ '+e.message,'idle'); }
+  }catch(e){ setAgent('analyste','⚠️ '+e.message,'err'); }
   await loadEditorial();
 }
 
@@ -361,7 +439,7 @@ function renderBrand(){
   box.innerHTML=`
     <div class="brand-sum">${esc(e.summary||'')}</div>
     <div class="brand-grid">
-      ${item('Ton',e.tone)}${item('Cible',e.audience)}${item('Thèmes',e.topics)}${item('À mettre en avant',e.dos)}${item('À éviter',e.donts)}
+      ${item('Ton',e.tone)}${item('Cible',e.audience)}${item('Thèmes',e.topics)}${item('À mettre en avant',e.dos)}${item('À éviter',e.donts)}${item('🎨 Couleurs de la marque',e.brand_colors)}
     </div>
     <div class="row" style="margin-top:12px">
       <button class="btn ghost small" id="reanalyzeBtn" style="flex:0 0 auto">🔎 Ré-analyser le site</button>
@@ -377,12 +455,15 @@ function renderBrandEdit(){
     <div class="row"><div><label>Ton</label><input id="eb_tone" value="${esc(e.tone)}"></div><div><label>Cible</label><input id="eb_audience" value="${esc(e.audience)}"></div></div>
     <label>Thèmes</label><textarea id="eb_topics">${esc(e.topics)}</textarea>
     <div class="row"><div><label>À mettre en avant</label><textarea id="eb_dos">${esc(e.dos)}</textarea></div><div><label>À éviter</label><textarea id="eb_donts">${esc(e.donts)}</textarea></div></div>
+    <label>🎨 Couleurs de la marque <span class="who">(le Directeur artistique s'en sert pour les visuels)</span></label>
+    <input id="eb_colors" value="${esc(e.brand_colors)}" placeholder="ex. bleu nuit #0e1b3a, orange vif #ff7a1a, blanc cassé">
     <div class="row" style="margin-top:12px"><button class="btn" id="eb_save" style="flex:0 0 auto">Enregistrer</button><button class="btn ghost" id="eb_cancel" style="flex:0 0 auto">Annuler</button></div>
     <span class="err" id="eb_msg"></span>`;
   el('eb_cancel').onclick=()=>{ EDIT_MODE=false; renderBrand(); };
   el('eb_save').onclick=async()=>{
     const payload={company_id:CURRENT_COMPANY.id,summary:el('eb_summary').value,tone:el('eb_tone').value,audience:el('eb_audience').value,
-      topics:el('eb_topics').value,dos:el('eb_dos').value,donts:el('eb_donts').value,language:'fr',updated_at:new Date().toISOString()};
+      topics:el('eb_topics').value,dos:el('eb_dos').value,donts:el('eb_donts').value,brand_colors:el('eb_colors').value,
+      language:'fr',updated_at:new Date().toISOString()};
     const {error}=await db.from('mkt_editorial').upsert(payload,{onConflict:'company_id'});
     if(error){ el('eb_msg').textContent='Erreur : '+error.message; return; }
     await loadEditorial();
@@ -423,6 +504,68 @@ async function saveCadence(network,per_week,days,hour,active,btn){
   if(btn){ const t=btn.textContent; btn.textContent='✓'; setTimeout(()=>btn.textContent=t,1200); }
 }
 
+// ---- Visuels : agent Directeur artistique ----
+async function callImageAgent(postId){
+  const {data:{session}}=await db.auth.getSession();
+  const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-image',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({post_id:postId})
+  });
+  const out=await res.json().catch(()=>({error:'réponse illisible'}));
+  if(!res.ok||out.error) throw new Error(out.error||('erreur '+res.status));
+  return out;
+}
+// Met à jour l'encart visuel d'un post sans recharger toute la liste (on voit l'image arriver).
+function patchImage(id,patch){
+  const p=POSTS.find(x=>x.id===id); if(!p) return;
+  Object.assign(p,patch);
+  const zone=document.querySelector('[data-img="'+id+'"]');
+  if(!zone) return;
+  zone.outerHTML=imgZone(p);
+  const btn=document.querySelector('[data-img="'+id+'"] .act-img');
+  if(btn) btn.onclick=()=>runImageQueue([id]);
+}
+function imgZone(p){
+  if(p.image_status==='ready'&&p.image_url){
+    return `<div class="post-img" data-img="${p.id}">
+      <img src="${esc(p.image_url)}" alt="${esc(p.image_alt)}" title="Ouvrir en grand" onclick="window.open(this.src,'_blank')">
+      <div class="img-foot">
+        <span class="img-tag">🎨 ${esc(p.image_style||'visuel')}${p.image_alt?' — '+esc(p.image_alt):''}</span>
+        <a class="btn ghost small" href="${esc(p.image_url)}" target="_blank" rel="noopener">⬇️ Ouvrir</a>
+        <button class="btn ghost small act-img">↻ Regénérer</button>
+      </div></div>`;
+  }
+  if(p.image_status==='pending'){
+    return `<div class="post-img" data-img="${p.id}"><div class="img-skel">🎨 Le Directeur artistique dessine…<span style="font-size:12px;opacity:.8">20 à 40 secondes</span></div></div>`;
+  }
+  if(p.image_status==='error'){
+    return `<div class="post-img" data-img="${p.id}"><div class="img-fail">⚠️ ${esc(p.image_error||'Visuel non créé')}</div>
+      <div class="img-foot"><span class="img-tag"></span><button class="btn ghost small act-img">↻ Réessayer</button></div></div>`;
+  }
+  return `<div class="post-img" data-img="${p.id}">
+    <div class="img-foot"><span class="img-tag">Aucun visuel pour l'instant</span><button class="btn small act-img">🎨 Créer le visuel</button></div></div>`;
+}
+async function runImageQueue(ids){
+  if(!ids.length || IMG_RUNNING) return;
+  IMG_RUNNING=true; el('imagesBtn').disabled=true; el('generateBtn').disabled=true;
+  let ok=0, ko=0;
+  for(let i=0;i<ids.length;i++){
+    setAgent('designer', ids.length>1?`🎨 Visuel ${i+1}/${ids.length}`:'🎨 Création du visuel','busy');
+    patchImage(ids[i],{image_status:'pending'});
+    try{ const out=await callImageAgent(ids[i]);
+      patchImage(ids[i],{image_status:'ready',image_url:out.image_url,image_style:out.style,image_alt:out.alt}); ok++;
+    }catch(e){ patchImage(ids[i],{image_status:'error',image_error:e.message}); ko++; }
+  }
+  setAgent('designer', ko? `⚠️ ${ok} créé(s), ${ko} en échec` : `✅ ${ok} visuel(s) créé(s)`, ko&&!ok?'err':'done');
+  IMG_RUNNING=false; el('imagesBtn').disabled=false; el('generateBtn').disabled=false;
+}
+el('imagesBtn').onclick=()=>{
+  const ids=POSTS.filter(p=>p.image_status!=='ready'&&p.status!=='refuse').map(p=>p.id);
+  if(!ids.length){ el('genMsg').style.color='var(--muted)'; el('genMsg').textContent='Tous les posts ont déjà leur visuel.'; setTimeout(()=>el('genMsg').textContent='',4000); return; }
+  runImageQueue(ids);
+};
+
 // ---- Posts : génération, rendu, validation ----
 async function generateWeek(){
   if(!CURRENT_COMPANY){ return; }
@@ -431,6 +574,7 @@ async function generateWeek(){
   el('generateBtn').disabled=true;
   setAgent('orchestrateur','🧠 Planifie la semaine…','busy');
   setAgent('redacteur','✍️ Écrit les posts…','busy');
+  let newIds=[];
   try{
     const {data:{session}}=await db.auth.getSession();
     const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-generate',{
@@ -447,11 +591,14 @@ async function generateWeek(){
       el('genMsg').style.color='var(--good)'; el('genMsg').textContent='✅ '+n+' post(s) généré(s).';
       setAgent('orchestrateur','✅ A planifié '+n+' post(s)','done');
       setAgent('redacteur','✅ A écrit '+n+' post(s)','done');
+      newIds=(out.created||[]).map(p=>p.id);
     }
-  }catch(e){ el('genMsg').style.color='var(--bad)'; el('genMsg').textContent='Erreur réseau : '+e.message; setAgent('orchestrateur','⚠️','idle'); setAgent('redacteur','⚠️','idle'); }
+  }catch(e){ el('genMsg').style.color='var(--bad)'; el('genMsg').textContent='Erreur réseau : '+e.message; setAgent('orchestrateur','⚠️','err'); setAgent('redacteur','⚠️','err'); }
   el('generateBtn').disabled=false;
   await loadPosts();
   setTimeout(()=>el('genMsg').textContent='',6000);
+  // Le Directeur artistique enchaîne : un visuel pour chaque post généré.
+  if(newIds.length) await runImageQueue(newIds);
 }
 el('generateBtn').onclick=generateWeek;
 
@@ -460,8 +607,9 @@ async function loadPosts(){
   const {data,error}=await db.from('mkt_posts').select('*').eq('company_id',CURRENT_COMPANY.id)
     .order('scheduled_at',{nullsFirst:false});
   if(error){ el('posts').innerHTML='<div class="err">'+esc(error.message)+'</div>'; return; }
-  if(!data.length){ el('posts').innerHTML='<div class="who">Aucun post. Clique « ✨ Générer la semaine ».</div>'; return; }
-  el('posts').innerHTML=data.map(p=>`
+  POSTS=data||[];
+  if(!POSTS.length){ el('posts').innerHTML='<div class="who">Aucun post. Clique « ✨ Générer la semaine ».</div>'; return; }
+  el('posts').innerHTML=POSTS.map(p=>`
     <div class="panel" style="background:var(--panel2)" data-id="${p.id}">
       <div class="row" style="align-items:center">
         <strong style="flex:0 0 auto">${NET_LABEL[p.network]||p.network}</strong>
@@ -469,7 +617,8 @@ async function loadPosts(){
         <span class="rolebadge" style="flex:0 0 auto">${STATUS_LABEL[p.status]||p.status}</span>
       </div>
       <textarea class="post-body">${esc(p.body)}</textarea>
-      <div class="who" style="margin-top:6px">🎨 ${esc(p.visual_idea)}</div>
+      ${imgZone(p)}
+      <div class="who" style="margin-top:6px">💡 ${esc(p.visual_idea)}</div>
       <div class="who">🏷️ ${esc(p.caption)}</div>
       <div class="row" style="margin-top:10px">
         <button class="btn act-valider small" style="flex:0 0 auto">✅ Valider</button>
@@ -484,6 +633,8 @@ async function loadPosts(){
     card.querySelector('.act-refuser').onclick=()=>setPostStatus(id,'refuse');
     card.querySelector('.act-pause').onclick=()=>setPostStatus(id,'pause');
     card.querySelector('.act-save').onclick=()=>savePostBody(id,card.querySelector('.post-body').value);
+    const img=card.querySelector('.act-img');
+    if(img) img.onclick=()=>runImageQueue([id]);
   });
 }
 async function setPostStatus(id,status){
