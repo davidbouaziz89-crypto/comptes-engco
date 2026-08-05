@@ -564,7 +564,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v8 · visuels designés';
+const APP_VERSION='v9 · vidéo à l unité';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -671,8 +671,10 @@ function renderAgents(){
         <div class="a-desc">${esc(t.role||a.role)}</div>
       </div>
       <div class="a-status"><span class="dot"></span><span class="txt" id="st-${a.k}">Au repos</span></div>
+      ${(t.avatar_url&&!t.avatar_video_url)?`<button class="btn ghost small act-vid" data-ag="${a.k}" style="margin-top:9px;width:100%">🎥 Animer ${esc(t.first_name||a.first)} (1,20 $)</button>`:''}
       <div class="a-bar"><span></span></div>
     </div>`;}).join('');
+  el('agents').querySelectorAll('.act-vid').forEach(b=>b.onclick=()=>animateAgents([b.dataset.ag]));
 }
 // ---- Portraits de l'équipe ----
 async function loadTeam(){
@@ -946,10 +948,10 @@ async function callVideo(agent,check){
   if(!res.ok||out.error) throw new Error(out.error||('erreur '+res.status));
   return out;
 }
-el('videoBtn').onclick=async()=>{
-  const todo=AGENTS.filter(a=>TEAM[a.k]&&TEAM[a.k].avatar_url&&!TEAM[a.k].avatar_video_url).map(a=>a.k);
+async function animateAgents(todo){
   if(!todo.length){ el('teamMsg').style.color='var(--muted)'; el('teamMsg').textContent='Tout le monde a déjà sa vidéo (ou pas encore de portrait).'; return; }
-  if(!confirm(`Générer une vidéo animée pour ${todo.length} collègue(s) ?\n\nEnviron ${(todo.length*1.2).toFixed(2)} $ au total, et 2 à 4 minutes chacun.`)) return;
+  const noms=todo.map(k=>AG(k).first).join(', ');
+  if(!confirm(`Animer ${noms} en vidéo ?\n\nEnviron ${(todo.length*1.2).toFixed(2)} $ au total, 2 à 4 minutes par personne.\nTu n'es facturé que si la vidéo aboutit.`)) return;
   const btn=el('videoBtn'); btn.disabled=true; el('portraitsBtn').disabled=true;
   for(let i=0;i<todo.length;i++){
     const k=todo[i], nom=AG(k).first;
@@ -975,7 +977,9 @@ el('videoBtn').onclick=async()=>{
   await loadTeam(); refreshCost();
   btn.disabled=false; el('portraitsBtn').disabled=false;
   if(el('teamMsg').style.color!=='var(--bad)'){ el('teamMsg').style.color='var(--good)'; el('teamMsg').textContent='✅ Tournage terminé.'; }
-};
+}
+el('videoBtn').onclick=()=>animateAgents(
+  AGENTS.filter(a=>TEAM[a.k]&&TEAM[a.k].avatar_url&&!TEAM[a.k].avatar_video_url).map(a=>a.k));
 
 // ---- Incrustation du logo sur le visuel ----
 // Fait dans le navigateur : le logo reste net et fidèle, alors qu'une IA le
