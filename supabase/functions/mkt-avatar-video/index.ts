@@ -113,35 +113,40 @@ Deno.serve(async (req) => {
     const mime = imgRes.headers.get("content-type") || "image/png";
     const b64 = encodeBase64(new Uint8Array(await imgRes.arrayBuffer()));
 
-    // La forme du champ image change selon le modèle Veo : on essaie les deux connues.
-    const imageShapes = [
-      { bytesBase64Encoded: b64, mimeType: mime },
-      { inlineData: { mimeType: mime, data: b64 } },
+    // Veo refuse `numberOfVideos` et `inlineData` : on essaie les combinaisons
+    // connues, de la plus riche à la plus dépouillée, et on garde la PREMIÈRE
+    // erreur (la plus parlante) plutôt que la dernière.
+    const variants: { image: unknown; parameters?: unknown }[] = [
+      { image: { bytesBase64Encoded: b64, mimeType: mime }, parameters: { resolution: "720p" } },
+      { image: { bytesBase64Encoded: b64, mimeType: mime } },
+      { image: { imageBytes: b64, mimeType: mime } },
+      { image: { inlineData: { mimeType: mime, data: b64 } } },
     ];
 
-    let started: { name?: string } | null = null, lastErr = "";
+    let started: { name?: string } | null = null, firstErr = "";
     outer:
     for (const m of [model, "veo-3.1-generate-preview"]) {
-      for (const image of imageShapes) {
+      for (const v of variants) {
+        const payload: Record<string, unknown> = {
+          instances: [{ prompt: videoPrompt(agent), image: v.image }],
+        };
+        if (v.parameters) payload.parameters = v.parameters;
         const res = await fetch(`${BASE}/models/${m}:predictLongRunning`, {
           method: "POST",
           headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            instances: [{ prompt: videoPrompt(agent), image }],
-            parameters: { numberOfVideos: 1, resolution: "720p" },
-          }),
+          body: JSON.stringify(payload),
         });
         const txt = await res.text();
         if (res.ok) { started = JSON.parse(txt); break outer; }
-        lastErr = txt;
+        if (!firstErr) firstErr = txt;
         console.error("VEO_START_ERROR", m, res.status, txt.slice(0, 800));
-        if (res.status === 400) continue;          // forme refusée : variante suivante
+        if (res.status === 400) continue;          // réglage refusé : variante suivante
         if (res.status === 404) break;             // modèle inconnu : modèle suivant
         if (res.status === 429) return json({ error: "Quota vidéo Google atteint. Vérifie ta facturation." }, 502);
         return json({ error: "Lancement impossible (" + res.status + ") : " + txt.slice(0, 200) }, 502);
       }
     }
-    if (!started?.name) return json({ error: "Lancement impossible : " + lastErr.slice(0, 250) }, 502);
+    if (!started?.name) return json({ error: "Lancement impossible : " + firstErr.slice(0, 300) }, 502);
 
     await admin.from("mkt_team").update({ video_op: started.name }).eq("owner", uid).eq("agent_key", agent);
     return json({ ok: true, ready: false, operation: started.name });
