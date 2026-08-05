@@ -1000,7 +1000,7 @@ function wrapLines(ctx,text,maxW){
     if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=w; } else cur=t;
   }
   if(cur) lines.push(cur);
-  return lines.slice(0,3);
+  return lines.slice(0,2);
 }
 // Le fond vient de l'IA ; l'accroche et le logo sont dessinés par l'app.
 // C'est ce qui garantit un texte net et un logo fidèle à chaque fois.
@@ -1020,63 +1020,52 @@ async function composeVisual(postId,companyId,imageUrl,headline){
     const ctx=cv.getContext('2d');
     ctx.drawImage(img,0,0,W,H);
 
-    const pad=Math.round(W*0.055);
     const accent=brandColor();
 
-    // Voile dégradé : le texte reste lisible quel que soit le fond.
-    if(headline){
-      const g=ctx.createLinearGradient(0,H*0.35,0,H);
-      g.addColorStop(0,'rgba(8,10,14,0)');
-      g.addColorStop(.55,'rgba(8,10,14,.62)');
-      g.addColorStop(1,'rgba(8,10,14,.88)');
-      ctx.fillStyle=g; ctx.fillRect(0,Math.round(H*0.35),W,Math.round(H*0.65));
-    }
+    // Mise en page : la photo occupe le haut, un bandeau blanc en pied porte
+    // l'accroche et le logo. Le logo se pose directement sur le blanc, sans
+    // pastille rapportée, et la barre de marque est calée sur la hauteur du texte.
+    const bandH=Math.round(W>=H ? H*0.235 : H*0.175);
+    const bandY=H-bandH;
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,bandY,W,bandH);
+    const rule=Math.max(3,Math.round(bandH*0.035));
+    ctx.fillStyle=accent;
+    ctx.fillRect(0,H-rule,W,rule);
 
-    let bottom=H-pad;
-    // Logo : en bas à droite, sur une pastille claire pour tenir sur tous les fonds.
+    const m=Math.round(bandH*0.26);
+    const inner=bandY+Math.round((bandH-rule)/2);   // milieu optique du bandeau
+
+    let logoBlock=0;
     if(logo){
-      const lw=Math.round(W*0.15);
-      const lh=Math.round(lw*(logo.naturalHeight/logo.naturalWidth||0.4));
-      const ip=Math.round(pad*0.34);
-      const bw=lw+ip*2, bh=lh+ip*2;
-      const bx=W-bw-pad, by=H-bh-pad;
-      ctx.save();
-      ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=pad*0.5; ctx.shadowOffsetY=Math.round(pad*0.1);
-      ctx.fillStyle='rgba(255,255,255,.96)';
-      ctx.beginPath();
-      if(ctx.roundRect) ctx.roundRect(bx,by,bw,bh,Math.round(ip*1.4)); else ctx.rect(bx,by,bw,bh);
-      ctx.fill(); ctx.restore();
-      ctx.drawImage(logo,bx+ip,by+ip,lw,lh);
+      const lh=Math.round(bandH*0.46);
+      const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
+      ctx.drawImage(logo,W-m-lw,inner-Math.round(lh/2),lw,lh);
+      logoBlock=lw+m;
     }
 
-    // Accroche : grosse, blanche, alignée en bas à gauche, avec une barre de couleur de marque.
     if(headline){
-      const maxW=Math.round(W*(logo?0.62:0.84));
-      let size=Math.round(W/12);
-      ctx.textBaseline='alphabetic';
-      let lines=[];
+      const barW=Math.max(4,Math.round(bandH*0.05));
+      const textX=m+barW+Math.round(m*0.75);
+      const maxW=Math.max(60,W-textX-m-logoBlock);
+      let size=Math.round(bandH*0.30), lines=[];
       for(;;){
         ctx.font=`700 ${size}px "Space Grotesk","Segoe UI",sans-serif`;
         lines=wrapLines(ctx,headline,maxW);
         const tooWide=lines.some(l=>ctx.measureText(l).width>maxW);
-        if((!tooWide && lines.length<=3) || size<=Math.round(W/26)) break;
-        size=Math.round(size*0.92);
+        if((!tooWide && lines.length<=2) || size<=Math.round(bandH*0.13)) break;
+        size=Math.round(size*0.93);
       }
-      const lh=Math.round(size*1.16);
-      const blockH=lines.length*lh;
-      const baseY=bottom-Math.round(size*0.15);
-      const startY=baseY-blockH+lh;
-      ctx.save();
+      const lineH=Math.round(size*1.14);
+      const blockH=lines.length*lineH;
+      const top=inner-Math.round(blockH/2);
       ctx.fillStyle=accent;
-      const barH=Math.round(size*0.16), barW=Math.round(size*1.7);
       ctx.beginPath();
-      if(ctx.roundRect) ctx.roundRect(pad,startY-lh-Math.round(size*0.62),barW,barH,barH/2);
-      else ctx.rect(pad,startY-lh-Math.round(size*0.62),barW,barH);
+      if(ctx.roundRect) ctx.roundRect(m,top,barW,blockH,barW/2); else ctx.rect(m,top,barW,blockH);
       ctx.fill();
-      ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=Math.round(size*0.35); ctx.shadowOffsetY=Math.round(size*0.06);
-      ctx.fillStyle='#ffffff';
-      lines.forEach((l,i)=>ctx.fillText(l,pad,startY+i*lh));
-      ctx.restore();
+      ctx.fillStyle='#111820';
+      ctx.textBaseline='top';
+      lines.forEach((l,i)=>ctx.fillText(l,textX,top+i*lineH+Math.round((lineH-size)*0.34)));
     }
 
     const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
