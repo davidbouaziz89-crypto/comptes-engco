@@ -12,6 +12,23 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// --- Suivi des frais IA (tarifs publics Anthropic, en dollars par million de tokens) ---
+const PRICE: Record<string, { i: number; o: number }> = {
+  "claude-opus-5": { i: 5, o: 25 },
+  "claude-opus-4-8": { i: 5, o: 25 },
+  "claude-sonnet-5": { i: 3, o: 15 },
+  "claude-haiku-4-5": { i: 1, o: 5 },
+};
+function claudeCost(model: string, u: Record<string, number> | null) {
+  const p = PRICE[model] || PRICE["claude-opus-5"];
+  const inT = u?.input_tokens || 0, outT = u?.output_tokens || 0, cache = u?.cache_read_input_tokens || 0;
+  return (inT * p.i + outT * p.o + cache * p.i * 0.1) / 1_000_000;
+}
+// Jamais bloquant : un souci de journalisation ne doit pas casser la fonctionnalité.
+async function logUsage(admin: { from: (t: string) => { insert: (r: unknown) => Promise<unknown> } }, row: Record<string, unknown>) {
+  try { await admin.from("mkt_usage").insert(row); } catch (e) { console.error("USAGE_LOG_FAIL", String(e)); }
+}
+
 const BRAND_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -149,6 +166,15 @@ Sois concret et fidèle à ce que tu as lu. N'invente pas de faits précis (prix
     };
     const { error: upErr } = await admin.from("mkt_editorial").upsert(editorial, { onConflict: "company_id" });
     if (upErr) return json({ error: "Sauvegarde échouée : " + upErr.message }, 500);
+
+    await logUsage(admin, {
+      owner: uid, company_id: companyId, source: "analyse", agent: "analyste",
+      provider: "anthropic", model,
+      input_tokens: out.usage?.input_tokens || 0,
+      output_tokens: out.usage?.output_tokens || 0,
+      cache_read_tokens: out.usage?.cache_read_input_tokens || 0,
+      cost_usd: claudeCost(model, out.usage || null),
+    });
 
     return json({ ok: true, editorial, site_read: !!siteText, usage: out.usage || null });
   } catch (e) {

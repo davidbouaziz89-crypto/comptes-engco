@@ -81,10 +81,24 @@
   .a-desc{color:var(--muted);font-size:12px;margin-top:2px}
   .a-status{display:flex;align-items:center;gap:7px;font-size:13px;margin-top:11px;min-height:18px}
   .a-status .txt{color:var(--txt)}
-  /* Avatar */
+  /* Avatar : un vrai visage, entouré d'anneaux vivants */
   .ava{position:relative;width:54px;height:54px;flex:0 0 auto}
   .ava svg{width:100%;height:100%;display:block;overflow:visible}
-  .ava .emo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:19px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+  .ava .face{position:absolute;left:9px;top:9px;width:36px;height:36px;border-radius:50%;object-fit:cover;
+    border:1.5px solid color-mix(in srgb,var(--c) 70%,transparent);background:var(--panel2);
+    box-shadow:0 3px 10px -4px rgba(0,0,0,.7)}
+  .ava .initials{position:absolute;left:9px;top:9px;width:36px;height:36px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:14px;color:#fff;
+    background:linear-gradient(140deg,color-mix(in srgb,var(--c) 85%,#000),color-mix(in srgb,var(--c) 45%,#000));
+    border:1.5px solid color-mix(in srgb,var(--c) 70%,transparent)}
+  .ava .emo{position:absolute;right:-2px;bottom:-2px;width:20px;height:20px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:11px;
+    background:var(--panel);border:1px solid var(--line)}
+  .ava.big{width:74px;height:74px}
+  .ava.big .face,.ava.big .initials{left:12px;top:12px;width:50px;height:50px;font-size:18px}
+  .ava.sm{width:38px;height:38px}
+  .ava.sm .face,.ava.sm .initials{left:6px;top:6px;width:26px;height:26px;font-size:11px}
+  .ava.sm .emo{width:15px;height:15px;font-size:9px}
   .ava .halo,.ava .ring,.ava .core,.ava .orbit{transform-box:view-box;transform-origin:27px 27px}
   .ava .halo{fill:color-mix(in srgb,var(--c) 20%,transparent);opacity:.3}
   .ava .core{fill:color-mix(in srgb,var(--c) 26%,var(--panel));stroke:color-mix(in srgb,var(--c) 75%,transparent);stroke-width:1.2;animation:breathe 3.6s ease-in-out infinite}
@@ -133,6 +147,74 @@
   .img-foot{display:flex;align-items:center;gap:8px;padding:7px 9px;border-top:1px solid var(--line);flex-wrap:wrap}
   .img-tag{font-size:12px;color:var(--muted);flex:1;min-width:120px}
   .img-fail{padding:14px;font-size:13px;color:var(--bad);text-align:center}
+  .agent[data-state="busy"] .face,.agent[data-state="busy"] .initials{animation:corepulse .95s ease-in-out infinite}
+  /* Onglets */
+  .tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px;overflow-x:auto}
+  .tab{flex:1;min-width:110px;padding:9px 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);
+    font-family:var(--font-display);font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;transition:.2s}
+  .tab:hover{color:var(--txt)}
+  .tab.on{background:var(--grad-accent);color:#fff;box-shadow:0 8px 22px -14px var(--accent)}
+  .costchip{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:20px;
+    padding:5px 12px;font-size:13px;font-family:var(--font-mono);font-weight:600;cursor:pointer;white-space:nowrap}
+  .costchip:hover{border-color:var(--accent)}
+  /* ---------- Discussion ---------- */
+  .chat-shell{display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start}
+  .chat-side{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;position:sticky;top:14px}
+  .cs-title{font-family:var(--font-display);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+  .mate{--c:var(--accent);display:flex;align-items:center;gap:9px;padding:7px;border-radius:10px;transition:background .2s}
+  .mate:hover{background:var(--panel2)}
+  .mate .m-n{font-weight:600;font-size:13.5px;line-height:1.15}
+  .mate .m-r{font-size:11.5px;color:var(--muted)}
+  .mate.here .m-n::after{content:"●";color:var(--good);font-size:9px;margin-left:6px;vertical-align:middle}
+  .chatitem{padding:8px 10px;border-radius:9px;font-size:13px;color:var(--muted);cursor:pointer;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chatitem:hover{background:var(--panel2);color:var(--txt)}
+  .chatitem.on{background:var(--panel2);color:var(--txt);box-shadow:inset 2px 0 0 var(--accent)}
+  .chat-main{background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:min(72vh,640px)}
+  .chat-head{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .parts{display:flex;align-items:center}
+  .parts .ava{margin-right:-10px;transition:margin .3s}
+  .parts .ava:last-child{margin-right:0}
+  .chat-feed{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:14px;max-height:56vh}
+  .msg{display:flex;gap:10px;align-items:flex-start;animation:pop .35s cubic-bezier(.2,.9,.3,1.2) both}
+  .msg.me{flex-direction:row-reverse}
+  .bub{max-width:min(76%,620px);padding:11px 14px;border-radius:14px;font-size:14.5px;line-height:1.5;white-space:pre-wrap;
+    background:var(--panel2);border:1px solid var(--line);border-top-left-radius:4px}
+  .msg.me .bub{background:var(--grad-accent);color:#fff;border:0;border-radius:14px;border-top-right-radius:4px}
+  .who-line{font-size:12px;color:var(--muted);margin-bottom:3px;font-weight:600}
+  .join{align-self:center;font-size:12.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);
+    border-radius:20px;padding:6px 14px;animation:pop .4s cubic-bezier(.2,.9,.3,1.2) both}
+  @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+  .chat-input{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);align-items:flex-end}
+  .chat-input textarea{resize:none;max-height:140px;min-height:42px}
+  .chat-input .btn{flex:0 0 auto;height:42px;width:48px;font-size:17px}
+  .starters{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .starter{border:1px solid var(--line);background:var(--panel2);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer;color:var(--muted)}
+  .starter:hover{color:var(--txt);border-color:var(--accent)}
+  .empty-chat{margin:auto;text-align:center;color:var(--muted);max-width:460px;padding:20px}
+  @media(max-width:820px){.chat-shell{grid-template-columns:1fr}.chat-side{position:static}}
+  /* ---------- Frais ---------- */
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:var(--panel2);border-radius:20px;padding:6px 13px;font-size:13px;cursor:pointer;user-select:none}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .kpi .k{font-size:12px;color:var(--muted)}
+  .kpi .v{font-family:var(--font-display);font-size:23px;font-weight:700;margin-top:3px}
+  .kpi .s{font-size:12px;color:var(--muted);margin-top:2px}
+  .chart{display:flex;align-items:flex-end;gap:5px;height:170px;padding-top:10px;overflow-x:auto}
+  .bar{flex:1;min-width:16px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;height:100%}
+  .bar .fill{width:100%;border-radius:6px 6px 0 0;background:var(--grad-accent);min-height:2px;transition:height .5s cubic-bezier(.2,.9,.3,1)}
+  .bar .lbl{font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .brk{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13.5px}
+  .brk .nm{width:110px;flex:0 0 auto;color:var(--muted)}
+  .brk .track{flex:1;height:8px;border-radius:6px;background:var(--panel2);overflow:hidden}
+  .brk .track i{display:block;height:100%;border-radius:6px;background:var(--grad-accent)}
+  .brk .amt{flex:0 0 auto;font-family:var(--font-mono);font-size:13px}
+  .utable{width:100%;border-collapse:collapse;font-size:13px}
+  .utable th{text-align:left;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line);font-size:12px}
+  .utable td{padding:7px 8px;border-bottom:1px solid var(--line)}
+  .utable td.n{font-family:var(--font-mono);text-align:right;white-space:nowrap}
   /* Ce que l'IA a compris */
   .brand-sum{background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 12%,var(--panel2)),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:16px;font-size:15px;line-height:1.5}
   .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
@@ -187,6 +269,7 @@
       <select id="companySel" style="max-width:220px;width:auto"></select>
       <button class="btn ghost small" id="newCompanyBtn">+ Société</button>
       <div class="spacer"></div>
+      <button class="costchip" id="costChip" title="Dépense IA aujourd'hui — cliquer pour voir le détail">💶 —</button>
       <span class="who" id="who"></span>
       <a class="btn ghost small" href="./index.html">← Portail</a>
       <button class="btn ghost small" id="logoutBtn">Quitter</button>
@@ -196,6 +279,14 @@
         <h2 style="margin-top:0">👋 Bienvenue !</h2>
         <p class="who">Ajoute ta première société avec le bouton <strong>« + Société »</strong> en haut : donne son nom et son site web, l'IA s'occupe du reste.</p>
       </div>
+
+      <nav class="tabs" id="tabs">
+        <button class="tab on" data-tab="pilotage">🚀 Pilotage</button>
+        <button class="tab" data-tab="chat">💬 Discussion</button>
+        <button class="tab" data-tab="frais">💶 Frais</button>
+      </nav>
+
+      <div id="tab-pilotage">
 
       <!-- En-tête société -->
       <div class="panel companyPanel">
@@ -211,8 +302,12 @@
 
       <!-- Ton équipe -->
       <div class="panel companyPanel">
-        <h2>👥 Ton équipe d'agents</h2>
-        <div class="agents" id="agents"></div>
+        <div class="row" style="align-items:center">
+          <h2 style="margin:0">👥 Ton équipe</h2>
+          <div style="flex:0 0 auto"><button class="btn ghost small" id="portraitsBtn">📸 Générer les portraits</button></div>
+        </div>
+        <div class="agents" id="agents" style="margin-top:12px"></div>
+        <div class="err" id="teamMsg"></div>
       </div>
 
       <!-- Ce que l'IA a compris -->
@@ -240,6 +335,70 @@
         <div id="genMsg" class="err"></div>
         <div id="posts"></div>
       </div>
+      </div><!-- /tab-pilotage -->
+
+      <!-- ================= DISCUSSION ================= -->
+      <div id="tab-chat" class="hidden">
+        <div class="chat-shell">
+          <aside class="chat-side">
+            <div class="cs-title">Ton équipe</div>
+            <div id="chatTeam"></div>
+            <button class="btn ghost small" id="newChatBtn" style="width:100%;margin-top:12px">✏️ Nouvelle discussion</button>
+            <div class="cs-title" style="margin-top:16px">Discussions</div>
+            <div id="chatList"></div>
+          </aside>
+          <section class="chat-main">
+            <div class="chat-head">
+              <div id="chatParticipants" class="parts"></div>
+              <div class="who" id="chatTitle">Nouvelle discussion</div>
+            </div>
+            <div class="chat-feed" id="chatFeed"></div>
+            <div class="chat-input">
+              <textarea id="chatBox" rows="1" placeholder="Pose ta question à l'équipe…"></textarea>
+              <button class="btn" id="chatSend" title="Envoyer (Cmd/Ctrl + Entrée)">➤</button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ================= FRAIS ================= -->
+      <div id="tab-frais" class="hidden">
+        <div class="panel">
+          <h2 style="margin-top:0">💶 Ce que te coûte l'IA</h2>
+          <div class="chips" id="rangeChips">
+            <span class="chip" data-r="today">Aujourd'hui</span>
+            <span class="chip on" data-r="7d">7 derniers jours</span>
+            <span class="chip" data-r="month">Ce mois-ci</span>
+            <span class="chip" data-r="all">Tout</span>
+          </div>
+          <div class="row" style="margin-top:12px;align-items:flex-end">
+            <div style="max-width:190px"><label style="margin-top:0">Du</label><input type="date" id="fFrom"></div>
+            <div style="max-width:190px"><label style="margin-top:0">Au</label><input type="date" id="fTo"></div>
+            <div style="flex:0 0 auto"><button class="btn ghost" id="fApply">Appliquer</button></div>
+            <div style="flex:0 0 auto"><select id="fGroup" style="width:auto"><option value="day">Par jour</option><option value="week">Par semaine</option><option value="month">Par mois</option></select></div>
+          </div>
+          <div class="kpis" id="fKpis"></div>
+          <div class="who" style="margin-top:10px">Montants convertis en euros à titre indicatif. Les images Google sont estimées à 0,04 $ pièce : tant que tu restes dans le quota gratuit, elles ne te sont pas facturées.</div>
+        </div>
+        <div class="panel">
+          <h2 style="margin-top:0">📈 Évolution</h2>
+          <div id="fChart" class="chart"></div>
+        </div>
+        <div class="row" style="align-items:stretch">
+          <div class="panel" style="flex:1;min-width:260px">
+            <h2 style="margin-top:0">🧩 Par activité</h2>
+            <div id="fBySource"></div>
+          </div>
+          <div class="panel" style="flex:1;min-width:260px">
+            <h2 style="margin-top:0">🏢 Par société</h2>
+            <div id="fByCompany"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 style="margin-top:0">🧾 Détail des appels</h2>
+          <div id="fRows"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -250,6 +409,8 @@ const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
+let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'];
+let USAGE=[], RANGE={from:null,to:null};
 
 const NETWORKS=[{k:'linkedin',label:'LinkedIn'},{k:'instagram',label:'Instagram'},{k:'facebook',label:'Facebook'}];
 const DAYS=[{i:1,l:'L'},{i:2,l:'M'},{i:3,l:'M'},{i:4,l:'J'},{i:5,l:'V'},{i:6,l:'S'},{i:0,l:'D'}];
@@ -263,12 +424,16 @@ const LOGOS=[
   {url:'assets/logos/mb-formation.jpg',label:'MB Formation'},
   {url:'assets/logos/vos-formateurs.png',label:'Vos Formateurs'},
 ];
+// L'équipe : des collègues avec un prénom et un visage, pas des robots.
 const AGENTS=[
-  {k:'analyste',emoji:'🔎',name:'Analyste de marque',desc:'lit le site et comprend la société',color:'#3fc9ff'},
-  {k:'orchestrateur',emoji:'🧠',name:'Orchestrateur',desc:'planifie la semaine de posts',color:'#7c5cff'},
-  {k:'redacteur',emoji:'✍️',name:'Rédacteur',desc:'écrit les posts',color:'#ff5ca8'},
-  {k:'designer',emoji:'🎨',name:'Directeur artistique',desc:'crée le visuel de chaque post',color:'#ffb454'},
+  {k:'orchestrateur',emoji:'🧠',first:'Marc',role:'Chef de projet marketing',desc:'planifie la semaine et arbitre',color:'#7c5cff'},
+  {k:'analyste',emoji:'🔎',first:'Léa',role:'Analyste de marque',desc:'lit le site et comprend la société',color:'#3fc9ff'},
+  {k:'redacteur',emoji:'✍️',first:'Pierre',role:'Responsable marketing & rédaction',desc:'écrit les posts',color:'#ff5ca8'},
+  {k:'designer',emoji:'🎨',first:'Nina',role:'Directrice artistique',desc:'crée le visuel de chaque post',color:'#ffb454'},
 ];
+const AG=k=>AGENTS.find(a=>a.k===k)||AGENTS[0];
+const EUR=0.92;                      // conversion indicative dollar → euro
+function money(usd){ const e=(usd||0)*EUR; return (e<1?e.toFixed(3):e.toFixed(2)).replace('.',',')+' €'; }
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtDate(iso){ if(!iso) return 'non planifié'; const d=new Date(iso);
   return d.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
@@ -281,7 +446,8 @@ async function boot(){
   SESSION=session;
   el('who').textContent=session.user.email;
   el('auth').classList.add('hidden'); el('app').classList.remove('hidden');
-  renderAgents();
+  await loadTeam();
+  refreshCost();
   await loadCompanies();
 }
 el('loginBtn').onclick=async()=>{
@@ -306,20 +472,55 @@ function avatarSVG(){
     </g>
   </svg>`;
 }
+// Le visage de l'agent : sa photo si elle existe, sinon ses initiales — toujours entouré des anneaux animés.
+function avatarHTML(key,size){
+  const a=AG(key), t=TEAM[key]||{}, url=t.avatar_url||'';
+  const face=url
+    ? `<img class="face" src="${esc(url)}" alt="${esc(t.first_name||a.first)}" loading="lazy">`
+    : `<span class="initials">${esc((t.first_name||a.first).slice(0,2))}</span>`;
+  return `<div class="ava ${size||''}" style="--c:${a.color}">${avatarSVG()}${face}<span class="emo">${a.emoji}</span></div>`;
+}
 function renderAgents(){
-  el('agents').innerHTML=AGENTS.map(a=>`
-    <div class="agent" id="ag-${a.k}" data-state="idle" style="--c:${a.color}">
+  el('agents').innerHTML=AGENTS.map(a=>{
+    const t=TEAM[a.k]||{};
+    return `<div class="agent" id="ag-${a.k}" data-state="idle" style="--c:${a.color}">
       <div class="a-head">
-        <div class="ava">${avatarSVG()}<span class="emo">${a.emoji}</span></div>
+        ${avatarHTML(a.k)}
         <div style="min-width:0">
-          <div class="a-name">${a.name}</div>
-          <div class="a-desc">${a.desc}</div>
+          <div class="a-name">${esc(t.first_name||a.first)}</div>
+          <div class="a-desc">${esc(t.role||a.role)}</div>
         </div>
       </div>
       <div class="a-status"><span class="dot"></span><span class="txt" id="st-${a.k}">Au repos</span></div>
       <div class="a-bar"><span></span></div>
-    </div>`).join('');
+    </div>`;}).join('');
 }
+// ---- Portraits de l'équipe ----
+async function loadTeam(){
+  const {data}=await db.from('mkt_team').select('*');
+  TEAM={}; (data||[]).forEach(r=>TEAM[r.agent_key]=r);
+  renderAgents(); renderChatTeam();
+}
+el('portraitsBtn').onclick=async()=>{
+  const btn=el('portraitsBtn'); btn.disabled=true;
+  el('teamMsg').style.color='var(--muted)';
+  el('teamMsg').textContent='📸 Séance photo en cours… (environ 30 s par personne)';
+  AGENTS.forEach(a=>{ if(!TEAM[a.k]?.avatar_url) setAgent(a.k,'📸 Prend la pose…','busy'); });
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-portraits',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({})
+    });
+    const out=await res.json();
+    if(!res.ok||out.error){ el('teamMsg').style.color='var(--bad)'; el('teamMsg').textContent='Erreur : '+(out.error||res.status); }
+    else{ el('teamMsg').style.color='var(--good)'; el('teamMsg').textContent=out.created?.length?`✅ ${out.created.length} portrait(s) créé(s).`:(out.message||'Rien à faire.'); }
+  }catch(e){ el('teamMsg').style.color='var(--bad)'; el('teamMsg').textContent='Erreur réseau : '+e.message; }
+  await loadTeam(); resetAgents(); refreshCost();
+  btn.disabled=false;
+  setTimeout(()=>el('teamMsg').textContent='',6000);
+};
 function setAgent(k,text,state){ // state: 'idle' | 'busy' | 'done' | 'err'
   const card=el('ag-'+k), st=el('st-'+k);
   if(card) card.dataset.state=state||'idle';
@@ -347,6 +548,9 @@ function selectCompany(id){
   showCompanyPanels(true);
   el('companySel').value=id;
   resetAgents();
+  CHAT_ID=null; CHAT_MSGS=[]; CHAT_PARTS=['orchestrateur'];
+  el('chatTitle').textContent='Nouvelle discussion';
+  renderFeed(); renderChatTeam(); loadChats();
   // en-tête
   el('coName').textContent=CURRENT_COMPANY.name;
   const logo=el('coLogo');
@@ -415,7 +619,7 @@ async function analyzeBrand(){
       if(data){ CURRENT_COMPANY=data; COMPANIES=COMPANIES.map(c=>c.id===data.id?data:c); }
     }
   }catch(e){ setAgent('analyste','⚠️ '+e.message,'err'); }
-  await loadEditorial();
+  await loadEditorial(); refreshCost();
 }
 
 // ---- Ce que l'IA a compris (affichage + ajustement optionnel) ----
@@ -558,7 +762,7 @@ async function runImageQueue(ids){
     }catch(e){ patchImage(ids[i],{image_status:'error',image_error:e.message}); ko++; }
   }
   setAgent('designer', ko? `⚠️ ${ok} créé(s), ${ko} en échec` : `✅ ${ok} visuel(s) créé(s)`, ko&&!ok?'err':'done');
-  IMG_RUNNING=false; el('imagesBtn').disabled=false; el('generateBtn').disabled=false;
+  IMG_RUNNING=false; el('imagesBtn').disabled=false; el('generateBtn').disabled=false; refreshCost();
 }
 el('imagesBtn').onclick=()=>{
   const ids=POSTS.filter(p=>p.image_status!=='ready'&&p.status!=='refuse').map(p=>p.id);
@@ -595,7 +799,7 @@ async function generateWeek(){
     }
   }catch(e){ el('genMsg').style.color='var(--bad)'; el('genMsg').textContent='Erreur réseau : '+e.message; setAgent('orchestrateur','⚠️','err'); setAgent('redacteur','⚠️','err'); }
   el('generateBtn').disabled=false;
-  await loadPosts();
+  await loadPosts(); refreshCost();
   setTimeout(()=>el('genMsg').textContent='',6000);
   // Le Directeur artistique enchaîne : un visuel pour chaque post généré.
   if(newIds.length) await runImageQueue(newIds);
@@ -646,6 +850,216 @@ async function savePostBody(id,body){
   const {error}=await db.from('mkt_posts').update({body,updated_at:new Date().toISOString()}).eq('id',id);
   if(error){ alert('Erreur : '+error.message); return; }
   await loadPosts();
+}
+
+// ================= ONGLETS =================
+document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
+function showTab(name){
+  document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
+  ['pilotage','chat','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
+  if(name==='chat') loadChats();
+  if(name==='frais') loadUsage();
+}
+el('costChip').onclick=()=>showTab('frais');
+
+// ================= DISCUSSION =================
+function renderChatTeam(){
+  const box=el('chatTeam'); if(!box) return;
+  box.innerHTML=AGENTS.map(a=>{
+    const t=TEAM[a.k]||{};
+    return `<div class="mate ${CHAT_PARTS.includes(a.k)?'here':''}" style="--c:${a.color}">
+      ${avatarHTML(a.k,'sm')}
+      <div style="min-width:0">
+        <div class="m-n">${esc(t.first_name||a.first)}</div>
+        <div class="m-r">${esc(t.role||a.role)}</div>
+      </div></div>`;
+  }).join('');
+}
+async function loadChats(){
+  if(!CURRENT_COMPANY){ el('chatList').innerHTML='<div class="who">Choisis une société.</div>'; return; }
+  const {data}=await db.from('mkt_chats').select('id,title,updated_at,participants')
+    .eq('company_id',CURRENT_COMPANY.id).order('updated_at',{ascending:false}).limit(30);
+  CHATS=data||[];
+  el('chatList').innerHTML=CHATS.length
+    ? CHATS.map(c=>`<div class="chatitem ${c.id===CHAT_ID?'on':''}" data-chat="${c.id}">${esc(c.title||'Discussion')}</div>`).join('')
+    : '<div class="who" style="font-size:12.5px">Aucune discussion pour l\'instant.</div>';
+  el('chatList').querySelectorAll('[data-chat]').forEach(d=>d.onclick=()=>openChat(d.dataset.chat));
+}
+async function openChat(id){
+  CHAT_ID=id;
+  const c=CHATS.find(x=>x.id===id);
+  CHAT_PARTS=(c&&c.participants)||['orchestrateur'];
+  el('chatTitle').textContent=(c&&c.title)||'Discussion';
+  const {data}=await db.from('mkt_messages').select('*').eq('chat_id',id).order('created_at');
+  CHAT_MSGS=data||[];
+  renderFeed(); renderChatTeam(); loadChats();
+}
+function newChat(){
+  CHAT_ID=null; CHAT_MSGS=[]; CHAT_PARTS=['orchestrateur'];
+  el('chatTitle').textContent='Nouvelle discussion';
+  renderFeed(); renderChatTeam(); loadChats();
+}
+el('newChatBtn').onclick=newChat;
+
+const STARTERS=[
+  'Où en est-on cette semaine ?',
+  'Quel post va le mieux marcher sur LinkedIn ?',
+  'Propose-moi 3 idées de sujets pour le mois prochain',
+  'Le style des visuels ne me plaît pas, on change quoi ?',
+];
+function bubble(m){
+  if(m.role==='user'){
+    return `<div class="msg me"><div><div class="who-line" style="text-align:right">Toi</div><div class="bub">${esc(m.content)}</div></div></div>`;
+  }
+  if(m.role==='system'){
+    return `<div class="join">${avatarHTML(m.agent,'sm')}<span style="margin-left:8px;vertical-align:middle">👋 ${esc(m.content)}</span></div>`;
+  }
+  const a=AG(m.agent), t=TEAM[m.agent]||{};
+  return `<div class="msg">${avatarHTML(m.agent,'sm')}
+    <div><div class="who-line">${esc(t.first_name||a.first)} · ${esc(t.role||a.role)}</div>
+    <div class="bub">${esc(m.content)}</div></div></div>`;
+}
+function renderFeed(){
+  const f=el('chatFeed'); if(!f) return;
+  if(!CHAT_MSGS.length){
+    f.innerHTML=`<div class="empty-chat">
+      ${avatarHTML('orchestrateur','big')}
+      <h3 style="margin:12px 0 4px">Ton équipe t'écoute</h3>
+      <p style="font-size:14px;line-height:1.5">Pose ta question à ${esc((TEAM.orchestrateur&&TEAM.orchestrateur.first_name)||'Marc')}. Si c'est le métier d'un collègue, il le fait entrer dans la conversation.</p>
+      <div class="starters">${STARTERS.map(s=>`<span class="starter">${esc(s)}</span>`).join('')}</div>
+    </div>`;
+    f.querySelectorAll('.starter').forEach(s=>s.onclick=()=>{ el('chatBox').value=s.textContent; sendChat(); });
+    renderParts(); return;
+  }
+  f.innerHTML=CHAT_MSGS.map(bubble).join('');
+  f.scrollTop=f.scrollHeight;
+  renderParts();
+}
+function renderParts(){ el('chatParticipants').innerHTML=CHAT_PARTS.map(k=>avatarHTML(k,'sm')).join(''); }
+async function sendChat(){
+  const box=el('chatBox'), text=box.value.trim();
+  if(!text) return;
+  if(!CURRENT_COMPANY){ alert('Choisis d\'abord une société.'); return; }
+  box.value=''; box.style.height='auto';
+  CHAT_MSGS.push({role:'user',agent:null,content:text});
+  renderFeed();
+  const f=el('chatFeed');
+  f.insertAdjacentHTML('beforeend',
+    `<div class="msg" id="typing">${avatarHTML('orchestrateur','sm')}
+      <div><div class="who-line">${esc((TEAM.orchestrateur&&TEAM.orchestrateur.first_name)||'Marc')}</div>
+      <div class="bub"><span class="think" style="--c:${AG('orchestrateur').color}"><i></i><i></i><i></i></span></div></div></div>`);
+  f.scrollTop=f.scrollHeight;
+  el('chatSend').disabled=true;
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-chat',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({company_id:CURRENT_COMPANY.id,chat_id:CHAT_ID,message:text})
+    });
+    const out=await res.json();
+    const t=document.getElementById('typing'); if(t) t.remove();
+    if(!res.ok||out.error){
+      CHAT_MSGS.push({role:'agent',agent:'orchestrateur',content:'⚠️ '+(out.error||('erreur '+res.status))});
+    }else{
+      CHAT_ID=out.chat_id; CHAT_PARTS=out.participants||CHAT_PARTS;
+      CHAT_MSGS=CHAT_MSGS.slice(0,-1).concat(out.messages||[]);
+      renderChatTeam(); loadChats(); refreshCost();
+    }
+  }catch(e){
+    const t=document.getElementById('typing'); if(t) t.remove();
+    CHAT_MSGS.push({role:'agent',agent:'orchestrateur',content:'⚠️ Erreur réseau : '+e.message});
+  }
+  el('chatSend').disabled=false;
+  renderFeed();
+}
+el('chatSend').onclick=sendChat;
+el('chatBox').addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){ e.preventDefault(); sendChat(); } });
+el('chatBox').addEventListener('input',e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,140)+'px'; });
+
+// ================= FRAIS =================
+const SRC_LABEL={analyse:'Analyse de marque',generation:'Écriture des posts',image:'Visuels',discussion:'Discussion',portrait:'Portraits'};
+function ymd(d){ return d.toISOString().slice(0,10); }
+function setRange(key){
+  const now=new Date(), to=ymd(now); let from=to;
+  if(key==='7d'){ const d=new Date(now); d.setDate(d.getDate()-6); from=ymd(d); }
+  else if(key==='month'){ from=ymd(new Date(now.getFullYear(),now.getMonth(),1)); }
+  else if(key==='all'){ from='2020-01-01'; }
+  RANGE={from,to};
+  el('fFrom').value=from; el('fTo').value=to;
+}
+document.querySelectorAll('#rangeChips .chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('#rangeChips .chip').forEach(x=>x.classList.toggle('on',x===c));
+  setRange(c.dataset.r); loadUsage();
+});
+el('fApply').onclick=()=>{
+  document.querySelectorAll('#rangeChips .chip').forEach(x=>x.classList.remove('on'));
+  RANGE={from:el('fFrom').value||'2020-01-01',to:el('fTo').value||ymd(new Date())};
+  loadUsage();
+};
+el('fGroup').onchange=renderFrais;
+
+async function loadUsage(){
+  if(!RANGE.from) setRange('7d');
+  const {data,error}=await db.from('mkt_usage').select('*')
+    .gte('created_at',RANGE.from+'T00:00:00Z').lte('created_at',RANGE.to+'T23:59:59.999Z')
+    .order('created_at',{ascending:false});
+  if(error){ el('fKpis').innerHTML='<div class="err">'+esc(error.message)+'</div>'; return; }
+  USAGE=data||[]; renderFrais();
+}
+async function refreshCost(){
+  const today=ymd(new Date());
+  const {data}=await db.from('mkt_usage').select('cost_usd').gte('created_at',today+'T00:00:00Z');
+  const total=(data||[]).reduce((s,r)=>s+Number(r.cost_usd||0),0);
+  el('costChip').textContent='💶 '+money(total);
+}
+function groupKey(iso,mode){
+  const d=new Date(iso);
+  if(mode==='month') return d.toISOString().slice(0,7);
+  if(mode==='week'){ const x=new Date(d); const dow=(x.getDay()+6)%7; x.setDate(x.getDate()-dow); return ymd(x); }
+  return ymd(d);
+}
+function renderFrais(){
+  const total=USAGE.reduce((s,r)=>s+Number(r.cost_usd||0),0);
+  const tokens=USAGE.reduce((s,r)=>s+(r.input_tokens||0)+(r.output_tokens||0),0);
+  const images=USAGE.reduce((s,r)=>s+(r.images||0),0);
+  const days=Math.max(1,Math.round((new Date(RANGE.to)-new Date(RANGE.from))/86400000)+1);
+  el('fKpis').innerHTML=`
+    <div class="kpi"><div class="k">Total sur la période</div><div class="v">${money(total)}</div><div class="s">${USAGE.length} appel(s) IA</div></div>
+    <div class="kpi"><div class="k">Moyenne par jour</div><div class="v">${money(total/days)}</div><div class="s">sur ${days} jour(s)</div></div>
+    <div class="kpi"><div class="k">Projection 30 jours</div><div class="v">${money(total/days*30)}</div><div class="s">au rythme actuel</div></div>
+    <div class="kpi"><div class="k">Texte traité</div><div class="v">${(tokens/1000).toFixed(1)} k</div><div class="s">unités machine (tokens)</div></div>
+    <div class="kpi"><div class="k">Images créées</div><div class="v">${images}</div><div class="s">estimation 0,04 $ pièce</div></div>`;
+
+  const mode=el('fGroup').value, byG={};
+  USAGE.forEach(r=>{ const k=groupKey(r.created_at,mode); byG[k]=(byG[k]||0)+Number(r.cost_usd||0); });
+  const keys=Object.keys(byG).sort(), max=Math.max.apply(null,Object.values(byG).concat([0.000001]));
+  el('fChart').innerHTML=keys.length
+    ? keys.map(k=>`<div class="bar" title="${k} — ${money(byG[k])}">
+        <div class="fill" style="height:${Math.max(2,byG[k]/max*100)}%"></div>
+        <div class="lbl">${mode==='month'?k.slice(5):k.slice(8)+'/'+k.slice(5,7)}</div></div>`).join('')
+    : '<div class="who">Aucune dépense sur cette période.</div>';
+
+  const brk=(obj)=>{
+    const ent=Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+    const mx=Math.max.apply(null,ent.map(e=>e[1]).concat([0.000001]));
+    return ent.length? ent.map(([k,v])=>`<div class="brk"><span class="nm">${esc(k)}</span>
+      <span class="track"><i style="width:${Math.max(3,v/mx*100)}%"></i></span>
+      <span class="amt">${money(v)}</span></div>`).join('') : '<div class="who">Rien à afficher.</div>';
+  };
+  const bySrc={}; USAGE.forEach(r=>{ const k=SRC_LABEL[r.source]||r.source; bySrc[k]=(bySrc[k]||0)+Number(r.cost_usd||0); });
+  el('fBySource').innerHTML=brk(bySrc);
+  const byCo={}; USAGE.forEach(r=>{ const c=COMPANIES.find(x=>x.id===r.company_id); const k=c?c.name:'Équipe / général'; byCo[k]=(byCo[k]||0)+Number(r.cost_usd||0); });
+  el('fByCompany').innerHTML=brk(byCo);
+
+  el('fRows').innerHTML=USAGE.length? `<div style="overflow-x:auto"><table class="utable">
+    <thead><tr><th>Quand</th><th>Qui</th><th>Quoi</th><th>Modèle</th><th style="text-align:right">Coût</th></tr></thead>
+    <tbody>${USAGE.slice(0,60).map(r=>{
+      const a=AG(r.agent), t=TEAM[r.agent]||{};
+      return `<tr><td>${fmtDate(r.created_at)}</td><td>${esc(t.first_name||a.first)}</td>
+        <td>${esc(SRC_LABEL[r.source]||r.source)}</td><td class="who" style="font-size:12px">${esc(r.model||'')}</td>
+        <td class="n">${money(Number(r.cost_usd||0))}</td></tr>`;}).join('')}</tbody></table></div>`
+    : '<div class="who">Aucun appel sur cette période.</div>';
 }
 
 boot();

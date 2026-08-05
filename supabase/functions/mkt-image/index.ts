@@ -16,6 +16,25 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// --- Suivi des frais IA (tarifs publics Anthropic, en dollars par million de tokens) ---
+const PRICE: Record<string, { i: number; o: number }> = {
+  "claude-opus-5": { i: 5, o: 25 },
+  "claude-opus-4-8": { i: 5, o: 25 },
+  "claude-sonnet-5": { i: 3, o: 15 },
+  "claude-haiku-4-5": { i: 1, o: 5 },
+};
+function claudeCost(model: string, u: Record<string, number> | null) {
+  const p = PRICE[model] || PRICE["claude-opus-5"];
+  const inT = u?.input_tokens || 0, outT = u?.output_tokens || 0, cache = u?.cache_read_input_tokens || 0;
+  return (inT * p.i + outT * p.o + cache * p.i * 0.1) / 1_000_000;
+}
+// Jamais bloquant : un souci de journalisation ne doit pas casser la fonctionnalité.
+async function logUsage(admin: { from: (t: string) => { insert: (r: unknown) => Promise<unknown> } }, row: Record<string, unknown>) {
+  try { await admin.from("mkt_usage").insert(row); } catch (e) { console.error("USAGE_LOG_FAIL", String(e)); }
+}
+
+const IMAGE_PRICE_USD = 0.04; // estimation par image ; le quota gratuit Google n'est pas déduit
+
 // Format d'image le plus performant selon le réseau.
 const RATIO: Record<string, string> = { linkedin: "16:9", facebook: "16:9", instagram: "4:5" };
 
@@ -170,6 +189,15 @@ Ta mission :
     const art = textBlock ? tryParseJson(String(textBlock.text || "")) as { style?: string; prompt?: string; alt?: string } : null;
     if (!art || !art.prompt) throw new Error("Direction artistique illisible. Réessaie.");
 
+    await logUsage(admin, {
+      owner: uid, company_id: post.company_id, source: "image", agent: "designer",
+      provider: "anthropic", model: out.model || artModel,
+      input_tokens: out.usage?.input_tokens || 0,
+      output_tokens: out.usage?.output_tokens || 0,
+      cache_read_tokens: out.usage?.cache_read_input_tokens || 0,
+      cost_usd: claudeCost(out.model || artModel, out.usage || null),
+    });
+
     // 4) Génération de l'image
     const ratio = RATIO[post.network] || "16:9";
     const gem = await callGemini(geminiKey, imageModel, art.prompt, ratio);
@@ -201,6 +229,11 @@ Ta mission :
       updated_at: new Date().toISOString(),
     }).eq("id", postId);
     if (updErr) throw new Error("Enregistrement échoué : " + updErr.message);
+
+    await logUsage(admin, {
+      owner: uid, company_id: post.company_id, source: "image", agent: "designer",
+      provider: "google", model: imageModel, images: 1, cost_usd: IMAGE_PRICE_USD,
+    });
 
     return json({ ok: true, post_id: postId, image_url: imageUrl, style: art.style, alt: art.alt });
   } catch (e) {
