@@ -233,7 +233,9 @@ Choisis la mise en page la plus juste et écris les textes, en français :
 - « statement » quand le post porte une affirmation forte ou une promesse.
 - « stat » quand le post contient (ou permet d'extraire honnêtement) un chiffre marquant. N'invente jamais un chiffre absent du post.
 - « split » quand il y a une promesse et une preuve à opposer.
-Textes courts, concrets, sans superlatif creux, sans jargon, sans emoji. L'accroche doit se lire en une seconde.`;
+Textes courts, concrets, sans superlatif creux, sans jargon, sans emoji. L'accroche doit se lire en une seconde.${body.instruction ? `
+
+DEMANDE EXPRESSE DE DAVID, prioritaire : ${String(body.instruction).slice(0, 600)}` : ""}`;
 
       const outD = await callClaude(anthropicKey, artModel, brief, DESIGN_SCHEMA);
       const tbD = (outD.content || []).find((b: { type: string }) => b.type === "text");
@@ -298,7 +300,9 @@ Ta mission : rédiger la consigne d'un visuel de qualité professionnelle, digne
 - Autres interdits à mentionner : "no gibberish text, no distorted hands, no cluttered composition, no generic stock-photo look, no cheesy business clichés such as handshakes over cityscapes or glowing brains".
 - Le résultat doit ressembler à une campagne de marque soignée, jamais à une banque d'images.
 
-4) L'accroche (headline) : elle sera écrite en gros sur le visuel. Elle doit accrocher l'œil, dire un bénéfice concret, et tenir en 3 à 6 mots.`;
+4) L'accroche (headline) : elle sera écrite en gros sur le visuel. Elle doit accrocher l'œil, dire un bénéfice concret, et tenir en 3 à 6 mots.${body.instruction ? `
+
+5) DEMANDE EXPRESSE DE DAVID, prioritaire sur tout le reste : ${String(body.instruction).slice(0, 600)}` : ""}`;
 
     const out = await callClaude(anthropicKey, artModel, instruction);
     if (out.stop_reason === "refusal") throw new Error("Direction artistique refusée par l'IA.");
