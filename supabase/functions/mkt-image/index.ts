@@ -71,9 +71,13 @@ const ART_SCHEMA = {
       description:
         "La consigne complète pour le générateur d'images, en ANGLAIS, très concrète (sujet, cadrage, lumière, palette, ambiance). Si du texte doit apparaître sur l'image, l'indiquer entre guillemets, en français, 6 mots maximum.",
     },
+    headline: {
+      type: "string",
+      description: "L'accroche à incruster sur le visuel, en FRANÇAIS, 3 à 6 mots maximum, percutante et concrète. Pas de point final.",
+    },
     alt: { type: "string", description: "Description courte de l'image en français (accessibilité)" },
   },
-  required: ["style", "prompt", "alt"],
+  required: ["style", "prompt", "headline", "alt"],
 };
 
 function tryParseJson(s: string): unknown {
@@ -227,17 +231,19 @@ Ta mission : rédiger la consigne d'un visuel de qualité professionnelle, digne
 - LA MATIÈRE et L'AMBIANCE : textures, finition, émotion recherchée.
 - Termine par : "editorial quality, art-directed, sharp focus, high detail, professional colour grading".
 
-3) Règles absolues :
-- Laisse une zone calme et dégagée en bas à droite : le logo de la société y sera incrusté.
-- Aucun logo inventé, aucune marque existante, aucun visage de personne réelle, aucun texte parasite.
-- Interdits explicites à mentionner dans la consigne : "no watermark, no signature, no gibberish text, no distorted hands, no cluttered composition, no generic stock-photo look, no cheesy business clichés such as handshakes over cityscapes or glowing brains".
-- Si le style comporte du texte incrusté, indique le texte exact entre guillemets, en français, 6 mots maximum, avec une typographie sans-serif moderne, très lisible, bien contrastée.
-- Le résultat doit ressembler à une campagne de marque soignée, jamais à une banque d'images.`;
+3) Règles absolues — l'image que tu décris est un ARRIÈRE-PLAN :
+- L'accroche et le logo seront incrustés ensuite par le logiciel, proprement. Donc **l'image ne doit contenir AUCUN texte** : demande explicitement "absolutely no text, no letters, no numbers, no typography, no signage, no watermark".
+- Compose en gardant **le tiers inférieur visuellement calme et peu détaillé** (dégradé, matière, flou, ombre) : c'est là que le texte sera posé. Le sujet principal occupe la moitié haute ou un côté.
+- Aucun logo inventé, aucune marque existante, aucun visage de personne réelle.
+- Autres interdits à mentionner : "no gibberish text, no distorted hands, no cluttered composition, no generic stock-photo look, no cheesy business clichés such as handshakes over cityscapes or glowing brains".
+- Le résultat doit ressembler à une campagne de marque soignée, jamais à une banque d'images.
+
+4) L'accroche (headline) : elle sera écrite en gros sur le visuel. Elle doit accrocher l'œil, dire un bénéfice concret, et tenir en 3 à 6 mots.`;
 
     const out = await callClaude(anthropicKey, artModel, instruction);
     if (out.stop_reason === "refusal") throw new Error("Direction artistique refusée par l'IA.");
     const textBlock = (out.content || []).find((b: { type: string }) => b.type === "text");
-    const art = textBlock ? tryParseJson(String(textBlock.text || "")) as { style?: string; prompt?: string; alt?: string } : null;
+    const art = textBlock ? tryParseJson(String(textBlock.text || "")) as { style?: string; prompt?: string; headline?: string; alt?: string } : null;
     if (!art || !art.prompt) throw new Error("Direction artistique illisible. Réessaie.");
 
     await logUsage(admin, {
@@ -275,6 +281,7 @@ Ta mission : rédiger la consigne d'un visuel de qualité professionnelle, digne
       image_prompt: art.prompt,
       image_style: art.style || null,
       image_alt: art.alt || null,
+      image_headline: art.headline || null,
       image_status: "ready",
       image_error: null,
       updated_at: new Date().toISOString(),
@@ -286,7 +293,7 @@ Ta mission : rédiger la consigne d'un visuel de qualité professionnelle, digne
       provider: "google", model: imageModel, images: 1, cost_usd: IMAGE_PRICE_USD,
     });
 
-    return json({ ok: true, post_id: postId, image_url: imageUrl, style: art.style, alt: art.alt });
+    return json({ ok: true, post_id: postId, image_url: imageUrl, style: art.style, alt: art.alt, headline: art.headline || "" });
   } catch (e) {
     const msg = String((e as Error)?.message || e);
     if (postId) {
