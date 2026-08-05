@@ -215,6 +215,15 @@
   .utable th{text-align:left;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line);font-size:12px}
   .utable td{padding:7px 8px;border-bottom:1px solid var(--line)}
   .utable td.n{font-family:var(--font-mono);text-align:right;white-space:nowrap}
+  /* Quota d'images gratuites */
+  .quota-panel{background:linear-gradient(150deg,color-mix(in srgb,var(--good) 14%,var(--panel)),var(--panel))}
+  .quota-big{font-family:var(--font-display);font-size:38px;font-weight:700;margin:14px 0 10px;line-height:1}
+  .quota-big small{font-size:14px;font-weight:500;color:var(--muted);margin-left:6px}
+  .gauge{height:12px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+  .gauge i{display:block;height:100%;border-radius:8px;background:linear-gradient(90deg,var(--good),#8be9c0);
+    transition:width .6s cubic-bezier(.2,.9,.3,1)}
+  .gauge.warn i{background:linear-gradient(90deg,var(--warn),#ffd08a)}
+  .gauge.full i{background:linear-gradient(90deg,var(--bad),#ff9d9d)}
   /* Ce que l'IA a compris */
   .brand-sum{background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 12%,var(--panel2)),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:16px;font-size:15px;line-height:1.5}
   .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
@@ -363,6 +372,18 @@
 
       <!-- ================= FRAIS ================= -->
       <div id="tab-frais" class="hidden">
+        <div class="panel quota-panel">
+          <div class="row" style="align-items:center">
+            <h2 style="margin:0">🎁 Images gratuites Google</h2>
+            <div style="flex:0 0 auto;display:flex;align-items:center;gap:7px">
+              <span class="who">Quota / jour</span>
+              <input type="number" id="qLimit" min="1" max="100000" style="width:90px">
+            </div>
+          </div>
+          <div class="quota-big"><span id="qLeft">—</span> <small>images restantes aujourd'hui</small></div>
+          <div class="gauge"><i id="qBar" style="width:0%"></i></div>
+          <div class="who" id="qInfo" style="margin-top:8px"></div>
+        </div>
         <div class="panel">
           <h2 style="margin-top:0">💶 Ce que te coûte l'IA</h2>
           <div class="chips" id="rangeChips">
@@ -999,7 +1020,49 @@ el('fApply').onclick=()=>{
 };
 el('fGroup').onchange=renderFrais;
 
+// ---- Quota d'images gratuites Google ----
+// Google ne publie aucune API pour lire le solde : on compte les images que l'app a
+// réellement créées depuis la dernière remise à zéro (minuit heure du Pacifique).
+function tzOffsetHours(date,tz){
+  try{
+    const s=new Intl.DateTimeFormat('en-US',{timeZone:tz,timeZoneName:'shortOffset'})
+      .formatToParts(date).find(p=>p.type==='timeZoneName').value;
+    const m=s.match(/GMT([+-]\d+)/); return m?parseInt(m[1],10):0;
+  }catch(e){ return -8; }
+}
+function googleDayStart(){
+  const now=new Date(), tz='America/Los_Angeles';
+  const day=new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  const off=tzOffsetHours(now,tz);
+  return new Date(Date.parse(day+'T00:00:00Z')-off*3600000);
+}
+async function loadQuota(){
+  const start=googleDayStart();
+  const {data:prefs}=await db.from('mkt_prefs').select('free_images_per_day').maybeSingle();
+  const limit=(prefs&&prefs.free_images_per_day)||100;
+  el('qLimit').value=limit;
+  const {data}=await db.from('mkt_usage').select('images')
+    .eq('provider','google').gte('created_at',start.toISOString());
+  const used=(data||[]).reduce((s,r)=>s+(r.images||0),0);
+  const left=Math.max(0,limit-used), pct=Math.min(100,used/limit*100);
+  el('qLeft').textContent=left;
+  const g=el('qBar').parentElement;
+  g.className='gauge'+(pct>=100?' full':pct>=80?' warn':'');
+  el('qBar').style.width=pct+'%';
+  const reset=new Date(googleDayStart().getTime()+86400000);
+  el('qInfo').innerHTML=`${used} image(s) créée(s) sur ${limit} depuis la remise à zéro. `
+    +`Prochaine remise à zéro : <strong>${reset.toLocaleString('fr-FR',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</strong> (Google remet les compteurs à minuit, heure du Pacifique).<br>`
+    +`Compte les images générées par cette app uniquement. Ajuste le quota ci-dessus s'il ne correspond pas à ton palier Google.`;
+}
+el('qLimit').onchange=async()=>{
+  const v=Math.max(1,parseInt(el('qLimit').value||'100',10));
+  const {data:{session}}=await db.auth.getSession();
+  await db.from('mkt_prefs').upsert({owner:session.user.id,free_images_per_day:v,updated_at:new Date().toISOString()},{onConflict:'owner'});
+  loadQuota();
+};
+
 async function loadUsage(){
+  loadQuota();
   if(!RANGE.from) setRange('7d');
   const {data,error}=await db.from('mkt_usage').select('*')
     .gte('created_at',RANGE.from+'T00:00:00Z').lte('created_at',RANGE.to+'T23:59:59.999Z')
@@ -1012,6 +1075,7 @@ async function refreshCost(){
   const {data}=await db.from('mkt_usage').select('cost_usd').gte('created_at',today+'T00:00:00Z');
   const total=(data||[]).reduce((s,r)=>s+Number(r.cost_usd||0),0);
   el('costChip').textContent='💶 '+money(total);
+  loadQuota();
 }
 function groupKey(iso,mode){
   const d=new Date(iso);
