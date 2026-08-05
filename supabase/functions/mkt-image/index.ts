@@ -91,16 +91,23 @@ async function callClaude(apiKey: string, model: string, instruction: string) {
 // Le nom du réglage de format change selon la version d'API exposée par la clé.
 // On essaie les variantes connues, puis on génère sans contrainte de format :
 // mieux vaut une image au format par défaut que pas d'image du tout.
+// `imageConfig` est la forme acceptée aujourd'hui ; `responseFormat` ne l'est plus
+// sur toutes les versions. On garde les deux, puis on génère sans contrainte de format.
 function imageConfigs(aspectRatio: string) {
   return [
-    { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio } } },
     { responseModalities: ["IMAGE"], imageConfig: { aspectRatio } },
+    { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio } } },
     { responseModalities: ["IMAGE"] },
   ];
 }
 
+export const QUOTA_MSG =
+  "Quota Google épuisé. La génération d'images n'est pas couverte par le palier gratuit de ta clé, " +
+  "ou le quota du jour est atteint. Active la facturation sur ton projet Google AI Studio " +
+  "(https://aistudio.google.com/apikey) ou attends la remise à zéro.";
+
 async function callGemini(apiKey: string, model: string, prompt: string, aspectRatio: string) {
-  let lastErr = "";
+  let lastErr = "", quota = false;
   for (const m of [model, "gemini-2.5-flash-image"]) {
     for (const generationConfig of imageConfigs(aspectRatio)) {
       const resp = await fetch(
@@ -115,11 +122,13 @@ async function callGemini(apiKey: string, model: string, prompt: string, aspectR
       const txt = await resp.text();
       lastErr = txt;
       console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 300));
-      if (resp.status === 400) continue;              // réglage refusé : on tente la variante suivante
-      if (resp.status === 404) break;                 // modèle inconnu : on passe au modèle suivant
+      if (resp.status === 400) continue;      // réglage refusé : variante suivante
+      if (resp.status === 404) break;         // modèle inconnu : modèle suivant
+      if (resp.status === 429) { quota = true; break; }  // quota : un autre modèle a peut-être du crédit
       throw new Error("Erreur image (" + resp.status + ") : " + txt.slice(0, 200));
     }
   }
+  if (quota) throw new Error(QUOTA_MSG);
   throw new Error("Erreur image : " + lastErr.slice(0, 250));
 }
 

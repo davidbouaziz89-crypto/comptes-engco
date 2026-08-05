@@ -224,6 +224,22 @@
     transition:width .6s cubic-bezier(.2,.9,.3,1)}
   .gauge.warn i{background:linear-gradient(90deg,var(--warn),#ffd08a)}
   .gauge.full i{background:linear-gradient(90deg,var(--bad),#ff9d9d)}
+  /* Historique */
+  .hrow{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:14px;margin-bottom:12px}
+  .hrow .thumb{width:104px;height:104px;flex:0 0 auto;border-radius:10px;object-fit:cover;background:var(--panel2);border:1px solid var(--line)}
+  .hrow .thumb.ph{display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--muted)}
+  .hrow .meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}
+  .netbadge{font-family:var(--font-display);font-weight:700;font-size:13px;padding:3px 10px;border-radius:20px;
+    background:var(--panel2);border:1px solid var(--line)}
+  .netbadge.linkedin{color:#4aa3ff;border-color:#4aa3ff55}
+  .netbadge.instagram{color:#ff5ca8;border-color:#ff5ca855}
+  .netbadge.facebook{color:#7c9cff;border-color:#7c9cff55}
+  .hrow .txt{font-size:14px;line-height:1.5;white-space:pre-wrap;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .hrow .txt.open{-webkit-line-clamp:unset;display:block}
+  .hmore{font-size:12.5px;color:var(--accent);cursor:pointer;margin-top:6px;display:inline-block}
+  @media(max-width:640px){.hrow{flex-direction:column}.hrow .thumb{width:100%;height:180px}}
   /* Ce que l'IA a compris */
   .brand-sum{background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 12%,var(--panel2)),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:16px;font-size:15px;line-height:1.5}
   .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
@@ -271,6 +287,19 @@
     </div>
   </div>
 
+  <!-- Alerte quota d'images -->
+  <div id="quotaModal" class="overlay hidden">
+    <div class="modal-card" style="max-width:430px;text-align:center">
+      <div style="font-size:44px;line-height:1">⚠️</div>
+      <h2 id="qmTitle" style="margin:10px 0 6px">Quota d'images bientôt épuisé</h2>
+      <p id="qmText" class="who" style="font-size:14.5px;line-height:1.55"></p>
+      <div class="row" style="margin-top:16px;justify-content:center">
+        <a class="btn ghost" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="flex:0 0 auto">Voir mon quota Google</a>
+        <button class="btn" id="qmOk" style="flex:0 0 auto">J'ai compris</button>
+      </div>
+    </div>
+  </div>
+
   <!-- App -->
   <div id="app" class="hidden">
     <header>
@@ -292,6 +321,7 @@
       <nav class="tabs" id="tabs">
         <button class="tab on" data-tab="pilotage">🚀 Pilotage</button>
         <button class="tab" data-tab="chat">💬 Discussion</button>
+        <button class="tab" data-tab="histo">📚 Historique</button>
         <button class="tab" data-tab="frais">💶 Frais</button>
       </nav>
 
@@ -368,6 +398,33 @@
             </div>
           </section>
         </div>
+      </div>
+
+      <!-- ================= HISTORIQUE ================= -->
+      <div id="tab-histo" class="hidden">
+        <div class="panel">
+          <h2 style="margin-top:0">📚 Historique des publications</h2>
+          <div class="row">
+            <div><label>Société</label><select id="hCo"></select></div>
+            <div><label>Plateforme</label><select id="hNet">
+              <option value="">Toutes</option><option value="linkedin">LinkedIn</option>
+              <option value="instagram">Instagram</option><option value="facebook">Facebook</option>
+            </select></div>
+            <div><label>Statut</label><select id="hStatus">
+              <option value="">Tous</option><option value="a_valider">À valider</option>
+              <option value="valide">Validé</option><option value="publie">Publié</option>
+              <option value="refuse">Refusé</option><option value="pause">En pause</option>
+              <option value="brouillon">Brouillon</option>
+            </select></div>
+            <div><label>Du</label><input type="date" id="hFrom"></div>
+            <div><label>Au</label><input type="date" id="hTo"></div>
+          </div>
+          <div class="row" style="margin-top:12px;align-items:center">
+            <div style="flex:0 0 auto"><button class="btn ghost small" id="hReset">↺ Réinitialiser</button></div>
+            <div class="who" id="hCount" style="text-align:right"></div>
+          </div>
+        </div>
+        <div id="hList"></div>
       </div>
 
       <!-- ================= FRAIS ================= -->
@@ -877,9 +934,10 @@ async function savePostBody(id,body){
 document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
 function showTab(name){
   document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
-  ['pilotage','chat','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
+  ['pilotage','chat','histo','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
   if(name==='chat') loadChats();
   if(name==='frais') loadUsage();
+  if(name==='histo') loadHistory();
 }
 el('costChip').onclick=()=>showTab('frais');
 
@@ -998,6 +1056,59 @@ el('chatSend').onclick=sendChat;
 el('chatBox').addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){ e.preventDefault(); sendChat(); } });
 el('chatBox').addEventListener('input',e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,140)+'px'; });
 
+// ================= HISTORIQUE =================
+let HISTO=[];
+async function loadHistory(){
+  const {data,error}=await db.from('mkt_posts').select('*').order('scheduled_at',{ascending:false,nullsFirst:false});
+  if(error){ el('hList').innerHTML='<div class="panel err">'+esc(error.message)+'</div>'; return; }
+  HISTO=data||[];
+  const sel=el('hCo'), keep=sel.value;
+  sel.innerHTML='<option value="">Toutes</option>'+COMPANIES.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  sel.value=keep;
+  renderHistory();
+}
+['hCo','hNet','hStatus','hFrom','hTo'].forEach(id=>el(id).onchange=renderHistory);
+el('hReset').onclick=()=>{ ['hCo','hNet','hStatus','hFrom','hTo'].forEach(id=>el(id).value=''); renderHistory(); };
+
+function renderHistory(){
+  const co=el('hCo').value, net=el('hNet').value, st=el('hStatus').value;
+  const from=el('hFrom').value, to=el('hTo').value;
+  const rows=HISTO.filter(p=>{
+    if(co && p.company_id!==co) return false;
+    if(net && p.network!==net) return false;
+    if(st && p.status!==st) return false;
+    const d=(p.scheduled_at||p.created_at||'').slice(0,10);
+    if(from && d<from) return false;
+    if(to && d>to) return false;
+    return true;
+  });
+  el('hCount').textContent=rows.length+' publication(s)';
+  if(!rows.length){ el('hList').innerHTML='<div class="panel who">Aucune publication ne correspond à ces filtres.</div>'; return; }
+  el('hList').innerHTML=rows.map(p=>{
+    const c=COMPANIES.find(x=>x.id===p.company_id);
+    const thumb=p.image_url
+      ? `<img class="thumb" src="${esc(p.image_url)}" alt="" loading="lazy" onclick="window.open(this.src,'_blank')" style="cursor:zoom-in">`
+      : `<div class="thumb ph">🖼️</div>`;
+    return `<div class="hrow">
+      ${thumb}
+      <div style="min-width:0;flex:1">
+        <div class="meta">
+          <span class="netbadge ${p.network}">${NET_LABEL[p.network]||p.network}</span>
+          <span class="who">${fmtDate(p.scheduled_at||p.created_at)}</span>
+          <span class="rolebadge">${STATUS_LABEL[p.status]||p.status}</span>
+          <span class="who">· ${esc(c?c.name:'—')}</span>
+        </div>
+        <div class="txt">${esc(p.body)}</div>
+        <span class="hmore">Tout afficher</span>
+      </div></div>`;
+  }).join('');
+  el('hList').querySelectorAll('.hmore').forEach(b=>b.onclick=()=>{
+    const t=b.previousElementSibling;
+    t.classList.toggle('open');
+    b.textContent=t.classList.contains('open')?'Réduire':'Tout afficher';
+  });
+}
+
 // ================= FRAIS =================
 const SRC_LABEL={analyse:'Analyse de marque',generation:'Écriture des posts',image:'Visuels',discussion:'Discussion',portrait:'Portraits'};
 function ymd(d){ return d.toISOString().slice(0,10); }
@@ -1036,6 +1147,26 @@ function googleDayStart(){
   const off=tzOffsetHours(now,tz);
   return new Date(Date.parse(day+'T00:00:00Z')-off*3600000);
 }
+// Alerte visuelle quand le stock d'images gratuites devient critique.
+// Une seule fois par palier et par journée Google, pour ne pas harceler.
+el('qmOk').onclick=()=>el('quotaModal').classList.add('hidden');
+function quotaAlert(left,limit,start){
+  const level = left<=0 ? 'zero' : left<=10 ? 'low' : null;
+  if(!level) return;
+  const key='mkt-quota-'+start.toISOString().slice(0,10)+'-'+level;
+  try{ if(localStorage.getItem(key)) return; localStorage.setItem(key,'1'); }catch(e){}
+  const reset=new Date(start.getTime()+86400000).toLocaleString('fr-FR',{weekday:'long',hour:'2-digit',minute:'2-digit'});
+  if(level==='zero'){
+    el('qmTitle').textContent="Quota d'images épuisé";
+    el('qmText').innerHTML=`Tu as utilisé tes <strong>${limit}</strong> images gratuites du jour.<br>`
+      +`Les prochains visuels échoueront jusqu'à la remise à zéro, <strong>${reset}</strong> — sauf si tu actives la facturation chez Google.`;
+  }else{
+    el('qmTitle').textContent=`Plus que ${left} image${left>1?'s':''}`;
+    el('qmText').innerHTML=`Il te reste <strong>${left}</strong> image${left>1?'s':''} gratuite${left>1?'s':''} sur ${limit} aujourd'hui.<br>`
+      +`Remise à zéro <strong>${reset}</strong>. Pense à garder de la marge pour les posts qui comptent.`;
+  }
+  el('quotaModal').classList.remove('hidden');
+}
 async function loadQuota(){
   const start=googleDayStart();
   const {data:prefs}=await db.from('mkt_prefs').select('free_images_per_day').maybeSingle();
@@ -1049,6 +1180,7 @@ async function loadQuota(){
   const g=el('qBar').parentElement;
   g.className='gauge'+(pct>=100?' full':pct>=80?' warn':'');
   el('qBar').style.width=pct+'%';
+  quotaAlert(left,limit,start);
   const reset=new Date(googleDayStart().getTime()+86400000);
   el('qInfo').innerHTML=`${used} image(s) créée(s) sur ${limit} depuis la remise à zéro. `
     +`Prochaine remise à zéro : <strong>${reset.toLocaleString('fr-FR',{weekday:'short',hour:'2-digit',minute:'2-digit'})}</strong> (Google remet les compteurs à minuit, heure du Pacifique).<br>`

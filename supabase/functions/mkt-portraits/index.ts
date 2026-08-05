@@ -47,15 +47,20 @@ const TEAM: Record<string, { first_name: string; role: string; look: string }> =
 // on essaie les variantes connues avant de générer sans contrainte.
 function imageConfigs() {
   return [
-    { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio: "1:1" } } },
     { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
+    { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio: "1:1" } } },
     { responseModalities: ["IMAGE"] },
   ];
 }
 
+const QUOTA_MSG =
+  "Quota Google épuisé. La génération d'images n'est pas couverte par le palier gratuit de ta clé, " +
+  "ou le quota du jour est atteint. Active la facturation sur ton projet Google AI Studio " +
+  "(https://aistudio.google.com/apikey) ou attends la remise à zéro.";
+
 async function generatePortrait(apiKey: string, model: string, look: string) {
   const prompt = `${look} ${STUDIO}`;
-  let lastErr = "";
+  let lastErr = "", quota = false;
   for (const m of [model, "gemini-2.5-flash-image"]) {
     for (const generationConfig of imageConfigs()) {
       const resp = await fetch(`https://generativelanguage.googleapis.com/v1/models/${m}:generateContent`, {
@@ -78,9 +83,11 @@ async function generatePortrait(apiKey: string, model: string, look: string) {
       console.error("GEMINI_ERROR", m, resp.status, txt.slice(0, 300));
       if (resp.status === 400) continue;
       if (resp.status === 404) break;
+      if (resp.status === 429) { quota = true; break; }
       throw new Error("Erreur image (" + resp.status + ") : " + txt.slice(0, 200));
     }
   }
+  if (quota) throw new Error(QUOTA_MSG);
   throw new Error("Erreur image : " + lastErr.slice(0, 250));
 }
 
