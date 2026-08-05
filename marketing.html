@@ -382,6 +382,7 @@
       <div class="spacer"></div>
       <button class="costchip" id="costChip" title="Dépense IA aujourd'hui — cliquer pour voir le détail">💶 —</button>
       <span class="who" id="who"></span>
+      <span class="who" id="ver" style="opacity:.65;font-family:var(--font-mono);font-size:11px"></span>
       <a class="btn ghost small" href="./index.html">← Portail</a>
       <button class="btn ghost small" id="logoutBtn">Quitter</button>
     </header>
@@ -562,6 +563,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
+const APP_VERSION='v7 · bandeau blanc';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -600,6 +602,7 @@ async function boot(){
   if(!session){ el('auth').classList.remove('hidden'); el('app').classList.add('hidden'); return; }
   SESSION=session;
   el('who').textContent=session.user.email;
+  el('ver').textContent=APP_VERSION;
   el('auth').classList.add('hidden'); el('app').classList.remove('hidden');
   await loadTeam();
   refreshCost();
