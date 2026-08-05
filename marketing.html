@@ -84,7 +84,8 @@
   /* Portrait plein format : on voit le collègue et ce qu'il fait */
   .portrait{position:relative;width:100%;aspect-ratio:1;border-radius:14px;overflow:hidden;
     background:var(--panel2);border:1px solid var(--line);transition:box-shadow .35s,transform .35s}
-  .portrait img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .portrait img,.portrait .vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .portrait .vid{display:block}
   .portrait .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:var(--font-display);font-weight:700;font-size:34px;color:#fff;
     background:linear-gradient(140deg,color-mix(in srgb,var(--c) 85%,#000),color-mix(in srgb,var(--c) 40%,#000))}
@@ -417,7 +418,8 @@
       <div class="panel companyPanel">
         <div class="row" style="align-items:center">
           <h2 style="margin:0">👥 Ton équipe</h2>
-          <div style="flex:0 0 auto"><button class="btn ghost small" id="portraitsBtn">🎬 Générer les avatars animés</button></div>
+          <div style="flex:0 0 auto"><button class="btn ghost small" id="portraitsBtn">🎬 Générer les avatars</button>
+          <button class="btn ghost small" id="videoBtn">🎥 Animer en vidéo</button></div>
         </div>
         <div class="agents" id="agents" style="margin-top:12px"></div>
         <div class="err" id="teamMsg"></div>
@@ -441,6 +443,7 @@
         <div class="row" style="align-items:center">
           <h2 style="margin:0">🗓️ Posts de la semaine</h2>
           <div style="flex:0 0 auto;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn ghost" id="redoBtn">↻ Tout refaire</button>
             <button class="btn ghost" id="imagesBtn">🎨 Créer les visuels manquants</button>
             <button class="btn" id="generateBtn">✨ Générer la semaine</button>
           </div>
@@ -643,6 +646,10 @@ function avatarHTML(key,size,busy){
 // Portrait plein format (panneau Équipe) : on voit le collègue en train d'agir.
 function portraitHTML(key){
   const a=AG(key), t=TEAM[key]||{}, f=frames(key);
+  if(t.avatar_video_url){
+    return `<div class="portrait"><video class="vid" src="${esc(t.avatar_video_url)}"
+      autoplay loop muted playsinline preload="auto"></video><span class="emo">${a.emoji}</span></div>`;
+  }
   const body=f.idle
     ? `<img class="fidle" src="${esc(f.idle)}" alt="${esc(t.first_name||a.first)}" loading="lazy">
        <img class="fw1" src="${esc(f.w1)}" alt="" loading="lazy">
@@ -922,6 +929,50 @@ async function saveCadence(network,per_week,days,hour,active,btn){
   if(btn){ const t=btn.textContent; btn.textContent='✓'; setTimeout(()=>btn.textContent=t,1200); }
 }
 
+// ---- Avatars en vidéo (Veo) ----
+// La génération dure plusieurs minutes : on lance, puis on interroge régulièrement.
+async function callVideo(agent,check){
+  const {data:{session}}=await db.auth.getSession();
+  const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-avatar-video',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({agent,check:!!check})
+  });
+  const out=await res.json().catch(()=>({error:'réponse illisible'}));
+  if(!res.ok||out.error) throw new Error(out.error||('erreur '+res.status));
+  return out;
+}
+el('videoBtn').onclick=async()=>{
+  const todo=AGENTS.filter(a=>TEAM[a.k]&&TEAM[a.k].avatar_url&&!TEAM[a.k].avatar_video_url).map(a=>a.k);
+  if(!todo.length){ el('teamMsg').style.color='var(--muted)'; el('teamMsg').textContent='Tout le monde a déjà sa vidéo (ou pas encore de portrait).'; return; }
+  if(!confirm(`Générer une vidéo animée pour ${todo.length} collègue(s) ?\n\nEnviron ${(todo.length*1.2).toFixed(2)} $ au total, et 2 à 4 minutes chacun.`)) return;
+  const btn=el('videoBtn'); btn.disabled=true; el('portraitsBtn').disabled=true;
+  for(let i=0;i<todo.length;i++){
+    const k=todo[i], nom=AG(k).first;
+    setAgent(k,'🎥 Tournage…','busy');
+    el('teamMsg').style.color='var(--muted)';
+    el('teamMsg').textContent=`🎥 Tournage de ${nom} (${i+1}/${todo.length})… 2 à 4 minutes, laisse la page ouverte.`;
+    try{
+      await callVideo(k,false);
+      let ready=false;
+      for(let t=0;t<40 && !ready;t++){
+        await new Promise(r=>setTimeout(r,10000));
+        const st=await callVideo(k,true);
+        ready=!!st.ready;
+        if(ready){ await loadTeam(); setAgent(k,'✅ Animé','done'); }
+      }
+      if(!ready) setAgent(k,'⏳ Toujours en cours','idle');
+    }catch(e){
+      setAgent(k,'⚠️','err');
+      el('teamMsg').style.color='var(--bad)'; el('teamMsg').textContent='Erreur : '+e.message;
+      break;
+    }
+  }
+  await loadTeam(); refreshCost();
+  btn.disabled=false; el('portraitsBtn').disabled=false;
+  if(el('teamMsg').style.color!=='var(--bad)'){ el('teamMsg').style.color='var(--good)'; el('teamMsg').textContent='✅ Tournage terminé.'; }
+};
+
 // ---- Incrustation du logo sur le visuel ----
 // Fait dans le navigateur : le logo reste net et fidèle, alors qu'une IA le
 // redessinerait de travers. L'image finalisée remplace l'originale.
@@ -1100,6 +1151,12 @@ async function runImageQueue(ids){
   setAgent('designer', ko? `⚠️ ${ok} créé(s), ${ko} en échec` : `✅ ${ok} visuel(s) créé(s)`, ko&&!ok?'err':'done');
   IMG_RUNNING=false; el('imagesBtn').disabled=false; el('generateBtn').disabled=false; refreshCost();
 }
+el('redoBtn').onclick=()=>{
+  const ids=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
+  if(!ids.length) return;
+  if(!confirm(`Refaire les ${ids.length} visuels avec l'accroche et le logo ?\n\nEnviron ${(ids.length*0.06).toFixed(2)} $ et ${Math.ceil(ids.length*35/60)} min.`)) return;
+  runImageQueue(ids);
+};
 el('imagesBtn').onclick=()=>{
   const ids=POSTS.filter(p=>p.image_status!=='ready'&&p.status!=='refuse').map(p=>p.id);
   if(!ids.length){ el('genMsg').style.color='var(--muted)'; el('genMsg').textContent='Tous les posts ont déjà leur visuel.'; setTimeout(()=>el('genMsg').textContent='',4000); return; }
