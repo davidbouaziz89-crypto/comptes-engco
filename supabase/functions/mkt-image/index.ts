@@ -111,9 +111,12 @@ async function callClaude(apiKey: string, model: string, instruction: string) {
 // mieux vaut une image au format par défaut que pas d'image du tout.
 // `imageConfig` est la forme acceptée aujourd'hui ; `responseFormat` ne l'est plus
 // sur toutes les versions. On garde les deux, puis on génère sans contrainte de format.
+// On demande la haute définition en premier : c'est ce qui change tout sur la qualité perçue.
 function imageConfigs(aspectRatio: string) {
   return [
+    { responseModalities: ["IMAGE"], imageConfig: { aspectRatio, imageSize: "2K" } },
     { responseModalities: ["IMAGE"], imageConfig: { aspectRatio } },
+    { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio, imageSize: "2K" } } },
     { responseModalities: ["IMAGE"], responseFormat: { image: { aspectRatio } } },
     { responseModalities: ["IMAGE"] },
   ];
@@ -211,12 +214,25 @@ Texte du post :
 
 Idée de visuel proposée par le rédacteur : ${post.visual_idea || "(aucune)"}
 
-Ta mission :
-- Choisis TOI-MÊME le style le plus efficace pour ce post et ce réseau (visuel de marque avec accroche écrite, photo réaliste, illustration, 3D ou abstrait). LinkedIn = crédible et pro ; Instagram = plus créatif et coloré ; Facebook = chaleureux et accessible.
-- Rédige une consigne d'image en ANGLAIS, très concrète et détaillée : sujet, composition, cadrage, lumière, palette de couleurs, ambiance, niveau de détail.
-- N'inclus JAMAIS de logo inventé, de fausse marque, de visage de personne réelle ni de texte illisible.
-- Si le style choisi comporte du texte incrusté, précise le texte exact entre guillemets, en français, 6 mots maximum, et demande une typographie moderne et parfaitement lisible.
-- Le rendu doit ressembler à un visuel de marque professionnel, surtout pas à une image générique de banque d'images.`;
+Ta mission : rédiger la consigne d'un visuel de qualité professionnelle, digne d'une agence.
+
+1) Choisis TOI-MÊME le style le plus efficace pour ce post et ce réseau (visuel de marque avec accroche écrite, photo réaliste, illustration, 3D ou abstrait). LinkedIn = crédible et sobre ; Instagram = plus créatif et coloré ; Facebook = chaleureux et accessible.
+
+2) Rédige la consigne en ANGLAIS, riche et précise, en couvrant explicitement :
+- LE SUJET : UN seul sujet principal, clairement identifiable. Pas de collage d'idées, pas de scène chargée.
+- LA COMPOSITION : cadrage, angle, point de fuite, règle des tiers, profondeur de champ.
+- L'OPTIQUE : type de prise de vue (ex. 35mm f/2, macro, vue du dessus) ou le rendu (ex. 3D isométrique, illustration vectorielle plate).
+- LA LUMIÈRE : direction, douceur, contraste, heure de la journée.
+- LA PALETTE : nomme 2 ou 3 couleurs précises, cohérentes avec la marque.
+- LA MATIÈRE et L'AMBIANCE : textures, finition, émotion recherchée.
+- Termine par : "editorial quality, art-directed, sharp focus, high detail, professional colour grading".
+
+3) Règles absolues :
+- Laisse une zone calme et dégagée en bas à droite : le logo de la société y sera incrusté.
+- Aucun logo inventé, aucune marque existante, aucun visage de personne réelle, aucun texte parasite.
+- Interdits explicites à mentionner dans la consigne : "no watermark, no signature, no gibberish text, no distorted hands, no cluttered composition, no generic stock-photo look, no cheesy business clichés such as handshakes over cityscapes or glowing brains".
+- Si le style comporte du texte incrusté, indique le texte exact entre guillemets, en français, 6 mots maximum, avec une typographie sans-serif moderne, très lisible, bien contrastée.
+- Le résultat doit ressembler à une campagne de marque soignée, jamais à une banque d'images.`;
 
     const out = await callClaude(anthropicKey, artModel, instruction);
     if (out.stop_reason === "refusal") throw new Error("Direction artistique refusée par l'IA.");
