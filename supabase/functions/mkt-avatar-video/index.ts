@@ -28,6 +28,36 @@ const ACTIONS: Record<string, string> = {
   designer: "she makes a couple of strokes with a stylus on a tablet just below frame, then looks up pleased",
 };
 
+// Le chemin de la vidéo dans la réponse a changé selon les versions de l'API :
+// on essaie les formes documentées, puis on ratisse la réponse à la recherche d'une URL.
+// deno-lint-ignore no-explicit-any
+function findVideoUri(st: any): string | null {
+  const r = st?.response ?? {};
+  const known = [
+    r?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri,
+    r?.generatedSamples?.[0]?.video?.uri,
+    r?.generateVideoResponse?.generatedVideos?.[0]?.video?.uri,
+    r?.generatedVideos?.[0]?.video?.uri,
+    r?.videos?.[0]?.uri,
+    r?.predictions?.[0]?.videoUri,
+  ].filter((u) => typeof u === "string" && u);
+  if (known.length) return known[0] as string;
+
+  let found: string | null = null;
+  // deno-lint-ignore no-explicit-any
+  const walk = (o: any) => {
+    if (found || !o || typeof o !== "object") return;
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (typeof v === "string" && /^https?:\/\//.test(v) &&
+          (k === "uri" || k === "url" || k.toLowerCase().endsWith("uri"))) { found = v; return; }
+      if (v && typeof v === "object") walk(v);
+    }
+  };
+  walk(r);
+  return found;
+}
+
 function videoPrompt(agent: string) {
   const action = ACTIONS[agent] || "the character looks around and smiles warmly at the camera";
   return "Looping character idle animation for a user interface avatar. " +
@@ -80,10 +110,20 @@ Deno.serve(async (req) => {
         await admin.from("mkt_team").update({ video_op: null }).eq("owner", uid).eq("agent_key", agent);
         return json({ error: "Génération refusée : " + String(st.error.message || "").slice(0, 200) }, 502);
       }
-      const uri = st?.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+      // Le chemin de la vidéo varie selon la version : on couvre les formes connues,
+      // puis on cherche n'importe quelle URL dans la réponse. Et on journalise tout.
+      console.log("VEO_DONE", JSON.stringify(st).slice(0, 2500));
+      const uri = findVideoUri(st);
       if (!uri) {
+        const r = st?.response || {};
+        const g = r.generateVideoResponse || r;
+        const filtered = g.raiMediaFilteredCount || 0;
+        const reasons = (g.raiMediaFilteredReasons || []).join(" ; ");
         await admin.from("mkt_team").update({ video_op: null }).eq("owner", uid).eq("agent_key", agent);
-        return json({ error: "Aucune vidéo renvoyée." }, 502);
+        if (filtered) {
+          return json({ error: "Vidéo bloquée par les filtres de Google" + (reasons ? " : " + reasons.slice(0, 200) : "") + ". On peut adoucir la consigne et réessayer." }, 502);
+        }
+        return json({ error: "Aucune vidéo renvoyée. Réponse reçue : " + JSON.stringify(st?.response || st).slice(0, 300) }, 502);
       }
 
       const vres = await fetch(uri, { headers: { "x-goog-api-key": key }, redirect: "follow" });
