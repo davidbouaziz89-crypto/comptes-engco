@@ -18,6 +18,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.PFP_PUSH_APP={icon:'/icons/marketing-192.png',url:'/marketing.html',label:'Marketing IA'};</script>
+<script src="/push.js" defer></script>
 <style>
   :root{
     --bg:#0e1116;--panel:#171b22;--panel2:#1e242e;--line:#2a313c;--txt:#e8edf4;--muted:#93a0b4;
@@ -441,6 +443,11 @@
         <h2>📆 Rythme de publication</h2>
         <p class="who" style="margin-top:0">Le seul réglage que tu choisis : combien de posts par semaine, sur quels réseaux, quels jours et à quelle heure.</p>
         <div id="cadence"></div>
+        <label style="display:flex;align-items:center;gap:9px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);cursor:pointer">
+          <input type="checkbox" id="autoWeekly" style="width:auto">
+          <span style="color:var(--txt);font-size:14px">🤖 <strong>Pilote automatique</strong> — chaque lundi matin, l'équipe écrit la semaine toute seule et tu reçois une notification pour valider.</span>
+        </label>
+        <div class="err" id="autoMsg"></div>
       </div>
 
       <!-- Génération + posts -->
@@ -568,7 +575,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v11 · bulle de chat';
+const APP_VERSION='v12 · pilote auto';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -759,6 +766,7 @@ function selectCompany(id){
   if(CURRENT_COMPANY.logo_url){ logo.src=CURRENT_COMPANY.logo_url; logo.classList.remove('ph'); logo.textContent=''; }
   else { logo.removeAttribute('src'); logo.classList.add('ph'); logo.textContent='🏢'; }
   el('coWebsite').innerHTML=CURRENT_COMPANY.website?`🌐 <a href="${esc(CURRENT_COMPANY.website.startsWith('http')?CURRENT_COMPANY.website:'https://'+CURRENT_COMPANY.website)}" target="_blank" rel="noopener">${esc(CURRENT_COMPANY.website)}</a>`:'<span class="who">Aucun site renseigné</span>';
+  el('autoWeekly').checked=!!CURRENT_COMPANY.auto_weekly;
   loadEditorial(); loadCadence(); loadPosts();
 }
 
@@ -894,6 +902,20 @@ function renderBrandEdit(){
     await loadEditorial();
   };
 }
+
+el('autoWeekly').onchange=async(e)=>{
+  if(!CURRENT_COMPANY) return;
+  const on=e.target.checked;
+  const {error}=await db.from('mkt_companies').update({auto_weekly:on}).eq('id',CURRENT_COMPANY.id);
+  if(error){ el('autoMsg').style.color='var(--bad)'; el('autoMsg').textContent='Erreur : '+error.message; e.target.checked=!on; return; }
+  CURRENT_COMPANY.auto_weekly=on;
+  COMPANIES=COMPANIES.map(c=>c.id===CURRENT_COMPANY.id?CURRENT_COMPANY:c);
+  el('autoMsg').style.color='var(--good)';
+  el('autoMsg').textContent=on
+    ? "✅ Activé. Pense à autoriser les notifications (la cloche 🔔 en haut de l'écran)."
+    : 'Pilote automatique désactivé.';
+  setTimeout(()=>el('autoMsg').textContent='',6000);
+};
 
 // ---- Cadence ----
 async function loadCadence(){

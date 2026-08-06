@@ -93,13 +93,21 @@ Deno.serve(async (req) => {
     if (!apiKey) return json({ error: "Clé IA non configurée (ANTHROPIC_API_KEY manquante)." }, 500);
     const admin = createClient(url, serviceKey);
 
-    // 1) Auth : owner de la société ?
-    const token = (req.headers.get("Authorization") || "").replace("Bearer ", "");
-    const { data: userData, error: uErr } = await admin.auth.getUser(token);
-    if (uErr || !userData?.user) return json({ error: "Non authentifié" }, 401);
-    const uid = userData.user.id;
-
     const body = await req.json().catch(() => ({}));
+
+    // 1) Auth : soit l'utilisateur, soit le pilote automatique (secret côté serveur).
+    const cronSecret = Deno.env.get("CRON_SECRET") || "";
+    const given = req.headers.get("x-cron-secret") || "";
+    let uid: string;
+    if (cronSecret && given === cronSecret && body.owner_id) {
+      uid = String(body.owner_id);
+    } else {
+      const token = (req.headers.get("Authorization") || "").replace("Bearer ", "");
+      const { data: userData, error: uErr } = await admin.auth.getUser(token);
+      if (uErr || !userData?.user) return json({ error: "Non authentifié" }, 401);
+      uid = userData.user.id;
+    }
+
     const companyId = body.company_id;
     if (!companyId) return json({ error: "company_id manquant." }, 400);
 
