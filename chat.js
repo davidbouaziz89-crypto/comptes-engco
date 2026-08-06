@@ -174,7 +174,7 @@
     if (convs.length) html += convs.map(rowConv).join("");
     // Annuaire (collègues sans conversation encore)
     const withConv = new Set(S.convs.filter(c => c.type === "direct" && c.other).map(c => c.other.user_id));
-    const others = S.dir.filter(u => !withConv.has(u.user_id) && (!q || u.display_name.toLowerCase().includes(q)));
+    const others = S.dir.filter(u => !withConv.has(u.user_id) && (!q || (u.display_name || u.email || "").toLowerCase().includes(q)));
     if (others.length) html += `<div class="egc-sechead">Contacts</div>` + others.map(rowDir).join("");
     box.innerHTML = html || `<div class="egc-empty">Aucun contact.</div>`;
     box.querySelectorAll("[data-conv]").forEach(b => b.onclick = () => openConversation(b.dataset.conv));
@@ -187,7 +187,7 @@
   }
   function rowDir(u) {
     return `<button class="egc-row" data-dir="${u.user_id}">${avatarHTML(u.user_id, u.email, u.genre)}
-      <div class="egc-rmid"><div class="egc-rname">${esc(u.display_name)}</div><div class="egc-rlast">${S.online.has(u.user_id) ? "En ligne" : "Hors ligne"}</div></div></button>`;
+      <div class="egc-rmid"><div class="egc-rname">${esc(u.display_name || nameFromEmail(u.email))}</div><div class="egc-rlast">${S.online.has(u.user_id) ? "En ligne" : "Hors ligne"}</div></div></button>`;
   }
 
   /* ---------- Nouvelle discussion / groupe ---------- */
@@ -201,9 +201,9 @@
     const sel = new Set();
     const draw = () => {
       const q = (el("egc-nq").value || "").toLowerCase().trim();
-      el("egc-dirlist").innerHTML = S.dir.filter(u => !q || u.display_name.toLowerCase().includes(q)).map(u =>
+      el("egc-dirlist").innerHTML = S.dir.filter(u => !q || (u.display_name || u.email || "").toLowerCase().includes(q)).map(u =>
         `<button class="egc-row" data-u="${u.user_id}">${avatarHTML(u.user_id, u.email, u.genre)}
-          <div class="egc-rmid"><div class="egc-rname">${esc(u.display_name)}</div><div class="egc-rlast">${S.online.has(u.user_id) ? "En ligne" : "Hors ligne"}</div></div>
+          <div class="egc-rmid"><div class="egc-rname">${esc(u.display_name || nameFromEmail(u.email))}</div><div class="egc-rlast">${S.online.has(u.user_id) ? "En ligne" : "Hors ligne"}</div></div>
           <input type="checkbox" class="egc-chk" ${sel.has(u.user_id) ? "checked" : ""}></button>`).join("") || `<div class="egc-empty">Aucun collègue.</div>`;
       el("egc-dirlist").querySelectorAll("[data-u]").forEach(b => b.onclick = e => {
         const id = b.dataset.u;

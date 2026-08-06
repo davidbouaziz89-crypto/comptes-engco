@@ -52,6 +52,13 @@ Deno.serve(async (req: Request) => {
     const password = body.password || "";
     const genreRaw = (body.genre || "").toString().toLowerCase();
     const genre = ["femme", "homme"].includes(genreRaw) ? genreRaw : null;
+    const prenom = (body.prenom || "").toString().trim();
+    const nom = (body.nom || "").toString().trim();
+    const nomComplet = (prenom + " " + nom).trim();
+    const nameMeta: Record<string, unknown> = {};
+    if (genre) nameMeta.genre = genre;
+    if (prenom) nameMeta.prenom = prenom;
+    if (nom) nameMeta.nom = nom;
     if (!email || !password) return json({ error: "Email et mot de passe requis" }, 400);
     if (String(password).length < 6) return json({ error: "Mot de passe trop court (6 caractères minimum)" }, 400);
 
@@ -81,7 +88,7 @@ Deno.serve(async (req: Request) => {
     let userId: string;
     let linked = false;
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
-      email, password, email_confirm: true, user_metadata: genre ? { genre } : {},
+      email, password, email_confirm: true, user_metadata: nameMeta,
     });
     if (created?.user) {
       userId = created.user.id;
@@ -90,8 +97,8 @@ Deno.serve(async (req: Request) => {
       if (!existing) return json({ error: cErr?.message || "Création impossible" }, 400);
       userId = existing.id;
       linked = true;
-      // Rattachement : met a jour mot de passe + genre (fusionne avec les metadonnees existantes).
-      const meta = { ...(existing.user_metadata || {}), ...(genre ? { genre } : {}) };
+      // Rattachement : met a jour mot de passe + genre/nom (fusionne avec les metadonnees existantes).
+      const meta = { ...(existing.user_metadata || {}), ...nameMeta };
       await admin.auth.admin.updateUserById(userId, {
         ...(password ? { password, email_confirm: true } : {}), user_metadata: meta,
       });
@@ -112,7 +119,7 @@ Deno.serve(async (req: Request) => {
       const prof = body.profile || {};
       const roles = Array.isArray(body.roles) ? body.roles : [];
       await admin.from("pv_profiles").upsert({
-        id: userId, email, nom: body.nom || null, role: (pvMem as {role:string}).role,
+        id: userId, email, nom: nomComplet || null, role: (pvMem as {role:string}).role,
         roles, actif: true,
         adresse: prof.adresse || null, code_postal: prof.code_postal || null, ville: prof.ville || null,
       }, { onConflict: "id" });
@@ -124,7 +131,7 @@ Deno.serve(async (req: Request) => {
     if (ptMem) {
       const ptRole = (ptMem as {role:string}).role === "manager" ? "manager" : "user";
       await admin.from("profiles").upsert({
-        id: userId, email, full_name: body.nom || null, role: ptRole, is_active: true,
+        id: userId, email, full_name: nomComplet || null, role: ptRole, is_active: true,
       }, { onConflict: "id" });
     }
 

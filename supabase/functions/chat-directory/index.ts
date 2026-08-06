@@ -29,11 +29,13 @@ Deno.serve(async (req: Request) => {
       const users = data?.users || [];
       for (const x of users) {
         if (x.id === u.user.id) continue;
+        const md = (x.user_metadata || {}) as { genre?: string; prenom?: string; nom?: string };
+        const full = [md.prenom, md.nom].filter(Boolean).join(" ").trim();
         out.push({
           user_id: x.id,
           email: x.email || "",
-          display_name: nameFrom(x.email || ""),
-          genre: (x.user_metadata && (x.user_metadata as { genre?: string }).genre) || null,
+          display_name: full || nameFrom(x.email || ""),
+          genre: md.genre || null,
         });
       }
       if (users.length < 1000) break;

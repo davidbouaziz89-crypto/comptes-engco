@@ -43,7 +43,8 @@ Deno.serve(async (req: Request) => {
       // pour que la gestion des utilisateurs soit vraiment centralisee dans le portail.
       const usersMap: Record<string, {
         user_id: string; email: string; created_at: string | null;
-        last_sign_in_at: string | null; genre: string | null; mems: unknown[];
+        last_sign_in_at: string | null; genre: string | null;
+        prenom: string | null; nom: string | null; mems: unknown[];
       }> = {};
       for (let page = 1; page <= 20; page++) {
         const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
@@ -53,7 +54,9 @@ Deno.serve(async (req: Request) => {
           usersMap[u.id] = {
             user_id: u.id, email: u.email || "",
             created_at: u.created_at ?? null, last_sign_in_at: u.last_sign_in_at ?? null,
-            genre: (u.user_metadata && u.user_metadata.genre) || null, mems: [],
+            genre: (u.user_metadata && u.user_metadata.genre) || null,
+            prenom: (u.user_metadata && u.user_metadata.prenom) || null,
+            nom: (u.user_metadata && u.user_metadata.nom) || null, mems: [],
           };
         }
         if (users.length < 1000) break;
@@ -61,7 +64,7 @@ Deno.serve(async (req: Request) => {
       const { data: mems } = await admin.from("app_memberships").select("user_id, email, project_key, role, regie_name");
       for (const m of (mems || [])) {
         if (!usersMap[m.user_id]) {
-          usersMap[m.user_id] = { user_id: m.user_id, email: m.email || "", created_at: null, last_sign_in_at: null, genre: null, mems: [] };
+          usersMap[m.user_id] = { user_id: m.user_id, email: m.email || "", created_at: null, last_sign_in_at: null, genre: null, prenom: null, nom: null, mems: [] };
         }
         usersMap[m.user_id].mems.push(m);
       }
@@ -101,20 +104,27 @@ Deno.serve(async (req: Request) => {
         const { error: iErr } = await admin.from("app_memberships").insert(rows);
         if (iErr) return json({ error: iErr.message }, 400);
       }
-      // Pointage lit profiles (pas app_memberships) : on synchronise la fiche employe.
+      const prenom = body.prenom !== undefined ? String(body.prenom).trim() : undefined;
+      const nom = body.nom !== undefined ? String(body.nom).trim() : undefined;
+      const nomComplet = [prenom, nom].filter(Boolean).join(" ").trim();
+      // Pointage lit profiles (pas app_memberships) : on synchronise la fiche employe (nom complet inclus).
       const ptMem = memberships.find((m: { project_key: string }) => m.project_key === "pointage");
       if (ptMem) {
         const ptRole = (ptMem as { role: string }).role === "manager" ? "manager" : "user";
         await admin.from("profiles").upsert({
-          id: target, email, full_name: body.nom || null, role: ptRole, is_active: true,
+          id: target, email, full_name: nomComplet || null, role: ptRole, is_active: true,
         }, { onConflict: "id" });
       }
-      // Genre (avatar) : stocké dans user_metadata. '' = neutre (on efface).
-      if (body.genre !== undefined) {
-        const g = ["femme", "homme"].includes(String(body.genre).toLowerCase()) ? String(body.genre).toLowerCase() : null;
+      // Métadonnées avatar/nom : genre, prénom, nom (fusionnées ; valeur vide = on efface).
+      if (body.genre !== undefined || prenom !== undefined || nom !== undefined) {
         const { data: cur } = await admin.auth.admin.getUserById(target);
         const meta = { ...((cur?.user?.user_metadata) || {}) } as Record<string, unknown>;
-        if (g) meta.genre = g; else delete meta.genre;
+        if (body.genre !== undefined) {
+          const g = ["femme", "homme"].includes(String(body.genre).toLowerCase()) ? String(body.genre).toLowerCase() : null;
+          if (g) meta.genre = g; else delete meta.genre;
+        }
+        if (prenom !== undefined) { if (prenom) meta.prenom = prenom; else delete meta.prenom; }
+        if (nom !== undefined) { if (nom) meta.nom = nom; else delete meta.nom; }
         await admin.auth.admin.updateUserById(target, { user_metadata: meta });
       }
       const password = body.password || "";

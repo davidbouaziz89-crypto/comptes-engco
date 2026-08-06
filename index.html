@@ -1015,6 +1015,8 @@
       <h2 id="u-title">Créer un utilisateur</h2>
       <div class="hint">La personne se connectera avec cet email et ce mot de passe. Coche le(s) projet(s) auxquels elle a accès.</div>
       <form class="row" onsubmit="saveUser(event)">
+        <div class="field"><label>Prénom</label><input type="text" id="u-prenom" placeholder="Prénom"></div>
+        <div class="field"><label>Nom</label><input type="text" id="u-nom" placeholder="Nom"></div>
         <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
         <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères" required></div>
         <div class="field"><label>Genre <span class="hint">(avatar)</span></label><select id="u-genre"><option value="">Neutre</option><option value="femme">👩 Femme</option><option value="homme">👨 Homme</option></select></div>
@@ -3814,6 +3816,8 @@ async function saveUser(e){
   const email=document.getElementById('u-email').value.trim();
   const password=document.getElementById('u-pass').value;
   const genre=document.getElementById('u-genre').value;
+  const prenom=document.getElementById('u-prenom').value.trim();
+  const nom=document.getElementById('u-nom').value.trim();
   const msg=document.getElementById('u-msg');
   const isAdmin=document.getElementById('u-admin').checked;
   let memberships;
@@ -3832,7 +3836,7 @@ async function saveUser(e){
   }
   if(editingUserId){
     msg.innerHTML='Enregistrement…';
-    const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'update',user_id:editingUserId,memberships,email,password:password||undefined,genre}});
+    const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'update',user_id:editingUserId,memberships,email,password:password||undefined,genre,prenom,nom}});
     const errText=await svcErr(data,error);
     if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
     msg.innerHTML='<span class="val-good">Utilisateur modifié ✅</span>';
@@ -3840,7 +3844,7 @@ async function saveUser(e){
   }
   if(!password||password.length<6){ msg.innerHTML='<span class="val-bad">Mot de passe : 6 caractères minimum.</span>'; return; }
   msg.innerHTML='Création en cours…';
-  const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,memberships,genre}});
+  const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,memberships,genre,prenom,nom,nom_complet:(prenom+' '+nom).trim()}});
   const errText=await svcErr(data,error);
   if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
   msg.innerHTML='<span class="val-good">Utilisateur créé ✅</span>';
@@ -3852,6 +3856,8 @@ function editUser(uid){
   document.getElementById('u-email').value=u.email||''; document.getElementById('u-email').readOnly=true;
   const pass=document.getElementById('u-pass'); pass.value=''; pass.required=false; pass.placeholder='laisser vide = mot de passe inchangé';
   document.getElementById('u-genre').value=(['femme','homme'].includes((u.genre||'').toLowerCase())?(u.genre||'').toLowerCase():'');
+  document.getElementById('u-prenom').value=u.prenom||'';
+  document.getElementById('u-nom').value=u.nom||'';
   renderProjectRolesGrid();
   const isAdmin=u.mems.some(m=>m.role==='admin');
   document.getElementById('u-admin').checked=isAdmin; onAdminToggle();
@@ -3877,6 +3883,8 @@ function cancelEditUser(){
   const em=document.getElementById('u-email'); em.value=''; em.readOnly=false;
   const pass=document.getElementById('u-pass'); pass.value=''; pass.required=true; pass.placeholder='min. 6 caractères';
   const gs=document.getElementById('u-genre'); if(gs) gs.value='';
+  const pn=document.getElementById('u-prenom'); if(pn) pn.value='';
+  const nn=document.getElementById('u-nom'); if(nn) nn.value='';
   const adm=document.getElementById('u-admin'); if(adm){ adm.checked=false; onAdminToggle(); }
   renderProjectRolesGrid();
   document.getElementById('u-title').textContent='Créer un utilisateur';
@@ -3896,7 +3904,7 @@ async function loadUsers(){
   // via l'edge function. Ainsi la gestion des utilisateurs est centralisée dans le portail.
   const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'list'}});
   if(!error && data && Array.isArray(data.users)){
-    USERS_CACHE=data.users.map(u=>({user_id:u.user_id,email:u.email,genre:u.genre,mems:u.mems||[],last_sign_in_at:u.last_sign_in_at,created_at:u.created_at}))
+    USERS_CACHE=data.users.map(u=>({user_id:u.user_id,email:u.email,genre:u.genre,prenom:u.prenom,nom:u.nom,mems:u.mems||[],last_sign_in_at:u.last_sign_in_at,created_at:u.created_at}))
       .sort((a,b)=>{ const A=a.mems.length?0:1, B=b.mems.length?0:1; return A-B || (a.email||'').localeCompare(b.email||''); });
     renderUsersGrid(); return;
   }
@@ -3913,6 +3921,8 @@ function uAvatarColors(seed){ seed=String(seed||'x'); let h=0; for(let i=0;i<see
 function uInitials(email){ const n=(email||'?').split('@')[0].replace(/[._\-+]+/g,' ').trim(); const p=n.split(' ').filter(Boolean);
   return (((p[0]||'?')[0]||'?')+(p[1]?p[1][0]:((p[0]||'')[1]||''))).toUpperCase(); }
 function uName(email){ const n=(email||'').split('@')[0].replace(/[._\-+]+/g,' ').trim(); return n?n.replace(/\b\w/g,c=>c.toUpperCase()):(email||'—'); }
+// Nom affiché : Prénom Nom si renseignés, sinon nom déduit de l'email.
+function uDisplay(u){ const full=((u&&u.prenom||'')+' '+(u&&u.nom||'')).trim(); return full||uName(u&&u.email); }
 // ---- Petits avatars illustrés, différents femme/homme (style Marketing IA) ----
 function uHash(s){ s=String(s||'x'); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
 const U_SKINS=['#f8d9c0','#f2c9a0','#e8b48c','#d99b74','#c0895f','#a06a45','#8a5a3c'];
@@ -3962,7 +3972,7 @@ function renderTeamStrip(){
   const extra=(withAccess.length?withAccess:all).length-show.length;
   strip.innerHTML=show.map((u,i)=>{
     const c=uAvatarColors(u.email||u.user_id), adm=u.mems.some(m=>m.role==='admin');
-    return `<div class="tav" style="--a1:${c[0]};--a2:${c[1]};animation-delay:${(i*260)%2600}ms" title="${escH(uName(u.email))}${adm?' · Admin':''}">${adm?'<span class="crown">👑</span>':''}${userAvatarInner(u)}</div>`;
+    return `<div class="tav" style="--a1:${c[0]};--a2:${c[1]};animation-delay:${(i*260)%2600}ms" title="${escH(uDisplay(u))}${adm?' · Admin':''}">${adm?'<span class="crown">👑</span>':''}${userAvatarInner(u)}</div>`;
   }).join('') + (extra>0?`<div class="tav more" title="${extra} de plus">+${extra}</div>`:'');
 }
 function renderUsersGrid(){
@@ -4007,7 +4017,7 @@ function renderUsersGrid(){
       <div class="uc-top">
         <div class="uav">${userAvatarInner(u)}<span class="dot${noAcc?' off':''}"></span></div>
         <div style="min-width:0">
-          <div class="uc-name">${escH(uName(u.email))}${isAdmin?' <span title="Administrateur">👑</span>':''}</div>
+          <div class="uc-name">${escH(uDisplay(u))}${isAdmin?' <span title="Administrateur">👑</span>':''}</div>
           <div class="uc-mail">${escH(u.email||'')}</div>
         </div>
       </div>
