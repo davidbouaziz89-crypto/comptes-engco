@@ -152,6 +152,11 @@
   @media (prefers-reduced-motion:reduce){
     .ava *,.a-bar span,.think i,.img-skel{animation:none!important}
   }
+  /* File de validation */
+  .valbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 4px;padding:11px 14px;
+    border-radius:12px;background:color-mix(in srgb,var(--warn) 14%,var(--panel2));
+    border:1px solid color-mix(in srgb,var(--warn) 45%,var(--line))}
+  .valbar #valCount{font-family:var(--font-display);font-weight:700;font-size:14.5px;flex:1;min-width:150px}
   /* Calendrier éditorial */
   .calbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0 10px}
   .calbar #calTitle{font-family:var(--font-display);font-weight:700;font-size:14.5px;min-width:190px;text-align:center}
@@ -480,6 +485,15 @@
       <button class="btn ghost small" id="logoutBtn">Quitter</button>
     </header>
     <div class="wrap">
+      <div id="valNudge" class="panel hidden" style="border-color:var(--warn);cursor:pointer">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:26px">⏳</span>
+          <div style="flex:1"><strong id="valNudgeTxt"></strong>
+            <div class="who" style="font-size:12.5px">Clique ici pour les passer en revue d'un coup.</div></div>
+          <span class="btn small">Valider maintenant</span>
+        </div>
+      </div>
+
       <div id="noCompany" class="panel hidden">
         <h2 style="margin-top:0">👋 Bienvenue !</h2>
         <p class="who">Ajoute ta première société avec le bouton <strong>« + Société »</strong> en haut : donne son nom et son site web, l'IA s'occupe du reste.</p>
@@ -519,6 +533,11 @@
           </div>
         </div>
         <div id="genMsg" class="err"></div>
+        <div class="valbar hidden" id="valBar">
+          <span id="valCount"></span>
+          <button class="btn small" id="valAll">✅ Tout valider</button>
+          <button class="btn ghost small" id="valExit">Voir tous les posts</button>
+        </div>
         <div class="calbar">
           <button class="btn ghost small" id="calPrev">‹</button>
           <div id="calTitle"></div>
@@ -698,7 +717,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v19 · pièces jointes';
+const APP_VERSION='v20 · validation rapide';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -742,6 +761,9 @@ async function boot(){
   await loadTeam();
   refreshCost();
   await loadCompanies();
+  try{
+    if(new URLSearchParams(location.search).get('valider')==='1') setValidMode(true);
+  }catch(e){}
 }
 el('loginBtn').onclick=async()=>{
   el('autherr').textContent='';
@@ -957,6 +979,9 @@ el('co_save').onclick=async()=>{
   el('co_save').disabled=false;
   el('coModal').classList.add('hidden');
   await loadCompanies();
+  try{
+    if(new URLSearchParams(location.search).get('valider')==='1') setValidMode(true);
+  }catch(e){}
   selectCompany(companyId);
   if(website) analyzeBrand(); // l'agent lit le site tout de suite
 };
@@ -1536,6 +1561,27 @@ el('imagesBtn').onclick=()=>{
   runImageQueue(ids);
 };
 
+// ================= VALIDATION RAPIDE =================
+// La notification du lundi ouvre directement cette file : plus besoin de chercher.
+let VALID_ONLY=false;
+function setValidMode(on){
+  VALID_ONLY=on;
+  el('valBar').classList.toggle('hidden',!on);
+  if(on) el('calAll').checked=true;
+  loadPosts();
+}
+el('valExit').onclick=()=>setValidMode(false);
+el('valNudge').onclick=()=>setValidMode(true);
+el('valAll').onclick=async()=>{
+  const ids=POSTS.filter(p=>p.status==='a_valider').map(p=>p.id);
+  if(!ids.length) return;
+  if(!confirm(`Valider les ${ids.length} post(s) en attente ?`)) return;
+  const {error}=await db.from('mkt_posts')
+    .update({status:'valide',updated_at:new Date().toISOString()}).in('id',ids);
+  if(error){ alert('Erreur : '+error.message); return; }
+  await loadPosts();
+};
+
 // ================= AIDE À LA PUBLICATION =================
 // La publication automatique n'est pas encore possible (accès API LinkedIn à obtenir).
 // En attendant, on prépare tout pour que ça prenne dix secondes.
@@ -1675,10 +1721,18 @@ async function loadPosts(){
   renderCal();
   const mon=weekMonday(WEEK_OFF), fin=new Date(mon); fin.setDate(fin.getDate()+7);
   const tout=el('calAll').checked;
-  const vue=tout?POSTS:POSTS.filter(p=>{
+  let vue=tout?POSTS:POSTS.filter(p=>{
     if(!p.scheduled_at) return true;
     const d=new Date(p.scheduled_at); return d>=mon&&d<fin;
   });
+  const enAttente=POSTS.filter(p=>p.status==='a_valider').length;
+  if(VALID_ONLY) vue=vue.filter(p=>p.status==='a_valider');
+  el('valNudge').classList.toggle('hidden',!enAttente||VALID_ONLY);
+  el('valNudgeTxt').textContent=enAttente+' post(s) attendent ton feu vert';
+  el('valCount').textContent=enAttente
+    ? `⏳ ${enAttente} post(s) en attente de ta validation`
+    : '✅ Tout est validé';
+  el('valAll').classList.toggle('hidden',!enAttente);
   if(!POSTS.length){ el('posts').innerHTML='<div class="who">Aucun post. Clique « ✨ Générer la semaine ».</div>'; return; }
   if(!vue.length){ el('posts').innerHTML='<div class="who">Aucun post cette semaine-là. Coche « tout afficher » ou change de semaine.</div>'; return; }
   el('posts').innerHTML=vue.map(p=>`

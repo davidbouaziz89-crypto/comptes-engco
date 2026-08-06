@@ -21,7 +21,7 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(url, serviceKey);
 
 const ICON = "/icons/marketing-192.png";
-const APP_URL = "/marketing.html";
+const APP_URL = "/marketing.html?valider=1";
 
 async function sendToUser(userId: string, payload: Record<string, unknown>) {
   const { data: subs } = await admin.from("push_subscriptions").select("*").eq("user_id", userId);
