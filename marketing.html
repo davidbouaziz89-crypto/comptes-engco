@@ -457,7 +457,6 @@
       <nav class="tabs" id="tabs">
         <button class="tab on" data-tab="pilotage">🚀 Pilotage</button>
         <button class="tab" data-tab="chat">💬 Discussion</button>
-        <button class="tab" data-tab="param">⚙️ Paramétrage</button>
         <button class="tab" data-tab="histo">📚 Historique</button>
         <button class="tab" data-tab="frais">💶 Frais</button>
       </nav>
@@ -530,7 +529,10 @@
       <!-- ================= PARAMÉTRAGE ================= -->
       <div id="tab-param" class="hidden">
         <div class="panel">
-          <h2 style="margin-top:0">🏢 Tes sociétés</h2>
+          <div class="row" style="align-items:center;margin-bottom:4px">
+            <h2 style="margin:0">🏢 Tes sociétés</h2>
+            <div style="flex:0 0 auto"><button class="btn ghost small" id="paramBack">← Retour au pilotage</button></div>
+          </div>
           <div id="paramCos"></div>
         </div>
         <div class="panel companyPanel" id="factsPanel">
@@ -663,7 +665,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v16 · historique par société';
+const APP_VERSION='v17 · paramétrage dans le bandeau';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -838,10 +840,14 @@ function renderPicker(){
       : `<span class="ph">${esc(c.name.slice(0,2).toUpperCase())}</span>`;
     return `<button class="cotile ${c.id===cur?'on':''}" data-co="${c.id}" title="${esc(c.name)}">
       <span class="logo">${visuel}</span><span class="nm">${esc(c.name)}</span></button>`;
-  }).join('')+`<button class="cotile add" id="addCoTile" title="Ajouter une société">
-      <span class="logo"><span class="ph plus">+</span></span><span class="nm">Société</span></button>`;
+  }).join('')
+    +`<button class="cotile add" id="addCoTile" title="Ajouter une société">
+        <span class="logo"><span class="ph plus">+</span></span><span class="nm">Société</span></button>`
+    +`<button class="cotile add" id="paramTile" title="Paramétrage des sociétés">
+        <span class="logo"><span class="ph plus">⚙️</span></span><span class="nm">Paramétrage</span></button>`;
   el('coPicker').querySelectorAll('[data-co]').forEach(b=>b.onclick=()=>selectCompany(b.dataset.co));
   el('addCoTile').onclick=()=>openCompanyModal(null);
+  el('paramTile').onclick=()=>showTab('param');
 }
 function selectCompany(id){
   CURRENT_COMPANY=COMPANIES.find(c=>c.id===id)||null;
@@ -1635,6 +1641,10 @@ document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>showTab(t.datas
 function showTab(name){
   document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
   ['pilotage','param','chat','histo','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
+  const pt=el('paramTile'); if(pt) pt.classList.toggle('on',name==='param');
+  if(name!=='param' && !document.querySelector('#tabs .tab.on')){
+    const first=document.querySelector('#tabs .tab'); if(first) first.classList.add('on');
+  }
   if(name==='chat') loadChats();
   if(name==='frais') loadUsage();
   if(name==='histo') loadHistory();
@@ -1806,6 +1816,7 @@ async function loadFacts(){
     await db.from('mkt_facts').delete().eq('id',b.dataset.id); loadFacts();
   });
 }
+el('paramBack').onclick=()=>showTab('pilotage');
 el('factAdd').onclick=async()=>{
   if(!CURRENT_COMPANY) return;
   const q=el('factQ').value.trim(), a=el('factA').value.trim();
