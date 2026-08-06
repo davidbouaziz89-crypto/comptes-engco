@@ -54,12 +54,46 @@ Deno.serve(async (req) => {
     }
     const longToken = exJson.access_token as string;
 
-    // 2) Les Pages administrées, avec leur propre jeton
-    const pagesRes = await fetch(`${GRAPH}/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(longToken)}`);
+    // 2) Les Pages administrées, avec leur propre jeton.
+    // me/accounts ne voit que les Pages détenues en direct ; celles qui appartiennent
+    // à un portfolio professionnel passent par /me/businesses (d'où business_management).
+    type Page = { id: string; name: string; access_token: string };
+    const pages: Page[] = [];
+    const vus = new Set<string>();
+    const ajoute = (arr: unknown) => {
+      for (const p of (arr as Page[]) || []) {
+        if (p?.id && p.access_token && !vus.has(p.id)) { vus.add(p.id); pages.push(p); }
+      }
+    };
+
+    const pagesRes = await fetch(`${GRAPH}/me/accounts?fields=id,name,access_token&limit=100&access_token=${encodeURIComponent(longToken)}`);
     const pagesJson = await pagesRes.json();
-    const pages = (pagesJson?.data || []) as { id: string; name: string; access_token: string }[];
+    ajoute(pagesJson?.data);
+
     if (!pages.length) {
-      return json({ error: "Aucune Page trouvée. Vérifie que tu as bien sélectionné ta Page en générant le jeton." }, 400);
+      const bizRes = await fetch(`${GRAPH}/me/businesses?fields=id,name&limit=50&access_token=${encodeURIComponent(longToken)}`);
+      const bizJson = await bizRes.json();
+      for (const b of (bizJson?.data || []) as { id: string }[]) {
+        for (const rel of ["owned_pages", "client_pages"]) {
+          const r = await fetch(`${GRAPH}/${b.id}/${rel}?fields=id,name,access_token&limit=100&access_token=${encodeURIComponent(longToken)}`);
+          ajoute((await r.json())?.data);
+        }
+      }
+      if (!pages.length) {
+        // Diagnostic : ce que Meta a réellement accordé, et ce qu'il a répondu.
+        const permRes = await fetch(`${GRAPH}/me/permissions?access_token=${encodeURIComponent(longToken)}`);
+        const permJson = await permRes.json();
+        const accordees = ((permJson?.data || []) as { permission: string; status: string }[])
+          .filter((p) => p.status === "granted").map((p) => p.permission);
+        return json({
+          error: "Aucune Page trouvée.",
+          diagnostic: {
+            autorisations_accordees: accordees,
+            me_accounts: pagesJson?.error?.message || `${(pagesJson?.data || []).length} Page(s)`,
+            me_businesses: bizJson?.error?.message || `${(bizJson?.data || []).length} portfolio(s)`,
+          },
+        }, 400);
+      }
     }
 
     // Si David a précisé la Page, on la prend ; sinon on essaie de la reconnaître par le nom de la société.

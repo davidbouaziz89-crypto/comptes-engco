@@ -755,7 +755,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v25 · connexion réseaux';
+const APP_VERSION='v26 · diagnostic Meta';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2057,7 +2057,11 @@ el('metaGo').onclick=async()=>{
       body:JSON.stringify({company_id:CURRENT_COMPANY.id,token:jeton})
     });
     const out=await res.json().catch(()=>({error:'réponse illisible'}));
-    if(!res.ok||out.error){ el('metaMsg').style.color='var(--bad)'; el('metaMsg').textContent='Erreur : '+(out.error||res.status); }
+    if(!res.ok||out.error){
+      el('metaMsg').style.color='var(--bad)';
+      el('metaMsg').textContent='Erreur : '+(out.error||res.status)
+        +(out.diagnostic?' — '+JSON.stringify(out.diagnostic):'');
+    }
     else if(out.need_choice){
       el('metaMsg').style.color='var(--warn)';
       el('metaMsg').textContent='Plusieurs Pages trouvées : '+out.pages.map(p=>p.name).join(', ')+'. Dis-moi laquelle rattacher.';
