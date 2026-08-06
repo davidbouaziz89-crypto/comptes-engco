@@ -663,7 +663,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v15 · calendrier';
+const APP_VERSION='v16 · historique par société';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -859,6 +859,8 @@ function selectCompany(id){
   else { logo.removeAttribute('src'); logo.classList.add('ph'); logo.textContent='🏢'; }
   el('coWebsite').innerHTML=CURRENT_COMPANY.website?`🌐 <a href="${esc(CURRENT_COMPANY.website.startsWith('http')?CURRENT_COMPANY.website:'https://'+CURRENT_COMPANY.website)}" target="_blank" rel="noopener">${esc(CURRENT_COMPANY.website)}</a>`:'<span class="who">Aucun site renseigné</span>';
   el('autoWeekly').checked=!!CURRENT_COMPANY.auto_weekly;
+  HISTO_CO=CURRENT_COMPANY.id;
+  if(!el('tab-histo').classList.contains('hidden')) loadHistory();
   if(!el('tab-param').classList.contains('hidden')) loadParam();
   loadEditorial(); loadCadence(); loadPosts();
 }
@@ -1815,18 +1817,27 @@ el('factAdd').onclick=async()=>{
 };
 
 // ================= HISTORIQUE =================
-let HISTO=[];
+let HISTO=[], HISTO_CO=null;   // null = suivre la société en cours
 async function loadHistory(){
   const {data,error}=await db.from('mkt_posts').select('*').order('scheduled_at',{ascending:false,nullsFirst:false});
   if(error){ el('hList').innerHTML='<div class="panel err">'+esc(error.message)+'</div>'; return; }
   HISTO=data||[];
-  const sel=el('hCo'), keep=sel.value;
-  sel.innerHTML='<option value="">Toutes</option>'+COMPANIES.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  sel.value=keep;
+  const sel=el('hCo');
+  const voulu = HISTO_CO!==null ? HISTO_CO : (CURRENT_COMPANY?CURRENT_COMPANY.id:'');
+  sel.innerHTML='<option value="">Toutes les sociétés</option>'
+    +COMPANIES.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  sel.value=voulu;
+  HISTO_CO=sel.value;
   renderHistory();
 }
-['hCo','hNet','hStatus','hFrom','hTo'].forEach(id=>el(id).onchange=renderHistory);
-el('hReset').onclick=()=>{ ['hCo','hNet','hStatus','hFrom','hTo'].forEach(id=>el(id).value=''); renderHistory(); };
+['hNet','hStatus','hFrom','hTo'].forEach(id=>el(id).onchange=renderHistory);
+el('hCo').onchange=()=>{ HISTO_CO=el('hCo').value; renderHistory(); };
+el('hReset').onclick=()=>{
+  ['hNet','hStatus','hFrom','hTo'].forEach(id=>el(id).value='');
+  HISTO_CO=CURRENT_COMPANY?CURRENT_COMPANY.id:'';
+  el('hCo').value=HISTO_CO;
+  renderHistory();
+};
 
 function renderHistory(){
   const co=el('hCo').value, net=el('hNet').value, st=el('hStatus').value;
