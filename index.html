@@ -342,6 +342,7 @@
   .uav .dot.off{background:var(--muted);animation:none}
   /* Avatars illustrés (SVG) : remplissent le cercle, sous la pastille/couronne */
   .uav svg{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;z-index:0}
+  .uav .uav-img,.tav .uav-img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;z-index:0}
   .uav .dot{z-index:2}
   .uav{overflow:visible}
   .tav svg{position:absolute;inset:0;width:100%;height:100%;border-radius:50%}
@@ -3948,6 +3949,9 @@ function userAvatarSVG(u){
     </g>
   </svg>`;
 }
+// Vraie photo (portrait illustré) selon le genre, sinon dessin SVG neutre.
+function userAvatarImg(u){ const g=uGenre(u); if(g!=='homme'&&g!=='femme') return ''; const h=uHash((u&&u.email)||(u&&u.user_id)); const n=(((h^(h>>>7)^(h>>>15))>>>0)%12)+1; return 'assets/avatars/'+g+'_'+String(n).padStart(2,'0')+'.png'; }
+function userAvatarInner(u){ const src=userAvatarImg(u); return src?`<img class="uav-img" src="${src}" alt="" loading="lazy" onerror="this.remove()">`:userAvatarSVG(u); }
 // Bandeau d'avatars animés : aperçu de toute l'équipe en un coup d'œil (petits avatars qui flottent).
 function renderTeamStrip(){
   const strip=document.getElementById('team-strip'); if(!strip) return;
@@ -3958,7 +3962,7 @@ function renderTeamStrip(){
   const extra=(withAccess.length?withAccess:all).length-show.length;
   strip.innerHTML=show.map((u,i)=>{
     const c=uAvatarColors(u.email||u.user_id), adm=u.mems.some(m=>m.role==='admin');
-    return `<div class="tav" style="--a1:${c[0]};--a2:${c[1]};animation-delay:${(i*260)%2600}ms" title="${escH(uName(u.email))}${adm?' · Admin':''}">${adm?'<span class="crown">👑</span>':''}${userAvatarSVG(u)}</div>`;
+    return `<div class="tav" style="--a1:${c[0]};--a2:${c[1]};animation-delay:${(i*260)%2600}ms" title="${escH(uName(u.email))}${adm?' · Admin':''}">${adm?'<span class="crown">👑</span>':''}${userAvatarInner(u)}</div>`;
   }).join('') + (extra>0?`<div class="tav more" title="${extra} de plus">+${extra}</div>`:'');
 }
 function renderUsersGrid(){
@@ -4001,7 +4005,7 @@ function renderUsersGrid(){
         <button class="btn danger small" onclick="delUser('${u.user_id}','${emailEsc}')" title="Supprimer">🗑️</button>
       </div>
       <div class="uc-top">
-        <div class="uav">${userAvatarSVG(u)}<span class="dot${noAcc?' off':''}"></span></div>
+        <div class="uav">${userAvatarInner(u)}<span class="dot${noAcc?' off':''}"></span></div>
         <div style="min-width:0">
           <div class="uc-name">${escH(uName(u.email))}${isAdmin?' <span title="Administrateur">👑</span>':''}</div>
           <div class="uc-mail">${escH(u.email||'')}</div>
