@@ -438,6 +438,8 @@
           <div class="table-wrap"><table><thead><tr><th>Délégataire</th><th class="num">Dossiers</th><th class="num">CA (prime)</th><th class="num">Marge brute</th><th class="num">Cumac</th></tr></thead><tbody id="db-deleg-body"></tbody></table></div>
         </div>
       </div>
+      <h3 style="font-family:var(--font-display);margin:18px 0 8px">🏬 Revenus par dépôt <span style="color:var(--muted);font-weight:400;font-size:.85rem">— clique un dépôt pour voir ses dossiers</span></h3>
+      <div class="table-wrap"><table><thead><tr><th>Dépôt</th><th>Délégataire</th><th class="num">Dossiers</th><th class="num">CA (prime)</th><th class="num">Cumac</th></tr></thead><tbody id="db-depot-body"></tbody></table></div>
       <h3 style="font-family:var(--font-display);margin:18px 0 8px">🗓️ Frais par mois</h3>
       <div class="table-wrap"><table><thead><tr><th>Mois</th><th class="num">Nb frais</th><th class="num">Total</th><th class="num">Part société</th></tr></thead><tbody id="db-mois-body"></tbody></table></div>
     </section>
@@ -2968,6 +2970,14 @@ function doughnutCfg(labels,data,colors,t){
       tooltip:{callbacks:{label:(c)=>' '+c.label+' : '+eur(c.parsed)}}}}};
 }
 function hexA(hex,a){ const c=hex.replace('#',''); const n=c.length===3?c.split('').map(x=>x+x).join(''):c; const r=parseInt(n.slice(0,2),16),g=parseInt(n.slice(2,4),16),b=parseInt(n.slice(4,6),16); return `rgba(${r},${g},${b},${a})`; }
+const _depOpen=new Set();
+function toggleDepot(idx){
+  const nom=(window._depKeys||[])[idx]; if(nom==null) return;
+  const open=_depOpen.has(nom); if(open) _depOpen.delete(nom); else _depOpen.add(nom);
+  const det=document.getElementById('depdet-'+idx), arr=document.getElementById('deparr-'+idx);
+  if(det) det.style.display=open?'none':'';
+  if(arr) arr.textContent=open?'▸':'▾';
+}
 function renderDashboardTables(d){
   const frais=d.frais||[], valid=d.valid||[];
   // Par fournisseur
@@ -2986,6 +2996,27 @@ function renderDashboardTables(d){
   if(db) db.innerHTML=dRows.length?dRows.map(([nom,o])=>`<tr><td>${escH(nom)}</td><td class="num">${o.nb}</td><td class="num">${eur(o.ca)}</td><td class="num">${eur(o.mb)}</td><td class="num">${num(o.cumac)}</td></tr>`).join('')
     +`<tr style="border-top:2px solid var(--accent);font-weight:700"><td>Σ TOTAL</td><td class="num">${dRows.reduce((s,[,o])=>s+o.nb,0)}</td><td class="num">${eur(dRows.reduce((s,[,o])=>s+o.ca,0))}</td><td class="num">${eur(dRows.reduce((s,[,o])=>s+o.mb,0))}</td><td class="num">${num(dRows.reduce((s,[,o])=>s+o.cumac,0))}</td></tr>`
     :`<tr><td colspan="5" class="empty">Aucun dossier validé</td></tr>`;
+  // Par dépôt Emmy (TOUS les dossiers ; clic = déplie la liste des dossiers du dépôt)
+  const depMap={};
+  (d.dossiers||[]).forEach(x=>{ const dep=(''+(x.numero_depot||'')).trim()||'Sans dépôt'; (depMap[dep]=depMap[dep]||{nb:0,ca:0,cumac:0,doss:[]}); depMap[dep].nb++; depMap[dep].ca+=Number(x.montant_prime||0); depMap[dep].cumac+=Number(x.cumac||0); depMap[dep].doss.push(x); });
+  const depRows=Object.entries(depMap).sort((a,b)=>b[1].ca-a[1].ca);
+  window._depKeys=depRows.map(([nom])=>nom);
+  const depB=document.getElementById('db-depot-body');
+  if(depB){
+    depB.innerHTML=!depRows.length?`<tr><td colspan="5" class="empty">Aucun dossier</td></tr>`:
+      depRows.map(([nom,o],idx)=>{
+        let delg='—'; const dep=(window._depots||[]).find(z=>(''+(z.nom||'')).trim()===nom);
+        if(dep){ delg=delegNameOf(dep.delegataire_id)||'—'; }
+        else { const first=o.doss.find(z=>dossierDelegId(z)); if(first) delg=delegNameOf(dossierDelegId(first))||'—'; }
+        const open=_depOpen.has(nom);
+        const rowsD=o.doss.slice().sort((a,b)=>(''+(b.date||'')).localeCompare(''+(a.date||'')))
+          .map(z=>`<tr><td>${fdate(z.date)}</td><td><a href="#" onclick="openDossierDetail('${z.id}');return false" style="color:var(--accent);cursor:pointer">${escH(z.nom_client||'')||'(voir dossier)'}</a></td><td>${statutBadge?statutBadge(z.statut):escH(z.statut||'')}</td><td class="num">${num(z.cumac||0)}</td><td class="num">${eur(z.montant_prime)}</td></tr>`).join('');
+        const head=`<tr class="dep-row" style="cursor:pointer" onclick="toggleDepot(${idx})"><td><span id="deparr-${idx}">${open?'▾':'▸'}</span> ${escH(nom)}</td><td>${escH(delg)}</td><td class="num">${o.nb}</td><td class="num">${eur(o.ca)}</td><td class="num">${num(o.cumac)}</td></tr>`;
+        const det=`<tr class="dep-det" id="depdet-${idx}"${open?'':' style="display:none"'}><td colspan="5" style="padding:0;background:var(--panel2)"><div style="padding:6px 10px 12px"><table style="width:100%"><thead><tr><th>Date</th><th>Client</th><th>Statut</th><th class="num">Cumac</th><th class="num">Prime</th></tr></thead><tbody>${rowsD}</tbody></table></div></td></tr>`;
+        return head+det;
+      }).join('')
+      +`<tr style="border-top:2px solid var(--accent);font-weight:700"><td>Σ TOTAL</td><td></td><td class="num">${depRows.reduce((s,[,o])=>s+o.nb,0)}</td><td class="num">${eur(depRows.reduce((s,[,o])=>s+o.ca,0))}</td><td class="num">${num(depRows.reduce((s,[,o])=>s+o.cumac,0))}</td></tr>`;
+  }
   // Par mois (frais)
   const mMap={};
   frais.forEach(f=>{ const m=fraisMonth(f); if(!m) return; (mMap[m]=mMap[m]||{nb:0,tot:0,soc:0}); mMap[m].nb++; mMap[m].tot+=Number(f.montant||0); mMap[m].soc+=Number(f.montant_societe!=null?f.montant_societe:f.montant||0); });
