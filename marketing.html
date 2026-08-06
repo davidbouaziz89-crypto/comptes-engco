@@ -459,9 +459,10 @@
         <button class="btn ghost small" id="pubDl" style="margin-top:8px">⬇️ Télécharger l'image</button>
       </div>
 
-      <div class="row" style="margin-top:18px">
+      <button class="btn" id="pubAuto" style="margin-top:18px;width:100%;display:none">🚀 Publier maintenant</button>
+      <div class="row" style="margin-top:10px">
         <a class="btn ghost" id="pubOpen" target="_blank" rel="noopener" style="flex:1;text-align:center">🌐 Ouvrir le réseau</a>
-        <button class="btn" id="pubDone" style="flex:1">✅ C'est publié</button>
+        <button class="btn ghost" id="pubDone" style="flex:1">✅ C'est publié</button>
       </div>
       <div class="err" id="pubMsg"></div>
     </div>
@@ -755,7 +756,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v26 · diagnostic Meta';
+const APP_VERSION='v27 · publication auto';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1703,7 +1704,7 @@ const NET_URL={
   instagram:'https://www.instagram.com/'
 };
 let PUB_ID=null;
-function openPublish(id){
+async function openPublish(id){
   const p=POSTS.find(x=>x.id===id); if(!p) return;
   PUB_ID=id;
   el('pubTitle').textContent='Publier sur '+(NET_LABEL[p.network]||p.network);
@@ -1716,7 +1717,46 @@ function openPublish(id){
   el('pubMsg').textContent='';
   el('pubDone').textContent=p.status==='publie'?'Déjà publié ✓':'✅ C\'est publié';
   el('pubModal').classList.remove('hidden');
+  // Le bouton « publier maintenant » n'apparaît que si ce réseau est réellement connecté
+  // pour cette société — sinon on reste sur la publication assistée.
+  el('pubAuto').style.display='none';
+  if(!p.published_at&&CURRENT_COMPANY){
+    const {data}=await db.from('mkt_social_public').select('network')
+      .eq('company_id',CURRENT_COMPANY.id).eq('network',p.network).maybeSingle();
+    if(data){
+      el('pubAuto').style.display='block';
+      el('pubAuto').disabled=false;
+      el('pubAuto').textContent='🚀 Publier maintenant sur '+(NET_LABEL[p.network]||p.network);
+    }
+  }
 }
+el('pubAuto').onclick=async()=>{
+  if(!PUB_ID) return;
+  if(!confirm('Publier maintenant ? Le post partira en ligne immédiatement.')) return;
+  const btn=el('pubAuto'); btn.disabled=true; btn.textContent='⏳ Publication en cours…';
+  el('pubMsg').style.color='var(--muted)'; el('pubMsg').textContent='';
+  try{
+    // Le texte éventuellement retouché dans la fenêtre part avec le post.
+    await db.from('mkt_posts').update({body:el('pubBody').value}).eq('id',PUB_ID);
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-publish',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({post_id:PUB_ID})
+    });
+    const out=await res.json().catch(()=>({error:'réponse illisible'}));
+    if(!res.ok||out.error){
+      el('pubMsg').style.color='var(--bad)'; el('pubMsg').textContent='Erreur : '+(out.error||res.status);
+      btn.disabled=false; btn.textContent='🚀 Réessayer';
+      return;
+    }
+    el('pubModal').classList.add('hidden');
+    await loadPosts();
+  }catch(e){
+    el('pubMsg').style.color='var(--bad)'; el('pubMsg').textContent='Erreur réseau : '+e.message;
+    btn.disabled=false; btn.textContent='🚀 Réessayer';
+  }
+};
 el('pubClose').onclick=()=>el('pubModal').classList.add('hidden');
 async function copyTo(txt,btn){
   try{ await navigator.clipboard.writeText(txt); const o=btn.textContent; btn.textContent='✅ Copié';
