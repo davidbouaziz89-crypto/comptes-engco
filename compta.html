@@ -1656,11 +1656,18 @@ function countUp(el){ if(!el) return; const target=parseFloat(el.dataset.n)||0; 
   function tick(now){ if(t0==null)t0=now; const p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,3); el.textContent=f(target*e); if(p<1) requestAnimationFrame(tick); }
   requestAnimationFrame(tick); }
 function animateKpis(){ /* valeurs affichées directement (plus rapide, pas d'animation de comptage) */ }
-function kpiCard(ic,color,label,value,unit,sub,pulse){
-  return `<div class="card kpi${pulse?' pulse':''}" style="--kc:${color}">
-    <div class="k-ic">${ic}</div><div class="label">${label}</div>
+function kpiCard(ic,color,label,value,unit,sub,pulse,onClick){
+  const clk=onClick?` onclick="${onClick}" style="--kc:${color};cursor:pointer" title="Cliquer pour voir le détail"`:` style="--kc:${color}"`;
+  return `<div class="card kpi${pulse?' pulse':''}"${clk}>
+    <div class="k-ic">${ic}</div><div class="label">${label}${onClick?' ↦':''}</div>
     <div class="value" data-n="${value}" data-unit="${unit||'eur'}">${unit==='int'?value:euroC(value)}</div>
     ${sub?`<div class="k-sub">${sub}</div>`:''}</div>`; }
+// Navigations depuis le dashboard
+function goRappro(){ showTab('rappro'); }
+function goUnclassified(){ showTab('releves');
+  const g=id=>document.getElementById(id); ['tx-fcat','tx-ftiers','tx-fstmt','tx-search'].forEach(id=>{const e=g(id);if(e)e.value='';});
+  const st=g('tx-fstatus'); if(st) st.value='a_classer'; const grp=g('tx-group'); if(grp) grp.checked=false; renderTx();
+  const sec=g('tx-body'); if(sec){ try{ sec.closest('section').scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} } }
 
 let CHARTS={};
 function mkChart(id,cfg){ if(typeof Chart==='undefined') return; if(CHARTS[id]) CHARTS[id].destroy(); const el=document.getElementById(id); if(!el) return; CHARTS[id]=new Chart(el,cfg); }
@@ -1725,12 +1732,12 @@ function renderDashboard(){
   const solde=entrees-sorties, tvaNette=tvaColl-tvaRec;
   const toRappro=INVOICES.filter(i=>invMatchState(i)!=='rapproche').length;
   cards.innerHTML=
-    kpiCard('↗','var(--good)','Entrées',entrees,'eur',periodLabel())+
-    kpiCard('↘','var(--danger)','Sorties',sorties,'eur',periodLabel())+
-    kpiCard('💰',solde>=0?'var(--good)':'var(--danger)','Solde',solde,'eur',periodLabel())+
-    kpiCard('🧮','var(--accent3)','TVA nette',tvaNette,'eur',periodLabel()+' · coll. '+euro(tvaColl)+' · récup. '+euro(tvaRec))+
-    kpiCard('⏳',aClasser?'var(--warm)':'var(--good)','Lignes à classer',aClasser,'int',aClasser?'à catégoriser':'tout est classé')+
-    kpiCard('📄',toRappro?'var(--danger)':'var(--good)','Factures à rapprocher',toRappro,'int',toRappro?'à relier au relevé':'tout est rapproché',!!toRappro);
+    kpiCard('↗','var(--good)','Entrées',entrees,'eur',periodLabel(),false,"showTab('releves')")+
+    kpiCard('↘','var(--danger)','Sorties',sorties,'eur',periodLabel(),false,"showTab('releves')")+
+    kpiCard('💰',solde>=0?'var(--good)':'var(--danger)','Solde',solde,'eur',periodLabel(),false,"showTab('releves')")+
+    kpiCard('🧮','var(--accent3)','TVA nette',tvaNette,'eur',periodLabel()+' · coll. '+euro(tvaColl)+' · récup. '+euro(tvaRec),false,"showTab('tva')")+
+    kpiCard('⏳',aClasser?'var(--warm)':'var(--good)','Lignes à classer',aClasser,'int',aClasser?'à catégoriser':'tout est classé',false,"goUnclassified()")+
+    kpiCard('📄',toRappro?'var(--danger)':'var(--good)','Factures à rapprocher',toRappro,'int',toRappro?'à relier au relevé':'tout est rapproché',!!toRappro,"goRappro()");
   animateKpis(); renderDashCharts(); renderDashInvoices();
 }
 // Liste des factures pas encore (totalement) reliées à un paiement — toutes périodes.
