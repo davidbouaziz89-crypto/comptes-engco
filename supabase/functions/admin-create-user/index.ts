@@ -50,6 +50,8 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const email = (body.email || "").trim();
     const password = body.password || "";
+    const genreRaw = (body.genre || "").toString().toLowerCase();
+    const genre = ["femme", "homme"].includes(genreRaw) ? genreRaw : null;
     if (!email || !password) return json({ error: "Email et mot de passe requis" }, 400);
     if (String(password).length < 6) return json({ error: "Mot de passe trop court (6 caractères minimum)" }, 400);
 
@@ -78,7 +80,9 @@ Deno.serve(async (req: Request) => {
     // pour que TOUS les utilisateurs soient gerables depuis ici.
     let userId: string;
     let linked = false;
-    const { data: created, error: cErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+    const { data: created, error: cErr } = await admin.auth.admin.createUser({
+      email, password, email_confirm: true, user_metadata: genre ? { genre } : {},
+    });
     if (created?.user) {
       userId = created.user.id;
     } else {
@@ -86,8 +90,11 @@ Deno.serve(async (req: Request) => {
       if (!existing) return json({ error: cErr?.message || "Création impossible" }, 400);
       userId = existing.id;
       linked = true;
-      // Met a jour le mot de passe fourni pour le compte rattache.
-      if (password) await admin.auth.admin.updateUserById(userId, { password, email_confirm: true });
+      // Rattachement : met a jour mot de passe + genre (fusionne avec les metadonnees existantes).
+      const meta = { ...(existing.user_metadata || {}), ...(genre ? { genre } : {}) };
+      await admin.auth.admin.updateUserById(userId, {
+        ...(password ? { password, email_confirm: true } : {}), user_metadata: meta,
+      });
     }
 
     // Remplace les acces de cet utilisateur par ceux definis ici (source de verite = portail).

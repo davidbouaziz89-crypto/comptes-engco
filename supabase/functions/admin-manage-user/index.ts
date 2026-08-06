@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
       // pour que la gestion des utilisateurs soit vraiment centralisee dans le portail.
       const usersMap: Record<string, {
         user_id: string; email: string; created_at: string | null;
-        last_sign_in_at: string | null; mems: unknown[];
+        last_sign_in_at: string | null; genre: string | null; mems: unknown[];
       }> = {};
       for (let page = 1; page <= 20; page++) {
         const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
@@ -52,7 +52,8 @@ Deno.serve(async (req: Request) => {
         for (const u of users) {
           usersMap[u.id] = {
             user_id: u.id, email: u.email || "",
-            created_at: u.created_at ?? null, last_sign_in_at: u.last_sign_in_at ?? null, mems: [],
+            created_at: u.created_at ?? null, last_sign_in_at: u.last_sign_in_at ?? null,
+            genre: (u.user_metadata && u.user_metadata.genre) || null, mems: [],
           };
         }
         if (users.length < 1000) break;
@@ -60,7 +61,7 @@ Deno.serve(async (req: Request) => {
       const { data: mems } = await admin.from("app_memberships").select("user_id, email, project_key, role, regie_name");
       for (const m of (mems || [])) {
         if (!usersMap[m.user_id]) {
-          usersMap[m.user_id] = { user_id: m.user_id, email: m.email || "", created_at: null, last_sign_in_at: null, mems: [] };
+          usersMap[m.user_id] = { user_id: m.user_id, email: m.email || "", created_at: null, last_sign_in_at: null, genre: null, mems: [] };
         }
         usersMap[m.user_id].mems.push(m);
       }
@@ -107,6 +108,14 @@ Deno.serve(async (req: Request) => {
         await admin.from("profiles").upsert({
           id: target, email, full_name: body.nom || null, role: ptRole, is_active: true,
         }, { onConflict: "id" });
+      }
+      // Genre (avatar) : stocké dans user_metadata. '' = neutre (on efface).
+      if (body.genre !== undefined) {
+        const g = ["femme", "homme"].includes(String(body.genre).toLowerCase()) ? String(body.genre).toLowerCase() : null;
+        const { data: cur } = await admin.auth.admin.getUserById(target);
+        const meta = { ...((cur?.user?.user_metadata) || {}) } as Record<string, unknown>;
+        if (g) meta.genre = g; else delete meta.genre;
+        await admin.auth.admin.updateUserById(target, { user_metadata: meta });
       }
       const password = body.password || "";
       if (password) {

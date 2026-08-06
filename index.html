@@ -340,6 +340,12 @@
   .ucard.is-noacc{opacity:.82}
   .ucard.is-noacc:hover{opacity:1}
   .uav .dot.off{background:var(--muted);animation:none}
+  /* Avatars illustrés (SVG) : remplissent le cercle, sous la pastille/couronne */
+  .uav svg{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;z-index:0}
+  .uav .dot{z-index:2}
+  .uav{overflow:visible}
+  .tav svg{position:absolute;inset:0;width:100%;height:100%;border-radius:50%}
+  .tav .crown{z-index:3}
 </style>
 </head>
 <body>
@@ -1010,6 +1016,7 @@
       <form class="row" onsubmit="saveUser(event)">
         <div class="field"><label>Email</label><input type="email" id="u-email" required></div>
         <div class="field"><label>Mot de passe</label><input type="text" id="u-pass" placeholder="min. 6 caractères" required></div>
+        <div class="field"><label>Genre <span class="hint">(avatar)</span></label><select id="u-genre"><option value="">Neutre</option><option value="femme">👩 Femme</option><option value="homme">👨 Homme</option></select></div>
         <div class="field" style="grid-column:1/-1">
           <label class="chk" style="margin:0"><input type="checkbox" id="u-admin" onchange="onAdminToggle()"> 👑 Administrateur — accès global à <b>tous</b> les logiciels</label>
         </div>
@@ -3805,6 +3812,7 @@ async function saveUser(e){
   e.preventDefault();
   const email=document.getElementById('u-email').value.trim();
   const password=document.getElementById('u-pass').value;
+  const genre=document.getElementById('u-genre').value;
   const msg=document.getElementById('u-msg');
   const isAdmin=document.getElementById('u-admin').checked;
   let memberships;
@@ -3823,7 +3831,7 @@ async function saveUser(e){
   }
   if(editingUserId){
     msg.innerHTML='Enregistrement…';
-    const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'update',user_id:editingUserId,memberships,email,password:password||undefined}});
+    const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'update',user_id:editingUserId,memberships,email,password:password||undefined,genre}});
     const errText=await svcErr(data,error);
     if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
     msg.innerHTML='<span class="val-good">Utilisateur modifié ✅</span>';
@@ -3831,7 +3839,7 @@ async function saveUser(e){
   }
   if(!password||password.length<6){ msg.innerHTML='<span class="val-bad">Mot de passe : 6 caractères minimum.</span>'; return; }
   msg.innerHTML='Création en cours…';
-  const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,memberships}});
+  const {data,error}=await db.functions.invoke('admin-create-user',{body:{email,password,memberships,genre}});
   const errText=await svcErr(data,error);
   if(errText){ msg.innerHTML='<span class="val-bad">Erreur : '+errText+'</span>'; return; }
   msg.innerHTML='<span class="val-good">Utilisateur créé ✅</span>';
@@ -3842,6 +3850,7 @@ function editUser(uid){
   editingUserId=uid;
   document.getElementById('u-email').value=u.email||''; document.getElementById('u-email').readOnly=true;
   const pass=document.getElementById('u-pass'); pass.value=''; pass.required=false; pass.placeholder='laisser vide = mot de passe inchangé';
+  document.getElementById('u-genre').value=(['femme','homme'].includes((u.genre||'').toLowerCase())?(u.genre||'').toLowerCase():'');
   renderProjectRolesGrid();
   const isAdmin=u.mems.some(m=>m.role==='admin');
   document.getElementById('u-admin').checked=isAdmin; onAdminToggle();
@@ -3866,6 +3875,7 @@ function cancelEditUser(){
   editingUserId=null;
   const em=document.getElementById('u-email'); em.value=''; em.readOnly=false;
   const pass=document.getElementById('u-pass'); pass.value=''; pass.required=true; pass.placeholder='min. 6 caractères';
+  const gs=document.getElementById('u-genre'); if(gs) gs.value='';
   const adm=document.getElementById('u-admin'); if(adm){ adm.checked=false; onAdminToggle(); }
   renderProjectRolesGrid();
   document.getElementById('u-title').textContent='Créer un utilisateur';
@@ -3902,6 +3912,42 @@ function uAvatarColors(seed){ seed=String(seed||'x'); let h=0; for(let i=0;i<see
 function uInitials(email){ const n=(email||'?').split('@')[0].replace(/[._\-+]+/g,' ').trim(); const p=n.split(' ').filter(Boolean);
   return (((p[0]||'?')[0]||'?')+(p[1]?p[1][0]:((p[0]||'')[1]||''))).toUpperCase(); }
 function uName(email){ const n=(email||'').split('@')[0].replace(/[._\-+]+/g,' ').trim(); return n?n.replace(/\b\w/g,c=>c.toUpperCase()):(email||'—'); }
+// ---- Petits avatars illustrés, différents femme/homme (style Marketing IA) ----
+function uHash(s){ s=String(s||'x'); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
+const U_SKINS=['#f8d9c0','#f2c9a0','#e8b48c','#d99b74','#c0895f','#a06a45','#8a5a3c'];
+const U_HAIRS=['#20242b','#3a2517','#5b3a1f','#7a4a24','#a55a2a','#c9a13e','#6b7280','#1f2a44','#b0483a'];
+const U_FNAMES=new Set(['marie','sarah','sara','kimberley','lelia','anissa','siham','ines','iris','jade','sofia','sofiane','lea','léa','emma','manon','chloe','chloé','camille','julie','laura','sabrina','nadia','fatima','yasmine','sandra','carla','elodie','élodie','audrey','melanie','mélanie','sonia','samira','nawel','imane','lina','maeva','maëva','oceane','océane','celia','célia','amel','myriam','wafa','rania','sabrina','clara','anais','anaïs','pauline','estelle','virginie','stephanie','stéphanie']);
+const U_MNAMES=new Set(['david','dan','kevin','simon','eric','éric','julien','romain','axel','karim','mohamed','ilan','sofiane','ryan','yanis','anis','nicolas','thomas','alexandre','maxime','antoine','lucas','hugo','nathan','enzo','mehdi','samir','rachid','farid','bilal','yassine','adam','noah','gabriel','raphael','raphaël','paul','pierre','jean','marc','franck','frank','sebastien','sébastien','olivier','vincent','fabien','jerome','jérôme','ludovic','mickael','mickaël','anthony','jonathan','florian','damien','cedric','cédric','christophe','stephane','stéphane','laurent','patrick','philippe','bruno']);
+function uGuessGenre(email){ const n=(uName(email)||'').split(' ')[0].toLowerCase(); if(U_FNAMES.has(n)) return 'femme'; if(U_MNAMES.has(n)) return 'homme'; return 'neutre'; }
+function uGenre(u){ const g=(u&&u.genre||'').toString().toLowerCase();
+  if(['f','femme','female','w'].includes(g)) return 'femme';
+  if(['h','homme','male','m'].includes(g)) return 'homme';
+  if(['n','neutre','autre','x'].includes(g)) return 'neutre';
+  return uGuessGenre(u&&u.email); }
+function userAvatarSVG(u){
+  const h=uHash((u&&u.email)||(u&&u.user_id)), skin=U_SKINS[h%U_SKINS.length], hair=U_HAIRS[(h>>3)%U_HAIRS.length];
+  const cols=uAvatarColors((u&&u.email)||(u&&u.user_id)), genre=uGenre(u), id='av'+(h%99999);
+  const hairShape = genre==='femme'
+    ? `<path d="M9.5 24 Q7.5 8 22 7 Q36.5 8 34.5 24 L34 30 Q32.5 18 29.5 15.5 Q31 21 30 26 Q26.5 15.5 22 15.5 Q17.5 15.5 14 26 Q13 21 14.5 15.5 Q11.5 18 10 30 Z" fill="${hair}"/>`
+    : genre==='homme'
+    ? `<path d="M11.5 21 Q12 8.5 22 8.5 Q32 8.5 32.5 21 Q29 13.5 22 13.5 Q15 13.5 11.5 21 Z" fill="${hair}"/>`
+    : `<path d="M12.5 20 Q14 10 22 10 Q30 10 31.5 20 Q28 14.5 22 14.5 Q16 14.5 12.5 20 Z" fill="${hair}"/>`;
+  return `<svg viewBox="0 0 44 44" width="100%" height="100%" aria-hidden="true">
+    <defs>
+      <clipPath id="${id}"><circle cx="22" cy="22" r="22"/></clipPath>
+      <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${cols[0]}"/><stop offset="1" stop-color="${cols[1]}"/></linearGradient>
+    </defs>
+    <g clip-path="url(#${id})">
+      <rect width="44" height="44" fill="url(#${id}b)"/>
+      <path d="M8 44 Q8 32 22 32 Q36 32 36 44 Z" fill="rgba(255,255,255,.22)"/>
+      <ellipse cx="22" cy="21.5" rx="9.3" ry="10.4" fill="${skin}"/>
+      ${hairShape}
+      <circle cx="18.6" cy="21.5" r="1.25" fill="#2b2b2b"/>
+      <circle cx="25.4" cy="21.5" r="1.25" fill="#2b2b2b"/>
+      <path d="M18.7 26 Q22 28.6 25.3 26" stroke="#8a5a3c" stroke-width="1.15" fill="none" stroke-linecap="round"/>
+    </g>
+  </svg>`;
+}
 // Bandeau d'avatars animés : aperçu de toute l'équipe en un coup d'œil (petits avatars qui flottent).
 function renderTeamStrip(){
   const strip=document.getElementById('team-strip'); if(!strip) return;
@@ -3912,7 +3958,7 @@ function renderTeamStrip(){
   const extra=(withAccess.length?withAccess:all).length-show.length;
   strip.innerHTML=show.map((u,i)=>{
     const c=uAvatarColors(u.email||u.user_id), adm=u.mems.some(m=>m.role==='admin');
-    return `<div class="tav" style="--a1:${c[0]};--a2:${c[1]};animation-delay:${(i*260)%2600}ms" title="${escH(uName(u.email))}${adm?' · Admin':''}">${adm?'<span class="crown">👑</span>':''}${escH(uInitials(u.email))}</div>`;
+    return `<div class="tav" style="--a1:${c[0]};--a2:${c[1]};animation-delay:${(i*260)%2600}ms" title="${escH(uName(u.email))}${adm?' · Admin':''}">${adm?'<span class="crown">👑</span>':''}${userAvatarSVG(u)}</div>`;
   }).join('') + (extra>0?`<div class="tav more" title="${extra} de plus">+${extra}</div>`:'');
 }
 function renderUsersGrid(){
@@ -3955,7 +4001,7 @@ function renderUsersGrid(){
         <button class="btn danger small" onclick="delUser('${u.user_id}','${emailEsc}')" title="Supprimer">🗑️</button>
       </div>
       <div class="uc-top">
-        <div class="uav">${escH(uInitials(u.email))}<span class="dot${noAcc?' off':''}"></span></div>
+        <div class="uav">${userAvatarSVG(u)}<span class="dot${noAcc?' off':''}"></span></div>
         <div style="min-width:0">
           <div class="uc-name">${escH(uName(u.email))}${isAdmin?' <span title="Administrateur">👑</span>':''}</div>
           <div class="uc-mail">${escH(u.email||'')}</div>
