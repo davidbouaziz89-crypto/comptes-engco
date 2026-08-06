@@ -1,0 +1,93 @@
+/* Chat interne "gestion" — widget partagé. Tout est préfixé .egc- pour ne pas entrer en conflit. */
+#egc-chat, #egc-chat *{ box-sizing:border-box; }
+#egc-chat{
+  --egc-bg:#0f1626; --egc-panel:#151d31; --egc-panel2:#1b2540; --egc-line:#2a3552;
+  --egc-txt:#e9eefc; --egc-muted:#8a97ba; --egc-accent:#38bdf8; --egc-accent-ink:#04121e;
+  --egc-me:#2563eb; --egc-good:#22c55e; --egc-bad:#f43f5e;
+  --egc-shadow:0 18px 50px -20px rgba(0,0,0,.7);
+  font-family:system-ui,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: light){
+  #egc-chat{ --egc-bg:#ffffff; --egc-panel:#ffffff; --egc-panel2:#f1f5fc; --egc-line:#e2e8f3;
+    --egc-txt:#141c2e; --egc-muted:#5a6a86; --egc-accent:#0ea5e9; --egc-accent-ink:#ffffff;
+    --egc-me:#2563eb; --egc-shadow:0 18px 50px -22px rgba(30,50,90,.35); }
+}
+/* Bulle */
+.egc-bubble{ position:fixed; right:20px; bottom:20px; width:58px; height:58px; border-radius:50%;
+  border:0; cursor:pointer; z-index:2147483000; color:#fff; font-size:26px; line-height:1;
+  background:linear-gradient(135deg,#38bdf8,#2563eb); box-shadow:0 12px 30px -8px rgba(37,99,235,.6);
+  display:grid; place-items:center; transition:transform .16s ease; }
+.egc-bubble:hover{ transform:translateY(-2px) scale(1.04); }
+.egc-badge{ position:absolute; top:-4px; right:-4px; min-width:20px; height:20px; padding:0 5px;
+  border-radius:11px; background:var(--egc-bad); color:#fff; font:700 11px system-ui; display:grid;
+  place-items:center; border:2px solid var(--egc-bg); }
+.egc-badge[hidden]{ display:none; }
+/* Panneau */
+.egc-panel{ position:fixed; right:20px; bottom:88px; width:370px; height:min(560px,80vh);
+  background:var(--egc-panel); color:var(--egc-txt); border:1px solid var(--egc-line);
+  border-radius:18px; box-shadow:var(--egc-shadow); z-index:2147483000; overflow:hidden;
+  display:flex; flex-direction:column; }
+.egc-panel[hidden]{ display:none; }
+@media (max-width:640px){ .egc-panel{ right:0; left:0; bottom:0; top:0; width:100%; height:100%; border-radius:0; } }
+.egc-head{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--egc-line); }
+.egc-head h3{ margin:0; font-size:15px; font-weight:700; flex:1; }
+.egc-head .egc-sub{ font-size:11px; color:var(--egc-muted); font-weight:600; }
+.egc-ico{ background:transparent; border:0; color:var(--egc-txt); cursor:pointer; font-size:17px; padding:4px; border-radius:8px; }
+.egc-ico:hover{ background:var(--egc-panel2); }
+.egc-online-dot{ width:8px; height:8px; border-radius:50%; background:var(--egc-good); display:inline-block; margin-right:4px; }
+.egc-body{ flex:1; overflow-y:auto; }
+.egc-search{ margin:8px 12px; }
+.egc-search input{ width:100%; padding:8px 12px; border-radius:10px; border:1px solid var(--egc-line);
+  background:var(--egc-panel2); color:var(--egc-txt); font-size:13px; }
+/* Liste conversations / annuaire */
+.egc-row{ display:flex; align-items:center; gap:11px; padding:9px 12px; cursor:pointer; border:0; width:100%;
+  background:transparent; color:var(--egc-txt); text-align:left; }
+.egc-row:hover{ background:var(--egc-panel2); }
+.egc-av{ position:relative; width:44px; height:44px; flex:0 0 44px; border-radius:50%; overflow:hidden;
+  background:linear-gradient(135deg,#64748b,#334155); display:grid; place-items:center; color:#fff; font:700 15px system-ui; }
+.egc-av img{ width:100%; height:100%; object-fit:cover; }
+.egc-pdot{ position:absolute; right:0; bottom:0; width:12px; height:12px; border-radius:50%;
+  background:var(--egc-muted); border:2px solid var(--egc-panel); }
+.egc-pdot.on{ background:var(--egc-good); }
+.egc-rmid{ flex:1; min-width:0; }
+.egc-rname{ font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.egc-rlast{ font-size:12px; color:var(--egc-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.egc-rmeta{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.egc-rtime{ font-size:10px; color:var(--egc-muted); }
+.egc-unread{ min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--egc-accent);
+  color:var(--egc-accent-ink); font:700 11px system-ui; display:grid; place-items:center; }
+.egc-sechead{ font:700 11px system-ui; letter-spacing:.04em; text-transform:uppercase; color:var(--egc-muted); padding:10px 14px 4px; }
+.egc-empty{ color:var(--egc-muted); font-size:13px; text-align:center; padding:24px 16px; }
+/* Vue conversation */
+.egc-conv{ display:flex; flex-direction:column; height:100%; }
+.egc-msgs{ flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:6px; }
+.egc-day{ text-align:center; font-size:11px; color:var(--egc-muted); margin:8px 0; }
+.egc-msg{ max-width:78%; padding:8px 11px; border-radius:14px; font-size:13.5px; line-height:1.35; word-wrap:break-word; }
+.egc-msg.them{ align-self:flex-start; background:var(--egc-panel2); border-bottom-left-radius:5px; }
+.egc-msg.me{ align-self:flex-end; background:var(--egc-me); color:#fff; border-bottom-right-radius:5px; }
+.egc-msg .egc-who{ font-size:11px; font-weight:700; color:var(--egc-accent); margin-bottom:2px; }
+.egc-msg img.egc-att{ max-width:100%; border-radius:10px; margin-top:4px; display:block; cursor:pointer; }
+.egc-file{ display:flex; align-items:center; gap:8px; margin-top:4px; padding:7px 10px; border-radius:10px;
+  background:rgba(255,255,255,.12); color:inherit; text-decoration:none; font-size:12.5px; }
+.egc-seen{ align-self:flex-end; font-size:10.5px; color:var(--egc-muted); margin:1px 2px 4px; }
+.egc-inbar{ display:flex; align-items:center; gap:8px; padding:10px; border-top:1px solid var(--egc-line); }
+.egc-inbar input.egc-txt{ flex:1; padding:9px 12px; border-radius:20px; border:1px solid var(--egc-line);
+  background:var(--egc-panel2); color:var(--egc-txt); font-size:13.5px; }
+.egc-send, .egc-clip{ border:0; background:transparent; cursor:pointer; font-size:19px; color:var(--egc-accent); padding:4px; }
+.egc-send{ color:var(--egc-me); }
+/* Nouveau groupe */
+.egc-chk{ margin-left:auto; }
+.egc-newbar{ display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--egc-line); }
+.egc-newbar input{ flex:1; padding:8px 12px; border-radius:10px; border:1px solid var(--egc-line); background:var(--egc-panel2); color:var(--egc-txt); font-size:13px; }
+.egc-btn{ border:0; border-radius:10px; padding:8px 14px; font-weight:700; font-size:13px; cursor:pointer;
+  background:linear-gradient(135deg,#38bdf8,#2563eb); color:#fff; }
+.egc-btn[disabled]{ opacity:.5; cursor:default; }
+/* Toast */
+.egc-toast{ position:fixed; right:20px; bottom:88px; width:320px; max-width:92vw; z-index:2147483001;
+  background:var(--egc-panel); color:var(--egc-txt); border:1px solid var(--egc-line); border-radius:14px;
+  box-shadow:var(--egc-shadow); padding:11px 12px; display:flex; gap:10px; align-items:center; cursor:pointer;
+  animation:egc-in .25s ease; }
+@keyframes egc-in{ from{ transform:translateY(10px); opacity:0; } }
+.egc-toast .egc-tt{ font-weight:700; font-size:13px; }
+.egc-toast .egc-tb{ font-size:12px; color:var(--egc-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media (prefers-reduced-motion:reduce){ .egc-bubble,.egc-toast{ animation:none; transition:none; } }
