@@ -717,7 +717,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v22 · logo agrandi';
+const APP_VERSION='v23 · retouche d image';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1231,11 +1231,16 @@ async function pcSend(){
         const p=POSTS.find(x=>x.id===PC_POST); if(p) p.body=out.new_body;
       }
       if(out.info_request) loadFacts();
-      if(out.action==='update_text'||out.action==='regenerate_image'){
+      if(out.action==='update_text'||out.action==='regenerate_image'||out.action==='edit_image'){
         el('calAll').checked=true;      // le post reste visible quelle que soit la semaine
       }
+      if(out.action==='edit_image'){
+        PC_MSGS.push({role:'agent',agent:'designer',content:'🖌️ Je retouche l\'image sans la refaire, deux minutes…'});
+        pcRender();
+        runImageQueue([PC_POST],'retouche',out.image_instruction);
+      }
       if(out.action==='regenerate_image'){
-        PC_MSGS.push({role:'agent',agent:'designer',content:'🎨 Je refais le visuel, ça arrive…'});
+        PC_MSGS.push({role:'agent',agent:'designer',content:'🎨 Je refais le visuel entièrement, ça arrive…'});
         pcRender();
         runImageQueue([PC_POST],null,out.image_instruction);
       }
@@ -1508,6 +1513,11 @@ function patchImage(id,patch){
   zone.outerHTML=imgZone(p);
   const btn=document.querySelector('[data-img="'+id+'"] .act-img');
   if(btn) btn.onclick=()=>runImageQueue([id]);
+  const bt=document.querySelector('[data-img="'+id+'"] .act-touch');
+  if(bt) bt.onclick=()=>{
+    const quoi=prompt("Que faut-il changer sur cette image ?\n(la photo est conservée, seul ce détail change)");
+    if(quoi&&quoi.trim()) runImageQueue([id],'retouche',quoi.trim());
+  };
 }
 function imgZone(p){
   if(p.image_status==='ready'&&p.image_url){
@@ -1516,7 +1526,8 @@ function imgZone(p){
       <div class="img-foot">
         <span class="img-tag">${p.image_headline?'✍️ « '+esc(p.image_headline)+' »':'🎨 '+esc(p.image_style||'visuel')}</span>
         <a class="btn ghost small" href="${esc(p.image_url)}" target="_blank" rel="noopener">⬇️ Ouvrir</a>
-        <button class="btn ghost small act-img">↻ Regénérer</button>
+        <button class="btn ghost small act-touch">🖌️ Retoucher</button>
+        <button class="btn ghost small act-img">↻ Refaire</button>
       </div></div>`;
   }
   if(p.image_status==='pending'){
@@ -1540,7 +1551,12 @@ async function runImageQueue(ids,mode,instruction){
       const p=POSTS.find(x=>x.id===ids[i]);
       const cid=p?p.company_id:(CURRENT_COMPANY&&CURRENT_COMPANY.id);
       const out=await callImageAgent(ids[i],mode,instruction);
-      if(out.mode==='design'){
+      if(out.mode==='retouche'){
+        patchImage(ids[i],{image_status:'ready',image_url:out.image_url}); ok++;
+        const branded=await composeVisual(ids[i],cid,out.image_url,out.headline||'');
+        if(branded) patchImage(ids[i],{image_url:branded});
+      }
+      else if(out.mode==='design'){
         const url=await renderDesign(ids[i],cid,out.network,out.design);
         if(!url) throw new Error('rendu impossible');
         patchImage(ids[i],{image_status:'ready',image_url:url,image_style:'designé',
@@ -1776,6 +1792,11 @@ async function loadPosts(){
     card.querySelector('.act-save').onclick=()=>savePostBody(id,card.querySelector('.post-body').value);
     const img=card.querySelector('.act-img');
     if(img) img.onclick=()=>runImageQueue([id]);
+    const touch=card.querySelector('.act-touch');
+    if(touch) touch.onclick=()=>{
+      const quoi=prompt("Que faut-il changer sur cette image ?\n(la photo est conservée, seul ce détail change)");
+      if(quoi&&quoi.trim()) runImageQueue([id],'retouche',quoi.trim());
+    };
     card.querySelector('.act-chat').onclick=()=>openPostChat(id);
     card.querySelector('.act-pub').onclick=()=>openPublish(id);
   });

@@ -6,6 +6,7 @@
 // Secrets requis : ANTHROPIC_API_KEY (déjà posé), GEMINI_API_KEY (à poser).
 // Secrets optionnels : MKT_ART_MODEL (modèle Claude), MKT_IMAGE_MODEL (modèle Gemini).
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -175,7 +176,11 @@ export const QUOTA_MSG =
   "ou le quota du jour est atteint. Active la facturation sur ton projet Google AI Studio " +
   "(https://aistudio.google.com/apikey) ou attends la remise à zéro.";
 
-async function callGemini(apiKey: string, model: string, prompt: string, aspectRatio: string) {
+async function callGemini(apiKey: string, model: string, prompt: string, aspectRatio: string,
+                          ref?: { data: string; mime: string }) {
+  const parts: unknown[] = [];
+  if (ref) parts.push({ inline_data: { mime_type: ref.mime, data: ref.data } });
+  parts.push({ text: prompt });
   let lastErr = "", quota = false;
   for (const m of [model, "gemini-2.5-flash-image"]) {
     for (const generationConfig of imageConfigs(aspectRatio)) {
@@ -184,7 +189,7 @@ async function callGemini(apiKey: string, model: string, prompt: string, aspectR
         {
           method: "POST",
           headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig }),
+          body: JSON.stringify({ contents: [{ parts }], generationConfig }),
         },
       );
       if (resp.ok) return await resp.json();
@@ -230,7 +235,7 @@ Deno.serve(async (req) => {
 
     // 2) Charger le post + la société + la ligne éditoriale
     const { data: post } = await admin.from("mkt_posts")
-      .select("id, company_id, network, body, visual_idea, caption").eq("id", postId).maybeSingle();
+      .select("id, company_id, network, body, visual_idea, caption, image_url, image_raw_url, image_headline, image_style").eq("id", postId).maybeSingle();
     if (!post) return json({ error: "Post introuvable." }, 404);
 
     const { data: company } = await admin.from("mkt_companies")
@@ -241,6 +246,54 @@ Deno.serve(async (req) => {
     const { data: edit } = await admin.from("mkt_editorial").select("*").eq("company_id", post.company_id).maybeSingle();
 
     await admin.from("mkt_posts").update({ image_status: "pending", image_error: null }).eq("id", postId);
+
+    // ---- Mode « retouche » : on garde la photo et on ne change que ce qui est demandé ----
+    if (body.mode === "retouche") {
+      const source = post.image_raw_url || post.image_url;
+      if (!source) throw new Error("Aucune image à retoucher : génère d'abord un visuel.");
+      const consigne = String(body.instruction || "").trim();
+      if (!consigne) throw new Error("Dis-moi ce qu'il faut changer sur l'image.");
+
+      const src = await fetch(source);
+      if (!src.ok) throw new Error("Image d'origine illisible.");
+      const srcMime = src.headers.get("content-type") || "image/png";
+      const srcB64 = encodeBase64(new Uint8Array(await src.arrayBuffer()));
+
+      const prompt = `Edit the provided image. Keep the SAME photograph: same scene, same subject, same composition, `
+        + `same framing, same lighting, same colours. Do not regenerate it, do not change the style. `
+        + `Apply ONLY this change: ${consigne}. `
+        + `Keep the lower third visually calm — a caption bar will be added there afterwards. `
+        + `No text, no letters, no watermark. Photorealistic, seamless, high detail.`;
+
+      const gemR = await callGemini(geminiKey, imageModel, prompt, RATIO[post.network] || "16:9",
+        { data: srcB64, mime: srcMime });
+      const partsR = gemR?.candidates?.[0]?.content?.parts || [];
+      const inlR = partsR.find((p: { inlineData?: { data?: string } }) => p?.inlineData?.data)?.inlineData;
+      if (!inlR?.data) {
+        const reason = gemR?.candidates?.[0]?.finishReason || gemR?.promptFeedback?.blockReason || "aucune image renvoyée";
+        throw new Error("Retouche impossible (" + reason + ").");
+      }
+      const mimeR = inlR.mimeType || "image/png";
+      const bytesR = await b64ToBytes(inlR.data, mimeR);
+      const pathR = `${post.company_id}/${post.id}-retouche-${Date.now()}.${mimeR.includes("jpeg") ? "jpg" : "png"}`;
+      const { error: upR } = await admin.storage.from("mkt-images")
+        .upload(pathR, bytesR, { contentType: mimeR, upsert: true });
+      if (upR) throw new Error("Stockage échoué : " + upR.message);
+      const urlR = admin.storage.from("mkt-images").getPublicUrl(pathR).data.publicUrl;
+
+      await admin.from("mkt_posts").update({
+        image_raw_url: urlR, image_url: urlR, image_status: "ready", image_error: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", postId);
+
+      await logUsage(admin, {
+        owner: uid, company_id: post.company_id, source: "image", agent: "designer",
+        provider: "google", model: imageModel, images: 1, cost_usd: IMAGE_PRICE_USD,
+      });
+
+      return json({ ok: true, mode: "retouche", post_id: postId, image_url: urlR,
+        headline: post.image_headline || "", style: post.image_style || "" });
+    }
 
     // ---- Mode « visuel designé » : l'IA conçoit, l'app dessine. Aucune image générée. ----
     if (body.mode === "design") {
@@ -367,6 +420,7 @@ Ta mission : rédiger la consigne d'un visuel de qualité professionnelle, digne
 
     const { error: updErr } = await admin.from("mkt_posts").update({
       image_url: imageUrl,
+      image_raw_url: imageUrl,
       image_prompt: art.prompt,
       image_style: art.style || null,
       image_alt: art.alt || null,

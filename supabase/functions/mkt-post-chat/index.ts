@@ -61,8 +61,8 @@ const SCHEMA = {
     reply: { type: "string", description: "Ta réponse à David, en français, courte (1 à 4 phrases), ton de collègue. Dis ce que tu as changé." },
     action: {
       type: "string",
-      enum: ["none", "update_text", "regenerate_image"],
-      description: "update_text = tu réécris le post ; regenerate_image = le visuel doit être refait ; none = simple échange.",
+      enum: ["none", "update_text", "edit_image", "regenerate_image"],
+      description: "update_text = tu réécris le post ; edit_image = on GARDE la photo actuelle et on n'y change qu'un détail ; regenerate_image = on refait une image entièrement nouvelle ; none = simple échange.",
     },
     new_body: { type: "string", description: "Le texte complet et réécrit du post, prêt à publier. Vide si action ≠ update_text." },
     image_instruction: { type: "string", description: "La consigne à ajouter au Directeur artistique, en français, précise. Vide si action ≠ regenerate_image." },
@@ -130,7 +130,8 @@ Style du visuel : ${post.image_style || "(aucun)"}
 Règles :
 - Réponds en français, comme un collègue : direct, concret, pas de flatterie, 1 à 4 phrases.
 - Si David demande une modification du TEXTE, réécris-le EN ENTIER dans « new_body » et mets action = update_text. Garde le format du réseau, ne perds ni l'appel à l'action ni les hashtags sauf demande contraire.
-- Si David demande une modification du VISUEL, mets action = regenerate_image et écris dans « image_instruction » une consigne précise pour le Directeur artistique (ce qu'il faut changer : sujet, ambiance, couleurs, accroche…).
+- Si David veut GARDER l'image actuelle et n'y changer qu'un détail (ajouter ou retirer un élément, changer une couleur, déplacer quelque chose), mets action = edit_image et décris dans « image_instruction » UNIQUEMENT ce qui change. C'est le cas le plus fréquent : dans le doute, choisis edit_image plutôt que regenerate_image.
+- Ne choisis regenerate_image que si David demande explicitement une image entièrement différente, ou s'il rejette le concept même de l'image.
 - Si c'est une simple question ou un avis, action = none.
 - Ne promets jamais de publier sur les réseaux : le logiciel ne le fait pas encore.
 - S'il te manque une information sur la société pour bien faire (offre, prix, références, zone d'intervention, argument différenciant…), pose la question dans « info_request ». Elle sera posée à David dans l'onglet Paramétrage. Une seule question à la fois, et seulement si elle est vraiment utile.`;
