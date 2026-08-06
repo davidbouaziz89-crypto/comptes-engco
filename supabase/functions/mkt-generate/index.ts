@@ -140,7 +140,75 @@ Deno.serve(async (req) => {
     if (!company) return json({ error: "Société introuvable." }, 404);
     if (company.owner !== uid) return json({ error: "Accès refusé à cette société." }, 403);
 
-    // 2) Charger ligne éditoriale + cadence
+    // 2) Post à la demande : un sujet précis, hors cadence
+    const sujet = String(body.topic || "").trim();
+    if (sujet) {
+      const reseau = ["linkedin", "instagram", "facebook"].includes(body.network) ? body.network : "linkedin";
+      const quand = body.when || new Date(Date.now() + 86400000).toISOString();
+
+      const { data: ed1 } = await admin.from("mkt_editorial").select("*").eq("company_id", companyId).maybeSingle();
+      const e1 = ed1 || {};
+      const bloc = [
+        e1.summary ? `La société : ${e1.summary}` : null,
+        e1.tone ? `Ton : ${e1.tone}` : null,
+        e1.audience ? `Cible : ${e1.audience}` : null,
+        e1.dos ? `À faire : ${e1.dos}` : null,
+        e1.donts ? `À éviter : ${e1.donts}` : null,
+      ].filter(Boolean).join("\n") + await factsBlock(admin, companyId);
+
+      const consigne = `Tu es le responsable marketing de « ${company.name} »${company.activity ? ` (${company.activity})` : ""}.
+Écris UN SEUL post ${reseau}, sur ce sujet précis demandé par David :
+« ${sujet} »
+
+Ligne éditoriale :
+${bloc}
+
+Contraintes :
+- Le sujet demandé prime sur tout le reste : traite-le vraiment, ne le dilue pas.
+- Adapte le style au réseau : LinkedIn = professionnel et structuré ; Instagram = visuel et chaleureux ; Facebook = accessible.
+- Le post doit être publiable tel quel, sans mention à compléter.
+- Propose aussi une idée de visuel concrète et une légende courte avec hashtags.
+Renvoie exactement 1 post.`;
+
+      const resp1 = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({
+          model, max_tokens: 3000,
+          output_config: { format: { type: "json_schema", schema: POSTS_SCHEMA } },
+          messages: [{ role: "user", content: [{ type: "text", text: consigne }] }],
+        }),
+      });
+      if (!resp1.ok) {
+        const t = await resp1.text();
+        return json({ error: "Erreur IA (" + resp1.status + ") : " + t.slice(0, 300) }, 502);
+      }
+      const o1 = await resp1.json();
+      const tb1 = (o1.content || []).find((b: { type: string }) => b.type === "text");
+      const p1 = tb1 ? tryParseJson(String(tb1.text || "")) as { posts?: Record<string, string>[] } : null;
+      const un = p1 && Array.isArray(p1.posts) ? p1.posts[0] : null;
+      if (!un) return json({ error: "Réponse IA illisible. Réessaie." }, 502);
+
+      const { data: cree, error: e2 } = await admin.from("mkt_posts").insert({
+        company_id: companyId, network: reseau,
+        body: un.body || "", visual_idea: un.visual_idea || "", caption: un.caption || "",
+        scheduled_at: quand, status: "a_valider", image_status: "none",
+      }).select("id, network, body, visual_idea, caption, scheduled_at, status").single();
+      if (e2) return json({ error: "Insertion échouée : " + e2.message }, 500);
+
+      await logUsage(admin, {
+        owner: uid, company_id: companyId, source: "generation", agent: "redacteur",
+        provider: "anthropic", model,
+        input_tokens: o1.usage?.input_tokens || 0,
+        output_tokens: o1.usage?.output_tokens || 0,
+        cache_read_tokens: o1.usage?.cache_read_input_tokens || 0,
+        cost_usd: claudeCost(model, o1.usage || null),
+      });
+
+      return json({ ok: true, created: [cree], single: true });
+    }
+
+    // 3) Charger ligne éditoriale + cadence
     const { data: edit } = await admin.from("mkt_editorial").select("*").eq("company_id", companyId).maybeSingle();
     const { data: cadRows } = await admin.from("mkt_cadence").select("*").eq("company_id", companyId).eq("active", true);
     let cadence = (cadRows || []).filter((c: { per_week: number }) => c.per_week > 0);

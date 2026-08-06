@@ -410,6 +410,30 @@
     </div>
   </div>
 
+  <!-- Post à la demande -->
+  <div id="newPostModal" class="overlay hidden">
+    <div class="modal-card" style="max-width:520px">
+      <h2 style="margin-top:0">✍️ Écrire un post à la demande</h2>
+      <p class="who" style="margin-top:0">Une promo, un événement, une annonce… Dis le sujet, Pierre s'occupe du reste.</p>
+      <label>Sujet du post</label>
+      <textarea id="npTopic" style="min-height:90px" placeholder="ex. On lance une offre d'été : 3 mois à -30% pour tout nouveau client, valable jusqu'au 31 août"></textarea>
+      <div class="row">
+        <div><label>Réseau</label><select id="npNet">
+          <option value="linkedin">LinkedIn</option>
+          <option value="instagram">Instagram</option>
+          <option value="facebook">Facebook</option>
+        </select></div>
+        <div><label>Date</label><input type="date" id="npDate"></div>
+        <div style="max-width:110px"><label>Heure</label><input type="number" id="npHour" min="0" max="23" value="9"></div>
+      </div>
+      <div class="err" id="npMsg"></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn" id="npGo">✍️ Écrire le post</button>
+        <button class="btn ghost" id="npCancel" style="flex:0 0 auto">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Aide à la publication -->
   <div id="pubModal" class="overlay hidden">
     <div class="modal-card" style="max-width:600px;max-height:88vh;overflow:auto">
@@ -526,6 +550,7 @@
         <div class="row" style="align-items:center">
           <h2 style="margin:0">🗓️ Posts de la semaine</h2>
           <div style="flex:0 0 auto;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn ghost" id="newPostBtn">✍️ Nouveau post</button>
             <button class="btn ghost" id="designBtn">🖌️ Visuels designés</button>
             <button class="btn ghost" id="redoBtn">↻ Tout refaire (photo)</button>
             <button class="btn ghost" id="imagesBtn">🎨 Créer les visuels manquants</button>
@@ -717,7 +742,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v23 · retouche d image';
+const APP_VERSION='v24 · post à la demande';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1588,6 +1613,51 @@ el('imagesBtn').onclick=()=>{
   const ids=POSTS.filter(p=>p.image_status!=='ready'&&p.status!=='refuse').map(p=>p.id);
   if(!ids.length){ el('genMsg').style.color='var(--muted)'; el('genMsg').textContent='Tous les posts ont déjà leur visuel.'; setTimeout(()=>el('genMsg').textContent='',4000); return; }
   runImageQueue(ids);
+};
+
+// ================= POST À LA DEMANDE =================
+el('newPostBtn').onclick=()=>{
+  if(!CURRENT_COMPANY){ alert('Choisis d\'abord une société.'); return; }
+  const d=new Date(); d.setDate(d.getDate()+1);
+  el('npDate').value=d.toISOString().slice(0,10);
+  el('npTopic').value=''; el('npMsg').textContent='';
+  el('newPostModal').classList.remove('hidden');
+  setTimeout(()=>el('npTopic').focus(),80);
+};
+el('npCancel').onclick=()=>el('newPostModal').classList.add('hidden');
+el('npGo').onclick=async()=>{
+  const sujet=el('npTopic').value.trim();
+  if(!sujet){ el('npMsg').style.color='var(--bad)'; el('npMsg').textContent='Dis-moi de quoi doit parler le post.'; return; }
+  const quand=new Date((el('npDate').value||new Date().toISOString().slice(0,10))+'T00:00:00Z');
+  quand.setUTCHours(parseInt(el('npHour').value||'9',10),0,0,0);
+  el('npGo').disabled=true;
+  el('npMsg').style.color='var(--muted)'; el('npMsg').textContent='✍️ Pierre écrit… (10 à 20 s)';
+  setAgent('redacteur','✍️ Écrit ton post…','busy');
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-generate',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({company_id:CURRENT_COMPANY.id,topic:sujet,network:el('npNet').value,when:quand.toISOString()})
+    });
+    const out=await res.json().catch(()=>({error:'réponse illisible'}));
+    if(!res.ok||out.error){
+      el('npMsg').style.color='var(--bad)'; el('npMsg').textContent='Erreur : '+(out.error||res.status);
+      setAgent('redacteur','⚠️','err');
+    }else{
+      setAgent('redacteur','✅ Post écrit','done');
+      el('newPostModal').classList.add('hidden');
+      el('calAll').checked=true;
+      await loadPosts(); refreshCost();
+      const id=out.created&&out.created[0]&&out.created[0].id;
+      if(id){
+        const card=document.querySelector('[data-id="'+id+'"]');
+        if(card){ card.scrollIntoView({behavior:'smooth',block:'center'});
+          card.style.boxShadow='0 0 0 2px var(--accent)'; setTimeout(()=>card.style.boxShadow='',2000); }
+      }
+    }
+  }catch(e){ el('npMsg').style.color='var(--bad)'; el('npMsg').textContent='Erreur réseau : '+e.message; setAgent('redacteur','⚠️','err'); }
+  el('npGo').disabled=false;
 };
 
 // ================= VALIDATION RAPIDE =================
