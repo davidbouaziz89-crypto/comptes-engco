@@ -98,7 +98,10 @@
     });
     S.convById = {}; S.convs.forEach(c => S.convById[c.id] = c);
   }
-  function convName(c) { if (c.type === "group") return c.title || "Groupe"; const o = c.other; const d = o && S.dirById[o.user_id]; return d ? d.display_name : (o ? nameFromEmail(o.email) : "Discussion"); }
+  // Nom affiché d'un utilisateur (Prénom Nom via l'annuaire, sinon déduit de l'email).
+  function dispUser(userId, emailFb) { if (userId && me && userId === me.id) return "Moi"; const d = S.dirById[userId]; return (d && d.display_name) || nameFromEmail(emailFb || ""); }
+  function groupNames(c) { return (c.members || []).filter(m => m.user_id !== me.id).map(m => dispUser(m.user_id, m.email)).join(", "); }
+  function convName(c) { if (c.type === "group") return c.title || groupNames(c) || "Groupe"; const o = c.other; const d = o && S.dirById[o.user_id]; return d ? d.display_name : (o ? nameFromEmail(o.email) : "Discussion"); }
   function convAvatar(c) { if (c.type === "group") return `<div class="egc-av"><span style="position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(135deg,#8b5cf6,#6366f1)">👥</span></div>`; const o = c.other; const d = o && S.dirById[o.user_id]; return avatarHTML(o ? o.user_id : "", o ? o.email : "", d ? d.genre : null); }
 
   /* ---------- Presence ---------- */
@@ -261,13 +264,13 @@
   }
   function renderConvHeaderStatus() {
     const st = el("egc-status"); if (!st) return; const c = S.convById[S.openId]; if (!c) return;
-    if (c.type === "group") { const on = (c.members || []).filter(m => S.online.has(m.user_id)).length; st.textContent = `${(c.members || []).length} membres · ${on} en ligne`; }
+    if (c.type === "group") { const on = (c.members || []).filter(m => S.online.has(m.user_id)).length; const names = groupNames(c); st.textContent = (names || `${(c.members || []).length} membres`) + (on ? ` · ${on} en ligne` : ""); }
     else { st.innerHTML = c.other && S.online.has(c.other.user_id) ? `<span class="egc-online-dot"></span>En ligne` : "Hors ligne"; }
   }
   function appendMessage(m, noScroll) {
     const box = el("egc-msgs"); if (!box) return; const c = S.convById[m.conversation_id];
     const mine = m.sender_id === me.id;
-    const who = (!mine && c && c.type === "group") ? `<div class="egc-who">${esc(nameFromEmail(m.sender_email))}</div>` : "";
+    const who = (!mine && c && c.type === "group") ? `<div class="egc-who">${esc(dispUser(m.sender_id, m.sender_email))}</div>` : "";
     const atts = (S.attByMsg && S.attByMsg[m.id]) || [];
     let attHtml = "";
     for (const a of atts) attHtml += renderAttachment(a);
