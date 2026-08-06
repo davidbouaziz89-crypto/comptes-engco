@@ -405,6 +405,39 @@
     </div>
   </div>
 
+  <!-- Aide à la publication -->
+  <div id="pubModal" class="overlay hidden">
+    <div class="modal-card" style="max-width:600px;max-height:88vh;overflow:auto">
+      <div class="row" style="align-items:center">
+        <h2 style="margin:0" id="pubTitle">Publier</h2>
+        <button class="btn ghost small" id="pubClose" style="flex:0 0 auto">Fermer</button>
+      </div>
+      <p class="who" style="margin-top:6px">Tout est prêt. Copie, télécharge, publie — puis reviens cocher.</p>
+
+      <label>Le texte du post</label>
+      <textarea id="pubBody" style="min-height:150px"></textarea>
+      <button class="btn ghost small" id="pubCopyBody" style="margin-top:6px">📋 Copier le texte</button>
+
+      <div id="pubCapWrap">
+        <label>Légende et hashtags</label>
+        <textarea id="pubCap" style="min-height:60px"></textarea>
+        <button class="btn ghost small" id="pubCopyCap" style="margin-top:6px">📋 Copier la légende</button>
+      </div>
+
+      <div id="pubImgWrap" style="margin-top:14px">
+        <label>Le visuel</label>
+        <img id="pubImg" style="width:100%;border-radius:12px;border:1px solid var(--line);display:block">
+        <button class="btn ghost small" id="pubDl" style="margin-top:8px">⬇️ Télécharger l'image</button>
+      </div>
+
+      <div class="row" style="margin-top:18px">
+        <a class="btn ghost" id="pubOpen" target="_blank" rel="noopener" style="flex:1;text-align:center">🌐 Ouvrir le réseau</a>
+        <button class="btn" id="pubDone" style="flex:1">✅ C'est publié</button>
+      </div>
+      <div class="err" id="pubMsg"></div>
+    </div>
+  </div>
+
   <!-- Discussion sur un post précis -->
   <div id="postChat" class="chatpop hidden">
     <div class="cp-head">
@@ -665,7 +698,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v17 · paramétrage dans le bandeau';
+const APP_VERSION='v18 · publication assistée';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -673,7 +706,7 @@ let USAGE=[], RANGE={from:null,to:null};
 
 const NETWORKS=[{k:'linkedin',label:'LinkedIn'},{k:'instagram',label:'Instagram'},{k:'facebook',label:'Facebook'}];
 const DAYS=[{i:1,l:'L'},{i:2,l:'M'},{i:3,l:'M'},{i:4,l:'J'},{i:5,l:'V'},{i:6,l:'S'},{i:0,l:'D'}];
-const STATUS_LABEL={brouillon:'Brouillon',a_valider:'À valider',valide:'✅ Validé',publie:'Publié',refuse:'❌ Refusé',pause:'⏸️ En pause'};
+const STATUS_LABEL={brouillon:'Brouillon',a_valider:'À valider',valide:'✅ Validé',publie:'🚀 Publié',refuse:'❌ Refusé',pause:'⏸️ En pause'};
 const NET_LABEL={linkedin:'LinkedIn',instagram:'Instagram',facebook:'Facebook'};
 const LOGOS=[
   {url:'assets/logos/notelia.png',label:'Notelia'},
@@ -1503,6 +1536,59 @@ el('imagesBtn').onclick=()=>{
   runImageQueue(ids);
 };
 
+// ================= AIDE À LA PUBLICATION =================
+// La publication automatique n'est pas encore possible (accès API LinkedIn à obtenir).
+// En attendant, on prépare tout pour que ça prenne dix secondes.
+const NET_URL={
+  linkedin:'https://www.linkedin.com/feed/?shareActive=true',
+  facebook:'https://www.facebook.com/',
+  instagram:'https://www.instagram.com/'
+};
+let PUB_ID=null;
+function openPublish(id){
+  const p=POSTS.find(x=>x.id===id); if(!p) return;
+  PUB_ID=id;
+  el('pubTitle').textContent='Publier sur '+(NET_LABEL[p.network]||p.network);
+  el('pubBody').value=p.body||'';
+  el('pubCap').value=p.caption||'';
+  el('pubCapWrap').style.display=p.caption?'block':'none';
+  if(p.image_url){ el('pubImgWrap').style.display='block'; el('pubImg').src=p.image_url; }
+  else el('pubImgWrap').style.display='none';
+  el('pubOpen').href=NET_URL[p.network]||'https://www.linkedin.com/';
+  el('pubMsg').textContent='';
+  el('pubDone').textContent=p.status==='publie'?'Déjà publié ✓':'✅ C\'est publié';
+  el('pubModal').classList.remove('hidden');
+}
+el('pubClose').onclick=()=>el('pubModal').classList.add('hidden');
+async function copyTo(txt,btn){
+  try{ await navigator.clipboard.writeText(txt); const o=btn.textContent; btn.textContent='✅ Copié';
+    setTimeout(()=>btn.textContent=o,1600); }
+  catch(e){ el('pubMsg').style.color='var(--bad)'; el('pubMsg').textContent='Copie impossible : sélectionne le texte à la main.'; }
+}
+el('pubCopyBody').onclick=(e)=>copyTo(el('pubBody').value,e.target);
+el('pubCopyCap').onclick=(e)=>copyTo(el('pubCap').value,e.target);
+el('pubDl').onclick=async()=>{
+  const p=POSTS.find(x=>x.id===PUB_ID); if(!p||!p.image_url) return;
+  try{
+    const r=await fetch(p.image_url); const b=await r.blob();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(b);
+    a.download=(CURRENT_COMPANY?CURRENT_COMPANY.name.replace(/\s+/g,'-'):'visuel')+'-'+p.network+'.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch(e){ window.open(p.image_url,'_blank'); }
+};
+el('pubDone').onclick=async()=>{
+  if(!PUB_ID) return;
+  const body=el('pubBody').value;
+  const {error}=await db.from('mkt_posts')
+    .update({status:'publie',published_at:new Date().toISOString(),body,updated_at:new Date().toISOString()})
+    .eq('id',PUB_ID);
+  if(error){ el('pubMsg').style.color='var(--bad)'; el('pubMsg').textContent='Erreur : '+error.message; return; }
+  el('pubModal').classList.add('hidden');
+  await loadPosts();
+};
+
 // ================= CALENDRIER ÉDITORIAL =================
 let WEEK_OFF=0;
 const NET_COLOR={linkedin:'#3f7fff',instagram:'#e1467c',facebook:'#5b7cfa'};
@@ -1612,6 +1698,7 @@ async function loadPosts(){
         <button class="btn ghost act-refuser small" style="flex:0 0 auto">❌ Refuser</button>
         <button class="btn ghost act-pause small" style="flex:0 0 auto">⏸️ Pause</button>
         <button class="btn ghost act-chat small" style="flex:0 0 auto" title="Demander une modification">💬 Demander une modif</button>
+        <button class="btn act-pub small" style="flex:0 0 auto" title="Tout ce qu'il faut pour publier">📤 Publier</button>
       </div>
     </div>`).join('');
   el('posts').querySelectorAll('[data-id]').forEach(card=>{
@@ -1623,6 +1710,7 @@ async function loadPosts(){
     const img=card.querySelector('.act-img');
     if(img) img.onclick=()=>runImageQueue([id]);
     card.querySelector('.act-chat').onclick=()=>openPostChat(id);
+    card.querySelector('.act-pub').onclick=()=>openPublish(id);
   });
 }
 async function setPostStatus(id,status){
