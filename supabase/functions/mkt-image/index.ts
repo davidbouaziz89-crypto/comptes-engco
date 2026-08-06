@@ -16,6 +16,30 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// Ce que David a précisé aux agents : ces réponses valent autant que la ligne éditoriale.
+// deno-lint-ignore no-explicit-any
+async function factsBlock(admin: any, companyId: string): Promise<string> {
+  try {
+    const { data } = await admin.from("mkt_facts")
+      .select("question, answer").eq("company_id", companyId).not("answer", "is", null);
+    if (!data || !data.length) return "";
+    return "\n\nPrécisions données par David :\n"
+      + data.map((f: { question: string; answer: string }) => `- ${f.question} → ${f.answer}`).join("\n");
+  } catch (_) { return ""; }
+}
+
+// Enregistre une question de l'équipe, sans doublon.
+// deno-lint-ignore no-explicit-any
+async function askFact(admin: any, companyId: string, question: string, agent: string) {
+  const q = String(question || "").trim();
+  if (!q) return;
+  try {
+    const { data } = await admin.from("mkt_facts").select("id").eq("company_id", companyId).ilike("question", q);
+    if (data && data.length) return;
+    await admin.from("mkt_facts").insert({ company_id: companyId, question: q, asked_by: agent });
+  } catch (e) { console.error("FACT_ASK_FAIL", String(e)); }
+}
+
 // Décodage rapide, délégué au moteur : `atob` + boucle caractère par caractère
 // faisait exploser le budget CPU de la fonction sur des images de plusieurs Mo (erreur 546).
 async function b64ToBytes(b64: string, mime: string): Promise<Uint8Array> {
@@ -268,7 +292,7 @@ DEMANDE EXPRESSE DE DAVID, prioritaire : ${String(body.instruction).slice(0, 600
       ed.audience ? `Cible : ${ed.audience}` : null,
       ed.brand_colors ? `Couleurs de la marque à respecter : ${ed.brand_colors}` : null,
       ed.donts ? `À éviter absolument : ${ed.donts}` : null,
-    ].filter(Boolean).join("\n");
+    ].filter(Boolean).join("\n") + await factsBlock(admin, post.company_id);
 
     const instruction = `Tu es le directeur artistique de « ${company.name} »${company.activity ? ` (${company.activity})` : ""}.
 Tu dois créer le visuel qui accompagnera ce post ${post.network}.

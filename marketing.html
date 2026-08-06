@@ -441,6 +441,7 @@
       <nav class="tabs" id="tabs">
         <button class="tab on" data-tab="pilotage">🚀 Pilotage</button>
         <button class="tab" data-tab="chat">💬 Discussion</button>
+        <button class="tab" data-tab="param">⚙️ Paramétrage</button>
         <button class="tab" data-tab="histo">📚 Historique</button>
         <button class="tab" data-tab="frais">💶 Frais</button>
       </nav>
@@ -457,36 +458,6 @@
           <div class="who" style="font-size:11.5px;margin-top:10px;line-height:1.4">Clique sur un collègue pour lui parler.</div>
         </aside>
         <div class="pilot-main">
-
-      <!-- En-tête société -->
-      <div class="panel companyPanel">
-        <div class="co-head">
-          <img id="coLogo" class="co-logo ph" alt="">
-          <div style="flex:1;min-width:0">
-            <h2 style="margin:0" id="coName"></h2>
-            <div class="who" id="coWebsite"></div>
-          </div>
-          <button class="btn ghost small" id="editCompanyBtn" style="flex:0 0 auto">⚙️ Modifier</button>
-        </div>
-      </div>
-
-      <!-- Ce que l'IA a compris -->
-      <div class="panel companyPanel">
-        <h2>🧠 Ce que l'IA a compris de ta marque</h2>
-        <div id="brandBox"></div>
-      </div>
-
-      <!-- Cadence -->
-      <div class="panel companyPanel">
-        <h2>📆 Rythme de publication</h2>
-        <p class="who" style="margin-top:0">Le seul réglage que tu choisis : combien de posts par semaine, sur quels réseaux, quels jours et à quelle heure.</p>
-        <div id="cadence"></div>
-        <label style="display:flex;align-items:center;gap:9px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);cursor:pointer">
-          <input type="checkbox" id="autoWeekly" style="width:auto">
-          <span style="color:var(--txt);font-size:14px">🤖 <strong>Pilote automatique</strong> — chaque lundi matin, l'équipe écrit la semaine toute seule et tu reçois une notification pour valider.</span>
-        </label>
-        <div class="err" id="autoMsg"></div>
-      </div>
 
       <!-- Génération + posts -->
       <div class="panel companyPanel">
@@ -528,6 +499,57 @@
             </div>
           </section>
         </div>
+      </div>
+
+      <!-- ================= PARAMÉTRAGE ================= -->
+      <div id="tab-param" class="hidden">
+        <div class="panel">
+          <h2 style="margin-top:0">🏢 Tes sociétés</h2>
+          <div id="paramCos"></div>
+        </div>
+        <div class="panel companyPanel" id="factsPanel">
+          <h2 style="margin-top:0">❓ Ce que l'équipe aimerait savoir</h2>
+          <p class="who" style="margin-top:0">Quand un agent manque d'une information pour bien travailler, il la demande ici. Réponds une fois : tous les agents s'en serviront ensuite.</p>
+          <div id="factsList"></div>
+          <div class="row" style="margin-top:14px;align-items:flex-end">
+            <div><label style="margin-top:0">Ajouter une information de ton côté</label>
+              <input id="factQ" placeholder="ex. Notre offre d'entrée de gamme"></div>
+            <div><label style="margin-top:0">Sa valeur</label>
+              <input id="factA" placeholder="ex. 490 € / mois, 100 leads"></div>
+            <div style="flex:0 0 auto"><button class="btn ghost" id="factAdd">+ Ajouter</button></div>
+          </div>
+          <div class="err" id="factMsg"></div>
+        </div>
+      <!-- En-tête société -->
+      <div class="panel companyPanel">
+        <div class="co-head">
+          <img id="coLogo" class="co-logo ph" alt="">
+          <div style="flex:1;min-width:0">
+            <h2 style="margin:0" id="coName"></h2>
+            <div class="who" id="coWebsite"></div>
+          </div>
+          <button class="btn ghost small" id="editCompanyBtn" style="flex:0 0 auto">⚙️ Modifier</button>
+        </div>
+      </div>
+
+      <!-- Ce que l'IA a compris -->
+      <div class="panel companyPanel">
+        <h2>🧠 Ce que l'IA a compris de ta marque</h2>
+        <div id="brandBox"></div>
+      </div>
+
+      <!-- Cadence -->
+      <div class="panel companyPanel">
+        <h2>📆 Rythme de publication</h2>
+        <p class="who" style="margin-top:0">Le seul réglage que tu choisis : combien de posts par semaine, sur quels réseaux, quels jours et à quelle heure.</p>
+        <div id="cadence"></div>
+        <label style="display:flex;align-items:center;gap:9px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);cursor:pointer">
+          <input type="checkbox" id="autoWeekly" style="width:auto">
+          <span style="color:var(--txt);font-size:14px">🤖 <strong>Pilote automatique</strong> — chaque lundi matin, l'équipe écrit la semaine toute seule et tu reçois une notification pour valider.</span>
+        </label>
+        <div class="err" id="autoMsg"></div>
+      </div>
+
       </div>
 
       <!-- ================= HISTORIQUE ================= -->
@@ -615,7 +637,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v13 · équipe à gauche';
+const APP_VERSION='v14 · paramétrage';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -811,6 +833,7 @@ function selectCompany(id){
   else { logo.removeAttribute('src'); logo.classList.add('ph'); logo.textContent='🏢'; }
   el('coWebsite').innerHTML=CURRENT_COMPANY.website?`🌐 <a href="${esc(CURRENT_COMPANY.website.startsWith('http')?CURRENT_COMPANY.website:'https://'+CURRENT_COMPANY.website)}" target="_blank" rel="noopener">${esc(CURRENT_COMPANY.website)}</a>`:'<span class="who">Aucun site renseigné</span>';
   el('autoWeekly').checked=!!CURRENT_COMPANY.auto_weekly;
+  if(!el('tab-param').classList.contains('hidden')) loadParam();
   loadEditorial(); loadCadence(); loadPosts();
 }
 
@@ -1096,7 +1119,7 @@ async function pcSend(){
     else if(PC_MODE==='agent'){
       PC_CHAT_ID=out.chat_id||PC_CHAT_ID;
       (out.messages||[]).filter(m=>m.role!=='user').forEach(m=>PC_MSGS.push({role:m.role==='system'?'agent':'agent',agent:m.agent||PC_AGENT,content:m.content}));
-      refreshCost();
+      refreshCost(); loadFacts();
     }
     else{
       PC_MSGS.push({role:'agent',agent:out.agent,content:out.reply});
@@ -1105,6 +1128,7 @@ async function pcSend(){
         if(card) card.value=out.new_body;
         const p=POSTS.find(x=>x.id===PC_POST); if(p) p.body=out.new_body;
       }
+      if(out.info_request) loadFacts();
       if(out.action==='regenerate_image'){
         PC_MSGS.push({role:'agent',agent:'designer',content:'🎨 Je refais le visuel, ça arrive…'});
         pcRender();
@@ -1533,10 +1557,11 @@ async function savePostBody(id,body){
 document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
 function showTab(name){
   document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
-  ['pilotage','chat','histo','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
+  ['pilotage','param','chat','histo','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
   if(name==='chat') loadChats();
   if(name==='frais') loadUsage();
   if(name==='histo') loadHistory();
+  if(name==='param') loadParam();
 }
 el('costChip').onclick=()=>showTab('frais');
 
@@ -1654,6 +1679,65 @@ async function sendChat(){
 el('chatSend').onclick=sendChat;
 el('chatBox').addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){ e.preventDefault(); sendChat(); } });
 el('chatBox').addEventListener('input',e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,140)+'px'; });
+
+// ================= PARAMÉTRAGE =================
+let FACTS=[];
+async function loadParam(){
+  // Vue d'ensemble des sociétés
+  el('paramCos').innerHTML=COMPANIES.length? COMPANIES.map(c=>`
+    <div class="hrow" style="align-items:center">
+      ${c.logo_url?`<img class="thumb" src="${esc(c.logo_url)}" alt="" style="width:76px;height:76px;object-fit:contain;background:#fff;padding:6px">`
+                  :`<div class="thumb ph" style="width:76px;height:76px">🏢</div>`}
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:16px">${esc(c.name)}</div>
+        <div class="who">${c.website?'🌐 '+esc(c.website):'Aucun site renseigné'}${c.activity?' · '+esc(c.activity):''}</div>
+        <div class="who" style="margin-top:4px">${c.auto_weekly?'🤖 Pilote automatique actif':'Pilote automatique désactivé'}</div>
+      </div>
+      <button class="btn ghost small" data-edit="${c.id}" style="flex:0 0 auto">⚙️ Modifier</button>
+    </div>`).join('') : '<div class="who">Aucune société. Ajoute-la depuis le bandeau en haut.</div>';
+  el('paramCos').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{
+    const c=COMPANIES.find(x=>x.id===b.dataset.edit); if(c){ selectCompany(c.id); openCompanyModal(c); }
+  });
+  await loadFacts();
+}
+async function loadFacts(){
+  if(!CURRENT_COMPANY){ el('factsList').innerHTML=''; return; }
+  const {data}=await db.from('mkt_facts').select('*').eq('company_id',CURRENT_COMPANY.id).order('created_at',{ascending:false});
+  FACTS=data||[];
+  const attente=FACTS.filter(f=>!f.answer), connues=FACTS.filter(f=>f.answer);
+  el('factsList').innerHTML=
+    (attente.length? `<div class="who" style="margin-bottom:8px">En attente de ta réponse</div>`+attente.map(f=>`
+      <div class="hrow" style="align-items:center;padding:12px">
+        ${avatarHTML(f.asked_by||'redacteur','sm')}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">${esc(f.question)}</div>
+          <input class="fact-in" data-id="${f.id}" placeholder="Ta réponse…" style="margin-top:7px">
+        </div>
+        <button class="btn small fact-save" data-id="${f.id}" style="flex:0 0 auto">Enregistrer</button>
+      </div>`).join('') : '<div class="who">L\'équipe n\'a rien à te demander pour l\'instant.</div>')
+    + (connues.length? `<div class="who" style="margin:16px 0 8px">Informations connues de l'équipe</div>`+connues.map(f=>`
+      <div class="brk"><span class="nm" style="width:auto;flex:0 0 42%;color:var(--txt)">${esc(f.question)}</span>
+        <span style="flex:1;font-size:13.5px">${esc(f.answer)}</span>
+        <button class="btn ghost small fact-del" data-id="${f.id}" style="flex:0 0 auto">✕</button></div>`).join('') : '');
+  el('factsList').querySelectorAll('.fact-save').forEach(b=>b.onclick=async()=>{
+    const inp=el('factsList').querySelector('.fact-in[data-id="'+b.dataset.id+'"]');
+    const val=(inp&&inp.value||'').trim(); if(!val) return;
+    await db.from('mkt_facts').update({answer:val,answered_at:new Date().toISOString()}).eq('id',b.dataset.id);
+    loadFacts();
+  });
+  el('factsList').querySelectorAll('.fact-del').forEach(b=>b.onclick=async()=>{
+    await db.from('mkt_facts').delete().eq('id',b.dataset.id); loadFacts();
+  });
+}
+el('factAdd').onclick=async()=>{
+  if(!CURRENT_COMPANY) return;
+  const q=el('factQ').value.trim(), a=el('factA').value.trim();
+  if(!q||!a){ el('factMsg').style.color='var(--bad)'; el('factMsg').textContent='Renseigne l\'information et sa valeur.'; return; }
+  const {error}=await db.from('mkt_facts').insert({company_id:CURRENT_COMPANY.id,question:q,answer:a,asked_by:'david',answered_at:new Date().toISOString()});
+  if(error){ el('factMsg').style.color='var(--bad)'; el('factMsg').textContent='Erreur : '+error.message; return; }
+  el('factQ').value=''; el('factA').value=''; el('factMsg').textContent='';
+  loadFacts();
+};
 
 // ================= HISTORIQUE =================
 let HISTO=[];

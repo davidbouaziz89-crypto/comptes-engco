@@ -14,6 +14,30 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// Ce que David a précisé aux agents : ces réponses valent autant que la ligne éditoriale.
+// deno-lint-ignore no-explicit-any
+async function factsBlock(admin: any, companyId: string): Promise<string> {
+  try {
+    const { data } = await admin.from("mkt_facts")
+      .select("question, answer").eq("company_id", companyId).not("answer", "is", null);
+    if (!data || !data.length) return "";
+    return "\n\nPrécisions données par David :\n"
+      + data.map((f: { question: string; answer: string }) => `- ${f.question} → ${f.answer}`).join("\n");
+  } catch (_) { return ""; }
+}
+
+// Enregistre une question de l'équipe, sans doublon.
+// deno-lint-ignore no-explicit-any
+async function askFact(admin: any, companyId: string, question: string, agent: string) {
+  const q = String(question || "").trim();
+  if (!q) return;
+  try {
+    const { data } = await admin.from("mkt_facts").select("id").eq("company_id", companyId).ilike("question", q);
+    if (data && data.length) return;
+    await admin.from("mkt_facts").insert({ company_id: companyId, question: q, asked_by: agent });
+  } catch (e) { console.error("FACT_ASK_FAIL", String(e)); }
+}
+
 const PRICE: Record<string, { i: number; o: number }> = {
   "claude-opus-5": { i: 5, o: 25 }, "claude-opus-4-8": { i: 5, o: 25 },
   "claude-sonnet-5": { i: 3, o: 15 }, "claude-haiku-4-5": { i: 1, o: 5 },
@@ -42,8 +66,9 @@ const SCHEMA = {
     },
     new_body: { type: "string", description: "Le texte complet et réécrit du post, prêt à publier. Vide si action ≠ update_text." },
     image_instruction: { type: "string", description: "La consigne à ajouter au Directeur artistique, en français, précise. Vide si action ≠ regenerate_image." },
+    info_request: { type: "string", description: "Une information sur la société qui te manque pour bien faire ton travail, formulée comme une question courte à David. Vide si tu n'as besoin de rien." },
   },
-  required: ["agent", "reply", "action", "new_body", "image_instruction"],
+  required: ["agent", "reply", "action", "new_body", "image_instruction", "info_request"],
 };
 
 function tryParseJson(s: string): unknown {
@@ -94,7 +119,7 @@ Deno.serve(async (req) => {
 Celui des deux dont c'est le métier répond. Renseigne « agent » en conséquence.
 
 La société : ${company.name}${company.activity ? " — " + company.activity : ""}
-${[ed.summary && "Ce que l'équipe a compris : " + ed.summary, ed.tone && "Ton : " + ed.tone, ed.audience && "Cible : " + ed.audience, ed.donts && "À éviter : " + ed.donts].filter(Boolean).join("\n")}
+${[ed.summary && "Ce que l'équipe a compris : " + ed.summary, ed.tone && "Ton : " + ed.tone, ed.audience && "Cible : " + ed.audience, ed.donts && "À éviter : " + ed.donts].filter(Boolean).join("\n")}${await factsBlock(admin, post.company_id)}
 
 Le post concerné — réseau ${post.network} :
 """${post.body || ""}"""
@@ -107,7 +132,8 @@ Règles :
 - Si David demande une modification du TEXTE, réécris-le EN ENTIER dans « new_body » et mets action = update_text. Garde le format du réseau, ne perds ni l'appel à l'action ni les hashtags sauf demande contraire.
 - Si David demande une modification du VISUEL, mets action = regenerate_image et écris dans « image_instruction » une consigne précise pour le Directeur artistique (ce qu'il faut changer : sujet, ambiance, couleurs, accroche…).
 - Si c'est une simple question ou un avis, action = none.
-- Ne promets jamais de publier sur les réseaux : le logiciel ne le fait pas encore.`;
+- Ne promets jamais de publier sur les réseaux : le logiciel ne le fait pas encore.
+- S'il te manque une information sur la société pour bien faire (offre, prix, références, zone d'intervention, argument différenciant…), pose la question dans « info_request ». Elle sera posée à David dans l'onglet Paramétrage. Une seule question à la fois, et seulement si elle est vraiment utile.`;
 
     const history = Array.isArray(body.history) ? body.history.slice(-12) : [];
     const messages = [
@@ -143,6 +169,8 @@ Règles :
     const r = tb ? tryParseJson(String(tb.text || "")) as Record<string, string> : null;
     if (!r || !r.reply) return json({ error: "Réponse illisible. Réessaie." }, 502);
 
+    if (r.info_request) await askFact(admin, post.company_id, r.info_request, r.agent || "redacteur");
+
     // On applique tout de suite ce qui peut l'être.
     if (r.action === "update_text" && r.new_body) {
       await admin.from("mkt_posts")
@@ -166,6 +194,7 @@ Règles :
       action: r.action || "none",
       new_body: r.new_body || "",
       image_instruction: r.image_instruction || "",
+      info_request: r.info_request || "",
     });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);

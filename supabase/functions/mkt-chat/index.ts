@@ -13,6 +13,30 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// Ce que David a précisé aux agents : ces réponses valent autant que la ligne éditoriale.
+// deno-lint-ignore no-explicit-any
+async function factsBlock(admin: any, companyId: string): Promise<string> {
+  try {
+    const { data } = await admin.from("mkt_facts")
+      .select("question, answer").eq("company_id", companyId).not("answer", "is", null);
+    if (!data || !data.length) return "";
+    return "\n\nPrécisions données par David :\n"
+      + data.map((f: { question: string; answer: string }) => `- ${f.question} → ${f.answer}`).join("\n");
+  } catch (_) { return ""; }
+}
+
+// Enregistre une question de l'équipe, sans doublon.
+// deno-lint-ignore no-explicit-any
+async function askFact(admin: any, companyId: string, question: string, agent: string) {
+  const q = String(question || "").trim();
+  if (!q) return;
+  try {
+    const { data } = await admin.from("mkt_facts").select("id").eq("company_id", companyId).ilike("question", q);
+    if (data && data.length) return;
+    await admin.from("mkt_facts").insert({ company_id: companyId, question: q, asked_by: agent });
+  } catch (e) { console.error("FACT_ASK_FAIL", String(e)); }
+}
+
 // Tarifs Claude en dollars par million de tokens (source : tarifs publics Anthropic).
 const PRICE: Record<string, { i: number; o: number }> = {
   "claude-opus-5": { i: 5, o: 25 },
@@ -67,8 +91,11 @@ const ROUTER_SCHEMA = {
 const REPLY_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  properties: { message: { type: "string", description: "Ta réponse à David, en français." } },
-  required: ["message"],
+  properties: {
+    message: { type: "string", description: "Ta réponse à David, en français." },
+    info_request: { type: "string", description: "Une information sur la société qui te manque pour bien travailler, formulée en question courte. Vide si tu n'as besoin de rien." },
+  },
+  required: ["message", "info_request"],
 };
 
 function tryParseJson(s: string): unknown {
@@ -170,7 +197,7 @@ Deno.serve(async (req) => {
         ? `Rythme de publication : ${(cad || []).filter((c: { active: boolean }) => c.active).map((c: { network: string; per_week: number }) => `${c.network} ${c.per_week}/sem`).join(", ") || "aucun réseau actif"}`
         : null,
       `Posts en base : ${(posts || []).length} au total (${Object.entries(byStatus).map(([k, v]) => `${v} ${k}`).join(", ") || "aucun"}), ${withImage} avec visuel.`,
-    ].filter(Boolean).join("\n");
+    ].filter(Boolean).join("\n") + await factsBlock(admin, companyId);
 
     const teamList = Object.entries(TEAM)
       .map(([k, t]) => `- ${t.name} (${t.role}) — clé « ${k} » : ${t.persona}`).join("\n");
@@ -201,12 +228,14 @@ Contexte réel de la société :
 ${context}
 
 David te parle directement. Réponds en français, en collègue compétent : direct, concret, 2 à 6 phrases.
-Appuie-toi sur les chiffres réels ci-dessus plutôt que d'inventer. Ne promets pas de publication automatique sur les réseaux, ce n'est pas encore en place.`;
+Appuie-toi sur les chiffres réels ci-dessus plutôt que d'inventer. Ne promets pas de publication automatique sur les réseaux, ce n'est pas encore en place.
+S'il te manque une information sur la société pour bien faire ton métier, pose-la dans « info_request » : elle sera posée à David dans l'onglet Paramétrage. Une seule question, et seulement si elle est vraiment utile.`;
 
       const solo = await askClaude(apiKey, model, soloSystem, messagesForClaude, REPLY_SCHEMA);
       const stb = (solo.out.content || []).find((b: { type: string }) => b.type === "text");
-      const ans = stb ? tryParseJson(String(stb.text || "")) as { message?: string } : null;
+      const ans = stb ? tryParseJson(String(stb.text || "")) as { message?: string; info_request?: string } : null;
       if (!ans?.message) return json({ error: "Réponse illisible. Réessaie." }, 502);
+      if (ans.info_request) await askFact(admin, companyId, ans.info_request, direct);
 
       if (!participants.includes(direct)) participants = [...participants, direct];
       const rows = [
@@ -286,7 +315,8 @@ Réponds directement à David, en français, sur un ton de collègue compétent.
 
       const mateRes = await askClaude(apiKey, model, mateSystem, messagesForClaude, REPLY_SCHEMA);
       const mtb = (mateRes.out.content || []).find((b: { type: string }) => b.type === "text");
-      const mateAns = mtb ? tryParseJson(String(mtb.text || "")) as { message?: string } : null;
+      const mateAns = mtb ? tryParseJson(String(mtb.text || "")) as { message?: string; info_request?: string } : null;
+      if (mateAns?.info_request) await askFact(admin, companyId, mateAns.info_request, inviteKey);
       if (mateAns?.message) {
         newMessages.push({ role: "agent", agent: inviteKey, content: mateAns.message });
         usageRows.push({

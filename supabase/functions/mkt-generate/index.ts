@@ -12,6 +12,30 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
+// Ce que David a précisé aux agents : ces réponses valent autant que la ligne éditoriale.
+// deno-lint-ignore no-explicit-any
+async function factsBlock(admin: any, companyId: string): Promise<string> {
+  try {
+    const { data } = await admin.from("mkt_facts")
+      .select("question, answer").eq("company_id", companyId).not("answer", "is", null);
+    if (!data || !data.length) return "";
+    return "\n\nPrécisions données par David :\n"
+      + data.map((f: { question: string; answer: string }) => `- ${f.question} → ${f.answer}`).join("\n");
+  } catch (_) { return ""; }
+}
+
+// Enregistre une question de l'équipe, sans doublon.
+// deno-lint-ignore no-explicit-any
+async function askFact(admin: any, companyId: string, question: string, agent: string) {
+  const q = String(question || "").trim();
+  if (!q) return;
+  try {
+    const { data } = await admin.from("mkt_facts").select("id").eq("company_id", companyId).ilike("question", q);
+    if (data && data.length) return;
+    await admin.from("mkt_facts").insert({ company_id: companyId, question: q, asked_by: agent });
+  } catch (e) { console.error("FACT_ASK_FAIL", String(e)); }
+}
+
 // --- Suivi des frais IA (tarifs publics Anthropic, en dollars par million de tokens) ---
 const PRICE: Record<string, { i: number; o: number }> = {
   "claude-opus-5": { i: 5, o: 25 },
@@ -140,7 +164,7 @@ Deno.serve(async (req) => {
       ed.dos ? `À faire : ${ed.dos}` : null,
       ed.donts ? `À éviter : ${ed.donts}` : null,
       `Langue : ${ed.language || "fr"}`,
-    ].filter(Boolean).join("\n");
+    ].filter(Boolean).join("\n") + await factsBlock(admin, companyId);
 
     const instruction = `Tu es une équipe marketing pour la société « ${company.name} »${company.activity ? ` (${company.activity})` : ""}.
 Rédige ${totalPosts} post(s) de réseaux sociaux pour la semaine, répartis ainsi :
