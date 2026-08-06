@@ -189,6 +189,45 @@ Deno.serve(async (req) => {
         }],
       }));
 
+    const messagesForClaude = [...history, { role: "user", content: [{ type: "text", text: question }] }];
+
+    // Discussion directe avec un collègue précis : pas de routage par Marc.
+    const direct = body.agent && TEAM[body.agent] ? String(body.agent) : "";
+    if (direct) {
+      const mate = TEAM[direct];
+      const soloSystem = `Tu es ${mate.name}, ${mate.role.toLowerCase()} dans l'équipe marketing de David. ${mate.persona}
+
+Contexte réel de la société :
+${context}
+
+David te parle directement. Réponds en français, en collègue compétent : direct, concret, 2 à 6 phrases.
+Appuie-toi sur les chiffres réels ci-dessus plutôt que d'inventer. Ne promets pas de publication automatique sur les réseaux, ce n'est pas encore en place.`;
+
+      const solo = await askClaude(apiKey, model, soloSystem, messagesForClaude, REPLY_SCHEMA);
+      const stb = (solo.out.content || []).find((b: { type: string }) => b.type === "text");
+      const ans = stb ? tryParseJson(String(stb.text || "")) as { message?: string } : null;
+      if (!ans?.message) return json({ error: "Réponse illisible. Réessaie." }, 502);
+
+      if (!participants.includes(direct)) participants = [...participants, direct];
+      const rows = [
+        { role: "user", agent: null, content: question, chat_id: chatId },
+        { role: "agent", agent: direct, content: ans.message, chat_id: chatId },
+      ];
+      const { data: ins } = await admin.from("mkt_messages").insert(rows)
+        .select("id, role, agent, content, created_at");
+      await admin.from("mkt_chats")
+        .update({ participants, updated_at: new Date().toISOString() }).eq("id", chatId);
+      await admin.from("mkt_usage").insert({
+        owner: uid, company_id: companyId, source: "discussion", agent: direct,
+        provider: "anthropic", model: solo.usedModel,
+        input_tokens: solo.out.usage?.input_tokens || 0,
+        output_tokens: solo.out.usage?.output_tokens || 0,
+        cache_read_tokens: solo.out.usage?.cache_read_input_tokens || 0,
+        cost_usd: claudeCost(solo.usedModel, solo.out.usage || null),
+      });
+      return json({ ok: true, chat_id: chatId, participants, messages: ins || [] });
+    }
+
     const marc = TEAM.orchestrateur;
     const routerSystem = `Tu es ${marc.name}, ${marc.role.toLowerCase()} de l'équipe marketing de David. ${marc.persona}
 
@@ -206,7 +245,6 @@ Règles :
 - Ne promets jamais une action que le logiciel ne sait pas faire. Aujourd'hui l'app sait : analyser un site, écrire des posts, créer des visuels, valider/refuser. Elle ne publie pas encore automatiquement sur les réseaux.
 - Appuie-toi sur les chiffres réels du contexte ci-dessus plutôt que d'inventer.`;
 
-    const messagesForClaude = [...history, { role: "user", content: [{ type: "text", text: question }] }];
 
     const { out, usedModel } = await askClaude(apiKey, model, routerSystem, messagesForClaude, ROUTER_SCHEMA);
     if (out.stop_reason === "refusal") return json({ error: "Réponse refusée par l'IA." }, 422);

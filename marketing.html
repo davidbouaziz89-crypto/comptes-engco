@@ -186,6 +186,43 @@
   .cotile.add{opacity:.75;filter:none}
   .cotile.add .noimg{font-size:34px;color:var(--muted);font-weight:400}
   .cotile.add:hover .noimg{color:var(--accent)}
+  /* Pilotage : l'équipe en colonne à gauche, le travail à droite */
+  .pilot{display:grid;grid-template-columns:236px 1fr;gap:16px;align-items:start}
+  .team-rail{position:sticky;top:14px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:14px}
+  .rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;
+    font-family:var(--font-display);font-weight:700;font-size:15px}
+  .rail-head .btn{padding:4px 9px}
+  .mate-row{--c:var(--accent);display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    background:transparent;border:1px solid transparent;border-radius:12px;padding:8px;margin-bottom:4px;
+    cursor:pointer;color:var(--txt);font-family:inherit;transition:background .2s,border-color .2s,transform .15s}
+  .mate-row:hover{background:var(--panel2);border-color:color-mix(in srgb,var(--c) 45%,var(--line));transform:translateX(2px)}
+  .mate-row[data-state="busy"]{background:var(--panel2);border-color:var(--c);
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 25%,transparent)}
+  .mate-row[data-state="done"]{--c:var(--good)}
+  .mate-row[data-state="err"]{--c:var(--bad)}
+  .mr-face{position:relative;flex:0 0 auto}
+  .mr-face img{width:46px;height:46px;border-radius:12px;object-fit:cover;display:block;
+    border:1.5px solid color-mix(in srgb,var(--c) 55%,transparent)}
+  .mr-face .ph{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-display);font-weight:700;font-size:15px;color:#fff;
+    background:linear-gradient(140deg,color-mix(in srgb,var(--c) 85%,#000),color-mix(in srgb,var(--c) 45%,#000))}
+  .mr-face .emo{position:absolute;right:-3px;bottom:-3px;width:19px;height:19px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:10px;background:var(--panel);border:1px solid var(--line)}
+  .mr-txt{min-width:0;flex:1}
+  .mr-n{display:block;font-weight:700;font-size:13.5px;line-height:1.15}
+  .mr-r{display:block;font-size:11.5px;color:var(--muted);line-height:1.25;margin-top:1px}
+  .mate-row .a-status{margin-top:5px;min-height:0;font-size:11.5px;gap:5px}
+  .mate-row .dot{width:7px;height:7px}
+  .mate-row[data-state="busy"] .dot{background:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent)}
+  .mate-row[data-state="done"] .dot{background:var(--good)}
+  .mate-row[data-state="err"] .dot{background:var(--bad)}
+  @media(max-width:900px){
+    .pilot{grid-template-columns:1fr}
+    .team-rail{position:static}
+    #agents{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+    .mate-row{flex:0 0 auto;width:190px;margin-bottom:0}
+  }
   /* Onglets */
   .tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px;overflow-x:auto}
   .tab{flex:1;min-width:110px;padding:9px 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);
@@ -409,6 +446,17 @@
       </nav>
 
       <div id="tab-pilotage">
+      <div class="pilot">
+        <aside class="team-rail companyPanel">
+          <div class="rail-head">
+            <span>👥 Ton équipe</span>
+            <button class="btn ghost small" id="portraitsBtn" title="Créer ou refaire les portraits">📸</button>
+          </div>
+          <div id="agents"></div>
+          <div class="err" id="teamMsg" style="font-size:12px"></div>
+          <div class="who" style="font-size:11.5px;margin-top:10px;line-height:1.4">Clique sur un collègue pour lui parler.</div>
+        </aside>
+        <div class="pilot-main">
 
       <!-- En-tête société -->
       <div class="panel companyPanel">
@@ -420,16 +468,6 @@
           </div>
           <button class="btn ghost small" id="editCompanyBtn" style="flex:0 0 auto">⚙️ Modifier</button>
         </div>
-      </div>
-
-      <!-- Ton équipe -->
-      <div class="panel companyPanel">
-        <div class="row" style="align-items:center">
-          <h2 style="margin:0">👥 Ton équipe</h2>
-          <div style="flex:0 0 auto"><button class="btn ghost small" id="portraitsBtn">📸 Générer les portraits</button></div>
-        </div>
-        <div class="agents" id="agents" style="margin-top:12px"></div>
-        <div class="err" id="teamMsg"></div>
       </div>
 
       <!-- Ce que l'IA a compris -->
@@ -463,6 +501,8 @@
         </div>
         <div id="genMsg" class="err"></div>
         <div id="posts"></div>
+      </div>
+        </div>
       </div>
       </div><!-- /tab-pilotage -->
 
@@ -575,7 +615,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v12 · pilote auto';
+const APP_VERSION='v13 · équipe à gauche';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -666,16 +706,20 @@ function portraitHTML(key){
 }
 function renderAgents(){
   el('agents').innerHTML=AGENTS.map(a=>{
-    const t=TEAM[a.k]||{};
-    return `<div class="agent" id="ag-${a.k}" data-state="idle" style="--c:${a.color}">
-      ${portraitHTML(a.k)}
-      <div style="min-width:0;margin-top:11px">
-        <div class="a-name">${esc(t.first_name||a.first)}</div>
-        <div class="a-desc">${esc(t.role||a.role)}</div>
-      </div>
-      <div class="a-status"><span class="dot"></span><span class="txt" id="st-${a.k}">Au repos</span></div>
-      <div class="a-bar"><span></span></div>
-    </div>`;}).join('');
+    const t=TEAM[a.k]||{}, f=frames(a.k);
+    const face=f.idle
+      ? `<img src="${esc(f.idle)}" alt="${esc(t.first_name||a.first)}" loading="lazy">`
+      : `<span class="ph">${esc((t.first_name||a.first).slice(0,2))}</span>`;
+    return `<button class="mate-row" id="ag-${a.k}" data-ag="${a.k}" data-state="idle" style="--c:${a.color}"
+              title="Parler à ${esc(t.first_name||a.first)}">
+      <span class="mr-face">${face}<span class="emo">${a.emoji}</span></span>
+      <span class="mr-txt">
+        <span class="mr-n">${esc(t.first_name||a.first)}</span>
+        <span class="mr-r">${esc(t.role||a.role)}</span>
+        <span class="a-status"><span class="dot"></span><span class="txt" id="st-${a.k}">Au repos</span></span>
+      </span>
+    </button>`;}).join('');
+  el('agents').querySelectorAll('[data-ag]').forEach(b=>b.onclick=()=>openAgentChat(b.dataset.ag));
 }
 // ---- Portraits de l'équipe ----
 async function loadTeam(){
@@ -953,9 +997,26 @@ async function saveCadence(network,per_week,days,hour,active,btn){
 
 // ================= DISCUSSION SUR UN POST =================
 // Pierre répond sur le texte, Nina sur le visuel — et ils appliquent la modif.
-let PC_POST=null, PC_MSGS=[];
+let PC_POST=null, PC_MSGS=[], PC_MODE='post', PC_AGENT='redacteur', PC_CHAT_ID=null;
 function pcRender(){
   const f=el('pcFeed');
+  if(!PC_MSGS.length && PC_MODE==='agent'){
+    const a=AG(PC_AGENT), t=TEAM[PC_AGENT]||{};
+    const idees={
+      orchestrateur:['Où en est-on cette semaine ?','Sur quoi je devrais insister ?','Quel réseau marche le mieux ?'],
+      analyste:['Résume-moi notre positionnement','Qui sont nos concurrents ?','À qui on parle exactement ?'],
+      redacteur:['Propose 3 idées de posts','Quel ton pour LinkedIn ?','Écris-moi une accroche'],
+      designer:['Quel style pour nos visuels ?','Nos couleurs fonctionnent ?','Une idée de visuel fort']
+    }[PC_AGENT]||[];
+    el('pcFeed').innerHTML=`<div class="empty-chat" style="padding:22px 14px">
+      ${avatarHTML(PC_AGENT,'big')}
+      <h3 style="margin:10px 0 4px;font-size:16px">${esc(t.first_name||a.first)}</h3>
+      <p style="font-size:13px;line-height:1.5">${esc(t.role||a.role)}<br>Pose-lui ta question sur ${esc(CURRENT_COMPANY?CURRENT_COMPANY.name:'')}.</p>
+      <div class="starters">${idees.map(i=>`<span class="starter">${esc(i)}</span>`).join('')}</div>
+    </div>`;
+    el('pcFeed').querySelectorAll('.starter').forEach(b=>b.onclick=()=>{ el('pcBox').value=b.textContent; pcSend(); });
+    return;
+  }
   if(!PC_MSGS.length){
     const p=POSTS.find(x=>x.id===PC_POST);
     f.innerHTML=`<div class="empty-chat" style="padding:26px 16px">
@@ -978,9 +1039,21 @@ function pcRender(){
         <div class="bub">${esc(m.content)}</div></div></div>`).join('');
   f.scrollTop=f.scrollHeight;
 }
+function openAgentChat(key){
+  if(!CURRENT_COMPANY){ alert('Choisis d\'abord une société.'); return; }
+  PC_MODE='agent'; PC_AGENT=key; PC_POST=null; PC_MSGS=[]; PC_CHAT_ID=null;
+  const t=TEAM[key]||{}, a=AG(key);
+  el('pcAva').innerHTML=avatarHTML(key,'sm');
+  el('pcName').textContent=(t.first_name||a.first);
+  el('pcCtx').textContent=(t.role||a.role)+' · '+CURRENT_COMPANY.name;
+  pcRender();
+  el('postChat').classList.remove('hidden');
+  setTimeout(()=>el('pcBox').focus(),80);
+}
 function openPostChat(id){
-  PC_POST=id; PC_MSGS=[];
+  PC_MODE='post'; PC_POST=id; PC_MSGS=[];
   const p=POSTS.find(x=>x.id===id);
+  PC_AGENT='redacteur';
   el('pcAva').innerHTML=avatarHTML('redacteur','sm');
   el('pcName').textContent='Modifier ce post';
   el('pcCtx').textContent=p?`${NET_LABEL[p.network]||p.network} · ${fmtDate(p.scheduled_at)}`:'';
@@ -995,25 +1068,36 @@ el('pcSend').onclick=()=>pcSend();
 
 async function pcSend(){
   const box=el('pcBox'), text=box.value.trim();
-  if(!text||!PC_POST) return;
+  if(!text) return;
+  if(PC_MODE==='post'&&!PC_POST) return;
+  if(PC_MODE==='agent'&&!CURRENT_COMPANY) return;
   box.value=''; box.style.height='auto';
   PC_MSGS.push({role:'user',content:text});
   pcRender();
   const f=el('pcFeed');
-  f.insertAdjacentHTML('beforeend',`<div class="msg" id="pcTyping">${avatarHTML('redacteur','sm')}
+  f.insertAdjacentHTML('beforeend',`<div class="msg" id="pcTyping">${avatarHTML(PC_AGENT,'sm')}
     <div><div class="bub"><span class="think" style="--c:var(--accent)"><i></i><i></i><i></i></span></div></div></div>`);
   f.scrollTop=f.scrollHeight;
   el('pcSend').disabled=true;
   try{
     const {data:{session}}=await db.auth.getSession();
-    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-post-chat',{
+    const endpoint=PC_MODE==='agent'?'mkt-chat':'mkt-post-chat';
+    const payload=PC_MODE==='agent'
+      ? {company_id:CURRENT_COMPANY.id,message:text,agent:PC_AGENT,chat_id:PC_CHAT_ID}
+      : {post_id:PC_POST,message:text,history:PC_MSGS.slice(0,-1)};
+    const res=await fetch(SUPABASE_URL+'/functions/v1/'+endpoint,{
       method:'POST',
       headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({post_id:PC_POST,message:text,history:PC_MSGS.slice(0,-1)})
+      body:JSON.stringify(payload)
     });
     const out=await res.json().catch(()=>({error:'réponse illisible'}));
     const t=document.getElementById('pcTyping'); if(t) t.remove();
-    if(!res.ok||out.error){ PC_MSGS.push({role:'agent',agent:'redacteur',content:'⚠️ '+(out.error||('erreur '+res.status))}); }
+    if(!res.ok||out.error){ PC_MSGS.push({role:'agent',agent:PC_AGENT,content:'⚠️ '+(out.error||('erreur '+res.status))}); }
+    else if(PC_MODE==='agent'){
+      PC_CHAT_ID=out.chat_id||PC_CHAT_ID;
+      (out.messages||[]).filter(m=>m.role!=='user').forEach(m=>PC_MSGS.push({role:m.role==='system'?'agent':'agent',agent:m.agent||PC_AGENT,content:m.content}));
+      refreshCost();
+    }
     else{
       PC_MSGS.push({role:'agent',agent:out.agent,content:out.reply});
       if(out.action==='update_text'&&out.new_body){
