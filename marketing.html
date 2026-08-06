@@ -612,6 +612,19 @@
           </div>
           <div id="paramCos"></div>
         </div>
+        <div class="panel companyPanel" id="socialPanel">
+          <h2 style="margin-top:0">🔗 Connexion aux réseaux</h2>
+          <p class="who" style="margin-top:0">Une fois connecté, l'app pourra publier toute seule. Le jeton reste côté serveur, jamais dans le navigateur.</p>
+          <div id="socialState"></div>
+          <details style="margin-top:12px">
+            <summary style="cursor:pointer;font-size:14px;font-weight:600">➕ Connecter Instagram et Facebook</summary>
+            <label>Colle ici le jeton obtenu dans l'explorateur Meta</label>
+            <textarea id="metaToken" style="min-height:70px;font-family:var(--font-mono);font-size:12px" placeholder="EAAG..."></textarea>
+            <button class="btn" id="metaGo" style="margin-top:8px">🔗 Connecter</button>
+            <div class="err" id="metaMsg"></div>
+          </details>
+        </div>
+
         <div class="panel companyPanel" id="factsPanel">
           <h2 style="margin-top:0">❓ Ce que l'équipe aimerait savoir</h2>
           <p class="who" style="margin-top:0">Quand un agent manque d'une information pour bien travailler, il la demande ici. Réponds une fois : tous les agents s'en serviront ensuite.</p>
@@ -742,7 +755,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v24 · post à la demande';
+const APP_VERSION='v25 · connexion réseaux';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2013,6 +2026,53 @@ el('chatSend').onclick=sendChat;
 el('chatBox').addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){ e.preventDefault(); sendChat(); } });
 el('chatBox').addEventListener('input',e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,140)+'px'; });
 
+// ================= CONNEXION AUX RÉSEAUX =================
+async function loadSocial(){
+  if(!CURRENT_COMPANY){ el('socialState').innerHTML=''; return; }
+  const {data}=await db.from('mkt_social_public').select('*').eq('company_id',CURRENT_COMPANY.id);
+  const par={}; (data||[]).forEach(r=>par[r.network]=r);
+  el('socialState').innerHTML=[['instagram','Instagram'],['facebook','Facebook'],['linkedin','LinkedIn']].map(([k,nom])=>{
+    const r=par[k];
+    return `<div class="brk"><span class="nm" style="color:var(--txt)">${nom}</span>
+      <span style="flex:1;font-size:13.5px">${r
+        ? `✅ connecté — <strong>${esc(r.account_name||r.account_id)}</strong>`
+        : '<span class="who">non connecté</span>'}</span>
+      ${r?`<button class="btn ghost small soc-del" data-id="${r.id}" style="flex:0 0 auto">Déconnecter</button>`:''}</div>`;
+  }).join('');
+  el('socialState').querySelectorAll('.soc-del').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Déconnecter ce réseau ?')) return;
+    await db.from('mkt_social').delete().eq('id',b.dataset.id); loadSocial();
+  });
+}
+el('metaGo').onclick=async()=>{
+  const jeton=el('metaToken').value.trim();
+  if(!jeton||!CURRENT_COMPANY){ el('metaMsg').style.color='var(--bad)'; el('metaMsg').textContent='Colle d\'abord le jeton.'; return; }
+  el('metaGo').disabled=true;
+  el('metaMsg').style.color='var(--muted)'; el('metaMsg').textContent='⏳ Connexion à Meta…';
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-connect-meta',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({company_id:CURRENT_COMPANY.id,token:jeton})
+    });
+    const out=await res.json().catch(()=>({error:'réponse illisible'}));
+    if(!res.ok||out.error){ el('metaMsg').style.color='var(--bad)'; el('metaMsg').textContent='Erreur : '+(out.error||res.status); }
+    else if(out.need_choice){
+      el('metaMsg').style.color='var(--warn)';
+      el('metaMsg').textContent='Plusieurs Pages trouvées : '+out.pages.map(p=>p.name).join(', ')+'. Dis-moi laquelle rattacher.';
+    }
+    else{
+      el('metaMsg').style.color='var(--good)';
+      el('metaMsg').textContent='✅ Facebook : '+out.facebook.name
+        +(out.instagram?' · Instagram : @'+out.instagram.name:' — '+(out.warning||''));
+      el('metaToken').value='';
+      loadSocial();
+    }
+  }catch(e){ el('metaMsg').style.color='var(--bad)'; el('metaMsg').textContent='Erreur réseau : '+e.message; }
+  el('metaGo').disabled=false;
+};
+
 // ================= PARAMÉTRAGE =================
 // Lit les couleurs dominantes du logo : plus besoin de les demander à David.
 async function logoColors(){
@@ -2056,6 +2116,7 @@ async function loadParam(){
     const c=COMPANIES.find(x=>x.id===b.dataset.edit); if(c){ selectCompany(c.id); openCompanyModal(c); }
   });
   await loadFacts();
+  await loadSocial();
 }
 async function loadFacts(){
   if(!CURRENT_COMPANY){ el('factsList').innerHTML=''; return; }

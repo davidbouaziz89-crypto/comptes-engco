@@ -132,6 +132,14 @@ Règles :
 - Si David demande une modification du TEXTE, réécris-le EN ENTIER dans « new_body » et mets action = update_text. Garde le format du réseau, ne perds ni l'appel à l'action ni les hashtags sauf demande contraire.
 - Si David veut GARDER l'image actuelle et n'y changer qu'un détail (ajouter ou retirer un élément, changer une couleur, déplacer quelque chose), mets action = edit_image et décris dans « image_instruction » UNIQUEMENT ce qui change. C'est le cas le plus fréquent : dans le doute, choisis edit_image plutôt que regenerate_image.
 - Ne choisis regenerate_image que si David demande explicitement une image entièrement différente, ou s'il rejette le concept même de l'image.
+
+Lis sa phrase à la lettre, c'est ce qui compte le plus :
+  · « garde la photo mais… », « ajoute… », « enlève… », « mets… », « change la couleur de… »,
+    « déplace… », « rajoute le logo sur… »  → edit_image (on conserve la photo)
+  · « change la photo », « une autre image », « je n'aime pas cette image »,
+    « propose autre chose », « refais-en une »  → regenerate_image (nouvelle image)
+S'il précise un élément à conserver (« garde le même décor »), c'est toujours edit_image.
+S'il dit clairement qu'il veut une autre photo, ne t'entête pas à retoucher : change-la.
 - Si c'est une simple question ou un avis, action = none.
 - Ne promets jamais de publier sur les réseaux : le logiciel ne le fait pas encore.
 - S'il te manque une information sur la société pour bien faire (offre, prix, références, zone d'intervention, argument différenciant…), pose la question dans « info_request ». Elle sera posée à David dans l'onglet Paramétrage. Une seule question à la fois, et seulement si elle est vraiment utile.`;
