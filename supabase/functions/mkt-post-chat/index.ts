@@ -135,7 +135,30 @@ Règles :
 - Ne promets jamais de publier sur les réseaux : le logiciel ne le fait pas encore.
 - S'il te manque une information sur la société pour bien faire (offre, prix, références, zone d'intervention, argument différenciant…), pose la question dans « info_request ». Elle sera posée à David dans l'onglet Paramétrage. Une seule question à la fois, et seulement si elle est vraiment utile.`;
 
-    const history = Array.isArray(body.history) ? body.history.slice(-12) : [];
+    // Une discussion par post : l'historique survit à la fermeture de la bulle.
+    let chatId: string | null = null;
+    {
+      const { data: ex } = await admin.from("mkt_chats")
+        .select("id").eq("owner", uid).eq("post_id", postId).maybeSingle();
+      if (ex) chatId = ex.id;
+      else {
+        const { data: cr } = await admin.from("mkt_chats").insert({
+          owner: uid, company_id: post.company_id, post_id: postId,
+          title: `Post ${post.network} — ${(post.body || "").slice(0, 40)}`,
+          participants: ["redacteur"],
+        }).select("id").single();
+        chatId = cr?.id || null;
+      }
+    }
+
+    let history: { role: string; content: string }[] = [];
+    if (chatId) {
+      const { data: past } = await admin.from("mkt_messages")
+        .select("role, agent, content").eq("chat_id", chatId).order("created_at").limit(24);
+      history = (past || []).map((m: { role: string; content: string }) => ({
+        role: m.role === "user" ? "user" : "assistant", content: m.content,
+      }));
+    }
     const messages = [
       ...history.map((m: { role: string; content: string }) => ({
         role: m.role === "user" ? "user" : "assistant",
@@ -171,6 +194,14 @@ Règles :
 
     if (r.info_request) await askFact(admin, post.company_id, r.info_request, r.agent || "redacteur");
 
+    if (chatId) {
+      await admin.from("mkt_messages").insert([
+        { chat_id: chatId, role: "user", agent: null, content: message },
+        { chat_id: chatId, role: "agent", agent: r.agent || "redacteur", content: r.reply },
+      ]);
+      await admin.from("mkt_chats").update({ updated_at: new Date().toISOString() }).eq("id", chatId);
+    }
+
     // On applique tout de suite ce qui peut l'être.
     if (r.action === "update_text" && r.new_body) {
       await admin.from("mkt_posts")
@@ -195,6 +226,7 @@ Règles :
       new_body: r.new_body || "",
       image_instruction: r.image_instruction || "",
       info_request: r.info_request || "",
+      chat_id: chatId,
     });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);

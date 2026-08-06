@@ -192,14 +192,14 @@
     opacity:.5;filter:grayscale(.55);transition:opacity .2s,filter .2s,transform .2s}
   .cotile:hover{opacity:1;filter:none;transform:translateY(-3px)}
   .cotile.on{opacity:1;filter:none}
-  .cotile .logo{display:flex;align-items:center;justify-content:center;height:66px}
-  .cotile .logo img{height:66px;width:auto;max-width:190px;object-fit:contain;display:block}
+  .cotile .logo{display:flex;align-items:center;justify-content:center;height:96px}
+  .cotile .logo img{height:96px;width:auto;max-width:260px;object-fit:contain;display:block}
   :root[data-theme="light"] .cotile .logo img{filter:drop-shadow(0 2px 4px rgba(0,0,0,.14))}
   /* En thème sombre, un halo clair garde les logos foncés lisibles sans les enfermer dans un carré */
   .cotile .logo img{filter:drop-shadow(0 0 1px rgba(255,255,255,.55)) drop-shadow(0 2px 6px rgba(0,0,0,.5))}
-  .cotile .noimg{font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:-.5px;
-    padding:0 6px;line-height:66px}
-  .cotile .nm{font-size:12.5px;font-weight:600;color:var(--muted);max-width:190px;
+  .cotile .noimg{font-family:var(--font-display);font-weight:700;font-size:30px;letter-spacing:-.5px;
+    padding:0 6px;line-height:96px}
+  .cotile .nm{font-size:13px;font-weight:600;color:var(--muted);max-width:260px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cotile.on .nm{color:var(--txt)}
   .cotile::after{content:"";height:3px;width:0;border-radius:3px;background:var(--grad-accent);transition:width .25s}
@@ -717,7 +717,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v21 · logo reconnu';
+const APP_VERSION='v22 · logo agrandi';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1165,6 +1165,15 @@ function openAgentChat(key){
   el('postChat').classList.remove('hidden');
   setTimeout(()=>el('pcBox').focus(),80);
 }
+async function loadPostChat(id){
+  try{
+    const {data:chat}=await db.from('mkt_chats').select('id').eq('post_id',id).maybeSingle();
+    if(!chat) return;
+    const {data:msgs}=await db.from('mkt_messages').select('role,agent,content').eq('chat_id',chat.id).order('created_at');
+    PC_MSGS=(msgs||[]).map(m=>({role:m.role==='user'?'user':'agent',agent:m.agent||'redacteur',content:m.content}));
+    pcRender();
+  }catch(e){ console.warn('historique post',e.message); }
+}
 function openPostChat(id){
   PC_MODE='post'; PC_POST=id; PC_MSGS=[];
   const p=POSTS.find(x=>x.id===id);
@@ -1173,6 +1182,7 @@ function openPostChat(id){
   el('pcName').textContent='Modifier ce post';
   el('pcCtx').textContent=p?`${NET_LABEL[p.network]||p.network} · ${fmtDate(p.scheduled_at)}`:'';
   pcRender();
+  loadPostChat(id);
   el('postChat').classList.remove('hidden');
   setTimeout(()=>el('pcBox').focus(),80);
 }
@@ -1221,6 +1231,9 @@ async function pcSend(){
         const p=POSTS.find(x=>x.id===PC_POST); if(p) p.body=out.new_body;
       }
       if(out.info_request) loadFacts();
+      if(out.action==='update_text'||out.action==='regenerate_image'){
+        el('calAll').checked=true;      // le post reste visible quelle que soit la semaine
+      }
       if(out.action==='regenerate_image'){
         PC_MSGS.push({role:'agent',agent:'designer',content:'🎨 Je refais le visuel, ça arrive…'});
         pcRender();
@@ -1288,7 +1301,7 @@ async function composeVisual(postId,companyId,imageUrl,headline){
     // Mise en page : la photo occupe le haut, un bandeau blanc en pied porte
     // l'accroche et le logo. Le logo se pose directement sur le blanc, sans
     // pastille rapportée, et la barre de marque est calée sur la hauteur du texte.
-    const bandH=Math.round(W>=H ? H*0.235 : H*0.175);
+    const bandH=Math.round(W>=H ? H*0.26 : H*0.195);
     const bandY=H-bandH;
     ctx.fillStyle='#ffffff';
     ctx.fillRect(0,bandY,W,bandH);
@@ -1301,7 +1314,7 @@ async function composeVisual(postId,companyId,imageUrl,headline){
 
     let logoBlock=0;
     if(logo){
-      const lh=Math.round(bandH*0.46);
+      const lh=Math.round(bandH*0.66);
       const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
       ctx.drawImage(logo,W-m-lw,inner-Math.round(lh/2),lw,lh);
       logoBlock=lw+m;
@@ -1402,7 +1415,7 @@ async function renderDesign(postId,companyId,network,spec){
     if(co&&co.logo_url){
       try{
         const logo=await loadImg(absUrl(co.logo_url));
-        const lh=Math.round(bandH*0.44);
+        const lh=Math.round(bandH*0.62);
         const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
         ctx.drawImage(logo,W-m-lw,bandY+Math.round((bandH-rule-lh)/2),lw,lh);
       }catch(e){ console.warn('logo illisible',e.message); }
@@ -1989,7 +2002,12 @@ async function loadFacts(){
   el('factsList').querySelectorAll('.fact-save').forEach(b=>b.onclick=async()=>{
     const inp=el('factsList').querySelector('.fact-in[data-id="'+b.dataset.id+'"]');
     const val=(inp&&inp.value||'').trim(); if(!val) return;
+    const f=FACTS.find(x=>x.id===b.dataset.id)||{};
+    const nom=(TEAM[f.asked_by]&&TEAM[f.asked_by].first_name)||AG(f.asked_by||'redacteur').first;
     await db.from('mkt_facts').update({answer:val,answered_at:new Date().toISOString()}).eq('id',b.dataset.id);
+    el('factMsg').style.color='var(--good)';
+    el('factMsg').textContent=`✅ Merci — ${nom} en tiendra compte dès la prochaine génération.`;
+    setTimeout(()=>el('factMsg').textContent='',7000);
     loadFacts();
   });
   el('factsList').querySelectorAll('.fact-file').forEach(inp=>inp.onchange=async(e)=>{
