@@ -3896,7 +3896,7 @@ async function loadUsers(){
   // via l'edge function. Ainsi la gestion des utilisateurs est centralisée dans le portail.
   const {data,error}=await db.functions.invoke('admin-manage-user',{body:{action:'list'}});
   if(!error && data && Array.isArray(data.users)){
-    USERS_CACHE=data.users.map(u=>({user_id:u.user_id,email:u.email,mems:u.mems||[],last_sign_in_at:u.last_sign_in_at,created_at:u.created_at}))
+    USERS_CACHE=data.users.map(u=>({user_id:u.user_id,email:u.email,genre:u.genre,mems:u.mems||[],last_sign_in_at:u.last_sign_in_at,created_at:u.created_at}))
       .sort((a,b)=>{ const A=a.mems.length?0:1, B=b.mems.length?0:1; return A-B || (a.email||'').localeCompare(b.email||''); });
     renderUsersGrid(); return;
   }
