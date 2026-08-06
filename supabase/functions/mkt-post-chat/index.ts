@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     if (!post) return json({ error: "Post introuvable." }, 404);
 
     const { data: company } = await admin.from("mkt_companies")
-      .select("id, name, activity, owner").eq("id", post.company_id).maybeSingle();
+      .select("id, name, activity, owner, logo_url").eq("id", post.company_id).maybeSingle();
     if (!company || company.owner !== uid) return json({ error: "Accès refusé." }, 403);
 
     const { data: edit } = await admin.from("mkt_editorial").select("*").eq("company_id", post.company_id).maybeSingle();
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
 
 Celui des deux dont c'est le métier répond. Renseigne « agent » en conséquence.
 
-La société : ${company.name}${company.activity ? " — " + company.activity : ""}
+La société : ${company.name}${company.activity ? " — " + company.activity : ""}\n${company.logo_url ? "Logo : déjà fourni, incrusté automatiquement sur les visuels — ne le redemande pas." : "Logo : absent."}
 ${[ed.summary && "Ce que l'équipe a compris : " + ed.summary, ed.tone && "Ton : " + ed.tone, ed.audience && "Cible : " + ed.audience, ed.donts && "À éviter : " + ed.donts].filter(Boolean).join("\n")}${await factsBlock(admin, post.company_id)}
 
 Le post concerné — réseau ${post.network} :

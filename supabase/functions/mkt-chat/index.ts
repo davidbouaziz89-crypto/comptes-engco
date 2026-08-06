@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
     if (!question) return json({ error: "Message vide." }, 400);
 
     const { data: company } = await admin.from("mkt_companies")
-      .select("id, name, activity, website, owner").eq("id", companyId).maybeSingle();
+      .select("id, name, activity, website, owner, logo_url").eq("id", companyId).maybeSingle();
     if (!company) return json({ error: "Société introuvable." }, 404);
     if (company.owner !== uid) return json({ error: "Accès refusé à cette société." }, 403);
 
@@ -193,6 +193,7 @@ Deno.serve(async (req) => {
       ed.audience ? `Cible : ${ed.audience}` : null,
       ed.topics ? `Thèmes : ${ed.topics}` : null,
       ed.brand_colors ? `Couleurs de la marque : ${ed.brand_colors}` : null,
+      company.logo_url ? "Logo : déjà fourni par David et incrusté automatiquement sur chaque visuel — ne le redemande pas." : "Logo : absent, tu peux le demander.",
       (cad || []).length
         ? `Rythme de publication : ${(cad || []).filter((c: { active: boolean }) => c.active).map((c: { network: string; per_week: number }) => `${c.network} ${c.per_week}/sem`).join(", ") || "aucun réseau actif"}`
         : null,

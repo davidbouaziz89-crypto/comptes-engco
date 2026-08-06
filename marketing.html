@@ -717,7 +717,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v20 · validation rapide';
+const APP_VERSION='v21 · logo reconnu';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1910,6 +1910,30 @@ el('chatBox').addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.metaKey||e.
 el('chatBox').addEventListener('input',e=>{ e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,140)+'px'; });
 
 // ================= PARAMÉTRAGE =================
+// Lit les couleurs dominantes du logo : plus besoin de les demander à David.
+async function logoColors(){
+  if(!CURRENT_COMPANY||!CURRENT_COMPANY.logo_url) return [];
+  try{
+    const img=await loadImg(absUrl(CURRENT_COMPANY.logo_url));
+    const W=80, H=Math.max(1,Math.round(W*img.naturalHeight/img.naturalWidth));
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+    const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0,W,H);
+    const d=ctx.getImageData(0,0,W,H).data, seaux={};
+    for(let i=0;i<d.length;i+=4){
+      const r=d[i],g=d[i+1],b=d[i+2],a=d[i+3];
+      if(a<160) continue;
+      const max=Math.max(r,g,b), min=Math.min(r,g,b);
+      if(max>238&&min>238) continue;          // blanc
+      if(max<28) continue;                    // noir
+      if(max-min<26) continue;                // gris : peu identitaire
+      const cle=[r,g,b].map(v=>Math.round(v/24)*24).join(',');
+      seaux[cle]=(seaux[cle]||0)+1;
+    }
+    return Object.entries(seaux).sort((a,b)=>b[1]-a[1]).slice(0,3)
+      .map(([k])=>'#'+k.split(',').map(v=>Math.min(255,+v).toString(16).padStart(2,'0')).join(''));
+  }catch(e){ console.warn('couleurs logo',e.message); return []; }
+}
+
 let FACTS=[];
 async function loadParam(){
   // Vue d'ensemble des sociétés
@@ -1945,6 +1969,10 @@ async function loadFacts(){
             <label class="btn ghost small" style="margin:0;cursor:pointer">📎 Joindre un fichier
               <input type="file" class="fact-file" data-id="${f.id}" style="display:none">
             </label>
+            ${/logo/i.test(f.question)&&CURRENT_COMPANY.logo_url
+              ? `<button class="btn ghost small fact-logo" data-id="${f.id}">📌 Utiliser le logo enregistré</button>`:''}
+            ${/couleur/i.test(f.question)
+              ? `<button class="btn ghost small fact-colors" data-id="${f.id}">🎨 Détecter les couleurs du logo</button>`:''}
             <span class="who" style="font-size:11.5px">image, PDF, document…</span>
           </div>
         </div>
@@ -1991,6 +2019,18 @@ async function loadFacts(){
       el('factMsg').textContent='Envoi impossible : '+err.message;
       if(champ) champ.placeholder='Ta réponse…';
     }
+  });
+  el('factsList').querySelectorAll('.fact-logo').forEach(b=>b.onclick=async()=>{
+    const inp=el('factsList').querySelector('.fact-in[data-id="'+b.dataset.id+'"]');
+    if(inp) inp.value=CURRENT_COMPANY.logo_url;
+  });
+  el('factsList').querySelectorAll('.fact-colors').forEach(b=>b.onclick=async()=>{
+    const inp=el('factsList').querySelector('.fact-in[data-id="'+b.dataset.id+'"]');
+    b.textContent='⏳ Analyse…';
+    const cols=await logoColors();
+    b.textContent='🎨 Détecter les couleurs du logo';
+    if(!cols.length){ el('factMsg').style.color='var(--bad)'; el('factMsg').textContent='Couleurs illisibles depuis le logo.'; return; }
+    if(inp) inp.value=cols.join(', ');
   });
   el('factsList').querySelectorAll('.fact-del').forEach(b=>b.onclick=async()=>{
     await db.from('mkt_facts').delete().eq('id',b.dataset.id); loadFacts();

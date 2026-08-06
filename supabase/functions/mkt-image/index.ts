@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
     if (!post) return json({ error: "Post introuvable." }, 404);
 
     const { data: company } = await admin.from("mkt_companies")
-      .select("id, name, activity, owner").eq("id", post.company_id).maybeSingle();
+      .select("id, name, activity, owner, logo_url").eq("id", post.company_id).maybeSingle();
     if (!company) return json({ error: "Société introuvable." }, 404);
     if (company.owner !== uid) return json({ error: "Accès refusé à ce post." }, 403);
 
@@ -291,6 +291,7 @@ DEMANDE EXPRESSE DE DAVID, prioritaire : ${String(body.instruction).slice(0, 600
       ed.tone ? `Ton de la marque : ${ed.tone}` : null,
       ed.audience ? `Cible : ${ed.audience}` : null,
       ed.brand_colors ? `Couleurs de la marque à respecter : ${ed.brand_colors}` : null,
+      company.logo_url ? "Logo : déjà fourni, l'app l'incruste elle-même sur le bandeau — ne le redemande pas et ne le dessine pas." : null,
       ed.donts ? `À éviter absolument : ${ed.donts}` : null,
     ].filter(Boolean).join("\n") + await factsBlock(admin, post.company_id);
 
