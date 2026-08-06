@@ -698,7 +698,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v18 · publication assistée';
+const APP_VERSION='v19 · pièces jointes';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1887,18 +1887,56 @@ async function loadFacts(){
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:600">${esc(f.question)}</div>
           <input class="fact-in" data-id="${f.id}" placeholder="Ta réponse…" style="margin-top:7px">
+          <div style="margin-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label class="btn ghost small" style="margin:0;cursor:pointer">📎 Joindre un fichier
+              <input type="file" class="fact-file" data-id="${f.id}" style="display:none">
+            </label>
+            <span class="who" style="font-size:11.5px">image, PDF, document…</span>
+          </div>
         </div>
         <button class="btn small fact-save" data-id="${f.id}" style="flex:0 0 auto">Enregistrer</button>
       </div>`).join('') : '<div class="who">L\'équipe n\'a rien à te demander pour l\'instant.</div>')
     + (connues.length? `<div class="who" style="margin:16px 0 8px">Informations connues de l'équipe</div>`+connues.map(f=>`
       <div class="brk"><span class="nm" style="width:auto;flex:0 0 42%;color:var(--txt)">${esc(f.question)}</span>
-        <span style="flex:1;font-size:13.5px">${esc(f.answer)}</span>
+        <span style="flex:1;font-size:13.5px">${/^https?:\/\//.test(f.answer)
+          ? (/\.(png|jpe?g|webp|gif|svg)$/i.test(f.answer)
+              ? `<img src="${esc(f.answer)}" style="height:34px;border-radius:6px;background:#fff;padding:3px;vertical-align:middle">`
+              : `<a href="${esc(f.answer)}" target="_blank" rel="noopener">📎 Fichier joint</a>`)
+          : esc(f.answer)}</span>
         <button class="btn ghost small fact-del" data-id="${f.id}" style="flex:0 0 auto">✕</button></div>`).join('') : '');
   el('factsList').querySelectorAll('.fact-save').forEach(b=>b.onclick=async()=>{
     const inp=el('factsList').querySelector('.fact-in[data-id="'+b.dataset.id+'"]');
     const val=(inp&&inp.value||'').trim(); if(!val) return;
     await db.from('mkt_facts').update({answer:val,answered_at:new Date().toISOString()}).eq('id',b.dataset.id);
     loadFacts();
+  });
+  el('factsList').querySelectorAll('.fact-file').forEach(inp=>inp.onchange=async(e)=>{
+    const f=e.target.files&&e.target.files[0]; if(!f||!CURRENT_COMPANY) return;
+    const id=e.target.dataset.id;
+    const champ=el('factsList').querySelector('.fact-in[data-id="'+id+'"]');
+    if(champ) champ.placeholder='⏳ Envoi en cours…';
+    try{
+      const {data:{session}}=await db.auth.getSession();
+      const ext=(f.name.split('.').pop()||'bin').toLowerCase();
+      const chemin=`facts/${session.user.id}/${Date.now()}.${ext}`;
+      const {error}=await db.storage.from('mkt-images').upload(chemin,f,{contentType:f.type||'application/octet-stream',upsert:true});
+      if(error) throw new Error(error.message);
+      const lien=db.storage.from('mkt-images').getPublicUrl(chemin).data.publicUrl;
+      const q=(FACTS.find(x=>x.id===id)||{}).question||'';
+      // Si c'est le logo qu'on réclame, il devient aussi le logo de la société.
+      if(/logo/i.test(q)&&/^image\//.test(f.type||'')){
+        await db.from('mkt_companies').update({logo_url:lien}).eq('id',CURRENT_COMPANY.id);
+        CURRENT_COMPANY.logo_url=lien;
+        COMPANIES=COMPANIES.map(c=>c.id===CURRENT_COMPANY.id?CURRENT_COMPANY:c);
+        renderPicker();
+      }
+      await db.from('mkt_facts').update({answer:lien,answered_at:new Date().toISOString()}).eq('id',id);
+      loadFacts();
+    }catch(err){
+      el('factMsg').style.color='var(--bad)';
+      el('factMsg').textContent='Envoi impossible : '+err.message;
+      if(champ) champ.placeholder='Ta réponse…';
+    }
   });
   el('factsList').querySelectorAll('.fact-del').forEach(b=>b.onclick=async()=>{
     await db.from('mkt_facts').delete().eq('id',b.dataset.id); loadFacts();
