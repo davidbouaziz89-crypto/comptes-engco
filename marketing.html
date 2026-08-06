@@ -152,6 +152,22 @@
   @media (prefers-reduced-motion:reduce){
     .ava *,.a-bar span,.think i,.img-skel{animation:none!important}
   }
+  /* Calendrier éditorial */
+  .calbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0 10px}
+  .calbar #calTitle{font-family:var(--font-display);font-weight:700;font-size:14.5px;min-width:190px;text-align:center}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-bottom:18px}
+  .calday{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:8px;min-height:96px}
+  .calday.today{border-color:var(--accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .calday .d{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+  .calday.today .d{color:var(--accent);font-weight:700}
+  .calchip{display:block;width:100%;text-align:left;border:0;border-radius:8px;padding:6px 7px;margin-bottom:5px;
+    cursor:pointer;font-family:inherit;font-size:11.5px;line-height:1.25;color:#fff;background:var(--c,#7c5cff);
+    opacity:.92;transition:transform .15s,opacity .15s}
+  .calchip:hover{transform:translateY(-1px);opacity:1}
+  .calchip .h{font-weight:700;font-size:10.5px;opacity:.85}
+  .calchip.done{background:var(--good)}
+  .calchip.off{background:var(--muted);opacity:.5}
+  @media(max-width:760px){.cal{grid-template-columns:repeat(3,1fr)}}
   /* Visuel d'un post */
   .post-img{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
   .post-img img{display:block;width:100%;height:auto;cursor:zoom-in}
@@ -471,6 +487,16 @@
           </div>
         </div>
         <div id="genMsg" class="err"></div>
+        <div class="calbar">
+          <button class="btn ghost small" id="calPrev">‹</button>
+          <div id="calTitle"></div>
+          <button class="btn ghost small" id="calNext">›</button>
+          <button class="btn ghost small" id="calToday" style="margin-left:auto">Cette semaine</button>
+          <label class="who" style="display:flex;align-items:center;gap:6px;margin:0">
+            <input type="checkbox" id="calAll" style="width:auto"> tout afficher
+          </label>
+        </div>
+        <div class="cal" id="cal"></div>
         <div id="posts"></div>
       </div>
         </div>
@@ -637,7 +663,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v14 · paramétrage';
+const APP_VERSION='v15 · calendrier';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1469,6 +1495,47 @@ el('imagesBtn').onclick=()=>{
   runImageQueue(ids);
 };
 
+// ================= CALENDRIER ÉDITORIAL =================
+let WEEK_OFF=0;
+const NET_COLOR={linkedin:'#3f7fff',instagram:'#e1467c',facebook:'#5b7cfa'};
+function weekMonday(off){
+  const d=new Date(); const dow=(d.getDay()+6)%7;
+  d.setDate(d.getDate()-dow+off*7); d.setHours(0,0,0,0); return d;
+}
+function renderCal(){
+  const mon=weekMonday(WEEK_OFF);
+  const fin=new Date(mon); fin.setDate(fin.getDate()+6);
+  el('calTitle').textContent='Semaine du '+mon.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})
+    +' au '+fin.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+  const today=new Date(); today.setHours(0,0,0,0);
+  let html='';
+  for(let i=0;i<7;i++){
+    const day=new Date(mon); day.setDate(day.getDate()+i);
+    const key=day.toISOString().slice(0,10);
+    const items=POSTS.filter(p=>(p.scheduled_at||'').slice(0,10)===key);
+    html+=`<div class="calday ${day.getTime()===today.getTime()?'today':''}">
+      <div class="d">${day.toLocaleDateString('fr-FR',{weekday:'short'})} ${day.getDate()}</div>
+      ${items.map(p=>{
+        const cls=p.status==='valide'||p.status==='publie'?'done':(p.status==='refuse'||p.status==='pause'?'off':'');
+        const h=p.scheduled_at?new Date(p.scheduled_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'';
+        return `<button class="calchip ${cls}" data-go="${p.id}" style="--c:${NET_COLOR[p.network]||'#7c5cff'}">
+          <span class="h">${h}</span><br>${esc((NET_LABEL[p.network]||p.network))}</button>`;
+      }).join('')}
+    </div>`;
+  }
+  el('cal').innerHTML=html;
+  el('cal').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
+    const card=document.querySelector('[data-id="'+b.dataset.go+'"]');
+    if(card){ card.scrollIntoView({behavior:'smooth',block:'center'});
+      card.style.transition='box-shadow .4s'; card.style.boxShadow='0 0 0 2px var(--accent)';
+      setTimeout(()=>card.style.boxShadow='',1600); }
+  });
+}
+el('calPrev').onclick=()=>{ WEEK_OFF--; loadPosts(); };
+el('calNext').onclick=()=>{ WEEK_OFF++; loadPosts(); };
+el('calToday').onclick=()=>{ WEEK_OFF=0; loadPosts(); };
+el('calAll').onchange=()=>loadPosts();
+
 // ---- Posts : génération, rendu, validation ----
 async function generateWeek(){
   if(!CURRENT_COMPANY){ return; }
@@ -1511,8 +1578,16 @@ async function loadPosts(){
     .order('scheduled_at',{nullsFirst:false});
   if(error){ el('posts').innerHTML='<div class="err">'+esc(error.message)+'</div>'; return; }
   POSTS=data||[];
+  renderCal();
+  const mon=weekMonday(WEEK_OFF), fin=new Date(mon); fin.setDate(fin.getDate()+7);
+  const tout=el('calAll').checked;
+  const vue=tout?POSTS:POSTS.filter(p=>{
+    if(!p.scheduled_at) return true;
+    const d=new Date(p.scheduled_at); return d>=mon&&d<fin;
+  });
   if(!POSTS.length){ el('posts').innerHTML='<div class="who">Aucun post. Clique « ✨ Générer la semaine ».</div>'; return; }
-  el('posts').innerHTML=POSTS.map(p=>`
+  if(!vue.length){ el('posts').innerHTML='<div class="who">Aucun post cette semaine-là. Coche « tout afficher » ou change de semaine.</div>'; return; }
+  el('posts').innerHTML=vue.map(p=>`
     <div class="panel" style="background:var(--panel2)" data-id="${p.id}">
       <div class="row" style="align-items:center">
         <strong style="flex:0 0 auto">${NET_LABEL[p.network]||p.network}</strong>
