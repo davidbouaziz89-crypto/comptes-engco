@@ -1610,7 +1610,9 @@ function fillCatSelects(){
   const catOpts='<option value="">— catégorie —</option>'+txCompanyCats().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
   ['t-cat','i-cat','ti-cat'].forEach(id=>{ const el=document.getElementById(id); if(el){ const cur=el.value; el.innerHTML=catOpts; el.value=cur; } });
   const itx=document.getElementById('i-tx'); if(itx) setPayPick(itx.value); // rafraîchit le libellé du bouton
-  const dl=document.getElementById('tiers-list'); if(dl){ const names=[...new Set([].concat(allTiers().map(x=>x.name),INVOICES.map(i=>i.counterparty),TX.map(t=>t.counterparty)).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); dl.innerHTML=names.map(n=>`<option value="${esc(n)}"></option>`).join(''); }
+  const dl=document.getElementById('tiers-list'); if(dl){ const seen=new Set(), names=[];
+    [].concat(allTiers().map(x=>x.name),INVOICES.map(i=>i.counterparty),TX.map(t=>t.counterparty)).filter(Boolean).forEach(n=>{ const k=tiersKey(n); if(k&&!seen.has(k)){ seen.add(k); names.push(String(n).trim()); } });
+    names.sort((a,b)=>a.localeCompare(b)); dl.innerHTML=names.map(n=>`<option value="${esc(n)}"></option>`).join(''); }
 }
 function catIsRestaurant(id){ const c=catById(id); return !!(c&&/restaurant|restau|repas/i.test(c.name||'')); }
 function onInvCatChange(){ const sel=document.getElementById('i-cat'); const v=sel?sel.value:'';
@@ -1627,16 +1629,18 @@ function onInvTiersCat(){
   const ic=document.getElementById('i-cat'); if(!ic || ic.value) return;   // ne pas écraser un choix déjà fait
   const name=(document.getElementById('i-tiers').value||'').trim(); if(name.length<2) return;
   const key=tiersKey(name);
-  let catId=null;
-  const reg=TIERS.find(t=>t.name_key===key); if(reg&&reg.category_id) catId=reg.category_id;              // 1) catégorie du registre
-  if(!catId){ const r=applyRule({label:name,counterparty:name}); if(r&&r.category_id) catId=r.category_id; } // 2) règle apprise
-  if(!catId){ const inv=INVOICES.find(i=>tiersKey(i.counterparty)===key&&i.category_id); if(inv) catId=inv.category_id; } // 3) facture précédente
-  if(!catId){ const t=TX.find(x=>tiersKey(x.counterparty)===key&&x.category_id); if(t) catId=t.category_id; }            // 4) ligne de relevé
-  if(!catId) return;
-  // map vers l'option visible (les catégories sont dédoublonnées par nom)
-  const wantName=(catName(catId)||'').toLowerCase();
-  const opt=txCompanyCats().find(c=>c.id===catId) || txCompanyCats().find(c=>(c.name||'').toLowerCase()===wantName);
-  if(opt){ ic.value=opt.id; onInvCatChange(); }
+  // candidats de catégorie, par ordre de préférence
+  const cands=[];
+  const reg=TIERS.find(t=>t.name_key===key); if(reg&&reg.category_id) cands.push(reg.category_id);     // 1) registre
+  const r=applyRule({label:name,counterparty:name}); if(r&&r.category_id) cands.push(r.category_id);    // 2) règle apprise
+  INVOICES.filter(i=>tiersKey(i.counterparty)===key&&i.category_id).forEach(i=>cands.push(i.category_id)); // 3) factures passées
+  TX.filter(x=>tiersKey(x.counterparty)===key&&x.category_id).forEach(x=>cands.push(x.category_id));       // 4) lignes de relevé
+  const opts=txCompanyCats();
+  for(const cid of cands){                       // on prend le 1er candidat qui correspond à une catégorie visible
+    let opt=opts.find(c=>c.id===cid);
+    if(!opt){ const nm=(catName(cid)||'').toLowerCase(); if(nm&&nm!=='—') opt=opts.find(c=>(c.name||'').toLowerCase()===nm); }
+    if(opt){ ic.value=opt.id; onInvCatChange(); return; }
+  }
 }
 
 /* ---------- Catégorie helpers ---------- */
