@@ -11,9 +11,9 @@ Une seule bulle en bas à droite, cohérente d'une app à l'autre, la conversati
 
 ## 2. Périmètre
 
-**Inclus (V1)** : messages 1:1, groupes, présence en ligne/hors ligne, compteur de non-lus, notifications in-app (badge + son + toast) **et** push web, pièces jointes (images + fichiers), avatars (portraits + genre déjà en place).
+**Inclus (V1)** : messages 1:1, groupes, présence en ligne/hors ligne, **nombre de personnes connectées**, **bouton vert en ligne par personne**, **envoi possible même si le destinataire est hors ligne**, compteur de non-lus, **accusés de lecture (« Vu »)**, notifications in-app (badge + son + toast) **et** push web, pièces jointes (images + fichiers), avatars (portraits + genre déjà en place).
 
-**Exclus (plus tard)** : appels audio/vidéo, réactions emoji, fils de réponse, messages éphémères, édition de message, recherche plein-texte avancée, accusés de lecture par message (on gère les non-lus au niveau conversation).
+**Exclus (plus tard)** : appels audio/vidéo, réactions emoji, fils de réponse, messages éphémères, édition de message, recherche plein-texte avancée, « en train d'écrire ».
 
 ## 3. Décisions validées
 
@@ -22,6 +22,10 @@ Une seule bulle en bas à droite, cohérente d'une app à l'autre, la conversati
 - V1 = **fonctionnalité complète** (1:1 + groupes + présence + fichiers + notif).
 - Historique : **conservé** (pas d'auto-suppression).
 - Droits : **tout le monde peut écrire à tout le monde**, tout membre peut créer un groupe.
+- **Nombre de connectés** affiché (compteur global + par conversation).
+- **Bouton/point vert** par personne selon présence ; on peut **écrire à quelqu'un hors ligne** (le message est stocké + push, lu à sa reconnexion).
+- **Accusés de lecture (« Vu »)** : basés sur `chat_members.last_read_at` (pas de table par message). En 1:1 : « Vu HH:MM » sous le dernier message lu par l'autre. En groupe : « Vu par N » (détail des noms au survol).
+- Taille max pièce jointe : **25 Mo**. Son de notification : **activé par défaut, coupable**.
 
 ## 4. Architecture
 
@@ -36,7 +40,7 @@ Une seule bulle en bas à droite, cohérente d'une app à l'autre, la conversati
 ### 4.2 Temps réel
 - **Supabase Realtime** :
   - *Presence* : un canal global `presence:gestion` où chaque widget ouvert `track()` `{user_id, email}` → liste des connectés en direct.
-  - *postgres_changes* : abonnement aux `INSERT` sur `chat_messages` filtrés par les conversations de l'utilisateur → réception instantanée.
+  - *postgres_changes* : abonnement aux `INSERT` sur `chat_messages` (réception instantanée) et aux `UPDATE` sur `chat_members` (`last_read_at` → mise à jour du « Vu » et des compteurs), filtrés par les conversations de l'utilisateur.
 - Repli : si Realtime indisponible, un rafraîchissement léger au focus de la fenêtre (pas de polling agressif).
 
 ## 5. Modèle de données (nouvelles tables `chat_*`)
@@ -106,13 +110,15 @@ L'insertion du message se fait **directement par le client** (RLS), pour un temp
 
 - **Bulle flottante** bas-droite : icône 💬 + pastille rouge de non-lus (total).
 - **Panneau** (ouverture au clic) :
-  - En-tête : « Messages » + bouton « ✏️ Nouveau » (nouvelle discussion / groupe) + recherche.
-  - **Liste** triée par `last_message_at` : avatar (portrait+genre), nom, dernier message, heure, **point vert si en ligne**, badge non-lus. Section « En ligne » en haut.
+  - En-tête : « Messages » + **compteur de connectés** (ex. « 🟢 5 en ligne ») + bouton « ✏️ Nouveau » + recherche.
+  - **Liste** triée par `last_message_at` : avatar (portrait+genre), nom, dernier message, heure, **point/bouton vert si en ligne** (gris sinon), badge non-lus. Section « En ligne » en haut ; les personnes hors ligne restent joignables (on peut leur écrire).
   - **Nouvelle discussion** : annuaire des collègues (avec point de présence) ; sélection multiple → propose un **nom de groupe**.
 - **Vue conversation** :
   - En-tête : avatar(s) + nom + statut (en ligne / vu récemment) + retour.
   - **Fil** de messages (bulles gauche/droite), séparateurs de jour, vignettes d'images, blocs fichiers téléchargeables.
-  - **Saisie** : champ texte, **📎 pièce jointe**, envoi (Entrée). Indicateur « en train d'écrire » (optionnel V1.1).
+  - **Accusés de lecture** : sous le dernier message envoyé, « Envoyé » puis « Vu HH:MM » (1:1) ou « Vu par N » (groupe) dès que `last_read_at` du/des destinataires dépasse l'heure du message. Mise à jour en direct via Realtime sur `chat_members`.
+  - **Saisie** : champ texte, **📎 pièce jointe**, envoi (Entrée).
+  - À l'ouverture d'une conversation, on met à jour son propre `last_read_at = now()` (→ « Vu » chez l'expéditeur, non-lus remis à zéro).
 - **Responsive** : < 640 px, le panneau passe en **plein écran**.
 - **Accessibilité** : focus visible, `prefers-reduced-motion` respecté, contrastes ok en thèmes clair/sombre.
 
@@ -140,7 +146,9 @@ L'insertion du message se fait **directement par le client** (RLS), pour un temp
 
 ## 12. Tests / critères de réussite
 
-- Deux utilisateurs voient l'état en ligne l'un de l'autre en < 2 s.
+- Deux utilisateurs voient l'état en ligne l'un de l'autre en < 2 s, et le **compteur de connectés** est correct.
+- Un message envoyé à une personne **hors ligne** est bien stocké, notifié en push, et lu à sa reconnexion.
+- L'indicateur **« Vu »** apparaît chez l'expéditeur dès que le destinataire ouvre la conversation (temps réel).
 - Message envoyé apparaît chez le destinataire en temps réel sans rechargement.
 - Le badge de non-lus est correct et se remet à zéro à l'ouverture de la conversation.
 - Un groupe de 3 fonctionne (tous reçoivent).
