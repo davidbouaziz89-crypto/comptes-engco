@@ -367,6 +367,15 @@
   .stat.en_pause{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
   .stat.terminee{background:var(--panel);color:var(--muted)}
   .stat.brouillon{background:var(--panel);color:var(--muted)}
+  /* Passer d'une app du portail à l'autre sans repasser par l'accueil */
+  .appmenu{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:238px;
+    background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:6px;
+    box-shadow:0 26px 60px -28px #000}
+  .appmenu a{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;
+    color:var(--txt);text-decoration:none;font-size:14px;font-weight:600}
+  .appmenu a:hover{background:var(--panel2)}
+  .appmenu a.on{color:var(--accent);cursor:default}
+  .appmenu .ic{font-size:17px;flex:0 0 auto}
   .costchip{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:20px;
     padding:5px 12px;font-size:13px;font-family:var(--font-mono);font-weight:600;cursor:pointer;white-space:nowrap}
   .costchip:hover{border-color:var(--accent)}
@@ -711,6 +720,11 @@
       <button class="costchip" id="costChip" title="Dépense IA aujourd'hui — cliquer pour voir le détail">💶 —</button>
       <span class="who" id="who"></span>
       <span class="who" id="ver" style="opacity:.65;font-family:var(--font-mono);font-size:11px"></span>
+      <div style="position:relative;flex:0 0 auto">
+        <button class="btn ghost small" id="appSwitch" title="Changer d'application">🔀 Applications</button>
+        <div id="appMenu" class="appmenu hidden"></div>
+      </div>
+      <button class="btn ghost small" id="themeBtn" title="Thème clair / sombre">🌙</button>
       <a class="btn ghost small" href="./index.html">← Portail</a>
       <button class="btn ghost small" id="logoutBtn">Quitter</button>
     </header>
@@ -1001,7 +1015,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v34 · visuels retravailles';
+const APP_VERSION='v35 · theme + apps';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2771,6 +2785,43 @@ el('adDelete').onclick=async()=>{
   el('adModal').classList.add('hidden');
   await loadAds();
 };
+
+// ================= THÈME ET APPLICATIONS =================
+// Le choix du thème est partagé avec les autres apps du portail (clé pfp-theme),
+// pour ne pas avoir à le refaire dans chacune.
+function majThemeBtn(){
+  const clair=document.documentElement.getAttribute('data-theme')==='light';
+  el('themeBtn').textContent=clair?'☀️':'🌙';
+  el('themeBtn').title=clair?'Passer en sombre':'Passer en clair';
+}
+el('themeBtn').onclick=()=>{
+  const clair=document.documentElement.getAttribute('data-theme')!=='light';
+  if(clair) document.documentElement.setAttribute('data-theme','light');
+  else document.documentElement.removeAttribute('data-theme');
+  try{ localStorage.setItem('pfp-theme',clair?'light':'dark'); }catch(e){}
+  majThemeBtn();
+};
+majThemeBtn();
+
+const APPS=[
+  {nom:'Marketing IA',icon:'🚀',url:'./marketing.html'},
+  {nom:'Compta multi-sociétés',icon:'🧾',url:'./compta.html'},
+  {nom:'CRM Photovoltaïque',icon:'☀️',url:'./photovoltaique.html'},
+  {nom:'Notelia (CRM Télécom)',icon:'📡',url:'./notelia.html'},
+  {nom:'CRM Formation',icon:'🎓',url:'./crm.html'},
+  {nom:'TimeGuard Pro (Pointage)',icon:'⏱️',url:'./pointage.html'},
+  {nom:'Générateur de documents',icon:'📄',url:'./documents.html'},
+  {nom:'Zeste (Tâches & Courses)',icon:'🍋',url:'https://davidbouaziz89-crypto.github.io/zeste/'}
+];
+el('appMenu').innerHTML=APPS.map(a=>{
+  const ici=a.url.endsWith('marketing.html');
+  return `<a href="${a.url}" class="${ici?'on':''}"${ici?' onclick="return false"':''}${a.url.startsWith('http')?' target="_blank" rel="noopener"':''}>
+    <span class="ic">${a.icon}</span>${esc(a.nom)}${ici?' ·':''}</a>`;
+}).join('');
+el('appSwitch').onclick=(e)=>{ e.stopPropagation(); el('appMenu').classList.toggle('hidden'); };
+document.addEventListener('click',e=>{
+  if(!el('appMenu').classList.contains('hidden')&&!el('appMenu').contains(e.target)) el('appMenu').classList.add('hidden');
+});
 
 // ================= BARRE COLLÉE =================
 // Le bloc du haut reste accessible en permanence ; il se compacte au défilement
