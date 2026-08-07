@@ -551,6 +551,41 @@
     </div>
   </div>
 
+  <!-- Sponsoriser un post publié -->
+  <div id="boostModal" class="overlay hidden">
+    <div class="modal-card" style="max-width:520px">
+      <div class="row" style="align-items:center">
+        <h2 style="margin:0">🚀 Sponsoriser un post</h2>
+        <button class="btn ghost small" id="boostCancel" style="flex:0 0 auto">Fermer</button>
+      </div>
+      <p class="who" style="margin-top:6px">La campagne est créée <strong>en pause</strong> chez Meta.
+        Rien n'est dépensé tant que tu ne l'actives pas toi-même.</p>
+      <label>Le post à pousser</label>
+      <select id="bo_post"></select>
+      <div class="row">
+        <div><label>Budget par jour (€)</label><input type="number" min="1" step="1" id="bo_budget" value="10"></div>
+        <div><label>Durée (jours)</label><input type="number" min="1" max="90" id="bo_jours" value="7"></div>
+      </div>
+      <label>Objectif</label>
+      <select id="bo_obj">
+        <option value="leads">Leads — interactions et messages</option>
+        <option value="trafic">Trafic — clics vers le site</option>
+        <option value="notoriete">Notoriété — toucher le plus de monde</option>
+      </select>
+      <div class="row">
+        <div><label>Âge minimum</label><input type="number" min="18" max="65" id="bo_agemin" value="25"></div>
+        <div><label>Âge maximum</label><input type="number" min="18" max="65" id="bo_agemax" value="65"></div>
+        <div><label>Pays</label><input id="bo_pays" value="FR" placeholder="FR, BE, CH"></div>
+      </div>
+      <div class="who" id="bo_total" style="margin-top:10px"></div>
+      <div class="err" id="bo_err"></div>
+      <div class="row" style="margin-top:14px">
+        <div style="flex:1"></div>
+        <button class="btn" id="boostGo" style="flex:0 0 auto">Créer la campagne (en pause)</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Campagne payante -->
   <div id="adModal" class="overlay hidden">
     <div class="modal-card" style="max-width:560px">
@@ -863,7 +898,9 @@
                 <option value="facebook">Facebook</option><option value="instagram">Instagram</option>
                 <option value="linkedin">LinkedIn</option></select></div>
             <div style="flex:0 0 auto"><button class="btn ghost" id="adReset">↺ Tout</button></div>
-            <div style="flex:0 0 auto"><button class="btn" id="adNew">+ Campagne</button></div>
+            <div style="flex:0 0 auto"><button class="btn ghost" id="adSync">🔄 Actualiser les chiffres</button></div>
+            <div style="flex:0 0 auto"><button class="btn" id="adBoost">🚀 Sponsoriser un post</button></div>
+            <div style="flex:0 0 auto"><button class="btn ghost" id="adNew">+ Manuelle</button></div>
           </div>
           <div class="kpis" id="adKpis"></div>
         </div>
@@ -959,7 +996,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v31 · compte publicitaire';
+const APP_VERSION='v32 · pub automatique';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2374,6 +2411,77 @@ function openAdModal(a){
   el('ad_nom').focus();
 }
 el('adNew').onclick=()=>{ if(!CURRENT_COMPANY){ alert('Choisis une société.'); return; } openAdModal(null); };
+
+// ---- Sponsoriser un post déjà en ligne ----
+// Meta ne sait sponsoriser qu'une publication existante : il faut son identifiant
+// côté Facebook, donc un post parti depuis l'app avec le bouton « Publier maintenant ».
+function majTotalBoost(){
+  const t=(Number(el('bo_budget').value||0))*(Number(el('bo_jours').value||0));
+  el('bo_total').textContent=t>0?`Budget total engagé : ${eur(t)}`:'';
+}
+['bo_budget','bo_jours'].forEach(i=>el(i).oninput=majTotalBoost);
+el('adBoost').onclick=()=>{
+  if(!CURRENT_COMPANY){ alert('Choisis une société.'); return; }
+  const eligibles=POSTS.filter(p=>p.network==='facebook'&&p.published_at&&p.external_id);
+  if(!eligibles.length){
+    alert("Aucun post sponsorisable.\n\nMeta ne peut booster qu'une publication déjà en ligne, publiée depuis l'app avec « 🚀 Publier maintenant » — c'est ce qui lui donne son identifiant Facebook.");
+    return;
+  }
+  el('bo_post').innerHTML=eligibles.map(p=>
+    `<option value="${p.id}">${esc((p.body||'').slice(0,70))}</option>`).join('');
+  el('bo_err').textContent=''; majTotalBoost();
+  el('boostModal').classList.remove('hidden');
+};
+el('boostCancel').onclick=()=>el('boostModal').classList.add('hidden');
+el('boostGo').onclick=async()=>{
+  const budget=Number(el('bo_budget').value||0), jours=Number(el('bo_jours').value||0);
+  if(budget<1){ el('bo_err').textContent='Budget quotidien minimum : 1 €.'; return; }
+  if(!confirm(`Créer la campagne ?\n\nBudget ${eur(budget)} par jour pendant ${jours} jour(s), soit ${eur(budget*jours)} au total.\n\nElle sera créée EN PAUSE : rien n'est dépensé avant que tu l'actives dans le Gestionnaire de publicités.`)) return;
+  const btn=el('boostGo'); btn.disabled=true; btn.textContent='⏳ Création…';
+  el('bo_err').style.color='var(--muted)'; el('bo_err').textContent='';
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-ads-create',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        post_id:el('bo_post').value, budget_jour:budget, jours,
+        objectif:el('bo_obj').value,
+        age_min:Number(el('bo_agemin').value||25), age_max:Number(el('bo_agemax').value||65),
+        pays:el('bo_pays').value.split(/[,\s]+/).filter(Boolean).map(s=>s.toUpperCase())
+      })
+    });
+    const out=await res.json().catch(()=>({error:'réponse illisible'}));
+    if(!res.ok||out.error){
+      el('bo_err').style.color='var(--bad)'; el('bo_err').textContent='Erreur : '+(out.error||res.status);
+      btn.disabled=false; btn.textContent='Réessayer'; return;
+    }
+    el('boostModal').classList.add('hidden');
+    await loadAds();
+    if(confirm('✅ Campagne créée en pause.\n\nOuvrir le Gestionnaire de publicités pour l\'activer ?')) window.open(out.url,'_blank');
+  }catch(e){
+    el('bo_err').style.color='var(--bad)'; el('bo_err').textContent='Erreur réseau : '+e.message;
+  }
+  btn.disabled=false; btn.textContent='Créer la campagne (en pause)';
+};
+el('adSync').onclick=async()=>{
+  if(!CURRENT_COMPANY) return;
+  const btn=el('adSync'); btn.disabled=true; btn.textContent='⏳ Lecture chez Meta…';
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-ads-sync',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({company_id:CURRENT_COMPANY.id})
+    });
+    const out=await res.json().catch(()=>({error:'réponse illisible'}));
+    el('adMsg').style.color=out.error?'var(--bad)':'var(--good)';
+    el('adMsg').textContent=out.error?('Erreur : '+out.error)
+      :(out.majs?`✅ ${out.majs} campagne(s) actualisée(s)`:(out.message||'Rien à actualiser'));
+    if(!out.error) await loadAds();
+  }catch(e){ el('adMsg').style.color='var(--bad)'; el('adMsg').textContent='Erreur réseau : '+e.message; }
+  btn.disabled=false; btn.textContent='🔄 Actualiser les chiffres';
+};
 el('adCancel').onclick=()=>el('adModal').classList.add('hidden');
 el('adFrom').onchange=renderAds; el('adTo').onchange=renderAds; el('adNet').onchange=renderAds;
 el('adReset').onclick=()=>{ el('adFrom').value=''; el('adTo').value=''; el('adNet').value=''; renderAds(); };
