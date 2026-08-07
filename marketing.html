@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>window.PFP_PUSH_APP={icon:'/icons/marketing-192.png',url:'/marketing.html',label:'Marketing IA'};</script>
+<script>window.PFP_PUSH_APP={app:'marketing',icon:'/icons/marketing-192.png',url:'/marketing.html',label:'Marketing IA'};</script>
 <script src="/push.js" defer></script>
 <style>
   :root{
@@ -308,6 +308,43 @@
   .tab:hover{color:var(--txt)}
   .tab.on{background:var(--grad-accent);color:#fff;
     box-shadow:0 10px 26px -12px var(--accent),0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent)}
+  /* ---------- Aperçu fidèle au réseau ----------
+     Volontairement en clair même en thème sombre : c'est ce que verront les gens. */
+  .np{--np-bg:#fff;--np-tx:#050505;--np-mu:#65676b;--np-li:#e4e6eb;
+    background:var(--np-bg);color:var(--np-tx);border-radius:12px;overflow:hidden;
+    border:1px solid var(--np-li);max-width:520px;font-size:14px;line-height:1.42;
+    box-shadow:0 18px 44px -30px rgba(0,0,0,.9)}
+  .np-h{display:flex;align-items:center;gap:9px;padding:11px 13px 8px}
+  .np-av{width:40px;height:40px;border-radius:50%;object-fit:contain;background:#fff;flex:0 0 auto;
+    border:1px solid var(--np-li)}
+  .np-av.ph{display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;background:#7c5cff}
+  .np-n{font-weight:600;font-size:14px;color:var(--np-tx)}
+  .np-s{font-size:12px;color:var(--np-mu);display:flex;align-items:center;gap:4px}
+  .np-t{padding:0 13px 11px;white-space:pre-wrap;word-break:break-word}
+  .np-img{background:#000;line-height:0;border-top:1px solid var(--np-li);border-bottom:1px solid var(--np-li)}
+  .np-img img{width:100%;height:auto;display:block;cursor:zoom-in}
+  .np-a{display:flex;gap:4px;padding:6px 8px;border-top:1px solid var(--np-li)}
+  .np-a span{flex:1;text-align:center;padding:7px 4px;font-size:13px;font-weight:600;color:var(--np-mu);border-radius:6px}
+  .np-tag{color:#385898;font-weight:400}
+  /* Facebook */
+  .np.fb .np-n{color:#050505}
+  /* Instagram : entête compact, actions en icônes, légende sous l'image */
+  .np.ig{max-width:420px}
+  .np.ig .np-h{padding:9px 12px}
+  .np.ig .np-av{width:34px;height:34px}
+  .np.ig .np-n{font-size:13.5px;font-weight:700}
+  .np.ig .np-img{border:0}
+  .np.ig .np-icons{display:flex;gap:14px;padding:9px 12px 4px;font-size:19px}
+  .np.ig .np-likes{padding:0 12px;font-weight:700;font-size:13.5px}
+  .np.ig .np-t{padding:5px 12px 12px;font-size:13.5px}
+  .np.ig .np-t b{font-weight:700;margin-right:5px}
+  /* LinkedIn : avatar carré, sous-titre d'activité, actions texte */
+  .np.li{--np-li:#e0e0e0;max-width:540px}
+  .np.li .np-av{border-radius:6px}
+  .np.li .np-n{font-weight:700;font-size:14.5px}
+  .np.li .np-a span{color:#5f6368}
+  .np-more{color:#65676b;cursor:pointer}
+  .np-wrap{display:flex;justify-content:center;margin:12px 0 4px}
   /* ---------- Sponsoring : compteurs et campagnes ---------- */
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-top:16px}
   .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px 13px;position:relative;overflow:hidden}
@@ -915,7 +952,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v28 · cockpit + sponsoring';
+const APP_VERSION='v29 · apercu reseau';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1718,10 +1755,55 @@ function patchImage(id,patch){
     if(quoi&&quoi.trim()) runImageQueue([id],'retouche',quoi.trim());
   };
 }
+// Aperçu du post tel qu'il sortira sur le réseau : mêmes proportions, même
+// enchaînement, mêmes barres d'action. C'est ce que David valide, pas un champ texte.
+function netPreview(p){
+  const co=CURRENT_COMPANY||{};
+  const nom=esc(co.name||'Ma société');
+  const pseudo=(co.name||'masociete').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const av=co.logo_url
+    ? `<img class="np-av" src="${esc(co.logo_url)}" alt="">`
+    : `<div class="np-av ph">${esc((co.name||'?').trim().slice(0,1).toUpperCase())}</div>`;
+  const img=(p.image_status==='ready'&&p.image_url)
+    ? `<div class="np-img"><img src="${esc(p.image_url)}" alt="${esc(p.image_alt||'')}" title="Ouvrir en grand" onclick="window.open(this.src,'_blank')"></div>`
+    : '';
+  const txt=esc(p.body||'');
+  const cap=esc(p.caption||'');
+  const quand=p.scheduled_at?fmtDate(p.scheduled_at):'maintenant';
+
+  if(p.network==='instagram'){
+    return `<div class="np ig">
+      <div class="np-h">${av}<div style="flex:1;min-width:0"><div class="np-n">${pseudo}</div></div><div class="np-s">•••</div></div>
+      ${img||'<div class="np-img" style="background:#f0f0f0;height:180px"></div>'}
+      <div class="np-icons"><span>♡</span><span>💬</span><span>✈️</span><span style="margin-left:auto">🔖</span></div>
+      <div class="np-likes">Aperçu · ${esc(quand)}</div>
+      <div class="np-t"><b>${pseudo}</b>${txt}${cap?'<br><span class="np-tag">'+cap+'</span>':''}</div>
+    </div>`;
+  }
+  if(p.network==='linkedin'){
+    return `<div class="np li">
+      <div class="np-h">${av}<div style="flex:1;min-width:0">
+        <div class="np-n">${nom}</div>
+        <div class="np-s">${esc(co.activity||'Page entreprise')}</div>
+        <div class="np-s">${esc(quand)} · 🌐</div></div></div>
+      <div class="np-t">${txt}${cap?'\n\n<span class="np-tag">'+cap+'</span>':''}</div>
+      ${img}
+      <div class="np-a"><span>👍 J'aime</span><span>💬 Commenter</span><span>🔁 Republier</span><span>➤ Envoyer</span></div>
+    </div>`;
+  }
+  return `<div class="np fb">
+    <div class="np-h">${av}<div style="flex:1;min-width:0">
+      <div class="np-n">${nom}</div>
+      <div class="np-s">${esc(quand)} · 🌐</div></div><div class="np-s">•••</div></div>
+    <div class="np-t">${txt}${cap?'\n\n<span class="np-tag">'+cap+'</span>':''}</div>
+    ${img}
+    <div class="np-a"><span>👍 J'aime</span><span>💬 Commenter</span><span>↪️ Partager</span></div>
+  </div>`;
+}
 function imgZone(p){
   if(p.image_status==='ready'&&p.image_url){
+    // Le visuel est déjà dans l'aperçu réseau juste au-dessus : ici, seuls les outils.
     return `<div class="post-img" data-img="${p.id}">
-      <img src="${esc(p.image_url)}" alt="${esc(p.image_alt)}" title="Ouvrir en grand" onclick="window.open(this.src,'_blank')">
       <div class="img-foot">
         <span class="img-tag">${p.image_headline?'✍️ « '+esc(p.image_headline)+' »':'🎨 '+esc(p.image_style||'visuel')}</span>
         <a class="btn ghost small" href="${esc(p.image_url)}" target="_blank" rel="noopener">⬇️ Ouvrir</a>
@@ -2061,13 +2143,14 @@ async function loadPosts(){
         <span class="who" style="flex:0 0 auto">${fmtDate(p.scheduled_at)}</span>
         <span class="rolebadge" style="flex:0 0 auto">${STATUS_LABEL[p.status]||p.status}</span>
       </div>
-      <textarea class="post-body">${esc(p.body)}</textarea>
+      <div class="np-wrap">${netPreview(p)}</div>
+      <textarea class="post-body hidden">${esc(p.body)}</textarea>
       ${imgZone(p)}
       <div class="who" style="margin-top:6px">💡 ${esc(p.visual_idea)}</div>
-      <div class="who">🏷️ ${esc(p.caption)}</div>
       <div class="row" style="margin-top:10px">
         <button class="btn act-valider small" style="flex:0 0 auto">✅ Valider</button>
-        <button class="btn ghost act-save small" style="flex:0 0 auto">✏️ Enregistrer la modif</button>
+        <button class="btn ghost act-edit small" style="flex:0 0 auto">✏️ Modifier le texte</button>
+        <button class="btn ghost act-save small hidden" style="flex:0 0 auto">💾 Enregistrer</button>
         <button class="btn ghost act-refuser small" style="flex:0 0 auto">❌ Refuser</button>
         <button class="btn ghost act-pause small" style="flex:0 0 auto">⏸️ Pause</button>
         <button class="btn ghost act-chat small" style="flex:0 0 auto" title="Demander une modification">💬 Demander une modif</button>
@@ -2080,6 +2163,16 @@ async function loadPosts(){
     card.querySelector('.act-refuser').onclick=()=>setPostStatus(id,'refuse');
     card.querySelector('.act-pause').onclick=()=>setPostStatus(id,'pause');
     card.querySelector('.act-save').onclick=()=>savePostBody(id,card.querySelector('.post-body').value);
+    // L'aperçu réseau est la vue par défaut ; le champ d'édition n'apparaît qu'à la demande.
+    card.querySelector('.act-edit').onclick=()=>{
+      const ta=card.querySelector('.post-body'), prev=card.querySelector('.np-wrap');
+      const ouvre=ta.classList.contains('hidden');
+      ta.classList.toggle('hidden',!ouvre);
+      prev.classList.toggle('hidden',ouvre);
+      card.querySelector('.act-save').classList.toggle('hidden',!ouvre);
+      card.querySelector('.act-edit').textContent=ouvre?'👁 Voir l\'aperçu':'✏️ Modifier le texte';
+      if(ouvre) ta.focus();
+    };
     const img=card.querySelector('.act-img');
     if(img) img.onclick=()=>runImageQueue([id]);
     const touch=card.querySelector('.act-touch');

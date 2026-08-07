@@ -5,6 +5,9 @@
   var PFP_KEY = 'sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP';
   var VAPID_PUBLIC = 'BAA87xX2YnIW93CPOXzOML_TWMjf0UTt1dj-nVb3HaMd8yANWp0agfvehGWk1UCeTmnb-b1sZ7DJBb3rLVVCyI0';
   var CFG = window.PFP_PUSH_APP || {};
+  /* Identifiant de l'app courante. Un navigateur n'a qu'un seul abonnement push
+     pour tout le portail : la séparation se fait ici, app par app. */
+  var APP = CFG.app || (CFG.url || location.pathname).replace(/^.*\//, '').replace(/\.html.*$/, '') || 'portail';
   var _db = null;
   function db() { if (!_db) _db = window.supabase.createClient(PFP_URL, PFP_KEY, { auth: { persistSession: true, autoRefreshToken: false } }); return _db; }
   function supported() { return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
@@ -23,6 +26,8 @@
     if (!s || !s.user) { alert("Connecte-toi d'abord pour activer les notifications."); return { ok: false }; }
     var res = await db().from('push_subscriptions').upsert({ user_id: s.user.id, endpoint: sub.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_agent: navigator.userAgent }, { onConflict: 'endpoint' });
     if (res.error) { alert('Erreur enregistrement : ' + res.error.message); return { ok: false }; }
+    var opt = await db().from('push_app_optins').upsert({ endpoint: sub.endpoint, app: APP, user_id: s.user.id }, { onConflict: 'endpoint,app' });
+    if (opt.error) { alert('Erreur enregistrement : ' + opt.error.message); return { ok: false }; }
     return { ok: true };
   }
 
@@ -33,15 +38,34 @@
     return r.data;
   }
 
+  /* Se désabonner ne coupe que l'app courante. L'abonnement du navigateur n'est
+     supprimé que s'il ne reste plus aucune app inscrite dessus — sinon on
+     couperait aussi les notifications des autres apps du portail. */
   async function disable() {
-    try { var reg = await navigator.serviceWorker.ready; var sub = await reg.pushManager.getSubscription(); if (sub) { await db().from('push_subscriptions').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe(); } } catch (e) { }
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      if (!sub) return { ok: true };
+      await db().from('push_app_optins').delete().eq('endpoint', sub.endpoint).eq('app', APP);
+      var reste = await db().from('push_app_optins').select('app').eq('endpoint', sub.endpoint);
+      if (!reste.error && (reste.data || []).length === 0) {
+        await db().from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+        await sub.unsubscribe();
+      }
+    } catch (e) { }
     return { ok: true };
   }
 
   async function state() {
     if (!supported()) return 'unsupported';
     if (Notification.permission === 'denied') return 'denied';
-    try { var reg = await navigator.serviceWorker.ready; var sub = await reg.pushManager.getSubscription(); return sub ? 'on' : 'off'; } catch (e) { return 'off'; }
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      if (!sub) return 'off';
+      var r = await db().from('push_app_optins').select('app').eq('endpoint', sub.endpoint).eq('app', APP).maybeSingle();
+      return (r.data) ? 'on' : 'off';
+    } catch (e) { return 'off'; }
   }
 
   window.pfpPush = { enable: enable, test: test, disable: disable, state: state, supported: supported };
@@ -63,7 +87,7 @@
     document.body.appendChild(wrap);
     var menu = wrap.querySelector('#pfp-bell-menu');
     var lbl = wrap.querySelector('#pfp-bell-state');
-    async function refresh() { var st = await state(); lbl.textContent = st === 'on' ? '✅ Notifications activées' : st === 'denied' ? '⛔ Bloquées (réglages du tel)' : st === 'unsupported' ? '⚠️ Non supporté (installe l\'app)' : '⚪ Désactivées'; }
+    async function refresh() { var nom = CFG.label || APP; var st = await state(); lbl.textContent = st === 'on' ? '✅ Activées pour ' + nom : st === 'denied' ? '⛔ Bloquées (réglages du tel)' : st === 'unsupported' ? '⚠️ Non supporté (installe l\'app)' : '⚪ Désactivées pour ' + nom; }
     wrap.querySelector('#pfp-bell-btn').onclick = function () { var open = menu.style.display === 'block'; menu.style.display = open ? 'none' : 'block'; if (!open) refresh(); };
     menu.addEventListener('click', async function (e) {
       var a = e.target && e.target.getAttribute && e.target.getAttribute('data-a'); if (!a) return;

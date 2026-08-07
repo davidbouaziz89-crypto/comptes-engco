@@ -23,10 +23,18 @@ const admin = createClient(url, serviceKey);
 const ICON = "/icons/marketing-192.png";
 const APP_URL = "/marketing.html?valider=1";
 
+const APP = "marketing";
+
 async function sendToUser(userId: string, payload: Record<string, unknown>) {
   const { data: subs } = await admin.from("push_subscriptions").select("*").eq("user_id", userId);
+  // On ne réveille que les appareils inscrits à Marketing IA : les autres apps
+  // du portail partagent le même abonnement, ce n'est pas une raison pour les
+  // faire sonner à notre place.
+  const { data: optins } = await admin.from("push_app_optins")
+    .select("endpoint").eq("user_id", userId).eq("app", APP);
+  const permis = new Set((optins || []).map((o: { endpoint: string }) => o.endpoint));
   let sent = 0;
-  for (const s of subs || []) {
+  for (const s of (subs || []).filter((s: { endpoint: string }) => permis.has(s.endpoint))) {
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
