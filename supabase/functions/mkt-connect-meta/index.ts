@@ -135,10 +135,37 @@ Deno.serve(async (req) => {
       .upsert(lignes, { onConflict: "company_id,network" });
     if (upErr) return json({ error: "Enregistrement échoué : " + upErr.message }, 500);
 
+    // 5) Le compte publicitaire, s'il y en a un : c'est le jeton *utilisateur* qui
+    // porte ads_management, pas celui de la Page. On le garde à part.
+    let pub: { id: string; name: string } | null = null;
+    try {
+      const adRes = await fetch(`${GRAPH}/me/adaccounts?fields=account_id,name,account_status&limit=25&access_token=${encodeURIComponent(longToken)}`);
+      const adJson = await adRes.json();
+      const comptes = ((adJson?.data || []) as { account_id: string; name: string; account_status: number }[])
+        .filter((c) => c.account_id);
+      const choisi = body.ad_account_id
+        ? comptes.find((c) => c.account_id === String(body.ad_account_id))
+        : comptes.find((c) => c.account_status === 1) || comptes[0];
+      if (choisi) {
+        pub = { id: choisi.account_id, name: choisi.name || choisi.account_id };
+        await admin.from("mkt_meta_ads").upsert({
+          company_id: companyId,
+          ad_account_id: choisi.account_id,
+          ad_account_name: choisi.name || null,
+          user_token: longToken,
+          expires_at: exJson.expires_in
+            ? new Date(Date.now() + Number(exJson.expires_in) * 1000).toISOString()
+            : null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "company_id" });
+      }
+    } catch (_) { /* la publicité est un bonus : son échec ne casse pas la connexion */ }
+
     return json({
       ok: true,
       facebook: { id: page.id, name: page.name },
       instagram: ig?.id ? { id: ig.id, name: ig.username } : null,
+      publicite: pub,
       warning: ig?.id ? null : "Page connectée, mais aucun compte Instagram professionnel ne lui est rattaché.",
     });
   } catch (e) {

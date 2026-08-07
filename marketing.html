@@ -959,7 +959,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v30 · LinkedIn pret';
+const APP_VERSION='v31 · compte publicitaire';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2582,7 +2582,8 @@ el('metaGo').onclick=async()=>{
     else{
       el('metaMsg').style.color='var(--good)';
       el('metaMsg').textContent='✅ Facebook : '+out.facebook.name
-        +(out.instagram?' · Instagram : @'+out.instagram.name:' — '+(out.warning||''));
+        +(out.instagram?' · Instagram : @'+out.instagram.name:' — '+(out.warning||''))
+        +(out.publicite?' · Publicité : '+out.publicite.name+' ('+out.publicite.id+')':'');
       el('metaToken').value='';
       loadSocial();
     }
