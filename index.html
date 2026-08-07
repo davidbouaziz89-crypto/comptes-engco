@@ -190,6 +190,12 @@
   .calc-card{overflow:visible!important;cursor:help}
   .calc-pop{position:absolute;top:calc(100% + 8px);left:0;min-width:260px;max-width:340px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.55);padding:12px 14px;z-index:30;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .16s ease,transform .16s ease;white-space:normal;text-align:left}
   .calc-card:hover .calc-pop{opacity:1;transform:none;pointer-events:auto}
+  .proj-switch .proj-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:210px;max-height:70vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);padding:6px;z-index:60;opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease;display:flex;flex-direction:column;gap:2px}
+  .proj-switch:hover .proj-menu{opacity:1;pointer-events:auto;transform:none}
+  .proj-menu-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;border:0;color:var(--txt);padding:8px 11px;border-radius:8px;cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
+  .proj-menu-item:hover{background:var(--panel2)}
+  .proj-menu-item.cur{background:color-mix(in srgb,var(--accent) 18%,transparent);font-weight:600}
+  .proj-menu-sep{height:1px;background:var(--line);margin:4px 2px}
   .kpi.calc-card{overflow:visible!important;cursor:help}
   /* Sur les cartes du bandeau : le calcul s'affiche DANS la carte (par-dessus la mini-courbe), sans recouvrir les graphes voisins */
   .kpi .calc-pop{top:50px;left:12px;right:12px;bottom:auto;min-width:0;max-width:none}
@@ -379,7 +385,10 @@
   </div>
   <div class="userbox">
     <span id="user-email"></span>
-    <button class="btn ghost small" id="btn-changeproj" onclick="showProjectPicker()" style="display:none">🔀 Changer de projet</button>
+    <div class="proj-switch" id="proj-switch" style="display:none;position:relative">
+      <button class="btn ghost small" id="btn-changeproj" onclick="showProjectPicker()">🔀 Changer de projet ▾</button>
+      <div class="proj-menu" id="proj-menu"></div>
+    </div>
     <button class="btn ghost small" id="theme-btn" onclick="toggleTheme()" title="Thème clair / sombre">🌙</button>
     <button class="btn ghost small" onclick="reloadData()">🔄 Rafraîchir</button>
     <button class="btn ghost small" onclick="changePassword()">🔑 Mot de passe</button>
@@ -1365,6 +1374,16 @@ function isAdminUser(){ return MY_MEMBERSHIPS.some(m=>m.role==='admin'); }
 function myProjectKeys(){ return isAdminUser() ? Object.keys(PROJECTS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>PROJECTS[k]); }
 function myToolKeys(){ const base = isAdminUser() ? Object.keys(EXTERNAL_TOOLS) : [...new Set(MY_MEMBERSHIPS.map(m=>m.project_key))].filter(k=>EXTERNAL_TOOLS[k]); if(!base.includes('zeste')) base.unshift('zeste'); return base; }
 function openTool(k){ const t=EXTERNAL_TOOLS[k]; if(!t||!t.url) return; if(t.internal) location.href=t.url; else window.open(t.url,'_blank','noopener'); }
+function renderProjSwitchMenu(){
+  const menu=document.getElementById('proj-menu'); if(!menu) return;
+  const keys=myProjectKeys(), tools=myToolKeys();
+  let html='';
+  keys.forEach(k=>{ const cur=(PROJ&&PROJ.key===k)?' cur':''; html+=`<button class="proj-menu-item${cur}" onclick="enterProject('${k}')"><span>${PROJECTS[k].icon}</span> ${escH(PROJECTS[k].nom)}</button>`; });
+  if(tools.length) html+='<div class="proj-menu-sep"></div>';
+  tools.forEach(k=>{ const t=EXTERNAL_TOOLS[k]; html+=`<button class="proj-menu-item" onclick="openTool('${k}')"><span>${t.icon}</span> ${escH(t.nom)}</button>`; });
+  if(isAdminUser()){ html+='<div class="proj-menu-sep"></div><button class="proj-menu-item'+(ADMIN_MODE?' cur':'')+'" onclick="openAdminUsers()"><span>👥</span> Utilisateurs</button>'; }
+  menu.innerHTML=html;
+}
 function showProjectPicker(){
   const list=document.getElementById('projpick-list');
   document.getElementById('projpick-msg').textContent='';
@@ -1382,7 +1401,7 @@ async function openAdminConsole(which){
   ADMIN_MODE=true; PROJ=null; CURRENT_ROLE='admin'; applyPermClasses();
   document.getElementById('projpick').style.display='none';
   document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">Admin</span>';
-  document.getElementById('btn-changeproj').style.display='';
+  document.getElementById('proj-switch').style.display=''; renderProjSwitchMenu();
   document.querySelectorAll('#mainnav button').forEach(b=>b.style.display='none');
   document.getElementById('adminnav').style.display='flex';
   await loadRolesCfg();
@@ -1416,7 +1435,8 @@ function enterProject(key){
   const roleLabel={admin:'Admin',secretaire:'Secrétaire',regie:'Régie '+(CURRENT_REGIE||'')}[CURRENT_ROLE]||CURRENT_ROLE;
   document.getElementById('proj-label').innerHTML=PROJ.icon+' '+PROJ.nom;
   document.getElementById('user-email').innerHTML=(SESSION.user.email||'')+' <span class="rolebadge">'+roleLabel+'</span>';
-  document.getElementById('btn-changeproj').style.display = myProjectKeys().length>1?'':'none';
+  document.getElementById('proj-switch').style.display = (myProjectKeys().length+myToolKeys().length>1)?'':'none';
+  renderProjSwitchMenu();
   buildAssocUI();
   applyRole(CURRENT_ROLE);
   if(CURRENT_ROLE==='regie'){ loadMonEspace(); } else { loadAll(); }
