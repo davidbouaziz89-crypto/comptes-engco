@@ -865,16 +865,6 @@
             <h2 style="margin-top:0">🏢 Tes sociétés</h2>
             <div id="paramCos"></div>
           </div>
-          <div class="panel companyPanel">
-            <div class="co-head">
-              <img id="coLogo" class="co-logo ph" alt="">
-              <div style="flex:1;min-width:0">
-                <h2 style="margin:0" id="coName"></h2>
-                <div class="who" id="coWebsite"></div>
-              </div>
-              <button class="btn ghost small" id="editCompanyBtn" style="flex:0 0 auto">⚙️ Modifier</button>
-            </div>
-          </div>
         </section>
 
         <!-- ---- Rythme ---- -->
@@ -1065,7 +1055,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v41 · parametrage range';
+const APP_VERSION='v42 · societes sans doublon';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1262,12 +1252,8 @@ function selectCompany(id){
   CHAT_ID=null; CHAT_MSGS=[]; CHAT_PARTS=['orchestrateur'];
   el('chatTitle').textContent='Nouvelle discussion';
   renderFeed(); renderChatTeam(); loadChats();
-  // en-tête
-  el('coName').textContent=CURRENT_COMPANY.name;
-  const logo=el('coLogo');
-  if(CURRENT_COMPANY.logo_url){ logo.src=CURRENT_COMPANY.logo_url; logo.classList.remove('ph'); logo.textContent=''; }
-  else { logo.removeAttribute('src'); logo.classList.add('ph'); logo.textContent='🏢'; }
-  el('coWebsite').innerHTML=CURRENT_COMPANY.website?`🌐 <a href="${esc(CURRENT_COMPANY.website.startsWith('http')?CURRENT_COMPANY.website:'https://'+CURRENT_COMPANY.website)}" target="_blank" rel="noopener">${esc(CURRENT_COMPANY.website)}</a>`:'<span class="who">Aucun site renseigné</span>';
+  // L'en-tête société a été retiré du paramétrage : la liste « Tes sociétés »
+  // affiche déjà logo, nom, site et bouton Modifier pour chacune.
   el('autoWeekly').checked=!!CURRENT_COMPANY.auto_weekly;
   HISTO_CO=CURRENT_COMPANY.id;
   if(!el('tab-histo').classList.contains('hidden')) loadHistory();
@@ -1294,7 +1280,6 @@ function openCompanyModal(existing){
   el('coModal').classList.remove('hidden');
   el('co_name').focus();
 }
-el('editCompanyBtn').onclick=()=>{ if(CURRENT_COMPANY) openCompanyModal(CURRENT_COMPANY); };
 el('co_cancel').onclick=()=>el('coModal').classList.add('hidden');
 el('co_name').addEventListener('input',()=>{ if(!MODAL_EDIT_ID && !el('co_logo').value){ const s=suggestLogo(el('co_name').value); if(s) el('co_logo').value=s; } });
 
