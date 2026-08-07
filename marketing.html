@@ -104,9 +104,10 @@
   .who{color:var(--muted);font-size:13px}
   .rolebadge{display:inline-block;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:700;background:var(--accent);color:#fff;white-space:nowrap}
   .wrap{max-width:1080px;margin:0 auto;padding:18px}
-  .panel{position:relative;background:color-mix(in srgb,var(--panel) 88%,transparent);
+  /* Opaques : en translucide, le contenu qui passait derrière au défilement
+     transparaissait et donnait des textes superposés illisibles. */
+  .panel{position:relative;background:var(--panel);
     border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;
-    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     box-shadow:0 1px 0 color-mix(in srgb,#fff 5%,transparent) inset,0 22px 50px -42px #000}
   /* Liseré lumineux en haut de chaque panneau, très ténu */
   .panel::before{content:"";position:absolute;left:16px;right:16px;top:0;height:1px;border-radius:1px;
@@ -926,6 +927,7 @@
                 <option value="linkedin">LinkedIn</option></select></div>
             <div style="flex:0 0 auto"><button class="btn ghost" id="adReset">↺ Tout</button></div>
             <div style="flex:0 0 auto"><button class="btn ghost" id="adSync">🔄 Actualiser les chiffres</button></div>
+            <div style="flex:0 0 auto"><button class="btn ghost" id="adExport">⬇️ Exporter (CSV)</button></div>
             <div style="flex:0 0 auto"><button class="btn" id="adBoost">🚀 Sponsoriser un post</button></div>
             <div style="flex:0 0 auto"><button class="btn ghost" id="adNew">+ Manuelle</button></div>
           </div>
@@ -1023,7 +1025,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v37 · rail epure';
+const APP_VERSION='v38 · export sponsoring';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2743,6 +2745,46 @@ el('boostGo').onclick=async()=>{
     el('bo_err').style.color='var(--bad)'; el('bo_err').textContent='Erreur réseau : '+e.message;
   }
   btn.disabled=false; btn.textContent='Créer la campagne (en pause)';
+};
+// Export global : toutes les campagnes affichées, jour par jour, dans un seul
+// fichier ouvrable directement dans Excel.
+el('adExport').onclick=async()=>{
+  const v=adsFiltrees();
+  if(!v.length){ el('adMsg').style.color='var(--bad)'; el('adMsg').textContent='Rien à exporter sur cette période.'; return; }
+  const btn=el('adExport'); btn.disabled=true; btn.textContent='⏳ Préparation…';
+  try{
+    const ids=v.filter(a=>a.external_campaign_id).map(a=>a.id);
+    let jours=[];
+    if(ids.length){
+      const {data}=await db.from('mkt_ads_daily').select('*').in('ad_id',ids).order('jour');
+      jours=data||[];
+    }
+    const parCamp={}; jours.forEach(j=>{ (parCamp[j.ad_id]=parCamp[j.ad_id]||[]).push(j); });
+    const lignes=[];
+    v.forEach(a=>{
+      const serie=parCamp[a.id];
+      if(serie&&serie.length){
+        serie.forEach(j=>lignes.push([a.nom,NET_LABEL[a.network]||a.network,AD_OBJ[a.objectif]||a.objectif||'',
+          j.jour,Number(j.depense).toFixed(2),j.impressions,j.clics,j.leads,
+          j.leads?(Number(j.depense)/j.leads).toFixed(2):'',AD_STAT[a.statut]||a.statut]));
+      } else {
+        // Campagne sans historique (jamais diffusée, ou saisie à la main) :
+        // on l'exporte quand même avec son total, sinon elle disparaît du fichier.
+        lignes.push([a.nom,NET_LABEL[a.network]||a.network,AD_OBJ[a.objectif]||a.objectif||'',
+          a.started_at||'',Number(a.depense).toFixed(2),a.impressions,a.clics,a.leads,
+          a.leads?(Number(a.depense)/a.leads).toFixed(2):'',AD_STAT[a.statut]||a.statut]);
+      }
+    });
+    const entete='Campagne;Reseau;Objectif;Date;Depense (EUR);Impressions;Clics;Leads;Cout par lead (EUR);Statut';
+    const csv='﻿'+[entete,...lignes.map(l=>l.join(';'))].join('\r\n');
+    const nom=(CURRENT_COMPANY?CURRENT_COMPANY.name.replace(/[^\w\-]+/g,'-'):'campagnes')+'-sponsoring.csv';
+    const a2=document.createElement('a');
+    a2.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a2.download=nom; document.body.appendChild(a2); a2.click(); a2.remove();
+    setTimeout(()=>URL.revokeObjectURL(a2.href),4000);
+    el('adMsg').style.color='var(--good)'; el('adMsg').textContent=`✅ ${lignes.length} ligne(s) exportée(s)`;
+  }catch(e){ el('adMsg').style.color='var(--bad)'; el('adMsg').textContent='Erreur : '+e.message; }
+  btn.disabled=false; btn.textContent='⬇️ Exporter (CSV)';
 };
 el('adSync').onclick=async()=>{
   if(!CURRENT_COMPANY) return;
