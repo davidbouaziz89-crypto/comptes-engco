@@ -1055,7 +1055,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v42 · societes sans doublon';
+const APP_VERSION='v43 · barre stable';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2917,15 +2917,29 @@ document.addEventListener('click',e=>{
 // (équipe, discussions) se calent juste en dessous au lieu de passer derrière.
 (function(){
   const stack=el('topStack'); if(!stack) return;
-  let raf=0;
+  // Deux seuils volontairement éloignés. Avec un seuil unique, compacter la barre
+  // raccourcit la page, le défilement repasse sous le seuil, la barre se
+  // décompacte — et elle se met à vibrer sans fin. L'écart absorbe le rebond.
+  const COMPACTE_A=90, RELACHE_A=24;
+  let compact=false, raf=0, dernier=-1;
+
+  function mesurer(){
+    const h=stack.offsetHeight;
+    if(h!==dernier){ dernier=h; document.documentElement.style.setProperty('--stick',h+'px'); }
+  }
   function maj(){
     raf=0;
-    stack.classList.toggle('compact',window.scrollY>36);
-    document.documentElement.style.setProperty('--stick',stack.offsetHeight+'px');
+    const y=window.scrollY;
+    if(!compact && y>COMPACTE_A){ compact=true; stack.classList.add('compact'); }
+    else if(compact && y<RELACHE_A){ compact=false; stack.classList.remove('compact'); }
+    mesurer();
   }
-  window.addEventListener('scroll',()=>{ if(!raf) raf=requestAnimationFrame(maj); },{passive:true});
-  window.addEventListener('resize',()=>{ if(!raf) raf=requestAnimationFrame(maj); });
-  new ResizeObserver(()=>{ if(!raf) raf=requestAnimationFrame(maj); }).observe(stack);
+  const planifier=()=>{ if(!raf) raf=requestAnimationFrame(maj); };
+  window.addEventListener('scroll',planifier,{passive:true});
+  window.addEventListener('resize',planifier);
+  // L'observateur ne fait que relever la hauteur : s'il rappelait maj(), le
+  // changement de hauteur qu'il observe relancerait la bascule en boucle.
+  new ResizeObserver(mesurer).observe(stack);
   maj();
 })();
 
