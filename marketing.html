@@ -347,26 +347,6 @@
   .np.li .np-a span{color:#5f6368}
   .np-more{color:#65676b;cursor:pointer}
   .np-wrap{display:flex;justify-content:center;margin:12px 0 4px}
-  /* ---------- CRM : pipeline en colonnes ---------- */
-  .pipe{display:flex;gap:12px;align-items:flex-start;min-height:120px}
-  .pcol{flex:0 0 264px;background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:10px}
-  .pcol.drop{border-color:var(--accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent)}
-  .pcol h4{margin:0 0 9px;font-size:13px;display:flex;align-items:center;gap:7px;font-family:var(--font-display)}
-  .pcol h4 .pt{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-  .pcol h4 .n{margin-left:auto;font-family:var(--font-mono);font-size:12px;color:var(--muted)}
-  .lead{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px 11px;margin-bottom:8px;
-    cursor:grab;transition:border-color .15s,transform .12s}
-  .lead:hover{border-color:var(--accent);transform:translateY(-1px)}
-  .lead.drag{opacity:.45}
-  .lead .n{font-weight:700;font-size:13.5px}
-  .lead .c{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45;word-break:break-word}
-  .lead .src{display:inline-block;font-size:10.5px;font-weight:700;border-radius:20px;padding:2px 8px;margin-top:6px;
-    background:var(--panel2);color:var(--muted)}
-  .pvide{font-size:12.5px;color:var(--muted);padding:8px 2px}
-  .ligne{display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--line);
-    border-radius:10px;padding:8px 10px;margin-bottom:6px}
-  .ligne .g{flex:1;min-width:0;font-size:13.5px}
-  .ligne .g small{display:block;color:var(--muted);font-size:11.5px}
   /* ---------- Sponsoring : compteurs et campagnes ---------- */
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-top:16px}
   .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px 13px;position:relative;overflow:hidden}
@@ -585,87 +565,6 @@
     </div>
   </div>
 
-  <!-- Fiche prospect -->
-  <div id="leadModal" class="overlay hidden">
-    <div class="modal-card" style="max-width:600px">
-      <div class="row" style="align-items:center">
-        <h2 style="margin:0" id="leadTitle">Nouveau prospect</h2>
-        <button class="btn ghost small" id="leadCancel" style="flex:0 0 auto">Fermer</button>
-      </div>
-      <div class="row">
-        <div><label>Étape</label><select id="ld_stage"></select></div>
-        <div><label>Campagne d'origine</label><select id="ld_camp"><option value="">— Aucune —</option></select></div>
-      </div>
-      <div class="row">
-        <div><label>Prénom</label><input id="ld_prenom"></div>
-        <div><label>Nom</label><input id="ld_nom"></div>
-      </div>
-      <div class="row">
-        <div><label>Téléphone</label><input id="ld_tel" type="tel" placeholder="06 12 34 56 78"></div>
-        <div><label>E-mail</label><input id="ld_email" type="email" placeholder="prenom@exemple.fr"></div>
-      </div>
-      <label>Adresse</label>
-      <input id="ld_adresse" placeholder="12 rue des Lilas">
-      <div class="row">
-        <div><label>Code postal</label><input id="ld_cp"></div>
-        <div><label>Ville</label><input id="ld_ville"></div>
-      </div>
-      <div id="ld_extra"></div>
-      <label>Notes</label>
-      <textarea id="ld_notes" style="min-height:70px" placeholder="Ce qui s'est dit, ce qu'il faut retenir…"></textarea>
-      <div class="err" id="ld_err"></div>
-      <div class="row" style="margin-top:14px">
-        <button class="btn ghost" id="leadDelete" style="flex:0 0 auto;color:var(--bad)">🗑 Supprimer</button>
-        <div style="flex:1"></div>
-        <button class="btn" id="leadSave" style="flex:0 0 auto">Enregistrer</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Éditeur de pipeline : étapes et champs -->
-  <div id="pipeModal" class="overlay hidden">
-    <div class="modal-card" style="max-width:680px">
-      <div class="row" style="align-items:center">
-        <h2 style="margin:0">⚙️ Étapes et champs</h2>
-        <button class="btn ghost small" id="pipeClose" style="flex:0 0 auto">Fermer</button>
-      </div>
-      <p class="who" style="margin-top:6px">Chaque campagne peut suivre son propre parcours, avec ses propres
-        informations à recueillir. Un prospect « standard téléphonique » ne se qualifie pas comme un prospect
-        « photovoltaïque ».</p>
-      <div class="row" style="align-items:flex-end">
-        <div><label style="margin-top:0">Pipeline</label><select id="pi_sel"></select></div>
-        <div style="flex:0 0 auto"><button class="btn ghost small" id="pi_new">+ Nouveau</button></div>
-        <div style="flex:0 0 auto"><button class="btn ghost small" id="pi_ren">✏️ Renommer</button></div>
-        <div style="flex:0 0 auto"><button class="btn ghost small" id="pi_del" style="color:var(--bad)">🗑</button></div>
-      </div>
-
-      <h3 style="margin:18px 0 6px;font-size:15px">Les étapes</h3>
-      <div id="pi_stages"></div>
-      <div class="row" style="align-items:flex-end;margin-top:8px">
-        <div><input id="pi_snom" placeholder="Nom de l'étape (ex. Rendez-vous pris)"></div>
-        <div style="flex:0 0 auto"><input type="color" id="pi_scol" value="#7c5cff" style="width:52px;padding:3px;height:38px"></div>
-        <div style="flex:0 0 auto"><button class="btn small" id="pi_sadd">+ Ajouter</button></div>
-      </div>
-
-      <h3 style="margin:20px 0 6px;font-size:15px">Les informations à recueillir</h3>
-      <p class="who" style="margin:0 0 8px;font-size:12.5px">Nom, prénom, téléphone, e-mail, adresse, code postal
-        et ville sont déjà présents sur chaque fiche. Ajoute ici ce qui est propre à ce parcours.</p>
-      <div id="pi_fields"></div>
-      <div class="row" style="align-items:flex-end;margin-top:8px">
-        <div><input id="pi_fnom" placeholder="Intitulé (ex. Nombre de lignes)"></div>
-        <div style="flex:0 0 auto"><select id="pi_ftype" style="width:auto">
-          <option value="texte">Texte</option><option value="zone">Texte long</option>
-          <option value="nombre">Nombre</option><option value="date">Date</option>
-          <option value="tel">Téléphone</option><option value="email">E-mail</option>
-          <option value="liste">Liste de choix</option><option value="case">Case à cocher</option>
-        </select></div>
-        <div><input id="pi_fopt" placeholder="Choix séparés par ; (liste seulement)"></div>
-        <div style="flex:0 0 auto"><button class="btn small" id="pi_fadd">+ Ajouter</button></div>
-      </div>
-      <div class="err" id="pi_err"></div>
-    </div>
-  </div>
-
   <!-- Sponsoriser un post publié -->
   <div id="boostModal" class="overlay hidden">
     <div class="modal-card" style="max-width:520px">
@@ -837,7 +736,6 @@
           <button class="tab on" data-tab="pilotage">🚀 Pilotage</button>
           <button class="tab" data-tab="chat">💬 Discussion</button>
           <button class="tab" data-tab="ads">📣 Sponsoring</button>
-          <button class="tab" data-tab="leads">📇 Prospects</button>
           <button class="tab" data-tab="histo">📚 Historique</button>
           <button class="tab" data-tab="frais">💶 Frais</button>
         </nav>
@@ -1042,28 +940,6 @@
         </div>
       </div>
 
-      <!-- ================= PROSPECTS (CRM) ================= -->
-      <div id="tab-leads" class="hidden">
-        <div class="panel">
-          <div class="row" style="align-items:center;margin-bottom:6px">
-            <h2 style="margin:0;flex:1">📇 Prospects</h2>
-            <div style="flex:0 0 auto"><button class="btn ghost small" id="lePipes">⚙️ Étapes et champs</button></div>
-          </div>
-          <div class="row" style="align-items:flex-end">
-            <div><label style="margin-top:0">Pipeline</label><select id="lePipe"></select></div>
-            <div><label style="margin-top:0">Campagne</label><select id="leCamp"><option value="">Toutes</option></select></div>
-            <div><label style="margin-top:0">Recherche</label><input id="leQ" placeholder="nom, téléphone, mail, ville…"></div>
-            <div style="flex:0 0 auto"><button class="btn" id="leNew">+ Prospect</button></div>
-            <div style="flex:0 0 auto"><button class="btn ghost" id="leExport">⬇️ Exporter (CSV)</button></div>
-          </div>
-          <div class="kpis" id="leKpis"></div>
-          <div class="err" id="leMsg"></div>
-        </div>
-        <div class="panel" style="overflow-x:auto">
-          <div class="pipe" id="lePipeline"></div>
-        </div>
-      </div>
-
       <!-- ================= HISTORIQUE ================= -->
       <div id="tab-histo" class="hidden">
         <div class="panel">
@@ -1149,7 +1025,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v39 · CRM prospects';
+const APP_VERSION='v38 · export sponsoring';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1356,7 +1232,6 @@ function selectCompany(id){
   HISTO_CO=CURRENT_COMPANY.id;
   if(!el('tab-histo').classList.contains('hidden')) loadHistory();
   if(!el('tab-ads').classList.contains('hidden')) loadAds();
-  if(!el('tab-leads').classList.contains('hidden')){ PIPE_ID=null; loadCRM(); }
   loadRappels();
   if(!el('tab-param').classList.contains('hidden')) loadParam();
   loadEditorial(); loadCadence(); loadPosts();
@@ -2492,7 +2367,7 @@ async function savePostBody(id,body){
 document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
 function showTab(name){
   document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
-  ['pilotage','param','chat','ads','leads','histo','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
+  ['pilotage','param','chat','ads','histo','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
   const pt=el('paramTile'); if(pt) pt.classList.toggle('on',name==='param');
   if(name!=='param' && !document.querySelector('#tabs .tab.on')){
     const first=document.querySelector('#tabs .tab'); if(first) first.classList.add('on');
@@ -2501,333 +2376,9 @@ function showTab(name){
   if(name==='frais') loadUsage();
   if(name==='histo') loadHistory();
   if(name==='ads') loadAds();
-  if(name==='leads'){ if(!ADS.length) loadAds().then(loadCRM); else loadCRM(); }
   if(name==='param') loadParam();
 }
 el('costChip').onclick=()=>showTab('frais');
-
-// ================= CRM DES PROSPECTS =================
-// Les étapes et les champs ne sont pas figés dans le code, contrairement au CRM
-// Photovoltaïque : ils vivent en base, un jeu par pipeline, et une campagne
-// choisit le sien. C'est ce qui permet d'avoir un parcours par type de prospect.
-let PIPES=[], STAGES=[], FIELDS=[], LEADS=[], PIPE_ID=null, LEAD_EDIT=null, PIPE_EDIT=null;
-const SOURCE_LABEL={manuel:'Saisi à la main',facebook:'Facebook',instagram:'Instagram',linkedin:'LinkedIn',import:'Import'};
-const cle=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-  .replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||('c'+Date.now());
-
-const ETAPES_DEFAUT=[
-  {libelle:'Nouveau',couleur:'#3b82f6'},
-  {libelle:'Contacté',couleur:'#8a5cff'},
-  {libelle:'Rendez-vous',couleur:'#f59e0b'},
-  {libelle:'Proposition',couleur:'#38bdf8'},
-  {libelle:'Gagné',couleur:'#22c55e',gagne:true},
-  {libelle:'Perdu',couleur:'#dc2626',perdu:true},
-];
-
-async function loadCRM(){
-  if(!CURRENT_COMPANY){ el('lePipeline').innerHTML=''; return; }
-  const {data,error}=await db.from('mkt_pipelines').select('*').eq('company_id',CURRENT_COMPANY.id).order('created_at');
-  if(error){
-    el('leMsg').style.color='var(--bad)';
-    el('leMsg').textContent=/mkt_pipelines/.test(error.message)
-      ? "Les tables du CRM n'existent pas encore : lance sql/mkt-crm.sql dans Supabase."
-      : 'Erreur : '+error.message;
-    return;
-  }
-  el('leMsg').textContent='';
-  PIPES=data||[];
-  if(!PIPES.length){ await creerPipeline('Parcours standard',true); return; }
-  if(!PIPE_ID||!PIPES.some(p=>p.id===PIPE_ID)) PIPE_ID=(PIPES.find(p=>p.defaut)||PIPES[0]).id;
-  el('lePipe').innerHTML=PIPES.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
-  el('lePipe').value=PIPE_ID;
-  el('leCamp').innerHTML='<option value="">Toutes les campagnes</option>'
-    +ADS.map(a=>`<option value="${a.id}">${esc(a.nom)}</option>`).join('');
-  await chargerPipeline(PIPE_ID);
-}
-async function creerPipeline(nom,defaut){
-  const {data,error}=await db.from('mkt_pipelines')
-    .insert({company_id:CURRENT_COMPANY.id,nom,defaut:!!defaut}).select().single();
-  if(error){ el('leMsg').style.color='var(--bad)'; el('leMsg').textContent='Erreur : '+error.message; return null; }
-  // Un pipeline vide ne sert à rien : on l'amorce avec un parcours de vente courant,
-  // que David modifiera plutôt que de tout construire depuis une page blanche.
-  await db.from('mkt_stages').insert(ETAPES_DEFAUT.map((e,i)=>({
-    pipeline_id:data.id,cle:cle(e.libelle),libelle:e.libelle,couleur:e.couleur,ordre:i,
-    gagne:!!e.gagne,perdu:!!e.perdu
-  })));
-  PIPE_ID=data.id;
-  await loadCRM();
-  return data.id;
-}
-async function chargerPipeline(id){
-  const [{data:st},{data:fl},{data:ld}]=await Promise.all([
-    db.from('mkt_stages').select('*').eq('pipeline_id',id).order('ordre'),
-    db.from('mkt_lead_fields').select('*').eq('pipeline_id',id).order('ordre'),
-    db.from('mkt_leads').select('*').eq('company_id',CURRENT_COMPANY.id).eq('pipeline_id',id).order('created_at',{ascending:false})
-  ]);
-  STAGES=st||[]; FIELDS=fl||[]; LEADS=ld||[];
-  renderPipeline();
-}
-function leadsFiltres(){
-  const q=el('leQ').value.trim().toLowerCase(), camp=el('leCamp').value;
-  return LEADS.filter(l=>{
-    if(camp&&l.ad_id!==camp) return false;
-    if(!q) return true;
-    return [l.nom,l.prenom,l.tel,l.email,l.ville,l.code_postal,l.notes]
-      .filter(Boolean).join(' ').toLowerCase().includes(q);
-  });
-}
-function renderPipeline(){
-  const v=leadsFiltres();
-  const gagnes=STAGES.filter(s=>s.gagne).map(s=>s.cle);
-  const perdus=STAGES.filter(s=>s.perdu).map(s=>s.cle);
-  const nbG=v.filter(l=>gagnes.includes(l.stage)).length;
-  const nbP=v.filter(l=>perdus.includes(l.stage)).length;
-  const traites=nbG+nbP;
-  el('leKpis').innerHTML=`
-    <div class="kpi"><div class="k">Prospects</div><div class="v">${v.length}</div><div class="s">dans ce parcours</div></div>
-    <div class="kpi"><div class="k">En cours</div><div class="v">${v.length-traites}</div><div class="s">à traiter</div></div>
-    <div class="kpi"><div class="k">Gagnés</div><div class="v">${nbG}</div>
-      <div class="s">${traites?Math.round(nbG/traites*100):0} % de transformation</div></div>
-    <div class="kpi"><div class="k">Perdus</div><div class="v">${nbP}</div><div class="s">abandonnés</div></div>`;
-
-  if(!STAGES.length){
-    el('lePipeline').innerHTML='<div class="who">Ce parcours n\'a aucune étape. Clique « ⚙️ Étapes et champs ».</div>';
-    return;
-  }
-  el('lePipeline').innerHTML=STAGES.map(s=>{
-    const dedans=v.filter(l=>l.stage===s.cle);
-    return `<div class="pcol" data-stage="${esc(s.cle)}">
-      <h4><span class="pt" style="background:${esc(s.couleur)}"></span>${esc(s.libelle)}<span class="n">${dedans.length}</span></h4>
-      ${dedans.length?dedans.map(l=>`
-        <div class="lead" draggable="true" data-lead="${l.id}">
-          <div class="n">${esc([l.prenom,l.nom].filter(Boolean).join(' ')||'Sans nom')}</div>
-          <div class="c">${[l.tel?'📞 '+esc(l.tel):'',l.email?'✉️ '+esc(l.email):'',
-              l.ville?'📍 '+esc([l.code_postal,l.ville].filter(Boolean).join(' ')):''].filter(Boolean).join('<br>')||'Aucune coordonnée'}</div>
-          <span class="src">${esc(SOURCE_LABEL[l.source]||l.source||'')}</span>
-        </div>`).join(''):'<div class="pvide">Vide</div>'}
-    </div>`;
-  }).join('');
-
-  // Glisser-déposer : c'est le geste attendu dans un pipeline, plus rapide
-  // qu'ouvrir la fiche pour changer une liste déroulante.
-  el('lePipeline').querySelectorAll('.lead').forEach(c=>{
-    c.onclick=()=>ouvrirLead(LEADS.find(l=>l.id===c.dataset.lead));
-    c.ondragstart=e=>{ e.dataTransfer.setData('text/plain',c.dataset.lead); c.classList.add('drag'); };
-    c.ondragend=()=>c.classList.remove('drag');
-  });
-  el('lePipeline').querySelectorAll('.pcol').forEach(col=>{
-    col.ondragover=e=>{ e.preventDefault(); col.classList.add('drop'); };
-    col.ondragleave=()=>col.classList.remove('drop');
-    col.ondrop=async e=>{
-      e.preventDefault(); col.classList.remove('drop');
-      const id=e.dataTransfer.getData('text/plain');
-      const l=LEADS.find(x=>x.id===id);
-      if(!l||l.stage===col.dataset.stage) return;
-      await bougerLead(l,col.dataset.stage);
-    };
-  });
-}
-async function bougerLead(l,vers){
-  const de=l.stage;
-  const {error}=await db.from('mkt_leads').update({stage:vers,updated_at:new Date().toISOString()}).eq('id',l.id);
-  if(error){ el('leMsg').style.color='var(--bad)'; el('leMsg').textContent='Erreur : '+error.message; return; }
-  await db.from('mkt_lead_events').insert({lead_id:l.id,de,vers});
-  l.stage=vers; renderPipeline();
-}
-function champsExtra(l){
-  if(!FIELDS.length){ el('ld_extra').innerHTML=''; return; }
-  const val=(l&&l.extra)||{};
-  el('ld_extra').innerHTML='<h3 style="margin:18px 0 4px;font-size:15px">Informations du parcours</h3>'
-    +FIELDS.map(f=>{
-      const v=val[f.cle]!==undefined?val[f.cle]:'';
-      const id='xf_'+f.cle;
-      if(f.type==='zone') return `<label>${esc(f.libelle)}${f.requis?' *':''}</label><textarea id="${id}">${esc(String(v))}</textarea>`;
-      if(f.type==='liste') return `<label>${esc(f.libelle)}${f.requis?' *':''}</label><select id="${id}"><option value=""></option>`
-        +String(f.options||'').split(';').map(o=>o.trim()).filter(Boolean)
-          .map(o=>`<option${String(v)===o?' selected':''}>${esc(o)}</option>`).join('')+'</select>';
-      if(f.type==='case') return `<label style="display:flex;align-items:center;gap:8px;margin-top:12px">
-        <input type="checkbox" id="${id}"${v?' checked':''} style="width:auto"> ${esc(f.libelle)}</label>`;
-      const t=f.type==='nombre'?'number':f.type==='date'?'date':f.type==='tel'?'tel':f.type==='email'?'email':'text';
-      return `<label>${esc(f.libelle)}${f.requis?' *':''}</label><input type="${t}" id="${id}" value="${esc(String(v))}">`;
-    }).join('');
-}
-function ouvrirLead(l){
-  LEAD_EDIT=l?l.id:null;
-  el('leadTitle').textContent=l?'Fiche prospect':'Nouveau prospect';
-  el('ld_stage').innerHTML=STAGES.map(s=>`<option value="${esc(s.cle)}">${esc(s.libelle)}</option>`).join('');
-  el('ld_stage').value=l?(l.stage||''):(STAGES[0]&&STAGES[0].cle)||'';
-  el('ld_camp').innerHTML='<option value="">— Aucune —</option>'+ADS.map(a=>`<option value="${a.id}">${esc(a.nom)}</option>`).join('');
-  el('ld_camp').value=l?(l.ad_id||''):'';
-  ['prenom','nom','tel','email','adresse','cp','ville','notes'].forEach(k=>{
-    const src={prenom:'prenom',nom:'nom',tel:'tel',email:'email',adresse:'adresse',cp:'code_postal',ville:'ville',notes:'notes'}[k];
-    el('ld_'+k).value=l?(l[src]||''):'';
-  });
-  champsExtra(l);
-  el('leadDelete').style.display=l?'inline-flex':'none';
-  el('ld_err').textContent='';
-  el('leadModal').classList.remove('hidden');
-  el('ld_prenom').focus();
-}
-el('leNew').onclick=()=>{ if(!PIPE_ID){ alert('Crée d\'abord un parcours.'); return; } ouvrirLead(null); };
-el('leadCancel').onclick=()=>el('leadModal').classList.add('hidden');
-el('lePipe').onchange=()=>{ PIPE_ID=el('lePipe').value; chargerPipeline(PIPE_ID); };
-el('leQ').oninput=renderPipeline;
-el('leCamp').onchange=renderPipeline;
-el('leadSave').onclick=async()=>{
-  const extra={};
-  for(const f of FIELDS){
-    const c=el('xf_'+f.cle); if(!c) continue;
-    const v=f.type==='case'?c.checked:c.value;
-    if(f.requis&&(v===''||v===null||v===undefined)){ el('ld_err').textContent='« '+f.libelle+' » est obligatoire.'; return; }
-    extra[f.cle]=v;
-  }
-  const ligne={
-    company_id:CURRENT_COMPANY.id, pipeline_id:PIPE_ID,
-    ad_id:el('ld_camp').value||null, stage:el('ld_stage').value,
-    prenom:el('ld_prenom').value.trim()||null, nom:el('ld_nom').value.trim()||null,
-    tel:el('ld_tel').value.trim()||null, email:el('ld_email').value.trim()||null,
-    adresse:el('ld_adresse').value.trim()||null, code_postal:el('ld_cp').value.trim()||null,
-    ville:el('ld_ville').value.trim()||null, notes:el('ld_notes').value.trim()||null,
-    extra, updated_at:new Date().toISOString()
-  };
-  if(!ligne.nom&&!ligne.prenom&&!ligne.tel&&!ligne.email){
-    el('ld_err').textContent='Donne au moins un nom, un téléphone ou un e-mail.'; return;
-  }
-  const {error}=LEAD_EDIT
-    ? await db.from('mkt_leads').update(ligne).eq('id',LEAD_EDIT)
-    : await db.from('mkt_leads').insert(ligne);
-  if(error){ el('ld_err').textContent='Erreur : '+error.message; return; }
-  el('leadModal').classList.add('hidden');
-  await chargerPipeline(PIPE_ID);
-};
-el('leadDelete').onclick=async()=>{
-  if(!LEAD_EDIT||!confirm('Supprimer ce prospect ? Son historique sera perdu.')) return;
-  const {error}=await db.from('mkt_leads').delete().eq('id',LEAD_EDIT);
-  if(error){ el('ld_err').textContent='Erreur : '+error.message; return; }
-  el('leadModal').classList.add('hidden');
-  await chargerPipeline(PIPE_ID);
-};
-el('leExport').onclick=()=>{
-  const v=leadsFiltres();
-  if(!v.length){ el('leMsg').style.color='var(--bad)'; el('leMsg').textContent='Aucun prospect à exporter.'; return; }
-  const nomEtape=k=>{ const s=STAGES.find(x=>x.cle===k); return s?s.libelle:(k||''); };
-  const nomCamp=id=>{ const a=ADS.find(x=>x.id===id); return a?a.nom:''; };
-  const entete=['Prenom','Nom','Telephone','Email','Adresse','Code postal','Ville','Etape','Campagne','Source','Cree le','Notes']
-    .concat(FIELDS.map(f=>f.libelle)).join(';');
-  const lignes=v.map(l=>[l.prenom,l.nom,l.tel,l.email,l.adresse,l.code_postal,l.ville,
-    nomEtape(l.stage),nomCamp(l.ad_id),SOURCE_LABEL[l.source]||l.source,
-    new Date(l.created_at).toLocaleDateString('fr-FR'),l.notes]
-    .concat(FIELDS.map(f=>(l.extra||{})[f.cle]))
-    // Le point-virgule sépare les colonnes : s'il est dans une valeur, tout se décale.
-    .map(x=>String(x===undefined||x===null?'':x).replace(/[;\r\n]+/g,' ').trim()).join(';'));
-  const csv='﻿'+[entete,...lignes].join('\r\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  a.download=(CURRENT_COMPANY?CURRENT_COMPANY.name.replace(/[^\w\-]+/g,'-'):'prospects')+'-prospects.csv';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  el('leMsg').style.color='var(--good)'; el('leMsg').textContent=`✅ ${v.length} prospect(s) exporté(s)`;
-};
-
-// ---- Éditeur de parcours ----
-el('lePipes').onclick=()=>{ PIPE_EDIT=PIPE_ID; ouvrirPipeModal(); };
-el('pipeClose').onclick=()=>{ el('pipeModal').classList.add('hidden'); loadCRM(); };
-function ouvrirPipeModal(){
-  el('pi_sel').innerHTML=PIPES.map(p=>`<option value="${p.id}">${esc(p.nom)}</option>`).join('');
-  el('pi_sel').value=PIPE_EDIT;
-  el('pi_err').textContent='';
-  el('pipeModal').classList.remove('hidden');
-  rafraichirPipeModal();
-}
-async function rafraichirPipeModal(){
-  const [{data:st},{data:fl}]=await Promise.all([
-    db.from('mkt_stages').select('*').eq('pipeline_id',PIPE_EDIT).order('ordre'),
-    db.from('mkt_lead_fields').select('*').eq('pipeline_id',PIPE_EDIT).order('ordre')
-  ]);
-  const S=st||[], F=fl||[];
-  el('pi_stages').innerHTML=S.length?S.map((s,i)=>`
-    <div class="ligne" data-st="${s.id}">
-      <span class="pt" style="width:11px;height:11px;border-radius:50%;background:${esc(s.couleur)};flex:0 0 auto"></span>
-      <span class="g">${esc(s.libelle)}<small>${s.gagne?'Étape de succès':s.perdu?'Étape d\'abandon':'Étape intermédiaire'}</small></span>
-      <button class="btn ghost small st-up" ${i===0?'disabled':''}>↑</button>
-      <button class="btn ghost small st-down" ${i===S.length-1?'disabled':''}>↓</button>
-      <button class="btn ghost small st-del" style="color:var(--bad)">🗑</button>
-    </div>`).join(''):'<div class="who">Aucune étape.</div>';
-  el('pi_fields').innerHTML=F.length?F.map(f=>`
-    <div class="ligne" data-fd="${f.id}">
-      <span class="g">${esc(f.libelle)}<small>${esc(f.type)}${f.options?' · '+esc(f.options):''}${f.requis?' · obligatoire':''}</small></span>
-      <button class="btn ghost small fd-req">${f.requis?'Rendre facultatif':'Rendre obligatoire'}</button>
-      <button class="btn ghost small fd-del" style="color:var(--bad)">🗑</button>
-    </div>`).join(''):'<div class="who">Aucune information supplémentaire.</div>';
-
-  el('pi_stages').querySelectorAll('[data-st]').forEach((r,i)=>{
-    const id=r.dataset.st;
-    r.querySelector('.st-up').onclick=()=>echangerEtape(S,i,i-1);
-    r.querySelector('.st-down').onclick=()=>echangerEtape(S,i,i+1);
-    r.querySelector('.st-del').onclick=async()=>{
-      if(!confirm('Supprimer cette étape ? Les prospects qui s\'y trouvent resteront, mais sans colonne.')) return;
-      await db.from('mkt_stages').delete().eq('id',id); rafraichirPipeModal();
-    };
-  });
-  el('pi_fields').querySelectorAll('[data-fd]').forEach(r=>{
-    const id=r.dataset.fd, f=F.find(x=>x.id===id);
-    r.querySelector('.fd-req').onclick=async()=>{
-      await db.from('mkt_lead_fields').update({requis:!f.requis}).eq('id',id); rafraichirPipeModal();
-    };
-    r.querySelector('.fd-del').onclick=async()=>{
-      if(!confirm('Supprimer ce champ ? Les valeurs déjà saisies resteront en base mais ne seront plus affichées.')) return;
-      await db.from('mkt_lead_fields').delete().eq('id',id); rafraichirPipeModal();
-    };
-  });
-}
-async function echangerEtape(S,i,j){
-  if(j<0||j>=S.length) return;
-  await Promise.all([
-    db.from('mkt_stages').update({ordre:j}).eq('id',S[i].id),
-    db.from('mkt_stages').update({ordre:i}).eq('id',S[j].id)
-  ]);
-  rafraichirPipeModal();
-}
-el('pi_sel').onchange=()=>{ PIPE_EDIT=el('pi_sel').value; rafraichirPipeModal(); };
-el('pi_new').onclick=async()=>{
-  const nom=prompt('Nom du nouveau parcours :','Parcours');
-  if(!nom) return;
-  const id=await creerPipeline(nom.trim(),false);
-  if(id){ PIPE_EDIT=id; ouvrirPipeModal(); }
-};
-el('pi_ren').onclick=async()=>{
-  const p=PIPES.find(x=>x.id===PIPE_EDIT); if(!p) return;
-  const nom=prompt('Nouveau nom :',p.nom); if(!nom) return;
-  await db.from('mkt_pipelines').update({nom:nom.trim()}).eq('id',PIPE_EDIT);
-  await loadCRM(); ouvrirPipeModal();
-};
-el('pi_del').onclick=async()=>{
-  if(PIPES.length<2){ el('pi_err').textContent='Il faut garder au moins un parcours.'; return; }
-  if(!confirm('Supprimer ce parcours ? Ses étapes et ses champs seront perdus ; les prospects resteront mais sans parcours.')) return;
-  await db.from('mkt_pipelines').delete().eq('id',PIPE_EDIT);
-  PIPE_ID=null; await loadCRM(); PIPE_EDIT=PIPE_ID; ouvrirPipeModal();
-};
-el('pi_sadd').onclick=async()=>{
-  const nom=el('pi_snom').value.trim(); if(!nom) return;
-  const {data}=await db.from('mkt_stages').select('ordre').eq('pipeline_id',PIPE_EDIT).order('ordre',{ascending:false}).limit(1);
-  const ordre=(data&&data[0]?data[0].ordre:-1)+1;
-  const {error}=await db.from('mkt_stages').insert({
-    pipeline_id:PIPE_EDIT,cle:cle(nom),libelle:nom,couleur:el('pi_scol').value,ordre
-  });
-  if(error){ el('pi_err').textContent='Erreur : '+error.message; return; }
-  el('pi_snom').value=''; el('pi_err').textContent=''; rafraichirPipeModal();
-};
-el('pi_fadd').onclick=async()=>{
-  const nom=el('pi_fnom').value.trim(); if(!nom) return;
-  const {data}=await db.from('mkt_lead_fields').select('ordre').eq('pipeline_id',PIPE_EDIT).order('ordre',{ascending:false}).limit(1);
-  const ordre=(data&&data[0]?data[0].ordre:-1)+1;
-  const {error}=await db.from('mkt_lead_fields').insert({
-    pipeline_id:PIPE_EDIT,cle:cle(nom),libelle:nom,type:el('pi_ftype').value,
-    options:el('pi_fopt').value.trim()||null,ordre
-  });
-  if(error){ el('pi_err').textContent='Erreur : '+error.message; return; }
-  el('pi_fnom').value=''; el('pi_fopt').value=''; el('pi_err').textContent=''; rafraichirPipeModal();
-};
 
 // ================= RAPPELS =================
 // Les jetons d'accès expirent sans prévenir : quand ça arrive, la publication
