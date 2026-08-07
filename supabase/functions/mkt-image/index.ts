@@ -82,6 +82,16 @@ const IMAGE_PRICE_USD = 0.04; // estimation par image ; le quota gratuit Google 
 // Google n'accepte qu'une liste courte de ratios : 1:1, 3:4, 4:3, 9:16, 16:9.
 const RATIO: Record<string, string> = { linkedin: "16:9", facebook: "16:9", instagram: "3:4" };
 
+// Le texte est incrusté après coup, à un endroit qui dépend de la mise en page
+// choisie par la société. Si l'IA remplit cette zone de détails, l'accroche
+// devient illisible — d'où une consigne différente selon le gabarit.
+const ZONES_CALMES: Record<string, string> = {
+  scrim: "Compose en gardant **la moitié inférieure visuellement calme** (dégradé, matière, ombre, flou) : le texte sera posé dessus, sur un voile sombre. Le sujet principal occupe la moitié haute.",
+  affiche: "Compose en gardant **tout le côté gauche calme et dépouillé** (environ 45 % de la largeur) : un panneau de couleur y sera posé. Place le sujet principal nettement à droite.",
+  bandeau: "Compose en gardant **le tiers inférieur calme et peu détaillé** : il sera recouvert par un bandeau blanc. Le sujet principal occupe la moitié haute.",
+  brut: "L'image sera publiée telle quelle, sans texte incrusté : compose-la comme une image finie, équilibrée sur toute sa surface.",
+};
+
 const ART_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -239,7 +249,7 @@ Deno.serve(async (req) => {
     if (!post) return json({ error: "Post introuvable." }, 404);
 
     const { data: company } = await admin.from("mkt_companies")
-      .select("id, name, activity, owner, logo_url").eq("id", post.company_id).maybeSingle();
+      .select("id, name, activity, owner, logo_url, visual_layout").eq("id", post.company_id).maybeSingle();
     if (!company) return json({ error: "Société introuvable." }, 404);
     if (company.owner !== uid) return json({ error: "Accès refusé à ce post." }, 403);
 
@@ -373,9 +383,10 @@ Ta mission : rédiger la consigne d'un visuel de qualité professionnelle, digne
 
 3) Règles absolues — l'image que tu décris est un ARRIÈRE-PLAN :
 - L'accroche et le logo seront incrustés ensuite par le logiciel, proprement. Donc **l'image ne doit contenir AUCUN texte** : demande explicitement "absolutely no text, no letters, no numbers, no typography, no signage, no watermark".
-- Compose en gardant **le tiers inférieur visuellement calme et peu détaillé** (dégradé, matière, flou, ombre) : c'est là que le texte sera posé. Le sujet principal occupe la moitié haute ou un côté.
+- ${ZONES_CALMES[String(company.visual_layout || "scrim")] || ZONES_CALMES.scrim}
 - Aucun logo inventé, aucune marque existante, aucun visage de personne réelle.
-- Autres interdits à mentionner : "no gibberish text, no distorted hands, no cluttered composition, no generic stock-photo look, no cheesy business clichés such as handshakes over cityscapes or glowing brains".
+- Autres interdits à mentionner : "no gibberish text, no distorted hands, no cluttered composition, no generic stock-photo look, no cheesy business clichés such as handshakes over cityscapes or glowing brains, no AI-render look, no plastic skin, no oversaturated HDR, no lens flare spam, no symmetrical centred subject".
+- Pour une photo, exige le vocabulaire du réel : "shot on location, natural imperfections, believable materials, subtle film grain, realistic depth of field". Une image trop lisse et trop parfaite se repère immédiatement comme générée — c'est exactement ce qu'il faut éviter.
 - Le résultat doit ressembler à une campagne de marque soignée, jamais à une banque d'images.
 
 4) L'accroche (headline) : elle sera écrite en gros sur le visuel. Elle doit accrocher l'œil, dire un bénéfice concret, et tenir en 3 à 6 mots.${body.instruction ? `

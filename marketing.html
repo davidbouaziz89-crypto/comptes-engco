@@ -519,6 +519,9 @@
         <img id="co_logo_prev" class="co-logo" style="display:none">
       </div>
       <div class="who" style="font-size:12px;margin-top:4px">Ton logo n'est pas dans la liste ? Envoie-le ici (PNG transparent de préférence) : il sera incrusté sur les visuels.</div>
+      <label>Mise en page des visuels</label>
+      <select id="co_layout"></select>
+      <div class="who" style="font-size:12px;margin-top:4px">L'écriture graphique de la marque, appliquée à tous ses posts.</div>
       <div class="err" id="co_err"></div>
       <div class="row" style="margin-top:16px">
         <button class="btn" id="co_save">Enregistrer & analyser le site</button>
@@ -998,7 +1001,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v33 · pilotage campagnes';
+const APP_VERSION='v34 · visuels retravailles';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1218,6 +1221,8 @@ function openCompanyModal(existing){
   el('co_website').value = existing? (existing.website||'') : '';
   el('co_logo').innerHTML = '<option value="">— Aucun logo —</option>'+LOGOS.map(l=>`<option value="${l.url}">${l.label}</option>`).join('');
   el('co_logo').value = existing? (existing.logo_url||'') : '';
+  el('co_layout').innerHTML=Object.entries(LAYOUTS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  el('co_layout').value = existing? (existing.visual_layout||'scrim') : 'scrim';
   el('co_err').textContent='';
   UPLOADED_LOGO=null;
   el('co_logo_file').value='';
@@ -1253,10 +1258,10 @@ el('co_save').onclick=async()=>{
   el('co_save').disabled=true;
   let companyId=MODAL_EDIT_ID;
   if(MODAL_EDIT_ID){
-    const {error}=await db.from('mkt_companies').update({name,website,logo_url}).eq('id',MODAL_EDIT_ID);
+    const {error}=await db.from('mkt_companies').update({name,website,logo_url,visual_layout:el('co_layout').value}).eq('id',MODAL_EDIT_ID);
     if(error){ el('co_err').textContent='Erreur : '+error.message; el('co_save').disabled=false; return; }
   } else {
-    const {data,error}=await db.from('mkt_companies').insert({name,website,logo_url}).select().single();
+    const {data,error}=await db.from('mkt_companies').insert({name,website,logo_url,visual_layout:el('co_layout').value}).select().single();
     if(error){ el('co_err').textContent='Erreur : '+error.message; el('co_save').disabled=false; return; }
     companyId=data.id;
   }
@@ -1569,11 +1574,32 @@ function wrapLines(ctx,text,maxW){
 }
 // Le fond vient de l'IA ; l'accroche et le logo sont dessinés par l'app.
 // C'est ce qui garantit un texte net et un logo fidèle à chaque fois.
-async function composeVisual(postId,companyId,imageUrl,headline){
+// Trois écritures graphiques, plus l'image nue. « scrim » est la mise en page des
+// campagnes de marque : image plein cadre, dégradé sombre en pied, texte posé
+// dessus. Le bandeau blanc reste disponible, mais il fait « fait maison ».
+const LAYOUTS={
+  scrim:'Plein cadre — texte sur dégradé',
+  affiche:'Affiche — panneau de couleur',
+  bandeau:'Bandeau blanc en pied',
+  brut:'Image nue, sans texte'
+};
+// Ajuste la taille jusqu'à ce que le texte tienne, plutôt que de le tronquer.
+function ajusteTexte(ctx,texte,maxW,depart,mini,poids,maxLignes){
+  let size=depart, lines=[];
+  for(;;){
+    ctx.font=`${poids} ${size}px "Space Grotesk","Segoe UI",sans-serif`;
+    lines=wrapLines(ctx,texte,maxW);
+    if((lines.length<=maxLignes && !lines.some(l=>ctx.measureText(l).width>maxW)) || size<=mini) break;
+    size=Math.round(size*0.94);
+  }
+  return {size,lines};
+}
+async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
   if(!imageUrl) return null;
   const co=COMPANIES.find(c=>c.id===companyId);
+  const layout=layoutForce||(co&&co.visual_layout)||'scrim';
   const logoSrc=co&&co.logo_url?absUrl(co.logo_url):null;
-  if(!headline && !logoSrc) return null;
+  if(layout!=='brut' && !headline && !logoSrc) return null;
   try{
     if(document.fonts&&document.fonts.load) await document.fonts.load('700 80px "Space Grotesk"');
     const img=await loadImg(imageUrl);
@@ -1584,53 +1610,104 @@ async function composeVisual(postId,companyId,imageUrl,headline){
     const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
     const ctx=cv.getContext('2d');
     ctx.drawImage(img,0,0,W,H);
+    ctx.textBaseline='top';
 
     const accent=brandColor();
+    const U=Math.min(W,H);                       // unité de mise en page
+    const m=Math.round(U*0.062);                 // marge respirante
 
-    // Mise en page : la photo occupe le haut, un bandeau blanc en pied porte
-    // l'accroche et le logo. Le logo se pose directement sur le blanc, sans
-    // pastille rapportée, et la barre de marque est calée sur la hauteur du texte.
-    const bandH=Math.round(W>=H ? H*0.26 : H*0.195);
-    const bandY=H-bandH;
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(0,bandY,W,bandH);
-    const rule=Math.max(3,Math.round(bandH*0.035));
-    ctx.fillStyle=accent;
-    ctx.fillRect(0,H-rule,W,rule);
+    const poseLogo=(x,y,h,clair)=>{
+      if(!logo) return 0;
+      const lw=Math.round(h*(logo.naturalWidth/logo.naturalHeight||2));
+      // Sur fond sombre, un logo foncé disparaît : on lui met une ombre portée
+      // plutôt qu'une pastille blanche, qui ferait autocollant.
+      if(!clair){ ctx.save(); ctx.shadowColor='rgba(0,0,0,.55)'; ctx.shadowBlur=Math.round(h*0.22); }
+      ctx.drawImage(logo,x,y,lw,h);
+      if(!clair) ctx.restore();
+      return lw;
+    };
 
-    const m=Math.round(bandH*0.26);
-    const inner=bandY+Math.round((bandH-rule)/2);   // milieu optique du bandeau
+    if(layout==='scrim'){
+      // Dégradé du bas : assez dense pour porter du blanc, assez progressif pour
+      // qu'on ne voie pas où il commence.
+      const gh=Math.round(H*0.52), gy=H-gh;
+      const g=ctx.createLinearGradient(0,gy,0,H);
+      g.addColorStop(0,'rgba(6,10,16,0)');
+      g.addColorStop(0.45,'rgba(6,10,16,.55)');
+      g.addColorStop(1,'rgba(6,10,16,.93)');
+      ctx.fillStyle=g; ctx.fillRect(0,gy,W,gh);
 
-    let logoBlock=0;
-    if(logo){
-      const lh=Math.round(bandH*0.66);
-      const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
-      ctx.drawImage(logo,W-m-lw,inner-Math.round(lh/2),lw,lh);
-      logoBlock=lw+m;
-    }
+      const rule=Math.max(4,Math.round(U*0.012));
+      ctx.fillStyle=accent; ctx.fillRect(0,H-rule,W,rule);
 
-    if(headline){
-      const barW=Math.max(4,Math.round(bandH*0.05));
-      const textX=m+barW+Math.round(m*0.75);
-      const maxW=Math.max(60,W-textX-m-logoBlock);
-      let size=Math.round(bandH*0.30), lines=[];
-      for(;;){
-        ctx.font=`700 ${size}px "Space Grotesk","Segoe UI",sans-serif`;
-        lines=wrapLines(ctx,headline,maxW);
-        const tooWide=lines.some(l=>ctx.measureText(l).width>maxW);
-        if((!tooWide && lines.length<=2) || size<=Math.round(bandH*0.13)) break;
-        size=Math.round(size*0.93);
+      const lh=Math.round(U*0.11);
+      const lw=logo?poseLogo(m,H-rule-m-lh,lh,false):0;
+      let bas=H-rule-m-(logo?lh+Math.round(m*0.6):0);
+
+      if(headline){
+        const {size,lines}=ajusteTexte(ctx,headline.toUpperCase(),W-2*m,Math.round(U*0.098),Math.round(U*0.045),'700',3);
+        const lineH=Math.round(size*1.08);
+        const top=bas-lines.length*lineH;
+        ctx.fillStyle='#ffffff';
+        lines.forEach((l,i)=>ctx.fillText(l,m,top+i*lineH));
+        // Filet de marque au-dessus du titre : signature discrète
+        ctx.fillStyle=accent;
+        ctx.fillRect(m,top-Math.round(m*0.55),Math.round(U*0.09),Math.max(3,Math.round(U*0.009)));
       }
-      const lineH=Math.round(size*1.14);
-      const blockH=lines.length*lineH;
-      const top=inner-Math.round(blockH/2);
-      ctx.fillStyle=accent;
-      ctx.beginPath();
-      if(ctx.roundRect) ctx.roundRect(m,top,barW,blockH,barW/2); else ctx.rect(m,top,barW,blockH);
-      ctx.fill();
-      ctx.fillStyle='#111820';
-      ctx.textBaseline='top';
-      lines.forEach((l,i)=>ctx.fillText(l,textX,top+i*lineH+Math.round((lineH-size)*0.34)));
+    }
+    else if(layout==='affiche'){
+      // Panneau de couleur sur la gauche : lisibilité maximale, très identifiable.
+      const pw=Math.round(W*(W>=H?0.42:0.62));
+      const g=ctx.createLinearGradient(0,0,pw,0);
+      g.addColorStop(0,accent);
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.globalAlpha=0.93; ctx.fillStyle=g; ctx.fillRect(0,0,pw,H); ctx.globalAlpha=1;
+
+      const maxW=pw-2*m;
+      if(logo) poseLogo(m,m,Math.round(U*0.1),false);
+      if(headline){
+        const {size,lines}=ajusteTexte(ctx,headline,maxW,Math.round(U*0.105),Math.round(U*0.05),'700',4);
+        const lineH=Math.round(size*1.1);
+        const top=Math.round(H/2-lines.length*lineH/2);
+        ctx.fillStyle='#ffffff';
+        lines.forEach((l,i)=>ctx.fillText(l,m,top+i*lineH));
+        ctx.fillStyle='rgba(255,255,255,.85)';
+        ctx.fillRect(m,top+lines.length*lineH+Math.round(m*0.5),Math.round(U*0.11),Math.max(3,Math.round(U*0.008)));
+      }
+    }
+    else if(layout==='bandeau'){
+      const bandH=Math.round(W>=H ? H*0.26 : H*0.195);
+      const bandY=H-bandH;
+      ctx.fillStyle='#ffffff'; ctx.fillRect(0,bandY,W,bandH);
+      const rule=Math.max(3,Math.round(bandH*0.035));
+      ctx.fillStyle=accent; ctx.fillRect(0,H-rule,W,rule);
+      const mb=Math.round(bandH*0.26);
+      const inner=bandY+Math.round((bandH-rule)/2);
+      let logoBlock=0;
+      if(logo){
+        const lh=Math.round(bandH*0.66);
+        const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
+        ctx.drawImage(logo,W-mb-lw,inner-Math.round(lh/2),lw,lh);
+        logoBlock=lw+mb;
+      }
+      if(headline){
+        const barW=Math.max(4,Math.round(bandH*0.05));
+        const textX=mb+barW+Math.round(mb*0.75);
+        const maxW=Math.max(60,W-textX-mb-logoBlock);
+        const {size,lines}=ajusteTexte(ctx,headline,maxW,Math.round(bandH*0.30),Math.round(bandH*0.13),'700',2);
+        const lineH=Math.round(size*1.14);
+        const top=inner-Math.round(lines.length*lineH/2);
+        ctx.fillStyle=accent;
+        ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(mb,top,barW,lines.length*lineH,barW/2); else ctx.rect(mb,top,barW,lines.length*lineH);
+        ctx.fill();
+        ctx.fillStyle='#111820';
+        lines.forEach((l,i)=>ctx.fillText(l,textX,top+i*lineH+Math.round((lineH-size)*0.34)));
+      }
+    }
+    else if(layout==='brut'){
+      // Rien d'incrusté : l'image telle que l'IA l'a produite.
+      if(logo) poseLogo(W-m-Math.round(U*0.1*(logo.naturalWidth/logo.naturalHeight||2)),H-m-Math.round(U*0.1),Math.round(U*0.1),false);
     }
 
     const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
@@ -1854,6 +1931,10 @@ function imgZone(p){
     return `<div class="post-img" data-img="${p.id}">
       <div class="img-foot">
         <span class="img-tag">${p.image_headline?'✍️ « '+esc(p.image_headline)+' »':'🎨 '+esc(p.image_style||'visuel')}</span>
+        <select class="act-layout" style="width:auto;flex:0 0 auto;padding:5px 8px;font-size:12.5px"
+                title="Changer la mise en page sans regénérer l'image">
+          ${Object.entries(LAYOUTS).map(([k,v])=>`<option value="${k}">🎨 ${esc(v)}</option>`).join('')}
+        </select>
         <a class="btn ghost small" href="${esc(p.image_url)}" target="_blank" rel="noopener">⬇️ Ouvrir</a>
         <button class="btn ghost small act-touch">🖌️ Retoucher</button>
         <button class="btn ghost small act-img">↻ Refaire</button>
@@ -2228,6 +2309,21 @@ async function loadPosts(){
       const quoi=prompt("Que faut-il changer sur cette image ?\n(la photo est conservée, seul ce détail change)");
       if(quoi&&quoi.trim()) runImageQueue([id],'retouche',quoi.trim());
     };
+    // Changer de mise en page ne recrée pas l'image : on recompose à partir de
+    // l'original, donc c'est instantané et gratuit.
+    const lay=card.querySelector('.act-layout');
+    if(lay){
+      const p=POSTS.find(x=>x.id===id);
+      lay.value=(CURRENT_COMPANY&&CURRENT_COMPANY.visual_layout)||'scrim';
+      lay.onchange=async()=>{
+        const src=(p&&p.image_raw_url)||(p&&p.image_url);
+        if(!src) return;
+        lay.disabled=true;
+        const url=await composeVisual(id,p.company_id,src,p.image_headline,lay.value);
+        lay.disabled=false;
+        if(url) await loadPosts(); else alert("Recomposition impossible : l'image d'origine n'est plus accessible.");
+      };
+    }
     card.querySelector('.act-chat').onclick=()=>openPostChat(id);
     card.querySelector('.act-pub').onclick=()=>openPublish(id);
   });
