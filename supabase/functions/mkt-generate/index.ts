@@ -1,6 +1,6 @@
 // Marketing IA — génération de posts (agents Orchestrateur + Contenu).
 // Auth : l'appelant doit être owner de la société. Secret requis : ANTHROPIC_API_KEY (déjà posé).
-// Modèle surchargeable via secret MKT_MODEL (défaut claude-opus-4-8).
+// Modèle surchargeable via secret MKT_MODEL (défaut claude-opus-5).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const cors = {
@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    const model = Deno.env.get("MKT_MODEL") || "claude-opus-4-8";
+    const model = Deno.env.get("MKT_MODEL") || "claude-opus-5";
     if (!apiKey) return json({ error: "Clé IA non configurée (ANTHROPIC_API_KEY manquante)." }, 500);
     const admin = createClient(url, serviceKey);
 
@@ -234,18 +234,36 @@ Renvoie exactement 1 post.`;
       `Langue : ${ed.language || "fr"}`,
     ].filter(Boolean).join("\n") + await factsBlock(admin, companyId);
 
-    const instruction = `Tu es une équipe marketing pour la société « ${company.name} »${company.activity ? ` (${company.activity})` : ""}.
-Rédige ${totalPosts} post(s) de réseaux sociaux pour la semaine, répartis ainsi :
+    const instruction = `Tu es directeur de création dans une agence qui écrit pour « ${company.name} »${company.activity ? ` (${company.activity})` : ""}.
+Écris ${totalPosts} post(s) pour la semaine, répartis ainsi :
 ${perNet}
 
 Ligne éditoriale :
 ${editorialBlock}
 
-Contraintes de rédaction :
-- Adapte le style à chaque réseau : LinkedIn = professionnel B2B, structuré, orienté valeur/leads ; Instagram = visuel, chaleureux, hashtags ; Facebook = accessible, communautaire.
-- Chaque post doit pouvoir être publié tel quel (pas de « [insérer ... ] »).
-- Pour chaque post, propose aussi une idée de visuel concrète (visual_idea) et une légende courte / hashtags (caption).
-- Varie les angles d'un post à l'autre, reste cohérent avec la ligne éditoriale.
+CE QUI FAIT UN BON POST — applique-le à la lettre :
+
+1) La première ligne décide de tout. Elle doit arrêter le pouce. Une tension, une question dérangeante, un chiffre inattendu, un aveu. Jamais « Chez ${company.name}, nous… », jamais « À l'ère du digital », jamais « Saviez-vous que ».
+
+2) UNE seule idée par post. Pas trois conseils, pas une liste fourre-tout. Un angle, développé jusqu'au bout.
+
+3) Du concret, toujours. Des chiffres, des durées, des prix, des situations vécues, des objections réelles de clients. Si tu n'as pas le chiffre exact, décris une scène précise plutôt que d'écrire une généralité.
+
+4) Écris comme on parle. Phrases courtes. Verbes actifs. Tu peux commencer par « Et » ou « Mais ». Interdits : « solution innovante », « au cœur de », « accompagner nos clients », « à l'ère de », « révolutionner », « incontournable », « sur-mesure », « expertise », « synergie », « il est important de noter ».
+
+5) Zéro emoji décoratif en début de ligne. Au maximum un ou deux dans tout le post, et seulement s'ils servent.
+
+6) Termine par une question ouverte ou une invitation concrète, jamais par « N'hésitez pas à nous contacter ».
+
+FORMAT PROPRE À CHAQUE RÉSEAU :
+- LinkedIn : 700 à 1200 signes. Accroche sur une ligne, saut de ligne, puis le corps aéré en paragraphes de 1 à 3 lignes. Ton d'expert qui partage, pas de commercial qui vend.
+- Facebook : 300 à 600 signes. Chaleureux, direct, conversationnel. On s'adresse à une personne, pas à un marché.
+- Instagram : 150 à 400 signes. Rythmé, incarné. La légende (caption) porte les hashtags : 5 à 10, précis et sectoriels, jamais #business #motivation.
+
+VISUEL (visual_idea) : décris une scène ou un objet précis, pas un concept. « Un standardiste débordé, six lignes qui clignotent » plutôt que « la communication d'entreprise ».
+
+Varie franchement les angles d'un post à l'autre : preuve chiffrée, objection démontée, coulisses, erreur fréquente, cas client, prise de position. Deux posts ne doivent jamais se ressembler.
+
 Renvoie exactement ${totalPosts} post(s), en respectant la répartition par réseau demandée.`;
 
     // 5) Appel Claude (sortie structurée)
@@ -273,12 +291,63 @@ Renvoie exactement ${totalPosts} post(s), en respectant la répartition par rés
       return json({ error: "Réponse IA illisible. Réessaie." }, 502);
     }
 
+    // 5 bis) Passe de relecture. Un premier jet d'IA retombe presque toujours dans
+    // le corporate mou ; c'est la réécriture sous critique qui fait la différence,
+    // bien plus qu'un prompt initial plus long.
+    let postsFinaux = parsed.posts;
+    try {
+      const relecture = `Tu es rédacteur en chef. Voici les brouillons écrits pour « ${company.name} »${company.activity ? ` (${company.activity})` : ""}.
+
+${JSON.stringify({ posts: parsed.posts }, null, 1).slice(0, 12000)}
+
+Ligne éditoriale :
+${editorialBlock}
+
+Passe chaque post au crible, sans complaisance :
+- L'accroche arrête-t-elle vraiment le pouce, ou est-ce un début tiède ? Si elle est tiède, réécris-la entièrement.
+- Reste-t-il du jargon d'entreprise, des formules creuses, des phrases qui pourraient être dans n'importe quel post de n'importe quelle société ? Supprime.
+- Le post dit-il quelque chose de CONCRET, ou tourne-t-il autour du sujet sans rien affirmer ? S'il ne dit rien, réécris-le autour d'une idée nette.
+- Y a-t-il deux posts qui se ressemblent ? Change l'angle de l'un des deux.
+- Les longueurs sont-elles tenues (LinkedIn 700-1200 signes, Facebook 300-600, Instagram 150-400) ?
+- Une phrase pourrait-elle sauter sans rien perdre ? Enlève-la.
+
+Renvoie les ${totalPosts} post(s) réécrits, même structure, même répartition par réseau. Ne commente pas, ne justifie pas : rends le texte final.`;
+
+      const rev = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({
+          model, max_tokens: 8000,
+          output_config: { format: { type: "json_schema", schema: POSTS_SCHEMA } },
+          messages: [{ role: "user", content: [{ type: "text", text: relecture }] }],
+        }),
+      });
+      if (rev.ok) {
+        const outRev = await rev.json();
+        const bRev = (outRev.content || []).find((b: { type: string }) => b.type === "text");
+        const pRev = bRev ? tryParseJson(String(bRev.text || "")) as { posts?: unknown[] } : null;
+        // On ne garde la relecture que si elle rend bien le compte attendu :
+        // un jet incomplet ferait perdre des posts sans prévenir.
+        if (pRev && Array.isArray(pRev.posts) && pRev.posts.length === parsed.posts.length) {
+          postsFinaux = pRev.posts;
+          await logUsage(admin, {
+            owner: uid, company_id: companyId, source: "generation", agent: "redacteur_chef",
+            provider: "anthropic", model: outRev.model || model,
+            input_tokens: outRev.usage?.input_tokens || 0,
+            output_tokens: outRev.usage?.output_tokens || 0,
+            cache_read_tokens: outRev.usage?.cache_read_input_tokens || 0,
+            cost_usd: claudeCost(outRev.model || model, outRev.usage || null),
+          });
+        }
+      }
+    } catch (e) { console.error("RELECTURE_FAIL", String(e)); }
+
     // 6) Calcul des dates + insertion (une file de dates par réseau)
     const dateQueue: Record<string, string[]> = {};
     for (const c of cadence) {
       dateQueue[c.network] = scheduleDates(weekMonday, c.days, c.hour, c.per_week);
     }
-    const rows = parsed.posts.map((p) => {
+    const rows = postsFinaux.map((p) => {
       const post = p as { network: string; body: string; visual_idea: string; caption: string };
       const net = ["linkedin", "instagram", "facebook"].includes(post.network) ? post.network : cadence[0].network;
       const when = (dateQueue[net] && dateQueue[net].shift()) || null;

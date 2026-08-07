@@ -76,7 +76,7 @@ async function logUsage(admin: { from: (t: string) => { insert: (r: unknown) => 
   try { await admin.from("mkt_usage").insert(row); } catch (e) { console.error("USAGE_LOG_FAIL", String(e)); }
 }
 
-const IMAGE_PRICE_USD = 0.04; // estimation par image ; le quota gratuit Google n'est pas déduit
+const IMAGE_PRICE_USD = 0.13; // estimation par image en qualité Pro ; le quota gratuit Google n'est pas déduit
 
 // Format d'image le plus performant selon le réseau.
 // Google n'accepte qu'une liste courte de ratios : 1:1, 3:4, 4:3, 9:16, 16:9.
@@ -192,7 +192,9 @@ async function callGemini(apiKey: string, model: string, prompt: string, aspectR
   if (ref) parts.push({ inline_data: { mime_type: ref.mime, data: ref.data } });
   parts.push({ text: prompt });
   let lastErr = "", quota = false;
-  for (const m of [model, "gemini-2.5-flash-image"]) {
+  // Repli en cascade : si le modèle haut de gamme est saturé ou indisponible,
+  // on redescend plutôt que de rendre une erreur à David.
+  for (const m of [model, "gemini-3.1-flash-image", "gemini-2.5-flash-image"]) {
     for (const generationConfig of imageConfigs(aspectRatio)) {
       const resp = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/${m}:generateContent`,
@@ -231,7 +233,7 @@ Deno.serve(async (req) => {
       return json({ error: "Clé image non configurée : ajoute le secret GEMINI_API_KEY dans Supabase (Edge Functions → Secrets)." }, 500);
     }
     const artModel = Deno.env.get("MKT_ART_MODEL") || "claude-opus-5";
-    const imageModel = Deno.env.get("MKT_IMAGE_MODEL") || "gemini-3.1-flash-image";
+    const imageModel = Deno.env.get("MKT_IMAGE_MODEL") || "gemini-3-pro-image";
 
     // 1) Auth
     const token = (req.headers.get("Authorization") || "").replace("Bearer ", "");
