@@ -36,6 +36,22 @@
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--txt);-webkit-font-smoothing:antialiased}
+  /* ---------- Décor : nappes de lumière fixes derrière l'interface ----------
+     Volontairement immobiles : une animation de fond fatigue à la longue sur un
+     outil qu'on garde ouvert toute la journée. */
+  body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+    background:
+      radial-gradient(900px 520px at 12% -8%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 62%),
+      radial-gradient(760px 480px at 92% 4%,color-mix(in srgb,var(--accent2) 16%,transparent),transparent 60%),
+      radial-gradient(680px 520px at 60% 105%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 62%)}
+  /* Grille technique très discrète, façon poste de pilotage */
+  body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.4;
+    background-image:linear-gradient(color-mix(in srgb,var(--line) 55%,transparent) 1px,transparent 1px),
+                     linear-gradient(90deg,color-mix(in srgb,var(--line) 55%,transparent) 1px,transparent 1px);
+    background-size:64px 64px;
+    -webkit-mask-image:radial-gradient(1000px 700px at 50% 0%,#000,transparent 75%);
+            mask-image:radial-gradient(1000px 700px at 50% 0%,#000,transparent 75%)}
+  :root[data-theme="light"] body::after{opacity:.55}
   h1,h2,h3{font-family:var(--font-display);letter-spacing:-.2px}
   .hidden{display:none!important}
   a{color:var(--accent)}
@@ -44,8 +60,17 @@
   textarea{resize:vertical;min-height:60px}
   input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
   .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;background:var(--grad-accent);border:0;border-radius:9px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none}
-  .btn:hover{filter:brightness(1.08)}
+  .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 14px;
+    background:var(--grad-accent);border:0;border-radius:10px;color:#fff;font-size:14px;font-weight:700;
+    cursor:pointer;text-decoration:none;overflow:hidden;
+    box-shadow:0 10px 26px -16px var(--accent);transition:box-shadow .2s,transform .12s,filter .2s}
+  /* Reflet qui balaie le bouton au survol */
+  .btn::after{content:"";position:absolute;inset:0;transform:translateX(-120%);transition:transform .55s;
+    background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.28),transparent 80%)}
+  .btn:hover{filter:brightness(1.08);box-shadow:0 14px 32px -14px var(--accent)}
+  .btn:hover::after{transform:translateX(120%)}
+  .btn:active{transform:translateY(1px)}
+  .btn.ghost::after{display:none}
   .btn:disabled{opacity:.5;cursor:default}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
   .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
@@ -55,13 +80,36 @@
   .authcard h1{margin:0 0 4px;font-size:22px}
   .authcard .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
   .modal-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:480px;width:100%;max-height:88vh;overflow:auto}
-  header{display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
-  header h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
+  /* ---------- Barre de navigation collée en haut ---------- */
+  .topstack{position:sticky;top:0;z-index:40;
+    background:color-mix(in srgb,var(--bg) 82%,transparent);
+    backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
+    border-bottom:1px solid transparent;transition:border-color .3s,box-shadow .3s}
+  .topstack.compact{border-bottom-color:var(--line);
+    box-shadow:0 18px 40px -34px color-mix(in srgb,var(--accent) 90%,transparent)}
+  /* Un filet lumineux qui court sous la barre : la touche « poste de pilotage » */
+  .topstack::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;opacity:0;
+    background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);
+    transition:opacity .35s}
+  .topstack.compact::after{opacity:.85}
+  .navzone{padding:0}
+  .navinner{max-width:1080px;margin:0 auto;padding:0 18px}
+  header{display:flex;align-items:center;gap:12px;padding:14px 22px;background:transparent;flex-wrap:wrap;
+    transition:padding .25s}
+  .topstack.compact header{padding:8px 22px}
+  header h1{font-size:18px;margin:0;display:flex;align-items:center;gap:8px;letter-spacing:-.3px}
+  header h1 .nom{background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent}
   header .spacer{margin-left:auto}
   .who{color:var(--muted);font-size:13px}
   .rolebadge{display:inline-block;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:700;background:var(--accent);color:#fff;white-space:nowrap}
   .wrap{max-width:1080px;margin:0 auto;padding:18px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .panel{position:relative;background:color-mix(in srgb,var(--panel) 88%,transparent);
+    border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    box-shadow:0 1px 0 color-mix(in srgb,#fff 5%,transparent) inset,0 22px 50px -42px #000}
+  /* Liseré lumineux en haut de chaque panneau, très ténu */
+  .panel::before{content:"";position:absolute;left:16px;right:16px;top:0;height:1px;border-radius:1px;
+    background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 55%,transparent),transparent)}
   .panel h2{margin:0 0 12px;font-size:17px;display:flex;align-items:center;gap:8px}
   .row{display:flex;gap:12px;flex-wrap:wrap}
   .row>*{flex:1;min-width:180px}
@@ -186,14 +234,21 @@
   .img-fail{padding:14px;font-size:13px;color:var(--bad);text-align:center}
   /* Bandeau de sociétés : le logo lui-même est le bouton, sans cadre */
   .copicker{display:flex;align-items:flex-end;gap:26px;overflow-x:auto;
-    padding:6px 2px 16px;border-bottom:1px solid var(--line);margin-bottom:16px;-webkit-overflow-scrolling:touch}
+    padding:6px 2px 14px;-webkit-overflow-scrolling:touch;transition:padding .25s}
+  /* Au défilement, les logos rapetissent au lieu de disparaître : toujours cliquables. */
+  .topstack.compact .copicker{padding:2px 2px 8px;gap:18px}
+  .topstack.compact .cotile .logo{height:34px}
+  .topstack.compact .cotile .logo img{height:34px;max-width:120px}
+  .topstack.compact .cotile .noimg{font-size:16px;line-height:34px}
+  .topstack.compact .cotile .nm{display:none}
+  .topstack.compact .cotile::after{height:2px}
   .cotile{flex:0 0 auto;background:none;border:0;padding:4px 2px 0;cursor:pointer;color:var(--txt);
     font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px;
     opacity:.5;filter:grayscale(.55);transition:opacity .2s,filter .2s,transform .2s}
   .cotile:hover{opacity:1;filter:none;transform:translateY(-3px)}
   .cotile.on{opacity:1;filter:none}
-  .cotile .logo{display:flex;align-items:center;justify-content:center;height:96px}
-  .cotile .logo img{height:96px;width:auto;max-width:260px;object-fit:contain;display:block}
+  .cotile .logo{display:flex;align-items:center;justify-content:center;height:96px;transition:height .25s}
+  .cotile .logo img{height:96px;width:auto;max-width:260px;object-fit:contain;display:block;transition:height .25s,max-width .25s}
   :root[data-theme="light"] .cotile .logo img{filter:drop-shadow(0 2px 4px rgba(0,0,0,.14))}
   /* En thème sombre, un halo clair garde les logos foncés lisibles sans les enfermer dans un carré */
   .cotile .logo img{filter:drop-shadow(0 0 1px rgba(255,255,255,.55)) drop-shadow(0 2px 6px rgba(0,0,0,.5))}
@@ -209,7 +264,7 @@
   .cotile.add:hover .noimg{color:var(--accent)}
   /* Pilotage : l'équipe en colonne à gauche, le travail à droite */
   .pilot{display:grid;grid-template-columns:236px 1fr;gap:16px;align-items:start}
-  .team-rail{position:sticky;top:14px;background:var(--panel);border:1px solid var(--line);
+  .team-rail{position:sticky;top:calc(var(--stick,0px) + 14px);background:var(--panel);border:1px solid var(--line);
     border-radius:14px;padding:14px}
   .rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;
     font-family:var(--font-display);font-weight:700;font-size:15px}
@@ -245,17 +300,42 @@
     .mate-row{flex:0 0 auto;width:190px;margin-bottom:0}
   }
   /* Onglets */
-  .tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:5px;overflow-x:auto}
+  .tabs{display:flex;gap:6px;margin-bottom:14px;background:color-mix(in srgb,var(--panel) 78%,transparent);
+    border:1px solid var(--line);border-radius:12px;padding:5px;overflow-x:auto;transition:margin .25s}
+  .topstack.compact .tabs{margin-bottom:9px}
   .tab{flex:1;min-width:110px;padding:9px 12px;border:0;border-radius:9px;background:transparent;color:var(--muted);
     font-family:var(--font-display);font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;transition:.2s}
   .tab:hover{color:var(--txt)}
-  .tab.on{background:var(--grad-accent);color:#fff;box-shadow:0 8px 22px -14px var(--accent)}
+  .tab.on{background:var(--grad-accent);color:#fff;
+    box-shadow:0 10px 26px -12px var(--accent),0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent)}
+  /* ---------- Sponsoring : compteurs et campagnes ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-top:16px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px 13px;position:relative;overflow:hidden}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--grad-accent)}
+  .kpi .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .kpi .v{font-family:var(--font-mono);font-weight:700;font-size:21px;margin-top:5px;line-height:1.1}
+  .kpi .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .adrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel2);
+    border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-bottom:9px;
+    transition:border-color .2s,transform .15s}
+  .adrow:hover{border-color:color-mix(in srgb,var(--accent) 50%,var(--line));transform:translateY(-1px)}
+  .adrow .nm{font-family:var(--font-display);font-weight:700;font-size:14.5px}
+  .adrow .meta{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .adrow .num{font-family:var(--font-mono);font-weight:700;font-size:14px;text-align:right}
+  .adrow .num span{display:block;font-family:var(--font-body);font-weight:500;font-size:11px;color:var(--muted)}
+  .bar{height:5px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:7px}
+  .bar i{display:block;height:100%;background:var(--grad-accent)}
+  .stat{border-radius:20px;padding:3px 10px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .stat.active{background:color-mix(in srgb,var(--good) 20%,transparent);color:var(--good)}
+  .stat.en_pause{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+  .stat.terminee{background:var(--panel);color:var(--muted)}
+  .stat.brouillon{background:var(--panel);color:var(--muted)}
   .costchip{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:20px;
     padding:5px 12px;font-size:13px;font-family:var(--font-mono);font-weight:600;cursor:pointer;white-space:nowrap}
   .costchip:hover{border-color:var(--accent)}
   /* ---------- Discussion ---------- */
   .chat-shell{display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start}
-  .chat-side{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;position:sticky;top:14px}
+  .chat-side{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;position:sticky;top:calc(var(--stick,0px) + 14px)}
   .cs-title{font-family:var(--font-display);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
   .mate{--c:var(--accent);display:flex;align-items:center;gap:9px;padding:7px;border-radius:10px;transition:background .2s}
   .mate:hover{background:var(--panel2)}
@@ -434,6 +514,53 @@
     </div>
   </div>
 
+  <!-- Campagne payante -->
+  <div id="adModal" class="overlay hidden">
+    <div class="modal-card" style="max-width:560px">
+      <div class="row" style="align-items:center">
+        <h2 style="margin:0" id="adModalTitle">Nouvelle campagne</h2>
+        <button class="btn ghost small" id="adCancel" style="flex:0 0 auto">Fermer</button>
+      </div>
+      <label>Nom de la campagne</label>
+      <input id="ad_nom" placeholder="ex. Leads standardistes — septembre">
+      <div class="row">
+        <div><label>Réseau</label>
+          <select id="ad_net"><option value="facebook">Facebook</option>
+            <option value="instagram">Instagram</option><option value="linkedin">LinkedIn</option></select></div>
+        <div><label>Objectif</label>
+          <select id="ad_obj"><option value="leads">Leads</option><option value="trafic">Trafic</option>
+            <option value="notoriete">Notoriété</option><option value="messages">Messages</option>
+            <option value="ventes">Ventes</option></select></div>
+      </div>
+      <label>Post sponsorisé (facultatif)</label>
+      <select id="ad_post"><option value="">— Aucun post rattaché —</option></select>
+      <div class="row">
+        <div><label>Budget engagé (€)</label><input type="number" step="0.01" id="ad_budget" placeholder="0"></div>
+        <div><label>Dépensé (€)</label><input type="number" step="0.01" id="ad_depense" placeholder="0"></div>
+      </div>
+      <div class="row">
+        <div><label>Début</label><input type="date" id="ad_start"></div>
+        <div><label>Fin</label><input type="date" id="ad_end"></div>
+        <div><label>Statut</label>
+          <select id="ad_statut"><option value="active">Active</option><option value="en_pause">En pause</option>
+            <option value="terminee">Terminée</option><option value="brouillon">Brouillon</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>Impressions</label><input type="number" id="ad_imp" placeholder="0"></div>
+        <div><label>Clics</label><input type="number" id="ad_clics" placeholder="0"></div>
+        <div><label>Leads</label><input type="number" id="ad_leads" placeholder="0"></div>
+      </div>
+      <label>Notes</label>
+      <textarea id="ad_notes" style="min-height:60px" placeholder="Ce qui a marché, ce qu'il faut changer…"></textarea>
+      <div class="err" id="ad_err"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn ghost" id="adDelete" style="flex:0 0 auto;color:var(--bad)">🗑 Supprimer</button>
+        <div style="flex:1"></div>
+        <button class="btn" id="adSave" style="flex:0 0 auto">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Aide à la publication -->
   <div id="pubModal" class="overlay hidden">
     <div class="modal-card" style="max-width:600px;max-height:88vh;overflow:auto">
@@ -500,8 +627,11 @@
 
   <!-- App -->
   <div id="app" class="hidden">
+    <!-- Tout ce qui sert à naviguer reste collé en haut ; au défilement, le bloc
+         se compacte pour ne pas manger l'écran, sans jamais devenir incliquable. -->
+    <div class="topstack" id="topStack">
     <header>
-      <h1>🚀 Marketing IA</h1>
+      <h1>🚀 <span class="nom">Marketing IA</span></h1>
       <div class="spacer"></div>
       <button class="costchip" id="costChip" title="Dépense IA aujourd'hui — cliquer pour voir le détail">💶 —</button>
       <span class="who" id="who"></span>
@@ -509,6 +639,17 @@
       <a class="btn ghost small" href="./index.html">← Portail</a>
       <button class="btn ghost small" id="logoutBtn">Quitter</button>
     </header>
+      <div class="navzone"><div class="navinner">
+        <div class="copicker" id="coPicker"></div>
+        <nav class="tabs" id="tabs">
+          <button class="tab on" data-tab="pilotage">🚀 Pilotage</button>
+          <button class="tab" data-tab="chat">💬 Discussion</button>
+          <button class="tab" data-tab="ads">📣 Sponsoring</button>
+          <button class="tab" data-tab="histo">📚 Historique</button>
+          <button class="tab" data-tab="frais">💶 Frais</button>
+        </nav>
+      </div></div>
+    </div>
     <div class="wrap">
       <div id="valNudge" class="panel hidden" style="border-color:var(--warn);cursor:pointer">
         <div style="display:flex;align-items:center;gap:12px">
@@ -523,15 +664,6 @@
         <h2 style="margin-top:0">👋 Bienvenue !</h2>
         <p class="who">Ajoute ta première société avec le bouton <strong>« + Société »</strong> en haut : donne son nom et son site web, l'IA s'occupe du reste.</p>
       </div>
-
-      <div class="copicker" id="coPicker"></div>
-
-      <nav class="tabs" id="tabs">
-        <button class="tab on" data-tab="pilotage">🚀 Pilotage</button>
-        <button class="tab" data-tab="chat">💬 Discussion</button>
-        <button class="tab" data-tab="histo">📚 Historique</button>
-        <button class="tab" data-tab="frais">💶 Frais</button>
-      </nav>
 
       <div id="tab-pilotage">
       <div class="pilot">
@@ -574,6 +706,7 @@
           </label>
         </div>
         <div class="cal" id="cal"></div>
+        <div class="who" id="doneNote" style="margin:2px 0 10px"></div>
         <div id="posts"></div>
       </div>
         </div>
@@ -671,6 +804,32 @@
 
       </div>
 
+      <!-- ================= SPONSORING ================= -->
+      <div id="tab-ads" class="hidden">
+        <div class="panel">
+          <h2 style="margin-top:0">📣 Publications payantes</h2>
+          <p class="who" style="margin-top:0">Ce que tu mets derrière tes posts, et ce que ça rapporte.
+            Les chiffres se saisissent à la main : l'API publicitaire de Meta demande une validation
+            d'application qu'on n'a pas encore.</p>
+          <div class="row" style="align-items:flex-end">
+            <div><label style="margin-top:0">Du</label><input type="date" id="adFrom"></div>
+            <div><label style="margin-top:0">Au</label><input type="date" id="adTo"></div>
+            <div><label style="margin-top:0">Réseau</label>
+              <select id="adNet"><option value="">Tous</option>
+                <option value="facebook">Facebook</option><option value="instagram">Instagram</option>
+                <option value="linkedin">LinkedIn</option></select></div>
+            <div style="flex:0 0 auto"><button class="btn ghost" id="adReset">↺ Tout</button></div>
+            <div style="flex:0 0 auto"><button class="btn" id="adNew">+ Campagne</button></div>
+          </div>
+          <div class="kpis" id="adKpis"></div>
+        </div>
+        <div class="panel">
+          <h2 style="margin-top:0">Campagnes</h2>
+          <div id="adList"></div>
+          <div class="err" id="adMsg"></div>
+        </div>
+      </div>
+
       <!-- ================= HISTORIQUE ================= -->
       <div id="tab-histo" class="hidden">
         <div class="panel">
@@ -756,7 +915,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v27 · publication auto';
+const APP_VERSION='v28 · cockpit + sponsoring';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -961,6 +1120,7 @@ function selectCompany(id){
   el('autoWeekly').checked=!!CURRENT_COMPANY.auto_weekly;
   HISTO_CO=CURRENT_COMPANY.id;
   if(!el('tab-histo').classList.contains('hidden')) loadHistory();
+  if(!el('tab-ads').classList.contains('hidden')) loadAds();
   if(!el('tab-param').classList.contains('hidden')) loadParam();
   loadEditorial(); loadCadence(); loadPosts();
 }
@@ -1879,6 +2039,13 @@ async function loadPosts(){
   });
   const enAttente=POSTS.filter(p=>p.status==='a_valider').length;
   if(VALID_ONLY) vue=vue.filter(p=>p.status==='a_valider');
+  // Un post parti en ligne n'a plus rien à faire dans le pilotage : il vit dans l'Historique.
+  const partis=vue.filter(p=>p.status==='publie'||p.published_at).length;
+  vue=vue.filter(p=>!(p.status==='publie'||p.published_at));
+  el('doneNote').innerHTML=partis
+    ? `✅ ${partis} post(s) déjà publié(s) sur cette période — <a href="#" id="goHisto">voir dans l'Historique</a>`
+    : '';
+  const lien=el('goHisto'); if(lien) lien.onclick=(e)=>{ e.preventDefault(); showTab('histo'); };
   el('valNudge').classList.toggle('hidden',!enAttente||VALID_ONLY);
   el('valNudgeTxt').textContent=enAttente+' post(s) attendent ton feu vert';
   el('valCount').textContent=enAttente
@@ -1939,7 +2106,7 @@ async function savePostBody(id,body){
 document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
 function showTab(name){
   document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
-  ['pilotage','param','chat','histo','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
+  ['pilotage','param','chat','ads','histo','frais'].forEach(n=>el('tab-'+n).classList.toggle('hidden',n!==name));
   const pt=el('paramTile'); if(pt) pt.classList.toggle('on',name==='param');
   if(name!=='param' && !document.querySelector('#tabs .tab.on')){
     const first=document.querySelector('#tabs .tab'); if(first) first.classList.add('on');
@@ -1947,9 +2114,165 @@ function showTab(name){
   if(name==='chat') loadChats();
   if(name==='frais') loadUsage();
   if(name==='histo') loadHistory();
+  if(name==='ads') loadAds();
   if(name==='param') loadParam();
 }
 el('costChip').onclick=()=>showTab('frais');
+
+// ================= SPONSORING =================
+// Suivi manuel des campagnes payantes : budget engagé, dépense réelle, et ce que
+// ça a produit. Tout est par société, comme le reste de l'app.
+let ADS=[], AD_EDIT=null;
+const AD_OBJ={leads:'Leads',trafic:'Trafic',notoriete:'Notoriété',messages:'Messages',ventes:'Ventes'};
+const AD_STAT={active:'Active',en_pause:'En pause',terminee:'Terminée',brouillon:'Brouillon'};
+const eur=n=>(Number(n)||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:2});
+const num=n=>(Number(n)||0).toLocaleString('fr-FR');
+
+async function loadAds(){
+  if(!CURRENT_COMPANY){ el('adList').innerHTML=''; el('adKpis').innerHTML=''; return; }
+  const {data,error}=await db.from('mkt_ads').select('*').eq('company_id',CURRENT_COMPANY.id)
+    .order('started_at',{ascending:false,nullsFirst:false});
+  if(error){
+    el('adMsg').style.color='var(--bad)';
+    el('adMsg').textContent=error.message.includes('mkt_ads')
+      ? "La table des campagnes n'existe pas encore : lance sql/mkt-ads.sql dans Supabase."
+      : 'Erreur : '+error.message;
+    return;
+  }
+  el('adMsg').textContent='';
+  ADS=data||[];
+  renderAds();
+}
+function adsFiltrees(){
+  const d1=el('adFrom').value, d2=el('adTo').value, net=el('adNet').value;
+  return ADS.filter(a=>{
+    if(net&&a.network!==net) return false;
+    // Une campagne compte si elle chevauche la période demandée.
+    if(d1&&a.ended_at&&a.ended_at<d1) return false;
+    if(d2&&a.started_at&&a.started_at>d2) return false;
+    return true;
+  });
+}
+function renderAds(){
+  const v=adsFiltrees();
+  const budget=v.reduce((s,a)=>s+Number(a.budget||0),0);
+  const depense=v.reduce((s,a)=>s+Number(a.depense||0),0);
+  const leads=v.reduce((s,a)=>s+Number(a.leads||0),0);
+  const clics=v.reduce((s,a)=>s+Number(a.clics||0),0);
+  const imps=v.reduce((s,a)=>s+Number(a.impressions||0),0);
+  const cpl=leads?depense/leads:0, cpc=clics?depense/clics:0;
+  el('adKpis').innerHTML=`
+    <div class="kpi"><div class="k">Budget engagé</div><div class="v">${eur(budget)}</div>
+      <div class="s">${v.length} campagne(s)</div></div>
+    <div class="kpi"><div class="k">Dépensé</div><div class="v">${eur(depense)}</div>
+      <div class="s">${budget?Math.round(depense/budget*100):0} % du budget</div></div>
+    <div class="kpi"><div class="k">Reste</div><div class="v">${eur(Math.max(0,budget-depense))}</div>
+      <div class="s">à consommer</div></div>
+    <div class="kpi"><div class="k">Leads</div><div class="v">${num(leads)}</div>
+      <div class="s">${leads?eur(cpl)+' / lead':'—'}</div></div>
+    <div class="kpi"><div class="k">Clics</div><div class="v">${num(clics)}</div>
+      <div class="s">${clics?eur(cpc)+' / clic':'—'}</div></div>
+    <div class="kpi"><div class="k">Impressions</div><div class="v">${num(imps)}</div>
+      <div class="s">${imps&&clics?(clics/imps*100).toFixed(2)+' % de clics':'—'}</div></div>`;
+  if(!v.length){
+    el('adList').innerHTML='<div class="who">Aucune campagne sur cette période. Clique « + Campagne » pour en créer une.</div>';
+    return;
+  }
+  el('adList').innerHTML=v.map(a=>{
+    const pct=a.budget?Math.min(100,Math.round(a.depense/a.budget*100)):0;
+    const periode=[a.started_at,a.ended_at].filter(Boolean).map(d=>new Date(d).toLocaleDateString('fr-FR')).join(' → ')||'sans dates';
+    return `<div class="adrow" data-ad="${a.id}">
+      <div style="flex:1;min-width:190px">
+        <div class="nm">${esc(a.nom)}</div>
+        <div class="meta">${NET_LABEL[a.network]||a.network} · ${AD_OBJ[a.objectif]||a.objectif||'—'} · ${periode}</div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="num" style="flex:0 0 auto">${eur(a.depense)}<span>sur ${eur(a.budget)}</span></div>
+      <div class="num" style="flex:0 0 auto">${num(a.leads)}<span>leads</span></div>
+      <div class="num" style="flex:0 0 auto">${a.leads?eur(a.depense/a.leads):'—'}<span>par lead</span></div>
+      <span class="stat ${a.statut}" style="flex:0 0 auto">${AD_STAT[a.statut]||a.statut}</span>
+      <button class="btn ghost small ad-edit" style="flex:0 0 auto">✏️</button>
+    </div>`;
+  }).join('');
+  el('adList').querySelectorAll('[data-ad]').forEach(r=>{
+    r.querySelector('.ad-edit').onclick=()=>openAdModal(ADS.find(x=>x.id===r.dataset.ad));
+  });
+}
+function openAdModal(a){
+  AD_EDIT=a?a.id:null;
+  el('adModalTitle').textContent=a?'Modifier la campagne':'Nouvelle campagne';
+  el('ad_nom').value=a?a.nom:'';
+  el('ad_net').value=a?a.network:'facebook';
+  el('ad_obj').value=a?(a.objectif||'leads'):'leads';
+  el('ad_budget').value=a?a.budget:'';
+  el('ad_depense').value=a?a.depense:'';
+  el('ad_start').value=a?(a.started_at||''):new Date().toISOString().slice(0,10);
+  el('ad_end').value=a?(a.ended_at||''):'';
+  el('ad_statut').value=a?a.statut:'active';
+  el('ad_imp').value=a?a.impressions:'';
+  el('ad_clics').value=a?a.clics:'';
+  el('ad_leads').value=a?a.leads:'';
+  el('ad_notes').value=a?(a.notes||''):'';
+  // On ne propose que les posts déjà partis en ligne : sponsoriser un brouillon n'a pas de sens.
+  const publies=POSTS.filter(p=>p.status==='publie'||p.published_at);
+  el('ad_post').innerHTML='<option value="">— Aucun post rattaché —</option>'
+    +publies.map(p=>`<option value="${p.id}">${esc((NET_LABEL[p.network]||p.network)+' · '+(p.body||'').slice(0,60))}</option>`).join('');
+  el('ad_post').value=a?(a.post_id||''):'';
+  el('adDelete').style.display=a?'inline-flex':'none';
+  el('ad_err').textContent='';
+  el('adModal').classList.remove('hidden');
+  el('ad_nom').focus();
+}
+el('adNew').onclick=()=>{ if(!CURRENT_COMPANY){ alert('Choisis une société.'); return; } openAdModal(null); };
+el('adCancel').onclick=()=>el('adModal').classList.add('hidden');
+el('adFrom').onchange=renderAds; el('adTo').onchange=renderAds; el('adNet').onchange=renderAds;
+el('adReset').onclick=()=>{ el('adFrom').value=''; el('adTo').value=''; el('adNet').value=''; renderAds(); };
+el('adSave').onclick=async()=>{
+  const nom=el('ad_nom').value.trim();
+  if(!nom){ el('ad_err').textContent='Donne un nom à la campagne.'; return; }
+  const ligne={
+    company_id:CURRENT_COMPANY.id, nom,
+    network:el('ad_net').value, objectif:el('ad_obj').value,
+    post_id:el('ad_post').value||null,
+    budget:Number(el('ad_budget').value||0), depense:Number(el('ad_depense').value||0),
+    started_at:el('ad_start').value||null, ended_at:el('ad_end').value||null,
+    statut:el('ad_statut').value,
+    impressions:Number(el('ad_imp').value||0), clics:Number(el('ad_clics').value||0),
+    leads:Number(el('ad_leads').value||0), notes:el('ad_notes').value.trim()||null,
+    updated_at:new Date().toISOString()
+  };
+  const {error}=AD_EDIT
+    ? await db.from('mkt_ads').update(ligne).eq('id',AD_EDIT)
+    : await db.from('mkt_ads').insert(ligne);
+  if(error){ el('ad_err').textContent='Erreur : '+error.message; return; }
+  el('adModal').classList.add('hidden');
+  await loadAds();
+};
+el('adDelete').onclick=async()=>{
+  if(!AD_EDIT||!confirm('Supprimer cette campagne ?')) return;
+  const {error}=await db.from('mkt_ads').delete().eq('id',AD_EDIT);
+  if(error){ el('ad_err').textContent='Erreur : '+error.message; return; }
+  el('adModal').classList.add('hidden');
+  await loadAds();
+};
+
+// ================= BARRE COLLÉE =================
+// Le bloc du haut reste accessible en permanence ; il se compacte au défilement
+// et publie sa hauteur réelle dans --stick pour que les colonnes collantes
+// (équipe, discussions) se calent juste en dessous au lieu de passer derrière.
+(function(){
+  const stack=el('topStack'); if(!stack) return;
+  let raf=0;
+  function maj(){
+    raf=0;
+    stack.classList.toggle('compact',window.scrollY>36);
+    document.documentElement.style.setProperty('--stick',stack.offsetHeight+'px');
+  }
+  window.addEventListener('scroll',()=>{ if(!raf) raf=requestAnimationFrame(maj); },{passive:true});
+  window.addEventListener('resize',()=>{ if(!raf) raf=requestAnimationFrame(maj); });
+  new ResizeObserver(()=>{ if(!raf) raf=requestAnimationFrame(maj); }).observe(stack);
+  maj();
+})();
 
 // ================= DISCUSSION =================
 function renderChatTeam(){
