@@ -28,6 +28,65 @@ async function graph(url: string, form: Record<string, string>) {
   return data;
 }
 
+// ---------- LinkedIn ----------
+// L'image ne se passe pas par URL comme chez Meta : il faut demander un
+// emplacement, y téléverser les octets, puis référencer l'URN obtenue.
+const LI_API = "https://api.linkedin.com";
+const LI_VERSION = "202405";
+
+async function publierLinkedIn(orgId: string, token: string, texte: string, imageUrl?: string | null, alt?: string | null) {
+  const entetes = {
+    "Authorization": `Bearer ${token}`,
+    "LinkedIn-Version": LI_VERSION,
+    "X-Restli-Protocol-Version": "2.0.0",
+    "Content-Type": "application/json",
+  };
+  const auteur = `urn:li:organization:${orgId}`;
+  let media: Record<string, unknown> | undefined;
+
+  if (imageUrl) {
+    const init = await fetch(`${LI_API}/rest/images?action=initializeUpload`, {
+      method: "POST", headers: entetes,
+      body: JSON.stringify({ initializeUploadRequest: { owner: auteur } }),
+    });
+    const initJson = await init.json().catch(() => ({}));
+    const val = initJson?.value;
+    if (!init.ok || !val?.uploadUrl || !val?.image) {
+      throw new Error("LinkedIn refuse l'envoi de l'image : " + String(initJson?.message || init.status).slice(0, 200));
+    }
+    const bin = await fetch(imageUrl);
+    if (!bin.ok) throw new Error("Visuel introuvable à son adresse.");
+    const up = await fetch(val.uploadUrl, {
+      method: "PUT",
+      headers: { "Authorization": `Bearer ${token}` },
+      body: new Uint8Array(await bin.arrayBuffer()),
+    });
+    if (!up.ok) throw new Error(`Téléversement de l'image refusé (HTTP ${up.status}).`);
+    media = { media: { id: val.image, altText: (alt || "").slice(0, 300) } };
+  }
+
+  // LinkedIn traite quelques caractères comme réservés dans le commentaire.
+  const commentaire = texte.replace(/([(){}\[\]<>@|~_*#\\])/g, "\\$1");
+
+  const res = await fetch(`${LI_API}/rest/posts`, {
+    method: "POST", headers: entetes,
+    body: JSON.stringify({
+      author: auteur,
+      commentary: commentaire,
+      visibility: "PUBLIC",
+      distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] },
+      lifecycleState: "PUBLISHED",
+      isReshareDisabledByAuthor: false,
+      ...(media ? { content: media } : {}),
+    }),
+  });
+  if (res.status !== 201 && !res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error("LinkedIn a refusé la publication : " + String(err?.message || res.status).slice(0, 220));
+  }
+  return res.headers.get("x-restli-id") || res.headers.get("x-linkedin-id") || "";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -87,8 +146,10 @@ Deno.serve(async (req) => {
         creation_id: String(conteneur.id), access_token: compte.access_token,
       });
       externalId = String(r.id || "");
+    } else if (post.network === "linkedin") {
+      externalId = await publierLinkedIn(compte.account_id, compte.access_token, texte, post.image_url, post.image_alt);
     } else {
-      return json({ error: "LinkedIn n'est pas encore branché — publie à la main pour celui-ci." }, 400);
+      return json({ error: "Réseau inconnu : " + post.network }, 400);
     }
 
     const maintenant = new Date().toISOString();

@@ -794,6 +794,13 @@
             <button class="btn" id="metaGo" style="margin-top:8px">🔗 Connecter</button>
             <div class="err" id="metaMsg"></div>
           </details>
+          <details style="margin-top:10px">
+            <summary style="cursor:pointer;font-size:14px;font-weight:600">➕ Connecter LinkedIn</summary>
+            <p class="who" style="margin-top:8px">Un clic suffit : LinkedIn demande ton accord, puis l'app
+              récupère la Page toute seule. Nécessite l'accès Community Management API.</p>
+            <button class="btn" id="liGo" style="margin-top:6px">🔗 Autoriser LinkedIn</button>
+            <div class="err" id="liMsg"></div>
+          </details>
         </div>
 
         <div class="panel companyPanel" id="factsPanel">
@@ -952,7 +959,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v29 · apercu reseau';
+const APP_VERSION='v30 · LinkedIn pret';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -999,6 +1006,7 @@ async function boot(){
   try{
     if(new URLSearchParams(location.search).get('valider')==='1') setValidMode(true);
   }catch(e){}
+  try{ await retourLinkedIn(); }catch(e){}
 }
 el('loginBtn').onclick=async()=>{
   el('autherr').textContent='';
@@ -2211,6 +2219,55 @@ function showTab(name){
   if(name==='param') loadParam();
 }
 el('costChip').onclick=()=>showTab('frais');
+
+// ================= CONNEXION LINKEDIN =================
+// OAuth classique : on envoie David chez LinkedIn, il revient avec un code dans
+// l'URL, et le serveur l'échange contre un jeton (le secret ne quitte jamais Supabase).
+const LI_CLIENT_ID='86dva8989u42yy';
+const LI_REDIRECT=location.origin+'/marketing.html';
+const LI_SCOPES='r_organization_social w_organization_social rw_organization_admin';
+el('liGo').onclick=()=>{
+  if(!CURRENT_COMPANY){ el('liMsg').style.color='var(--bad)'; el('liMsg').textContent='Choisis d\'abord une société.'; return; }
+  // L'état nous sert à retrouver la société au retour, et à écarter les retours frauduleux.
+  const etat=CURRENT_COMPANY.id+'.'+Math.random().toString(36).slice(2,10);
+  sessionStorage.setItem('li_state',etat);
+  location.href='https://www.linkedin.com/oauth/v2/authorization?response_type=code'
+    +'&client_id='+encodeURIComponent(LI_CLIENT_ID)
+    +'&redirect_uri='+encodeURIComponent(LI_REDIRECT)
+    +'&state='+encodeURIComponent(etat)
+    +'&scope='+encodeURIComponent(LI_SCOPES);
+};
+async function retourLinkedIn(){
+  const q=new URLSearchParams(location.search);
+  const code=q.get('code'), etat=q.get('state'), refus=q.get('error_description')||q.get('error');
+  if(!code&&!refus) return;
+  history.replaceState(null,'',location.pathname);
+  const attendu=sessionStorage.getItem('li_state');
+  sessionStorage.removeItem('li_state');
+  showTab('param');
+  if(refus){ el('liMsg').style.color='var(--bad)'; el('liMsg').textContent='LinkedIn a refusé : '+refus; return; }
+  if(!etat||etat!==attendu){ el('liMsg').style.color='var(--bad)'; el('liMsg').textContent='Retour LinkedIn non reconnu — relance la connexion.'; return; }
+  const coId=etat.split('.')[0];
+  el('liMsg').style.color='var(--muted)'; el('liMsg').textContent='⏳ Connexion à LinkedIn…';
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-connect-linkedin',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({company_id:coId,code,redirect_uri:LI_REDIRECT})
+    });
+    const out=await res.json().catch(()=>({error:'réponse illisible'}));
+    if(!res.ok||out.error){ el('liMsg').style.color='var(--bad)'; el('liMsg').textContent='Erreur : '+(out.error||res.status); return; }
+    if(out.need_choice){
+      el('liMsg').style.color='var(--warn)';
+      el('liMsg').textContent='Plusieurs Pages : '+out.pages.map(p=>p.name).join(', ')+'. Dis-moi laquelle rattacher.';
+      return;
+    }
+    el('liMsg').style.color='var(--good)';
+    el('liMsg').textContent='✅ LinkedIn : '+out.linkedin.name;
+    loadSocial();
+  }catch(e){ el('liMsg').style.color='var(--bad)'; el('liMsg').textContent='Erreur réseau : '+e.message; }
+}
 
 // ================= SPONSORING =================
 // Suivi manuel des campagnes payantes : budget engagé, dépense réelle, et ce que
