@@ -82,6 +82,23 @@ Deno.serve(async (req) => {
           synced_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }).eq("id", c.id);
+
+        // Série jour par jour : c'est elle qui permet de tracer une évolution
+        // plutôt qu'un simple total figé.
+        const jr = await fetch(`${GRAPH}/${c.external_campaign_id}/insights?fields=${champs}`
+          + `&date_preset=maximum&time_increment=1&limit=200&access_token=${encodeURIComponent(pub.user_token)}`);
+        const jrJson = await jr.json();
+        const lignes = ((jrJson?.data || []) as Record<string, unknown>[]).map((x) => ({
+          ad_id: c.id,
+          jour: String(x.date_start),
+          depense: Number(x.spend || 0),
+          impressions: Number(x.impressions || 0),
+          clics: Number(x.clicks || 0),
+          leads: ((x.actions || []) as { action_type: string; value: string }[])
+            .filter((a) => ACTIONS_LEAD.has(a.action_type))
+            .reduce((s, a) => s + Number(a.value || 0), 0),
+        })).filter((l) => l.jour && l.jour !== "undefined");
+        if (lignes.length) await admin.from("mkt_ads_daily").upsert(lignes, { onConflict: "ad_id,jour" });
         majs++;
       } catch (e) {
         erreurs.push(String((e as Error)?.message || e).slice(0, 120));

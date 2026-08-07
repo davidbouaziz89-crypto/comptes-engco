@@ -723,6 +723,8 @@
       </div></div>
     </div>
     <div class="wrap">
+      <div id="rappels"></div>
+
       <div id="valNudge" class="panel hidden" style="border-color:var(--warn);cursor:pointer">
         <div style="display:flex;align-items:center;gap:12px">
           <span style="font-size:26px">⏳</span>
@@ -996,7 +998,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v32 · pub automatique';
+const APP_VERSION='v33 · pilotage campagnes';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1203,6 +1205,7 @@ function selectCompany(id){
   HISTO_CO=CURRENT_COMPANY.id;
   if(!el('tab-histo').classList.contains('hidden')) loadHistory();
   if(!el('tab-ads').classList.contains('hidden')) loadAds();
+  loadRappels();
   if(!el('tab-param').classList.contains('hidden')) loadParam();
   loadEditorial(); loadCadence(); loadPosts();
 }
@@ -2257,6 +2260,74 @@ function showTab(name){
 }
 el('costChip').onclick=()=>showTab('frais');
 
+// ================= RAPPELS =================
+// Les jetons d'accès expirent sans prévenir : quand ça arrive, la publication
+// s'arrête en silence. L'app surveille les échéances et explique quoi refaire,
+// pour que David n'ait rien à retenir.
+const JETON_META_JOURS=60;
+function snoozé(code){
+  try{ const j=localStorage.getItem('rappel_'+code); return j && Date.now()<Number(j); }catch(e){ return false; }
+}
+async function loadRappels(){
+  const box=el('rappels'); if(!box) return;
+  if(!CURRENT_COMPANY){ box.innerHTML=''; return; }
+  const rappels=[];
+
+  const {data:pub}=await db.from('mkt_meta_ads_public').select('*').eq('company_id',CURRENT_COMPANY.id).maybeSingle();
+  if(pub){
+    // Meta ne renvoie pas toujours de date d'expiration : on retient la règle des
+    // 60 jours, quitte à prévenir un peu trop tôt plutôt que trop tard.
+    const fin=pub.expires_at?new Date(pub.expires_at)
+      :new Date(new Date(pub.updated_at).getTime()+JETON_META_JOURS*86400000);
+    const reste=Math.ceil((fin-new Date())/86400000);
+    if(reste<=15) rappels.push({
+      code:'jeton_meta_'+CURRENT_COMPANY.id,
+      gravite:reste<=3?'urgent':'bientot',
+      titre:reste>0?`Ton accès Meta expire dans ${reste} jour(s)`:'Ton accès Meta a expiré',
+      detail:'Sans renouvellement, la publication automatique et les campagnes s\'arrêtent pour '+CURRENT_COMPANY.name+'.',
+      etapes:[
+        'Ouvre l\'explorateur Meta : <a href="https://developers.facebook.com/tools/explorer/1646853544116699/" target="_blank" rel="noopener">developers.facebook.com/tools/explorer</a>',
+        'Onglet <strong>Configurations</strong>, choisis « Publication Marketing IA »',
+        'Clique <strong>Generate Access Token</strong> et valide tous les écrans (Pages, Instagram, comptes publicitaires)',
+        'Copie le jeton, puis colle-le ici dans <strong>⚙️ Paramétrage → 🔗 Connexion aux réseaux</strong>',
+        'Recommence pour chaque société'
+      ]
+    });
+  }
+  const {data:soc}=await db.from('mkt_social_public').select('*').eq('company_id',CURRENT_COMPANY.id).eq('network','linkedin').maybeSingle();
+  if(soc&&soc.expires_at){
+    const reste=Math.ceil((new Date(soc.expires_at)-new Date())/86400000);
+    if(reste<=15) rappels.push({
+      code:'jeton_li_'+CURRENT_COMPANY.id,
+      gravite:reste<=3?'urgent':'bientot',
+      titre:reste>0?`Ton accès LinkedIn expire dans ${reste} jour(s)`:'Ton accès LinkedIn a expiré',
+      detail:'La publication automatique sur la Page LinkedIn va s\'interrompre.',
+      etapes:['Va dans <strong>⚙️ Paramétrage → 🔗 Connexion aux réseaux</strong>','Déplie <strong>Connecter LinkedIn</strong> et clique <strong>Autoriser LinkedIn</strong>','C\'est tout : un clic, LinkedIn te ramène tout seul']
+    });
+  }
+
+  const visibles=rappels.filter(r=>!snoozé(r.code));
+  box.innerHTML=visibles.map(r=>`
+    <div class="panel" style="border-color:var(--${r.gravite==='urgent'?'bad':'warn'})">
+      <div class="row" style="align-items:center">
+        <span style="flex:0 0 auto;font-size:24px">${r.gravite==='urgent'?'🚨':'⏰'}</span>
+        <div style="flex:1;min-width:180px"><strong>${esc(r.titre)}</strong>
+          <div class="who" style="font-size:12.5px">${esc(r.detail)}</div></div>
+        <button class="btn ghost small rap-snooze" data-code="${r.code}" style="flex:0 0 auto">Plus tard</button>
+      </div>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:13.5px;font-weight:600">Comment faire</summary>
+        <ol class="who" style="margin:8px 0 0;padding-left:20px;line-height:1.7;font-size:13px">
+          ${r.etapes.map(e=>'<li>'+e+'</li>').join('')}
+        </ol>
+      </details>
+    </div>`).join('');
+  box.querySelectorAll('.rap-snooze').forEach(b=>b.onclick=()=>{
+    try{ localStorage.setItem('rappel_'+b.dataset.code,String(Date.now()+3*86400000)); }catch(e){}
+    loadRappels();
+  });
+}
+
 // ================= CONNEXION LINKEDIN =================
 // OAuth classique : on envoie David chez LinkedIn, il revient avec un code dans
 // l'URL, et le serveur l'échange contre un jeton (le secret ne quitte jamais Supabase).
@@ -2378,12 +2449,103 @@ function renderAds(){
       <div class="num" style="flex:0 0 auto">${num(a.leads)}<span>leads</span></div>
       <div class="num" style="flex:0 0 auto">${a.leads?eur(a.depense/a.leads):'—'}<span>par lead</span></div>
       <span class="stat ${a.statut}" style="flex:0 0 auto">${AD_STAT[a.statut]||a.statut}</span>
-      <button class="btn ghost small ad-edit" style="flex:0 0 auto">✏️</button>
+      ${a.external_campaign_id?`
+        <div style="flex:0 0 auto;display:flex;gap:5px">
+          ${a.statut!=='active'?'<button class="btn small ad-on" title="Activer — la diffusion démarre et le budget commence à être consommé">▶️</button>':''}
+          ${a.statut==='active'?'<button class="btn ghost small ad-off" title="Mettre en pause">⏸</button>':''}
+          <button class="btn ghost small ad-budget" title="Changer le budget quotidien">💶</button>
+          <button class="btn ghost small ad-graph" title="Voir l'évolution jour par jour">📈</button>
+          <button class="btn ghost small ad-stop" title="Terminer définitivement">⏹</button>
+        </div>`:'<button class="btn ghost small ad-edit" style="flex:0 0 auto" title="Campagne saisie à la main">✏️</button>'}
+      <div class="ad-detail hidden" style="flex:1 0 100%"></div>
     </div>`;
   }).join('');
   el('adList').querySelectorAll('[data-ad]').forEach(r=>{
-    r.querySelector('.ad-edit').onclick=()=>openAdModal(ADS.find(x=>x.id===r.dataset.ad));
+    const id=r.dataset.ad, a=ADS.find(x=>x.id===id);
+    const q=s=>r.querySelector(s);
+    if(q('.ad-edit')) q('.ad-edit').onclick=()=>openAdModal(a);
+    if(q('.ad-on')) q('.ad-on').onclick=()=>piloter(id,'activer',a);
+    if(q('.ad-off')) q('.ad-off').onclick=()=>piloter(id,'pause',a);
+    if(q('.ad-stop')) q('.ad-stop').onclick=()=>piloter(id,'terminer',a);
+    if(q('.ad-budget')) q('.ad-budget').onclick=()=>{
+      const v=prompt('Nouveau budget quotidien, en euros :', '10');
+      if(v&&Number(v)>=1) piloter(id,'budget',a,Number(v));
+    };
+    if(q('.ad-graph')) q('.ad-graph').onclick=()=>toggleGraphe(id,r.querySelector('.ad-detail'));
   });
+}
+async function piloter(id,action,a,budget){
+  const confirmations={
+    activer:`Activer « ${a.nom} » ?\n\nLa diffusion démarre et Meta commence à dépenser ton budget.`,
+    pause:'Mettre cette campagne en pause ? La diffusion s\'arrête, rien n\'est perdu.',
+    terminer:'Terminer définitivement cette campagne ? Elle sera archivée chez Meta et ne pourra plus être relancée.',
+    budget:`Passer le budget quotidien à ${eur(budget||0)} ?`
+  };
+  if(!confirm(confirmations[action])) return;
+  el('adMsg').style.color='var(--muted)'; el('adMsg').textContent='⏳ Envoi à Meta…';
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    const res=await fetch(SUPABASE_URL+'/functions/v1/mkt-ads-control',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({ad_id:id,action,budget_jour:budget})
+    });
+    const out=await res.json().catch(()=>({error:'réponse illisible'}));
+    if(!res.ok||out.error){ el('adMsg').style.color='var(--bad)'; el('adMsg').textContent='Erreur : '+(out.error||res.status); return; }
+    el('adMsg').style.color='var(--good)'; el('adMsg').textContent='✅ Fait';
+    await loadAds();
+  }catch(e){ el('adMsg').style.color='var(--bad)'; el('adMsg').textContent='Erreur réseau : '+e.message; }
+}
+// Courbe dessinée à la main en SVG : aucune bibliothèque à charger, donc rien
+// qui puisse casser hors ligne ou ralentir l'app.
+async function toggleGraphe(id,box){
+  if(!box.classList.contains('hidden')){ box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  box.innerHTML='<div class="who" style="padding:10px 0">⏳ Lecture de l\'historique…</div>';
+  const {data,error}=await db.from('mkt_ads_daily').select('*').eq('ad_id',id).order('jour');
+  if(error){ box.innerHTML='<div class="err">'+esc(error.message)+'</div>'; return; }
+  if(!data||!data.length){
+    box.innerHTML='<div class="who" style="padding:10px 0">Aucun historique. Clique « 🔄 Actualiser les chiffres » — la série se remplit dès que la campagne diffuse.</div>';
+    return;
+  }
+  const W=680,H=170,P=30;
+  const maxL=Math.max(1,...data.map(d=>d.leads));
+  const maxD=Math.max(0.01,...data.map(d=>Number(d.depense)));
+  const x=i=>P+(data.length<2?0:i*(W-2*P)/(data.length-1));
+  const yL=v=>H-P-(v/maxL)*(H-2*P);
+  const yD=v=>H-P-(v/maxD)*(H-2*P);
+  const ligne=(sel,y)=>data.map((d,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(sel(d)).toFixed(1)}`).join(' ');
+  const total=data.reduce((s,d)=>({l:s.l+d.leads,d:s.d+Number(d.depense),c:s.c+d.clics}),{l:0,d:0,c:0});
+  box.innerHTML=`
+    <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+      <div class="row" style="align-items:center;margin-bottom:8px">
+        <div class="who" style="flex:1"><span style="color:var(--accent2)">━</span> Leads &nbsp;
+          <span style="color:var(--accent)">━</span> Dépense &nbsp;·&nbsp;
+          ${data.length} jour(s) · ${total.l} lead(s) · ${eur(total.d)} · ${total.c} clic(s)</div>
+        <button class="btn ghost small ad-csv" style="flex:0 0 auto">⬇️ Télécharger (CSV)</button>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+        <line x1="${P}" y1="${H-P}" x2="${W-P}" y2="${H-P}" stroke="var(--line)"/>
+        <path d="${ligne(d=>Number(d.depense),yD)}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+        <path d="${ligne(d=>d.leads,yL)}" fill="none" stroke="var(--accent2)" stroke-width="2.5"/>
+        ${data.map((d,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${yL(d.leads).toFixed(1)}" r="3" fill="var(--accent2)"><title>${d.jour} — ${d.leads} lead(s), ${eur(d.depense)}</title></circle>`).join('')}
+        <text x="${P}" y="${H-8}" fill="var(--muted)" font-size="11">${data[0].jour}</text>
+        <text x="${W-P}" y="${H-8}" fill="var(--muted)" font-size="11" text-anchor="end">${data[data.length-1].jour}</text>
+      </svg>
+    </div>`;
+  box.querySelector('.ad-csv').onclick=()=>exportCSV(data,ADS.find(x=>x.id===id));
+}
+function exportCSV(lignes,a){
+  const entete='Date;Depense (EUR);Impressions;Clics;Leads;Cout par lead (EUR)';
+  const corps=lignes.map(d=>[d.jour,Number(d.depense).toFixed(2),d.impressions,d.clics,d.leads,
+    d.leads?(Number(d.depense)/d.leads).toFixed(2):''].join(';'));
+  // Point-virgule et BOM : Excel en français ouvre correctement, sans manipulation.
+  const csv='﻿'+[entete,...corps].join('\r\n');
+  const a2=document.createElement('a');
+  a2.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a2.download=((a&&a.nom)||'campagne').replace(/[^\w\-]+/g,'-').slice(0,50)+'.csv';
+  document.body.appendChild(a2); a2.click(); a2.remove();
+  setTimeout(()=>URL.revokeObjectURL(a2.href),4000);
 }
 function openAdModal(a){
   AD_EDIT=a?a.id:null;
