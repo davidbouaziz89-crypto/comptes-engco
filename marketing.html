@@ -347,6 +347,23 @@
   .np.li .np-a span{color:#5f6368}
   .np-more{color:#65676b;cursor:pointer}
   .np-wrap{display:flex;justify-content:center;margin:12px 0 4px}
+  /* ---------- Paramétrage : menu latéral ----------
+     La page faisait défiler six blocs à la suite ; on n'affiche plus qu'une
+     rubrique à la fois, celle qu'on est venu régler. */
+  .setwrap{display:grid;grid-template-columns:216px 1fr;gap:16px;align-items:start}
+  .setnav{position:sticky;top:calc(var(--stick,0px) + 14px);background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;padding:8px}
+  .setb{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;
+    border-radius:10px;padding:9px 11px;margin-bottom:3px;color:var(--muted);cursor:pointer;
+    font-family:var(--font-display);font-weight:600;font-size:13.5px;transition:.18s}
+  .setb:hover{color:var(--txt);background:var(--panel2)}
+  .setb.on{background:var(--grad-accent);color:#fff;box-shadow:0 8px 20px -14px var(--accent)}
+  @media(max-width:900px){
+    .setwrap{grid-template-columns:1fr}
+    .setnav{position:static;display:flex;gap:6px;overflow-x:auto}
+    .setb{width:auto;flex:0 0 auto;margin-bottom:0;white-space:nowrap}
+    #paramBack{width:auto!important;margin-top:0!important;flex:0 0 auto}
+  }
   /* ---------- Sponsoring : compteurs et campagnes ---------- */
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-top:16px}
   .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px 13px;position:relative;overflow:hidden}
@@ -831,87 +848,110 @@
 
       <!-- ================= PARAMÉTRAGE ================= -->
       <div id="tab-param" class="hidden">
-        <div class="panel">
-          <div class="row" style="align-items:center;margin-bottom:4px">
-            <h2 style="margin:0">🏢 Tes sociétés</h2>
-            <div style="flex:0 0 auto"><button class="btn ghost small" id="paramBack">← Retour au pilotage</button></div>
+        <div class="setwrap">
+        <aside class="setnav" id="setNav">
+          <button class="setb on" data-set="societes">🏢 Sociétés</button>
+          <button class="setb" data-set="rythme">📆 Rythme de publication</button>
+          <button class="setb" data-set="reseaux">🔗 Connexion aux réseaux</button>
+          <button class="setb" data-set="marque">🧠 Marque et informations</button>
+          <button class="setb" data-set="equipe">👥 Équipe</button>
+          <button class="btn ghost small" id="paramBack" style="width:100%;margin-top:10px">← Retour au pilotage</button>
+        </aside>
+        <div class="setmain">
+
+        <!-- ---- Sociétés ---- -->
+        <section class="pset" data-set="societes">
+          <div class="panel">
+            <h2 style="margin-top:0">🏢 Tes sociétés</h2>
+            <div id="paramCos"></div>
           </div>
-          <div id="paramCos"></div>
-        </div>
-        <div class="panel companyPanel" id="socialPanel">
-          <h2 style="margin-top:0">🔗 Connexion aux réseaux</h2>
-          <p class="who" style="margin-top:0">Une fois connecté, l'app pourra publier toute seule. Le jeton reste côté serveur, jamais dans le navigateur.</p>
-          <div id="socialState"></div>
-          <details style="margin-top:12px">
-            <summary style="cursor:pointer;font-size:14px;font-weight:600">➕ Connecter Instagram et Facebook</summary>
-            <label>Colle ici le jeton obtenu dans l'explorateur Meta</label>
-            <textarea id="metaToken" style="min-height:70px;font-family:var(--font-mono);font-size:12px" placeholder="EAAG..."></textarea>
-            <button class="btn" id="metaGo" style="margin-top:8px">🔗 Connecter</button>
-            <div class="err" id="metaMsg"></div>
-          </details>
-          <details style="margin-top:10px">
-            <summary style="cursor:pointer;font-size:14px;font-weight:600">➕ Connecter LinkedIn</summary>
-            <p class="who" style="margin-top:8px">Un clic suffit : LinkedIn demande ton accord, puis l'app
-              récupère la Page toute seule. Nécessite l'accès Community Management API.</p>
-            <button class="btn" id="liGo" style="margin-top:6px">🔗 Autoriser LinkedIn</button>
-            <div class="err" id="liMsg"></div>
-          </details>
-        </div>
-
-        <div class="panel">
-          <h2 style="margin-top:0">👥 Portraits de l'équipe</h2>
-          <p class="who" style="margin-top:0">Refabrique les visages de Marc, Léa, Pierre et Nina.
-            À n'utiliser que si un portrait manque ou ne te plaît pas : chaque génération est facturée.</p>
-          <button class="btn ghost" id="portraitsBtn">📸 Refaire les portraits</button>
-          <div class="err" id="teamMsg2" style="font-size:12px"></div>
-        </div>
-
-        <div class="panel companyPanel" id="factsPanel">
-          <h2 style="margin-top:0">❓ Ce que l'équipe aimerait savoir</h2>
-          <p class="who" style="margin-top:0">Quand un agent manque d'une information pour bien travailler, il la demande ici. Réponds une fois : tous les agents s'en serviront ensuite.</p>
-          <div id="factsList"></div>
-          <div class="row" style="margin-top:14px;align-items:flex-end">
-            <div><label style="margin-top:0">Ajouter une information de ton côté</label>
-              <input id="factQ" placeholder="ex. Notre offre d'entrée de gamme"></div>
-            <div><label style="margin-top:0">Sa valeur</label>
-              <input id="factA" placeholder="ex. 490 € / mois, 100 leads"></div>
-            <div style="flex:0 0 auto"><button class="btn ghost" id="factAdd">+ Ajouter</button></div>
+          <div class="panel companyPanel">
+            <div class="co-head">
+              <img id="coLogo" class="co-logo ph" alt="">
+              <div style="flex:1;min-width:0">
+                <h2 style="margin:0" id="coName"></h2>
+                <div class="who" id="coWebsite"></div>
+              </div>
+              <button class="btn ghost small" id="editCompanyBtn" style="flex:0 0 auto">⚙️ Modifier</button>
+            </div>
           </div>
-          <div class="err" id="factMsg"></div>
-        </div>
-      <!-- En-tête société -->
-      <div class="panel companyPanel">
-        <div class="co-head">
-          <img id="coLogo" class="co-logo ph" alt="">
-          <div style="flex:1;min-width:0">
-            <h2 style="margin:0" id="coName"></h2>
-            <div class="who" id="coWebsite"></div>
+        </section>
+
+        <!-- ---- Rythme ---- -->
+        <section class="pset hidden" data-set="rythme">
+          <div class="panel companyPanel">
+            <h2 style="margin-top:0">📆 Rythme de publication</h2>
+            <p class="who" style="margin-top:0">Le seul réglage que tu choisis : combien de posts par semaine, sur quels réseaux, quels jours et à quelle heure.</p>
+            <div id="cadence"></div>
+            <label style="display:flex;align-items:center;gap:9px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);cursor:pointer">
+              <input type="checkbox" id="autoWeekly" style="width:auto">
+              <span style="color:var(--txt);font-size:14px">🤖 <strong>Pilote automatique</strong> — chaque lundi matin, l'équipe écrit la semaine toute seule et tu reçois une notification pour valider.</span>
+            </label>
+            <div class="err" id="autoMsg"></div>
           </div>
-          <button class="btn ghost small" id="editCompanyBtn" style="flex:0 0 auto">⚙️ Modifier</button>
+        </section>
+
+        <!-- ---- Réseaux ---- -->
+        <section class="pset hidden" data-set="reseaux">
+          <div class="panel companyPanel" id="socialPanel">
+            <h2 style="margin-top:0">🔗 Connexion aux réseaux</h2>
+            <p class="who" style="margin-top:0">Une fois connecté, l'app pourra publier toute seule. Le jeton reste côté serveur, jamais dans le navigateur.</p>
+            <div id="socialState"></div>
+            <details style="margin-top:12px">
+              <summary style="cursor:pointer;font-size:14px;font-weight:600">➕ Connecter Instagram et Facebook</summary>
+              <label>Colle ici le jeton obtenu dans l'explorateur Meta</label>
+              <textarea id="metaToken" style="min-height:70px;font-family:var(--font-mono);font-size:12px" placeholder="EAAG..."></textarea>
+              <button class="btn" id="metaGo" style="margin-top:8px">🔗 Connecter</button>
+              <div class="err" id="metaMsg"></div>
+            </details>
+            <details style="margin-top:10px">
+              <summary style="cursor:pointer;font-size:14px;font-weight:600">➕ Connecter LinkedIn</summary>
+              <p class="who" style="margin-top:8px">Un clic suffit : LinkedIn demande ton accord, puis l'app
+                récupère la Page toute seule. Nécessite l'accès Community Management API.</p>
+              <button class="btn" id="liGo" style="margin-top:6px">🔗 Autoriser LinkedIn</button>
+              <div class="err" id="liMsg"></div>
+            </details>
+          </div>
+        </section>
+
+        <!-- ---- Marque ---- -->
+        <section class="pset hidden" data-set="marque">
+          <div class="panel companyPanel">
+            <h2 style="margin-top:0">🧠 Ce que l'IA a compris de ta marque</h2>
+            <div id="brandBox"></div>
+          </div>
+          <div class="panel companyPanel" id="factsPanel">
+            <h2 style="margin-top:0">❓ Ce que l'équipe aimerait savoir</h2>
+            <p class="who" style="margin-top:0">Quand un agent manque d'une information pour bien travailler, il la demande ici. Réponds une fois : tous les agents s'en serviront ensuite.</p>
+            <div id="factsList"></div>
+            <div class="row" style="margin-top:14px;align-items:flex-end">
+              <div><label style="margin-top:0">Ajouter une information de ton côté</label>
+                <input id="factQ" placeholder="ex. Notre offre d'entrée de gamme"></div>
+              <div><label style="margin-top:0">Sa valeur</label>
+                <input id="factA" placeholder="ex. 490 € / mois, 100 leads"></div>
+              <div style="flex:0 0 auto"><button class="btn ghost" id="factAdd">+ Ajouter</button></div>
+            </div>
+            <div class="err" id="factMsg"></div>
+          </div>
+        </section>
+
+        <!-- ---- Équipe ---- -->
+        <section class="pset hidden" data-set="equipe">
+          <div class="panel">
+            <h2 style="margin-top:0">👥 Portraits de l'équipe</h2>
+            <p class="who" style="margin-top:0">Refabrique les visages de Marc, Léa, Pierre et Nina.
+              À n'utiliser que si un portrait manque ou ne te plaît pas : chaque génération est facturée.</p>
+            <button class="btn ghost" id="portraitsBtn">📸 Refaire les portraits</button>
+            <div class="err" id="teamMsg2" style="font-size:12px"></div>
+          </div>
+        </section>
+
+        </div>
         </div>
       </div>
 
-      <!-- Ce que l'IA a compris -->
-      <div class="panel companyPanel">
-        <h2>🧠 Ce que l'IA a compris de ta marque</h2>
-        <div id="brandBox"></div>
-      </div>
-
-      <!-- Cadence -->
-      <div class="panel companyPanel">
-        <h2>📆 Rythme de publication</h2>
-        <p class="who" style="margin-top:0">Le seul réglage que tu choisis : combien de posts par semaine, sur quels réseaux, quels jours et à quelle heure.</p>
-        <div id="cadence"></div>
-        <label style="display:flex;align-items:center;gap:9px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);cursor:pointer">
-          <input type="checkbox" id="autoWeekly" style="width:auto">
-          <span style="color:var(--txt);font-size:14px">🤖 <strong>Pilote automatique</strong> — chaque lundi matin, l'équipe écrit la semaine toute seule et tu reçois une notification pour valider.</span>
-        </label>
-        <div class="err" id="autoMsg"></div>
-      </div>
-
-      </div>
-
-      <!-- ================= SPONSORING ================= -->
+      
+<!-- ================= SPONSORING ================= -->
       <div id="tab-ads" class="hidden">
         <div class="panel">
           <h2 style="margin-top:0">📣 Publications payantes</h2>
@@ -1025,7 +1065,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v40 · sans CRM';
+const APP_VERSION='v41 · parametrage range';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2379,6 +2419,19 @@ function showTab(name){
   if(name==='param') loadParam();
 }
 el('costChip').onclick=()=>showTab('frais');
+
+// ================= PARAMÉTRAGE : RUBRIQUES =================
+document.querySelectorAll('#setNav .setb').forEach(b=>b.onclick=()=>montrerReglage(b.dataset.set));
+function montrerReglage(nom){
+  document.querySelectorAll('#setNav .setb').forEach(b=>b.classList.toggle('on',b.dataset.set===nom));
+  document.querySelectorAll('.pset').forEach(s=>s.classList.toggle('hidden',s.dataset.set!==nom));
+  // La rubrique choisie est retenue : on revient souvent régler la même chose.
+  try{ localStorage.setItem('mkt_reglage',nom); }catch(e){}
+}
+try{
+  const dernier=localStorage.getItem('mkt_reglage');
+  if(dernier&&document.querySelector(`.pset[data-set="${dernier}"]`)) montrerReglage(dernier);
+}catch(e){}
 
 // ================= RAPPELS =================
 // Les jetons d'accès expirent sans prévenir : quand ça arrive, la publication
