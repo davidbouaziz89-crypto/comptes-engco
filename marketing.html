@@ -366,6 +366,18 @@
     .setb{width:auto;flex:0 0 auto;margin-bottom:0;white-space:nowrap}
     #paramBack{width:auto!important;margin-top:0!important;flex:0 0 auto}
   }
+  /* ---------- Avancement d'un traitement long ----------
+     Collé sous la barre du haut : visible quel que soit l'endroit de la page,
+     parce que la fabrication des visuels dure plusieurs minutes. */
+  .prog{position:sticky;top:calc(var(--stick,0px) + 8px);z-index:35;
+    background:var(--panel);border:1px solid var(--accent);border-radius:13px;
+    padding:12px 14px;margin-bottom:14px;
+    box-shadow:0 18px 44px -30px var(--accent)}
+  .prog .l{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:600}
+  .prog .pc{margin-left:auto;font-family:var(--font-mono);font-size:15px;color:var(--accent)}
+  .prog .bar{height:8px;border-radius:8px;background:var(--panel2);overflow:hidden;margin-top:9px}
+  .prog .bar i{display:block;height:100%;width:0;background:var(--grad-accent);transition:width .35s}
+  .prog .warn{font-size:12px;color:var(--warn);margin-top:7px}
   /* ---------- Sponsoring : compteurs et campagnes ---------- */
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-top:16px}
   .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px 13px;position:relative;overflow:hidden}
@@ -761,6 +773,12 @@
       </div></div>
     </div>
     <div class="wrap">
+      <div id="prog" class="prog hidden">
+        <div class="l"><span id="progIco">🎨</span><span id="progTxt"></span><span class="pc" id="progPc">0 %</span></div>
+        <div class="bar"><i id="progBar"></i></div>
+        <div class="warn">Ne change pas d'onglet ni de société : le travail se fait dans cette page et s'arrêterait.</div>
+      </div>
+
       <div id="rappels"></div>
 
       <div id="valNudge" class="panel hidden" style="border-color:var(--warn);cursor:pointer">
@@ -1060,7 +1078,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v46 · boutons dans le cadre';
+const APP_VERSION='v47 · barre de progression';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2072,12 +2090,40 @@ function imgZone(p){
   return `<div class="post-img" data-img="${p.id}">
     <div class="img-foot"><span class="img-tag">Aucun visuel pour l'instant</span><button class="btn small act-img">🎨 Créer le visuel</button></div></div>`;
 }
+// Avancement d'un traitement long, affiché en haut de page. Sans ça, David
+// changeait d'onglet en croyant que rien ne se passait — ce qui interrompt le
+// travail, puisqu'il s'exécute dans le navigateur.
+function progOuvre(txt,ico){
+  el('progIco').textContent=ico||'🎨';
+  el('progTxt').textContent=txt;
+  el('progPc').textContent='0 %';
+  el('progBar').style.width='0%';
+  el('prog').classList.remove('hidden');
+}
+function progMaj(fait,total,txt){
+  const pc=total?Math.round(fait/total*100):0;
+  el('progPc').textContent=pc+' %';
+  el('progBar').style.width=pc+'%';
+  if(txt) el('progTxt').textContent=txt;
+}
+function progFerme(txt){
+  if(txt){ el('progTxt').textContent=txt; el('progPc').textContent='100 %'; el('progBar').style.width='100%'; }
+  setTimeout(()=>el('prog').classList.add('hidden'),txt?2500:0);
+}
+// Empêche une fermeture d'onglet accidentelle pendant un traitement.
+window.addEventListener('beforeunload',e=>{
+  if(IMG_RUNNING){ e.preventDefault(); e.returnValue=''; }
+});
+
 async function runImageQueue(ids,mode,instruction){
   if(!ids.length || IMG_RUNNING) return;
   IMG_RUNNING=true; el('imagesBtn').disabled=true; el('generateBtn').disabled=true;
+  const quoi=mode==='design'?'Visuels designés':mode==='retouche'?'Retouche du visuel':'Création des visuels';
+  progOuvre(`${quoi} — 0 / ${ids.length}`,'🎨');
   let ok=0, ko=0;
   for(let i=0;i<ids.length;i++){
     setAgent('designer', ids.length>1?`🎨 Visuel ${i+1}/${ids.length}`:'🎨 Création du visuel','busy');
+    progMaj(i,ids.length,`${quoi} — ${i+1} / ${ids.length} en cours`);
     patchImage(ids[i],{image_status:'pending'});
     try{
       const p=POSTS.find(x=>x.id===ids[i]);
@@ -2102,6 +2148,7 @@ async function runImageQueue(ids,mode,instruction){
     }catch(e){ patchImage(ids[i],{image_status:'error',image_error:e.message}); ko++; }
   }
   setAgent('designer', ko? `⚠️ ${ok} créé(s), ${ko} en échec` : `✅ ${ok} visuel(s) créé(s)`, ko&&!ok?'err':'done');
+  progFerme(ko? `⚠️ ${ok} créé(s), ${ko} en échec` : `✅ ${ok} visuel(s) créé(s)`);
   IMG_RUNNING=false; el('imagesBtn').disabled=false; el('generateBtn').disabled=false; refreshCost();
 }
 el('designBtn').onclick=()=>{
@@ -2327,6 +2374,9 @@ async function generateWeek(){
   el('genMsg').style.color='var(--muted)';
   el('genMsg').textContent='⏳ Les agents travaillent… (10–30 s)';
   el('generateBtn').disabled=true;
+  // Écriture puis relecture : deux passes, d'où l'attente. On l'annonce.
+  progOuvre('Rédaction de la semaine, puis relecture par le rédacteur en chef…','✍️');
+  progMaj(1,3);
   setAgent('orchestrateur','🧠 Planifie la semaine…','busy');
   setAgent('redacteur','✍️ Écrit les posts…','busy');
   let newIds=[];
@@ -2350,6 +2400,7 @@ async function generateWeek(){
     }
   }catch(e){ el('genMsg').style.color='var(--bad)'; el('genMsg').textContent='Erreur réseau : '+e.message; setAgent('orchestrateur','⚠️','err'); setAgent('redacteur','⚠️','err'); }
   el('generateBtn').disabled=false;
+  progFerme(newIds.length?null:'Rédaction terminée');
   await loadPosts(); refreshCost();
   setTimeout(()=>el('genMsg').textContent='',6000);
   // Le Directeur artistique enchaîne : un visuel pour chaque post généré.
