@@ -1055,7 +1055,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v43 · barre stable';
+const APP_VERSION='v44 · visuels designes';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1689,7 +1689,8 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
       const rule=Math.max(4,Math.round(U*0.012));
       ctx.fillStyle=accent; ctx.fillRect(0,H-rule,W,rule);
 
-      const lh=Math.round(U*0.11);
+      // Logo nettement agrandi : à 11 % il se perdait dans la photo.
+      const lh=Math.round(U*0.17);
       const lw=logo?poseLogo(m,H-rule-m-lh,lh,false):0;
       let bas=H-rule-m-(logo?lh+Math.round(m*0.6):0);
 
@@ -1713,7 +1714,7 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
       ctx.globalAlpha=0.93; ctx.fillStyle=g; ctx.fillRect(0,0,pw,H); ctx.globalAlpha=1;
 
       const maxW=pw-2*m;
-      if(logo) poseLogo(m,m,Math.round(U*0.1),false);
+      if(logo) poseLogo(m,m,Math.round(U*0.16),false);
       if(headline){
         const {size,lines}=ajusteTexte(ctx,headline,maxW,Math.round(U*0.105),Math.round(U*0.05),'700',4);
         const lineH=Math.round(size*1.1);
@@ -1734,7 +1735,7 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
       const inner=bandY+Math.round((bandH-rule)/2);
       let logoBlock=0;
       if(logo){
-        const lh=Math.round(bandH*0.66);
+        const lh=Math.round(bandH*0.80);
         const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
         ctx.drawImage(logo,W-mb-lw,inner-Math.round(lh/2),lw,lh);
         logoBlock=lw+mb;
@@ -1756,7 +1757,7 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
     }
     else if(layout==='brut'){
       // Rien d'incrusté : l'image telle que l'IA l'a produite.
-      if(logo) poseLogo(W-m-Math.round(U*0.1*(logo.naturalWidth/logo.naturalHeight||2)),H-m-Math.round(U*0.1),Math.round(U*0.1),false);
+      if(logo) poseLogo(W-m-Math.round(U*0.15*(logo.naturalWidth/logo.naturalHeight||2)),H-m-Math.round(U*0.15),Math.round(U*0.15),false);
     }
 
     const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
@@ -1788,6 +1789,15 @@ function fitText(ctx,text,maxW,startPx,minPx,weight,maxLines){
   }
   return {size,lines};
 }
+// Reprend le langage graphique des visuels CALL IA que David a validés :
+// fond radial profond, halos de couleur, grille technique, surtitre espacé,
+// gros titre, filet de marque, et surtout un LOGO GRAND. Aucune photo générée :
+// tout est dessiné, donc tout est maîtrisé.
+function texteEspace(ctx,txt,x,y,esp){
+  let cx=x;
+  for(const ch of txt){ ctx.fillText(ch,cx,y); cx+=ctx.measureText(ch).width+esp; }
+  return cx-x;
+}
 async function renderDesign(postId,companyId,network,spec){
   try{
     if(document.fonts&&document.fonts.load){
@@ -1800,93 +1810,124 @@ async function renderDesign(postId,companyId,network,spec){
     const ctx=cv.getContext('2d');
 
     const accent=brandColor();
-    const deep=mixHex(accent,'#080b12',0.74);
-    const mid=mixHex(accent,'#080b12',0.38);
+    const clair=mixHex(accent,'#ffffff',0.42);
+    const nuit='#060B18';
 
-    // Fond : dégradé diagonal profond + formes douces, jamais plat.
-    const g=ctx.createLinearGradient(0,0,W,H);
-    g.addColorStop(0,mid); g.addColorStop(1,deep);
-    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-    ctx.save();
-    ctx.globalAlpha=.09; ctx.fillStyle='#ffffff';
-    ctx.beginPath(); ctx.arc(W*0.86,H*0.14,W*0.30,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha=.07; ctx.fillStyle=accent;
-    ctx.beginPath(); ctx.arc(W*0.10,H*0.86,W*0.34,0,Math.PI*2); ctx.fill();
-    ctx.restore();
-    ctx.save();
-    ctx.globalAlpha=.18; ctx.strokeStyle='#ffffff'; ctx.lineWidth=Math.max(2,W*0.0022);
-    ctx.beginPath(); ctx.arc(W*0.86,H*0.14,W*0.38,0,Math.PI*2); ctx.stroke();
-    ctx.restore();
+    // 1) Fond radial : la lumière vient d'un point, jamais d'un dégradé linéaire plat.
+    const rg=ctx.createRadialGradient(W*0.30,H*0.42,0,W*0.30,H*0.42,Math.max(W,H)*0.92);
+    rg.addColorStop(0,mixHex(accent,nuit,0.80));
+    rg.addColorStop(0.48,mixHex(accent,nuit,0.92));
+    rg.addColorStop(1,nuit);
+    ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
 
-    // Bandeau blanc en pied : même langage que les visuels photo.
-    const bandH=Math.round(portrait?H*0.155:H*0.20);
-    const bandY=H-bandH;
-    ctx.fillStyle='#ffffff'; ctx.fillRect(0,bandY,W,bandH);
-    const rule=Math.max(3,Math.round(bandH*0.04));
-    ctx.fillStyle=accent; ctx.fillRect(0,H-rule,W,rule);
+    // 2) Deux halos de couleur, hors cadre : ils donnent la profondeur.
+    const halo=(cx,cy,r,coul,alpha)=>{
+      const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+      g.addColorStop(0,coul); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.save(); ctx.globalAlpha=alpha; ctx.fillStyle=g;
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); ctx.restore();
+    };
+    halo(-W*0.10,-H*0.16,W*0.62,accent,0.34);
+    halo(W*1.02,H*1.10,W*0.55,clair,0.22);
+
+    // 3) Grille technique très discrète : la signature « poste de pilotage ».
+    ctx.save(); ctx.globalAlpha=0.055; ctx.strokeStyle=clair; ctx.lineWidth=1;
+    const pas=Math.round(W/32);
+    for(let x=0;x<W;x+=pas){ ctx.beginPath(); ctx.moveTo(x+.5,0); ctx.lineTo(x+.5,H); ctx.stroke(); }
+    for(let y=0;y<H;y+=pas){ ctx.beginPath(); ctx.moveTo(0,y+.5); ctx.lineTo(W,y+.5); ctx.stroke(); }
+    ctx.restore();
 
     const co=COMPANIES.find(c=>c.id===companyId);
-    const m=Math.round(W*0.072);
+    const m=Math.round(W*0.075);
+    let y=Math.round(H*(portrait?0.10:0.13));
+
+    // 4) Le logo, en grand et en haut : c'est lui qu'on doit voir en premier.
+    // Il faisait auparavant un dixième de la hauteur d'un bandeau — invisible.
     if(co&&co.logo_url){
       try{
         const logo=await loadImg(absUrl(co.logo_url));
-        const lh=Math.round(bandH*0.62);
+        const lh=Math.round(H*(portrait?0.085:0.105));
         const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
-        ctx.drawImage(logo,W-m-lw,bandY+Math.round((bandH-rule-lh)/2),lw,lh);
+        ctx.save();
+        ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=Math.round(lh*0.35);
+        ctx.drawImage(logo,m,y,Math.min(lw,W-2*m),lh);
+        ctx.restore();
+        y+=lh+Math.round(H*0.055);
       }catch(e){ console.warn('logo illisible',e.message); }
     }
-    ctx.fillStyle='#111820';
-    ctx.textBaseline='middle';
-    ctx.font=`700 ${Math.round(bandH*0.20)}px "Space Grotesk",sans-serif`;
-    ctx.fillText(co?co.name:'', m, bandY+(bandH-rule)/2);
 
-    // Contenu
-    const maxW=W-m*2;
-    let y=Math.round(H*0.16);
     ctx.textBaseline='top';
+    const maxW=W-m*2;
 
+    // 5) Surtitre : capitales, très espacées, dans un bleu clair de marque.
     if(spec.kicker){
-      ctx.font=`700 ${Math.round(W*0.026)}px "Space Grotesk",sans-serif`;
-      ctx.fillStyle=mixHex(accent,'#ffffff',0.55);
-      const k=String(spec.kicker).toUpperCase();
-      let x=m;
-      for(const ch of k){ ctx.fillText(ch,x,y); x+=ctx.measureText(ch).width+W*0.004; }
-      y+=Math.round(W*0.055);
+      const t=Math.round(W*0.0225);
+      ctx.font=`700 ${t}px "Space Grotesk",sans-serif`;
+      ctx.fillStyle=clair;
+      texteEspace(ctx,String(spec.kicker).toUpperCase(),m,y,W*0.0055);
+      y+=Math.round(t*2.4);
     }
 
+    // 6) Le chiffre choc, s'il y en a un.
     if(spec.layout==='stat'&&spec.stat){
-      const st=fitText(ctx,String(spec.stat),maxW,Math.round(W*0.26),Math.round(W*0.12),'700',1);
+      const st=fitText(ctx,String(spec.stat),maxW,Math.round(W*0.24),Math.round(W*0.12),'700',1);
       ctx.font=`700 ${st.size}px "Space Grotesk",sans-serif`;
-      ctx.fillStyle='#ffffff';
+      const gs=ctx.createLinearGradient(m,y,m+maxW*0.6,y);
+      gs.addColorStop(0,'#ffffff'); gs.addColorStop(1,clair);
+      ctx.fillStyle=gs;
       ctx.fillText(st.lines[0],m,y);
-      y+=Math.round(st.size*1.02);
+      y+=Math.round(st.size*1.04);
       if(spec.stat_label){
-        ctx.font=`600 ${Math.round(W*0.032)}px "Inter",sans-serif`;
-        ctx.fillStyle=mixHex(accent,'#ffffff',0.7);
+        ctx.font=`600 ${Math.round(W*0.030)}px "Inter",sans-serif`;
+        ctx.fillStyle='rgba(255,255,255,.72)';
         ctx.fillText(String(spec.stat_label),m,y);
-        y+=Math.round(W*0.062);
+        y+=Math.round(W*0.055);
       }
     }
 
-    const hl=fitText(ctx,spec.headline,maxW,Math.round(W*(portrait?0.095:0.078)),Math.round(W*0.042),'700',3);
+    // 7) Le titre. Le dernier mot passe en dégradé de marque, comme sur tes visuels.
+    const hl=fitText(ctx,spec.headline,maxW,Math.round(W*(portrait?0.098:0.082)),Math.round(W*0.042),'700',3);
     ctx.font=`700 ${hl.size}px "Space Grotesk",sans-serif`;
-    ctx.fillStyle='#ffffff';
-    const lh=Math.round(hl.size*1.12);
-    hl.lines.forEach((l,i)=>ctx.fillText(l,m,y+i*lh));
-    y+=hl.lines.length*lh+Math.round(W*0.028);
+    const lh2=Math.round(hl.size*1.1);
+    hl.lines.forEach((ligne,i)=>{
+      const derniere=i===hl.lines.length-1;
+      const mots=ligne.split(' ');
+      if(derniere&&mots.length>1){
+        const fin=mots.pop(), debut=mots.join(' ')+' ';
+        ctx.fillStyle='#ffffff';
+        ctx.fillText(debut,m,y+i*lh2);
+        const lx=m+ctx.measureText(debut).width;
+        const gg=ctx.createLinearGradient(lx,0,lx+ctx.measureText(fin).width,0);
+        gg.addColorStop(0,accent); gg.addColorStop(1,clair);
+        ctx.fillStyle=gg;
+        ctx.fillText(fin,lx,y+i*lh2);
+      } else {
+        ctx.fillStyle='#ffffff';
+        ctx.fillText(ligne,m,y+i*lh2);
+      }
+    });
+    y+=hl.lines.length*lh2+Math.round(W*0.030);
 
-    // Filet de marque entre l'accroche et la phrase de soutien
+    // 8) Filet de marque, puis la phrase de soutien.
     ctx.fillStyle=accent;
-    ctx.fillRect(m,y,Math.round(W*0.10),Math.max(4,Math.round(W*0.006)));
-    y+=Math.round(W*0.038);
+    ctx.fillRect(m,y,Math.round(W*0.085),Math.max(4,Math.round(W*0.0055)));
+    y+=Math.round(W*0.036);
 
     if(spec.subline){
-      const sub=fitText(ctx,spec.subline,Math.round(maxW*0.92),Math.round(W*0.036),Math.round(W*0.024),'500',3);
+      const sub=fitText(ctx,spec.subline,Math.round(maxW*0.90),Math.round(W*0.034),Math.round(W*0.023),'500',3);
       ctx.font=`500 ${sub.size}px "Inter",sans-serif`;
-      ctx.fillStyle='rgba(255,255,255,.82)';
-      const slh=Math.round(sub.size*1.42);
+      ctx.fillStyle='rgba(255,255,255,.80)';
+      const slh=Math.round(sub.size*1.45);
       sub.lines.forEach((l,i)=>ctx.fillText(l,m,y+i*slh));
     }
+
+    // 9) Signature en pied : le nom de la société et un filet de couleur.
+    // Aucun bandeau blanc : il coupait l'image en deux.
+    ctx.font=`600 ${Math.round(W*0.021)}px "Inter",sans-serif`;
+    ctx.fillStyle='rgba(255,255,255,.55)';
+    ctx.fillText(co?co.name.toUpperCase():'',m,H-m*0.62);
+    ctx.fillStyle=accent;
+    ctx.fillRect(0,H-Math.max(5,Math.round(H*0.009)),W,Math.max(5,Math.round(H*0.009)));
 
     const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
     if(!blob) return null;
