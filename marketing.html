@@ -816,6 +816,7 @@
           <div style="flex:1 1 auto;min-width:0;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
             <button class="btn ghost" id="newPostBtn">✍️ Nouveau post</button>
             <button class="btn ghost" id="designBtn">🖌️ Visuels designés</button>
+            <button class="btn ghost" id="mixBtn">🎭 Visuels variés</button>
             <button class="btn ghost" id="redoBtn">↻ Tout refaire (photo)</button>
             <button class="btn ghost" id="imagesBtn">🎨 Créer les visuels manquants</button>
             <button class="btn ghost" id="wipeBtn" style="color:var(--bad)">🗑 Vider</button>
@@ -1091,7 +1092,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v50 · progression reelle';
+const APP_VERSION='v51 · visuels varies + gros logo';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1746,7 +1747,7 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
       ctx.fillStyle=accent; ctx.fillRect(0,H-rule,W,rule);
 
       // Logo nettement agrandi : à 11 % il se perdait dans la photo.
-      const lh=Math.round(U*0.17);
+      const lh=Math.round(U*0.24);
       const lw=logo?poseLogo(m,H-rule-m-lh,lh,false):0;
       let bas=H-rule-m-(logo?lh+Math.round(m*0.6):0);
 
@@ -1770,7 +1771,7 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
       ctx.globalAlpha=0.93; ctx.fillStyle=g; ctx.fillRect(0,0,pw,H); ctx.globalAlpha=1;
 
       const maxW=pw-2*m;
-      if(logo) poseLogo(m,m,Math.round(U*0.16),false);
+      if(logo) poseLogo(m,m,Math.round(U*0.22),false);
       if(headline){
         const {size,lines}=ajusteTexte(ctx,headline,maxW,Math.round(U*0.105),Math.round(U*0.05),'700',4);
         const lineH=Math.round(size*1.1);
@@ -1813,7 +1814,7 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
     }
     else if(layout==='brut'){
       // Rien d'incrusté : l'image telle que l'IA l'a produite.
-      if(logo) poseLogo(W-m-Math.round(U*0.15*(logo.naturalWidth/logo.naturalHeight||2)),H-m-Math.round(U*0.15),Math.round(U*0.15),false);
+      if(logo) poseLogo(W-m-Math.round(U*0.20*(logo.naturalWidth/logo.naturalHeight||2)),H-m-Math.round(U*0.20),Math.round(U*0.20),false);
     }
 
     const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
@@ -1910,7 +1911,9 @@ async function renderDesign(postId,companyId,network,spec){
     if(co&&co.logo_url){
       try{
         const logo=await loadImg(absUrl(co.logo_url));
-        const lh=Math.round(H*(portrait?0.090:0.115));
+        // Le logo est la signature de la marque : il doit se voir de loin,
+        // y compris dans le fil d'actualité où l'image est affichée en petit.
+        const lh=Math.round(H*(portrait?0.135:0.175));
         const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
         ctx.save(); ctx.shadowColor='rgba(0,0,0,.55)'; ctx.shadowBlur=Math.round(lh*0.3);
         ctx.drawImage(logo,m,y,Math.min(lw,maxW),lh);
@@ -2205,10 +2208,10 @@ window.addEventListener('beforeunload',e=>{
 async function runImageQueue(ids,mode,instruction){
   if(!ids.length || IMG_RUNNING) return;
   IMG_RUNNING=true; el('imagesBtn').disabled=true; el('generateBtn').disabled=true;
-  const quoi=mode==='design'?'Visuels designés':mode==='retouche'?'Retouche du visuel':'Création des visuels';
+  const quoi=mode==='design'?'Visuels designés':mode==='mix'?'Visuels variés':mode==='retouche'?'Retouche du visuel':'Création des visuels';
   // Ordre de grandeur au démarrage ; dès le premier visuel terminé, l'estimation
   // s'appuie sur la durée réellement mesurée.
-  progOuvre(`${quoi} — 0 / ${ids.length}`,'🎨',ids.length*(mode==='design'?12:38));
+  progOuvre(`${quoi} — 0 / ${ids.length}`,'🎨',ids.length*(mode==='design'?12:mode==='mix'?21:38));
   let ok=0, ko=0;
   for(let i=0;i<ids.length;i++){
     setAgent('designer', ids.length>1?`🎨 Visuel ${i+1}/${ids.length}`:'🎨 Création du visuel','busy');
@@ -2217,7 +2220,10 @@ async function runImageQueue(ids,mode,instruction){
     try{
       const p=POSTS.find(x=>x.id===ids[i]);
       const cid=p?p.company_id:(CURRENT_COMPANY&&CURRENT_COMPANY.id);
-      const out=await callImageAgent(ids[i],mode,instruction);
+      // En mode « varié », un visuel sur trois est une photo : le fil respire,
+      // sans tomber dans la photo systématique qui sent l'IA.
+      const modeI = mode==='mix' ? (i%3===0 ? null : 'design') : mode;
+      const out=await callImageAgent(ids[i],modeI,instruction);
       if(out.mode==='retouche'){
         patchImage(ids[i],{image_status:'ready',image_url:out.image_url}); ok++;
         const branded=await composeVisual(ids[i],cid,out.image_url,out.headline||'');
@@ -2245,6 +2251,13 @@ el('designBtn').onclick=()=>{
   if(!ids.length) return;
   if(!confirm(`Concevoir ${ids.length} visuel(s) designé(s) ?\n\nAucune photo générée : l'IA compose la mise en page et l'app la dessine. Environ ${(ids.length*0.03).toFixed(2)} $, quelques secondes par visuel.`)) return;
   runImageQueue(ids,'design');
+};
+el('mixBtn').onclick=()=>{
+  const ids=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
+  if(!ids.length) return;
+  const photos=Math.ceil(ids.length/3);
+  if(!confirm(`Créer ${ids.length} visuel(s) variés ?\n\n${ids.length-photos} designé(s) et ${photos} photo(s) générée(s), en alternance.\nEnviron ${(photos*0.13+(ids.length-photos)*0.03).toFixed(2)} $.`)) return;
+  runImageQueue(ids,'mix');
 };
 el('redoBtn').onclick=()=>{
   const ids=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
@@ -2492,7 +2505,7 @@ async function generateWeek(){
   await loadPosts(); refreshCost();
   setTimeout(()=>el('genMsg').textContent='',6000);
   // Le Directeur artistique enchaîne : un visuel pour chaque post généré.
-  if(newIds.length) await runImageQueue(newIds);
+  if(newIds.length) await runImageQueue(newIds,'mix');
 }
 el('generateBtn').onclick=generateWeek;
 
