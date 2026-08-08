@@ -1116,7 +1116,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v52 · logos reseaux + design';
+const APP_VERSION='v53 · couts maitrises';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1749,9 +1749,9 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
   if(layout!=='brut' && !headline && !logoSrc) return null;
   try{
     if(document.fonts&&document.fonts.load) await document.fonts.load('700 80px "Space Grotesk"');
-    const img=await loadImg(imageUrl);
+    const img=await charge(imageUrl,3);
     let logo=null;
-    if(logoSrc){ try{ logo=await loadImg(logoSrc); }catch(e){ console.warn('logo illisible',e.message); } }
+    if(logoSrc){ try{ logo=await charge(logoSrc,3); }catch(e){ console.warn('logo illisible',e.message); } }
 
     const W=img.naturalWidth, H=img.naturalHeight;
     const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
@@ -1866,7 +1866,23 @@ async function composeVisual(postId,companyId,imageUrl,headline,layoutForce){
     const url=db.storage.from('mkt-images').getPublicUrl(path).data.publicUrl;
     await db.from('mkt_posts').update({image_url:url}).eq('id',postId);
     return url;
-  }catch(e){ console.warn('Composition impossible :',e.message); return null; }
+  }catch(e){
+    // Avant, l'échec restait dans la console et l'app publiait l'image brute,
+    // sans logo ni accroche, sans rien signaler. Maintenant c'est visible.
+    console.warn('Composition impossible :',e.message);
+    try{ await db.from('mkt_posts').update({image_error:'Logo et accroche non incrustés : '+e.message}).eq('id',postId); }catch(_){}
+    return null;
+  }
+}
+// Une image tout juste envoyée dans le stockage n'est pas toujours servie dans
+// la seconde : on réessaie au lieu d'abandonner.
+async function charge(url,essais){
+  let derniere;
+  for(let i=0;i<(essais||1);i++){
+    try{ return await loadImg(url); }
+    catch(e){ derniere=e; await new Promise(r=>setTimeout(r,600*(i+1))); }
+  }
+  throw derniere||new Error('image illisible');
 }
 
 // ================= VISUELS DESIGNÉS =================
@@ -2280,6 +2296,7 @@ async function runImageQueue(ids,mode,instruction){
           image_alt:out.alt,image_headline:out.headline||''}); ok++;
         const branded=await composeVisual(ids[i],cid,out.image_url,out.headline||'');
         if(branded) patchImage(ids[i],{image_url:branded});
+        else patchImage(ids[i],{image_error:'Logo et accroche non incrustés — clique « ↻ Refaire »'});
       }
     }catch(e){ patchImage(ids[i],{image_status:'error',image_error:e.message}); ko++; }
   }
@@ -2288,22 +2305,37 @@ async function runImageQueue(ids,mode,instruction){
   IMG_RUNNING=false; el('imagesBtn').disabled=false; el('generateBtn').disabled=false; refreshCost();
 }
 el('designBtn').onclick=()=>{
-  const ids=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
-  if(!ids.length) return;
+  const ids=choisirCibles('visuels designés'); if(!ids) return;
   if(!confirm(`Concevoir ${ids.length} visuel(s) designé(s) ?\n\nAucune photo générée : l'IA compose la mise en page et l'app la dessine. Environ ${(ids.length*0.03).toFixed(2)} $, quelques secondes par visuel.`)) return;
   runImageQueue(ids,'design');
 };
+// Chaque photo coûte 13 centimes : on ne refait jamais un visuel existant sans
+// que David l'ait explicitement demandé. C'est ce qui faisait exploser la note.
+function idsSansVisuel(){
+  return POSTS.filter(p=>p.status!=='refuse'&&p.image_status!=='ready').map(p=>p.id);
+}
+function choisirCibles(libelle){
+  const manquants=idsSansVisuel();
+  const tous=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
+  if(!tous.length) return null;
+  if(manquants.length) return manquants;
+  return confirm(`Les ${tous.length} posts ont déjà leur visuel.\n\nTout refaire en « ${libelle} » ? Les visuels actuels seront remplacés et cela sera refacturé.`)
+    ? tous : null;
+}
+function coutEstime(ids,mode){
+  const photos=mode==='mix'?Math.ceil(ids.length/3):mode==='design'?0:ids.length;
+  return (photos*0.13+(ids.length-photos)*0.03);
+}
 el('mixBtn').onclick=()=>{
-  const ids=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
-  if(!ids.length) return;
+  const ids=choisirCibles('visuels variés'); if(!ids) return;
   const photos=Math.ceil(ids.length/3);
-  if(!confirm(`Créer ${ids.length} visuel(s) variés ?\n\n${ids.length-photos} designé(s) et ${photos} photo(s) générée(s), en alternance.\nEnviron ${(photos*0.13+(ids.length-photos)*0.03).toFixed(2)} $.`)) return;
+  if(!confirm(`Créer ${ids.length} visuel(s) variés ?\n\n${ids.length-photos} designé(s) et ${photos} photo(s) générée(s), en alternance.\nEnviron ${coutEstime(ids,'mix').toFixed(2)} $.`)) return;
   runImageQueue(ids,'mix');
 };
 el('redoBtn').onclick=()=>{
   const ids=POSTS.filter(p=>p.status!=='refuse').map(p=>p.id);
   if(!ids.length) return;
-  if(!confirm(`Refaire les ${ids.length} visuels avec l'accroche et le logo ?\n\nEnviron ${(ids.length*0.06).toFixed(2)} $ et ${Math.ceil(ids.length*35/60)} min.`)) return;
+  if(!confirm(`Refaire les ${ids.length} visuels EN PHOTO ?\n\nLes visuels existants seront remplacés.\nEnviron ${(ids.length*0.13).toFixed(2)} $ et ${Math.ceil(ids.length*35/60)} min.`)) return;
   runImageQueue(ids);
 };
 el('imagesBtn').onclick=()=>{
