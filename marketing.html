@@ -114,7 +114,19 @@
   /* Liseré lumineux en haut de chaque panneau, très ténu */
   .panel::before{content:"";position:absolute;left:16px;right:16px;top:0;height:1px;border-radius:1px;
     background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 55%,transparent),transparent)}
-  .panel h2{margin:0 0 12px;font-size:17px;display:flex;align-items:center;gap:8px}
+  /* Titre de panneau : un filet dégradé sous le texte donne du relief sans
+     alourdir. Les panneaux se ressemblaient tous, d'où l'impression de fadeur. */
+  .panel h2{position:relative;margin:0 0 16px;padding-bottom:10px;font-size:17.5px;
+    display:flex;align-items:center;gap:8px;letter-spacing:-.3px}
+  .panel h2::after{content:"";position:absolute;left:0;bottom:0;width:46px;height:3px;border-radius:3px;
+    background:var(--grad-accent)}
+  /* Les compteurs méritent d'être lus de loin. */
+  .kpi{transition:border-color .2s,transform .15s}
+  .kpi:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));transform:translateY(-2px)}
+  .kpi .v{background:linear-gradient(180deg,var(--txt),color-mix(in srgb,var(--txt) 55%,var(--accent)));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  /* Un post en attente de validation se repère au premier coup d'œil. */
+  .postcard[data-att="1"]{box-shadow:0 0 0 1px color-mix(in srgb,var(--warn) 35%,transparent)}
   .row{display:flex;gap:12px;flex-wrap:wrap}
   .row>*{flex:1;min-width:180px}
   /* En-tête société */
@@ -507,6 +519,18 @@
   .hrow .thumb{width:104px;height:104px;flex:0 0 auto;border-radius:10px;object-fit:cover;background:var(--panel2);border:1px solid var(--line)}
   .hrow .thumb.ph{display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--muted)}
   .hrow .meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}
+  /* ---------- Réseaux : logo + nom, aux vraies couleurs ---------- */
+  .neti{display:inline-block;vertical-align:-2px;flex:0 0 auto}
+  .netchip{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-display);font-weight:700;
+    font-size:13px;padding:5px 12px 5px 10px;border-radius:20px;white-space:nowrap;
+    background:var(--panel2);border:1px solid var(--line)}
+  .netchip.facebook{color:#4d8cf5;border-color:#1877F244;background:#1877F214}
+  .netchip.instagram{color:#f0629a;border-color:#E1306C44;background:#E1306C14}
+  .netchip.linkedin{color:#3d9bea;border-color:#0A66C244;background:#0A66C214}
+  /* Le liseré de gauche d'une carte de post reprend la couleur du réseau :
+     on identifie la destination sans lire. */
+  .postcard{position:relative;overflow:hidden}
+  .postcard::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--nc,var(--accent))}
   .netbadge{font-family:var(--font-display);font-weight:700;font-size:13px;padding:3px 10px;border-radius:20px;
     background:var(--panel2);border:1px solid var(--line)}
   .netbadge.linkedin{color:#4aa3ff;border-color:#4aa3ff55}
@@ -1092,7 +1116,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v51 · visuels varies + gros logo';
+const APP_VERSION='v52 · logos reseaux + design';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1102,6 +1126,23 @@ const NETWORKS=[{k:'linkedin',label:'LinkedIn'},{k:'instagram',label:'Instagram'
 const DAYS=[{i:1,l:'L'},{i:2,l:'M'},{i:3,l:'M'},{i:4,l:'J'},{i:5,l:'V'},{i:6,l:'S'},{i:0,l:'D'}];
 const STATUS_LABEL={brouillon:'Brouillon',a_valider:'À valider',valide:'✅ Validé',publie:'🚀 Publié',refuse:'❌ Refusé',pause:'⏸️ En pause'};
 const NET_LABEL={linkedin:'LinkedIn',instagram:'Instagram',facebook:'Facebook'};
+// Les vrais glyphes des réseaux, dessinés en SVG : aucun fichier à charger, donc
+// rien qui casse hors ligne, et ils restent nets à toutes les tailles.
+const NET_SVG={
+  facebook:'<path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.03 1.79-4.7 4.53-4.7 1.31 0 2.69.24 2.69.24v2.97h-1.52c-1.49 0-1.96.93-1.96 1.89v2.26h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/>',
+  instagram:'<path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41-.56-.22-.96-.48-1.38-.9-.42-.42-.68-.82-.9-1.38-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16M12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63c-.79.3-1.46.72-2.13 1.38C1.35 2.68.93 3.35.63 4.14.33 4.9.13 5.78.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.3.79.72 1.46 1.38 2.13.67.66 1.34 1.08 2.13 1.38.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56.79-.3 1.46-.72 2.13-1.38.66-.67 1.08-1.34 1.38-2.13.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91-.3-.79-.72-1.46-1.38-2.13-.67-.66-1.34-1.08-2.13-1.38-.76-.3-1.64-.5-2.91-.56C15.67.01 15.26 0 12 0z"/><path d="M12 5.84A6.16 6.16 0 1 0 18.16 12 6.16 6.16 0 0 0 12 5.84zm0 10.16A4 4 0 1 1 16 12a4 4 0 0 1-4 4z"/><circle cx="18.41" cy="5.59" r="1.44"/>',
+  linkedin:'<path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/>',
+};
+const NET_TEINTE={facebook:'#1877F2',instagram:'#E1306C',linkedin:'#0A66C2'};
+function netIcon(net,taille){
+  const d=NET_SVG[net]; if(!d) return '';
+  const t=taille||16;
+  return `<svg class="neti" viewBox="0 0 24 24" width="${t}" height="${t}" fill="${NET_TEINTE[net]}" aria-hidden="true">${d}</svg>`;
+}
+// Pastille complète : logo + nom, aux couleurs du réseau.
+function netPastille(net,taille){
+  return `<span class="netchip ${net}">${netIcon(net,taille||15)}${esc(NET_LABEL[net]||net)}</span>`;
+}
 const LOGOS=[
   {url:'assets/logos/notelia.png',label:'Notelia'},
   {url:'assets/logos/db-telecom.png',label:'DB Telecom'},
@@ -2349,7 +2390,7 @@ let PUB_ID=null;
 async function openPublish(id){
   const p=POSTS.find(x=>x.id===id); if(!p) return;
   PUB_ID=id;
-  el('pubTitle').textContent='Publier sur '+(NET_LABEL[p.network]||p.network);
+  el('pubTitle').innerHTML='Publier sur '+netPastille(p.network,17);
   el('pubBody').value=p.body||'';
   el('pubCap').value=p.caption||'';
   el('pubCapWrap').style.display=p.caption?'block':'none';
@@ -2453,7 +2494,7 @@ function renderCal(){
         const cls=p.status==='valide'||p.status==='publie'?'done':(p.status==='refuse'||p.status==='pause'?'off':'');
         const h=p.scheduled_at?new Date(p.scheduled_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'';
         return `<button class="calchip ${cls}" data-go="${p.id}" style="--c:${NET_COLOR[p.network]||'#7c5cff'}">
-          <span class="h">${h}</span><br>${esc((NET_LABEL[p.network]||p.network))}</button>`;
+          <span class="h">${h}</span><br>${netIcon(p.network,12)} ${esc(NET_LABEL[p.network]||p.network)}</button>`;
       }).join('')}
     </div>`;
   }
@@ -2540,9 +2581,9 @@ async function loadPosts(){
   if(!POSTS.length){ el('posts').innerHTML='<div class="who">Aucun post. Clique « ✨ Générer la semaine ».</div>'; return; }
   if(!vue.length){ el('posts').innerHTML='<div class="who">Aucun post cette semaine-là. Coche « tout afficher » ou change de semaine.</div>'; return; }
   el('posts').innerHTML=vue.map(p=>`
-    <div class="panel" style="background:var(--panel2)" data-id="${p.id}">
+    <div class="panel postcard" style="background:var(--panel2);--nc:${NET_TEINTE[p.network]||'var(--accent)'}" data-id="${p.id}" data-att="${p.status==='a_valider'?1:0}">
       <div class="row" style="align-items:center">
-        <strong style="flex:0 0 auto">${NET_LABEL[p.network]||p.network}</strong>
+        <span style="flex:0 0 auto">${netPastille(p.network)}</span>
         <span class="who" style="flex:0 0 auto">${fmtDate(p.scheduled_at)}</span>
         <span class="rolebadge" style="flex:0 0 auto">${STATUS_LABEL[p.status]||p.status}</span>
       </div>
@@ -2854,7 +2895,7 @@ function renderAds(){
     return `<div class="adrow" data-ad="${a.id}">
       <div style="flex:1;min-width:190px">
         <div class="nm">${esc(a.nom)}</div>
-        <div class="meta">${NET_LABEL[a.network]||a.network} · ${AD_OBJ[a.objectif]||a.objectif||'—'} · ${periode}</div>
+        <div class="meta">${netIcon(a.network,13)} ${esc(NET_LABEL[a.network]||a.network)} · ${AD_OBJ[a.objectif]||a.objectif||'—'} · ${periode}</div>
         <div class="bar"><i style="width:${pct}%"></i></div>
       </div>
       <div class="num" style="flex:0 0 auto">${eur(a.depense)}<span>sur ${eur(a.budget)}</span></div>
@@ -3319,7 +3360,7 @@ async function loadSocial(){
   const par={}; (data||[]).forEach(r=>par[r.network]=r);
   el('socialState').innerHTML=[['instagram','Instagram'],['facebook','Facebook'],['linkedin','LinkedIn']].map(([k,nom])=>{
     const r=par[k];
-    return `<div class="brk"><span class="nm" style="color:var(--txt)">${nom}</span>
+    return `<div class="brk"><span class="nm" style="color:var(--txt);display:inline-flex;align-items:center;gap:7px">${netIcon(k,17)}${nom}</span>
       <span style="flex:1;font-size:13.5px">${r
         ? `✅ connecté — <strong>${esc(r.account_name||r.account_id)}</strong>`
         : '<span class="who">non connecté</span>'}</span>
@@ -3554,7 +3595,7 @@ function renderHistory(){
       ${thumb}
       <div style="min-width:0;flex:1">
         <div class="meta">
-          <span class="netbadge ${p.network}">${NET_LABEL[p.network]||p.network}</span>
+          ${netPastille(p.network)}
           <span class="who">${fmtDate(p.scheduled_at||p.created_at)}</span>
           <span class="rolebadge">${STATUS_LABEL[p.status]||p.status}</span>
           <span class="who">· ${esc(c?c.name:'—')}</span>
