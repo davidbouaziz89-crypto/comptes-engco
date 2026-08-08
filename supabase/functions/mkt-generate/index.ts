@@ -234,12 +234,23 @@ Renvoie exactement 1 post.`;
       `Langue : ${ed.language || "fr"}`,
     ].filter(Boolean).join("\n") + await factsBlock(admin, companyId);
 
+    // Des posts déjà validés par David valent mieux que toute consigne de style :
+    // l'IA imite un exemple, elle ne fait qu'interpréter une règle.
+    const blocExemples = ed.exemples
+      ? `\n\nMODÈLES À IMITER — de vrais posts publiés et validés par le client.
+Reprends leur STRUCTURE, leur mise en forme, leur usage des emoji, leur façon d'appeler à
+l'action et de terminer. Écris sur d'autres sujets, mais qu'on croirait écrits par la même
+personne. Ces modèles priment sur toute règle de style générale énoncée plus bas.
+
+"""${String(ed.exemples).slice(0, 6000)}"""`
+      : "";
+
     const instruction = `Tu es directeur de création dans une agence qui écrit pour « ${company.name} »${company.activity ? ` (${company.activity})` : ""}.
 Écris ${totalPosts} post(s) pour la semaine, répartis ainsi :
 ${perNet}
 
 Ligne éditoriale :
-${editorialBlock}
+${editorialBlock}${blocExemples}
 
 CE QUI FAIT UN BON POST — applique-le à la lettre :
 
@@ -251,9 +262,13 @@ CE QUI FAIT UN BON POST — applique-le à la lettre :
 
 4) Écris comme on parle. Phrases courtes. Verbes actifs. Tu peux commencer par « Et » ou « Mais ». Interdits : « solution innovante », « au cœur de », « accompagner nos clients », « à l'ère de », « révolutionner », « incontournable », « sur-mesure », « expertise », « synergie », « il est important de noter ».
 
-5) Zéro emoji décoratif en début de ligne. Au maximum un ou deux dans tout le post, et seulement s'ils servent.
+5) Les emoji sont utiles quand ils STRUCTURENT : ✅ ❌ 👉 en tête de puce, pour qu'on lise en diagonale.
+Évite seulement les emoji purement décoratifs.
 
-6) Termine par une question ouverte ou une invitation concrète, jamais par « N'hésitez pas à nous contacter ».
+6) Termine par un appel à l'action clair : une question ouverte, ou une invitation concrète avec
+l'adresse du site quand elle est connue. Évite seulement la formule creuse « n'hésitez pas à nous contacter ».
+
+7) Les listes courtes à puces sont bienvenues : sur les réseaux, on lit en diagonale.
 
 FORMAT PROPRE À CHAQUE RÉSEAU :
 - LinkedIn : 700 à 1200 signes. Accroche sur une ligne, saut de ligne, puis le corps aéré en paragraphes de 1 à 3 lignes. Ton d'expert qui partage, pas de commercial qui vend.
@@ -301,9 +316,11 @@ Renvoie exactement ${totalPosts} post(s), en respectant la répartition par rés
 ${JSON.stringify({ posts: parsed.posts }, null, 1).slice(0, 12000)}
 
 Ligne éditoriale :
-${editorialBlock}
+${editorialBlock}${blocExemples}
 
 Passe chaque post au crible, sans complaisance :
+- Si des modèles à imiter figurent ci-dessus, le post leur ressemble-t-il vraiment, dans sa structure
+  et sa mise en forme ? Sinon, reformate-le à leur image : c'est le style attendu.
 - L'accroche arrête-t-elle vraiment le pouce, ou est-ce un début tiède ? Si elle est tiède, réécris-la entièrement.
 - Reste-t-il du jargon d'entreprise, des formules creuses, des phrases qui pourraient être dans n'importe quel post de n'importe quelle société ? Supprime.
 - Le post dit-il quelque chose de CONCRET, ou tourne-t-il autour du sujet sans rien affirmer ? S'il ne dit rien, réécris-le autour d'une idée nette.

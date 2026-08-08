@@ -933,6 +933,19 @@
             <h2 style="margin-top:0">🧠 Ce que l'IA a compris de ta marque</h2>
             <div id="brandBox"></div>
           </div>
+          <div class="panel companyPanel">
+            <h2 style="margin-top:0">✍️ Tes posts de référence</h2>
+            <p class="who" style="margin-top:0">Colle ici deux ou trois posts que tu as publiés et que tu trouves
+              réussis. L'équipe s'en servira comme modèle de style — structure, emoji, appel à l'action, longueur.
+              C'est le réglage qui pèse le plus sur la qualité : une IA imite bien mieux un exemple qu'elle ne suit
+              une consigne.</p>
+            <textarea id="edExemples" style="min-height:220px;font-size:13px"
+              placeholder="POST 1&#10;Vos commerciaux passent 100 appels pour 2 réponses ?&#10;&#10;3 signes qui ne trompent pas :&#10;❌ Numéros injoignables&#10;❌ Contacts sur-sollicités&#10;&#10;👉 Devis sur www.exemple.com&#10;#prospection #leadsB2B&#10;&#10;---&#10;&#10;POST 2…"></textarea>
+            <div class="row" style="margin-top:10px;align-items:center">
+              <div style="flex:0 0 auto"><button class="btn" id="edExSave">Enregistrer les modèles</button></div>
+              <div class="err" id="edExMsg" style="margin-top:0"></div>
+            </div>
+          </div>
           <div class="panel companyPanel" id="factsPanel">
             <h2 style="margin-top:0">❓ Ce que l'équipe aimerait savoir</h2>
             <p class="who" style="margin-top:0">Quand un agent manque d'une information pour bien travailler, il la demande ici. Réponds une fois : tous les agents s'en serviront ensuite.</p>
@@ -1078,7 +1091,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v47 · barre de progression';
+const APP_VERSION='v48 · posts de reference';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1376,8 +1389,28 @@ async function loadEditorial(){
   if(!CURRENT_COMPANY) return;
   const {data}=await db.from('mkt_editorial').select('*').eq('company_id',CURRENT_COMPANY.id).maybeSingle();
   EDITORIAL=data||null; EDIT_MODE=false;
+  el('edExemples').value=(EDITORIAL&&EDITORIAL.exemples)||'';
+  el('edExMsg').textContent='';
   renderBrand();
 }
+el('edExSave').onclick=async()=>{
+  if(!CURRENT_COMPANY) return;
+  const txt=el('edExemples').value.trim()||null;
+  // La ligne éditoriale n'existe pas forcément encore : on la crée au besoin.
+  const {error}=EDITORIAL
+    ? await db.from('mkt_editorial').update({exemples:txt}).eq('company_id',CURRENT_COMPANY.id)
+    : await db.from('mkt_editorial').insert({company_id:CURRENT_COMPANY.id,exemples:txt});
+  if(error){
+    el('edExMsg').style.color='var(--bad)';
+    el('edExMsg').textContent=/exemples/.test(error.message)
+      ? "Colonne absente : lance sql/mkt-exemples.sql dans Supabase."
+      : 'Erreur : '+error.message;
+    return;
+  }
+  el('edExMsg').style.color='var(--good)';
+  el('edExMsg').textContent='✅ Modèles enregistrés — la prochaine génération les imitera';
+  await loadEditorial();
+};
 function renderBrand(){
   const box=el('brandBox');
   if(!EDITORIAL || !(EDITORIAL.summary||EDITORIAL.tone||EDITORIAL.topics)){
