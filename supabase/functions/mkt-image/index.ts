@@ -131,8 +131,13 @@ const DESIGN_SCHEMA = {
     subline: { type: "string", description: "Une phrase de soutien, 8 à 16 mots, concrète." },
     stat: { type: "string", description: "Le chiffre choc, très court (ex. « 3× », « 48 h », « +120 »). Vide si layout ≠ stat." },
     stat_label: { type: "string", description: "Ce que mesure le chiffre, 2 à 5 mots. Vide si layout ≠ stat." },
+    pills: {
+      type: "array",
+      description: "Deux ou trois preuves très courtes affichées en pastilles (ex. « Contrôle qualité », « CRM inclus », « Conforme RGPD »). 2 à 4 mots chacune.",
+      items: { type: "string" },
+    },
   },
-  required: ["layout", "kicker", "headline", "subline", "stat", "stat_label"],
+  required: ["layout", "kicker", "headline", "subline", "stat", "stat_label", "pills"],
 };
 
 function tryParseJson(s: string): unknown {

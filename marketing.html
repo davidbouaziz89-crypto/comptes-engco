@@ -1091,7 +1091,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v48 · posts de reference';
+const APP_VERSION='v49 · gabarit CALL IA';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -1845,172 +1845,199 @@ function fitText(ctx,text,maxW,startPx,minPx,weight,maxLines){
   }
   return {size,lines};
 }
-// Reprend le langage graphique des visuels CALL IA que David a validés :
-// fond radial profond, halos de couleur, grille technique, surtitre espacé,
-// gros titre, filet de marque, et surtout un LOGO GRAND. Aucune photo générée :
-// tout est dessiné, donc tout est maîtrisé.
+// Gabarit repris à l'identique de `callia-cover.html`, le visuel que David a validé :
+// fond radial 22 %/42 %, deux halos hors cadre, grille de 46 px à 6 %, surtitre en
+// pastille bordée, titre à fort corps dont le dernier mot passe en dégradé,
+// soutien en dégradé bleu clair, pastilles à coche, adresse du site en pied.
 function texteEspace(ctx,txt,x,y,esp){
   let cx=x;
   for(const ch of txt){ ctx.fillText(ch,cx,y); cx+=ctx.measureText(ch).width+esp; }
   return cx-x;
 }
+function largeurEspace(ctx,txt,esp){
+  let w=0; for(const ch of txt) w+=ctx.measureText(ch).width+esp; return w-esp;
+}
 async function renderDesign(postId,companyId,network,spec){
   try{
     if(document.fonts&&document.fonts.load){
-      await document.fonts.load('700 90px "Space Grotesk"');
-      await document.fonts.load('500 40px "Inter"');
+      await document.fonts.load('800 90px "Space Grotesk"');
+      await document.fonts.load('600 40px "Inter"');
     }
     const portrait=network==='instagram';
     const W=portrait?1080:1200, H=portrait?1350:675;
     const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
     const ctx=cv.getContext('2d');
 
+    // Palette dérivée de la couleur de marque, dans les proportions du fichier d'origine.
     const accent=brandColor();
-    const clair=mixHex(accent,'#ffffff',0.42);
+    const vif=mixHex(accent,'#ffffff',0.22);      // le ton clair du dégradé
+    const pale=mixHex(accent,'#ffffff',0.62);     // texte de surtitre
     const nuit='#060B18';
+    const rgba=(hex,a)=>{const c=hex.replace('#','');
+      return `rgba(${parseInt(c.slice(0,2),16)},${parseInt(c.slice(2,4),16)},${parseInt(c.slice(4,6),16)},${a})`;};
 
-    // 1) Fond radial : la lumière vient d'un point, jamais d'un dégradé linéaire plat.
-    const rg=ctx.createRadialGradient(W*0.30,H*0.42,0,W*0.30,H*0.42,Math.max(W,H)*0.92);
-    rg.addColorStop(0,mixHex(accent,nuit,0.80));
-    rg.addColorStop(0.48,mixHex(accent,nuit,0.92));
-    rg.addColorStop(1,nuit);
+    // 1) Fond radial décentré
+    const rg=ctx.createRadialGradient(W*0.22,H*0.42,0,W*0.22,H*0.42,Math.max(W,H)*0.95);
+    rg.addColorStop(0,mixHex(accent,nuit,0.82));
+    rg.addColorStop(0.42,mixHex(accent,nuit,0.93));
+    rg.addColorStop(0.78,nuit); rg.addColorStop(1,nuit);
     ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
 
-    // 2) Deux halos de couleur, hors cadre : ils donnent la profondeur.
+    // 2) Halos
     const halo=(cx,cy,r,coul,alpha)=>{
       const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
-      g.addColorStop(0,coul); g.addColorStop(1,'rgba(0,0,0,0)');
+      g.addColorStop(0,coul); g.addColorStop(0.62,rgba(coul,0)); g.addColorStop(1,rgba(coul,0));
       ctx.save(); ctx.globalAlpha=alpha; ctx.fillStyle=g;
       ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); ctx.restore();
     };
-    halo(-W*0.10,-H*0.16,W*0.62,accent,0.34);
-    halo(W*1.02,H*1.10,W*0.55,clair,0.22);
+    halo(-W*0.09,-H*0.30,W*0.50,accent,0.38);
+    halo(W*1.07,H*1.28,W*0.39,vif,0.22);
 
-    // 3) Grille technique très discrète : la signature « poste de pilotage ».
-    ctx.save(); ctx.globalAlpha=0.055; ctx.strokeStyle=clair; ctx.lineWidth=1;
-    const pas=Math.round(W/32);
+    // 3) Grille technique
+    ctx.save(); ctx.globalAlpha=0.06; ctx.strokeStyle=accent; ctx.lineWidth=1;
+    const pas=Math.round(W*0.038);
     for(let x=0;x<W;x+=pas){ ctx.beginPath(); ctx.moveTo(x+.5,0); ctx.lineTo(x+.5,H); ctx.stroke(); }
     for(let y=0;y<H;y+=pas){ ctx.beginPath(); ctx.moveTo(0,y+.5); ctx.lineTo(W,y+.5); ctx.stroke(); }
     ctx.restore();
 
     const co=COMPANIES.find(c=>c.id===companyId);
-    const m=Math.round(W*0.075);
-    let y=Math.round(H*(portrait?0.10:0.13));
+    const m=Math.round(W*0.072);
+    ctx.textBaseline='top';
+    const maxW=W-m*2;
+    let y=Math.round(H*(portrait?0.085:0.10));
 
-    // 4) Le logo, en grand et en haut : c'est lui qu'on doit voir en premier.
-    // Il faisait auparavant un dixième de la hauteur d'un bandeau — invisible.
+    // 4) Logo, en grand
     if(co&&co.logo_url){
       try{
         const logo=await loadImg(absUrl(co.logo_url));
-        const lh=Math.round(H*(portrait?0.085:0.105));
+        const lh=Math.round(H*(portrait?0.090:0.115));
         const lw=Math.round(lh*(logo.naturalWidth/logo.naturalHeight||2));
-        ctx.save();
-        ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=Math.round(lh*0.35);
-        ctx.drawImage(logo,m,y,Math.min(lw,W-2*m),lh);
+        ctx.save(); ctx.shadowColor='rgba(0,0,0,.55)'; ctx.shadowBlur=Math.round(lh*0.3);
+        ctx.drawImage(logo,m,y,Math.min(lw,maxW),lh);
         ctx.restore();
-        y+=lh+Math.round(H*0.055);
+        y+=lh+Math.round(H*0.05);
       }catch(e){ console.warn('logo illisible',e.message); }
     }
 
-    ctx.textBaseline='top';
-    const maxW=W-m*2;
+    const pied=Math.round(H*0.11);                 // réservé à l'adresse du site
+    const dispo=H-pied-y;
 
-    // On mesure TOUT avant de dessiner. Sans ça, un titre long plus une phrase
-    // de soutien débordaient du cadre : le texte sortait de l'image.
-    const hautDispo=H-Math.round(H*0.14)-y;   // ce qui reste sous le logo, hors pied
-    let ech=1;
-    let plan=null;
-    for(let essai=0;essai<14;essai++){
-      const p={h:0,blocs:[]};
+    // On mesure tout avant de dessiner : sinon le texte sort du cadre.
+    let ech=1, plan=null;
+    const pills=(spec.pills||[]).filter(Boolean).slice(0,3);
+    for(let essai=0;essai<16;essai++){
+      const p={h:0,b:[]};
       if(spec.kicker){
-        const t=Math.round(W*0.0225*ech);
-        p.blocs.push({type:'kicker',taille:t,h:Math.round(t*2.4)});
-        p.h+=Math.round(t*2.4);
+        const t=Math.round(W*0.0175*ech);
+        const hp=Math.round(t*2.5);
+        p.b.push({t:'kicker',taille:t,h:hp+Math.round(t*1.3)}); p.h+=hp+Math.round(t*1.3);
       }
       if(spec.layout==='stat'&&spec.stat){
-        const st=fitText(ctx,String(spec.stat),maxW,Math.round(W*0.24*ech),Math.round(W*0.10*ech),'700',1);
-        p.blocs.push({type:'stat',taille:st.size,lignes:st.lines,h:Math.round(st.size*1.04)});
-        p.h+=Math.round(st.size*1.04);
+        const st=fitText(ctx,String(spec.stat),maxW,Math.round(W*0.22*ech),Math.round(W*0.10*ech),'800',1);
+        p.b.push({t:'stat',taille:st.size,l:st.lines,h:Math.round(st.size*1.06)}); p.h+=Math.round(st.size*1.06);
         if(spec.stat_label){
-          const t=Math.round(W*0.030*ech);
-          p.blocs.push({type:'statlabel',taille:t,h:Math.round(W*0.055*ech)});
-          p.h+=Math.round(W*0.055*ech);
+          const t=Math.round(W*0.028*ech);
+          p.b.push({t:'statlabel',taille:t,h:Math.round(t*2.1)}); p.h+=Math.round(t*2.1);
         }
       }
-      const hl=fitText(ctx,spec.headline,maxW,Math.round(W*(portrait?0.098:0.082)*ech),Math.round(W*0.038*ech),'700',3);
-      const lh2=Math.round(hl.size*1.1);
-      p.blocs.push({type:'titre',taille:hl.size,lignes:hl.lines,lh:lh2,h:hl.lines.length*lh2+Math.round(W*0.030)});
-      p.h+=hl.lines.length*lh2+Math.round(W*0.030);
-      p.blocs.push({type:'filet',h:Math.round(W*0.036)});
-      p.h+=Math.round(W*0.036);
+      const hl=fitText(ctx,spec.headline,maxW,Math.round(W*(portrait?0.100:0.086)*ech),Math.round(W*0.040*ech),'800',3);
+      const lh=Math.round(hl.size*0.99);
+      p.b.push({t:'titre',taille:hl.size,l:hl.lines,lh,h:hl.lines.length*lh+Math.round(W*0.022)});
+      p.h+=hl.lines.length*lh+Math.round(W*0.022);
       if(spec.subline){
-        const sub=fitText(ctx,spec.subline,Math.round(maxW*0.90),Math.round(W*0.034*ech),Math.round(W*0.021*ech),'500',3);
-        const slh=Math.round(sub.size*1.45);
-        p.blocs.push({type:'sous',taille:sub.size,lignes:sub.lines,lh:slh,h:sub.lines.length*slh});
-        p.h+=sub.lines.length*slh;
+        const sub=fitText(ctx,spec.subline,Math.round(maxW*0.92),Math.round(W*0.036*ech),Math.round(W*0.022*ech),'600',3);
+        const slh=Math.round(sub.size*1.34);
+        p.b.push({t:'sous',taille:sub.size,l:sub.lines,lh:slh,h:sub.lines.length*slh+Math.round(W*0.020)});
+        p.h+=sub.lines.length*slh+Math.round(W*0.020);
+      }
+      if(pills.length){
+        const t=Math.round(W*0.0195*ech);
+        p.b.push({t:'pills',taille:t,h:Math.round(t*3.1)}); p.h+=Math.round(t*3.1);
       }
       plan=p;
-      if(p.h<=hautDispo) break;
-      ech*=0.92;
+      if(p.h<=dispo) break;
+      ech*=0.93;
     }
 
-    for(const b of plan.blocs){
-      if(b.type==='kicker'){
+    for(const b of plan.b){
+      if(b.t==='kicker'){
+        // Pastille bordée, texte espacé : la signature du gabarit d'origine.
         ctx.font=`700 ${b.taille}px "Space Grotesk",sans-serif`;
-        ctx.fillStyle=clair;
-        texteEspace(ctx,String(spec.kicker).toUpperCase(),m,y,W*0.0055);
+        const esp=b.taille*0.16, txt=String(spec.kicker).toUpperCase();
+        const lw=largeurEspace(ctx,txt,esp);
+        const padX=Math.round(b.taille*1.15), hp=Math.round(b.taille*2.5);
+        ctx.strokeStyle=rgba(accent,0.55); ctx.lineWidth=Math.max(1.5,W*0.0013);
+        ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(m,y,lw+padX*2,hp,hp/2); else ctx.rect(m,y,lw+padX*2,hp);
+        ctx.stroke();
+        ctx.fillStyle=pale;
+        texteEspace(ctx,txt,m+padX,y+Math.round((hp-b.taille)/2)-Math.round(b.taille*0.08),esp);
       }
-      else if(b.type==='stat'){
-        ctx.font=`700 ${b.taille}px "Space Grotesk",sans-serif`;
-        const gs=ctx.createLinearGradient(m,y,m+maxW*0.6,y);
-        gs.addColorStop(0,'#ffffff'); gs.addColorStop(1,clair);
-        ctx.fillStyle=gs;
-        ctx.fillText(b.lignes[0],m,y);
+      else if(b.t==='stat'){
+        ctx.font=`800 ${b.taille}px "Space Grotesk",sans-serif`;
+        const g=ctx.createLinearGradient(m,0,m+maxW*0.55,0);
+        g.addColorStop(0,accent); g.addColorStop(1,vif);
+        ctx.fillStyle=g; ctx.fillText(b.l[0],m,y);
       }
-      else if(b.type==='statlabel'){
+      else if(b.t==='statlabel'){
         ctx.font=`600 ${b.taille}px "Inter",sans-serif`;
         ctx.fillStyle='rgba(255,255,255,.72)';
         ctx.fillText(String(spec.stat_label),m,y);
       }
-      else if(b.type==='titre'){
-        ctx.font=`700 ${b.taille}px "Space Grotesk",sans-serif`;
-        b.lignes.forEach((ligne,i)=>{
-          const derniere=i===b.lignes.length-1;
+      else if(b.t==='titre'){
+        ctx.font=`800 ${b.taille}px "Space Grotesk",sans-serif`;
+        b.l.forEach((ligne,i)=>{
           const mots=ligne.split(' ');
+          const derniere=i===b.l.length-1;
           if(derniere&&mots.length>1){
             const fin=mots.pop(), debut=mots.join(' ')+' ';
-            ctx.fillStyle='#ffffff';
-            ctx.fillText(debut,m,y+i*b.lh);
+            ctx.fillStyle='#ffffff'; ctx.fillText(debut,m,y+i*b.lh);
             const lx=m+ctx.measureText(debut).width;
-            const gg=ctx.createLinearGradient(lx,0,lx+ctx.measureText(fin).width,0);
-            gg.addColorStop(0,accent); gg.addColorStop(1,clair);
-            ctx.fillStyle=gg;
-            ctx.fillText(fin,lx,y+i*b.lh);
-          } else {
-            ctx.fillStyle='#ffffff';
-            ctx.fillText(ligne,m,y+i*b.lh);
-          }
+            const g=ctx.createLinearGradient(lx,0,lx+ctx.measureText(fin).width,0);
+            g.addColorStop(0,accent); g.addColorStop(1,vif);
+            ctx.fillStyle=g; ctx.fillText(fin,lx,y+i*b.lh);
+          } else { ctx.fillStyle='#ffffff'; ctx.fillText(ligne,m,y+i*b.lh); }
         });
       }
-      else if(b.type==='filet'){
-        ctx.fillStyle=accent;
-        ctx.fillRect(m,y,Math.round(W*0.085),Math.max(4,Math.round(W*0.0055)));
+      else if(b.t==='sous'){
+        // En dégradé bleu clair, comme le `.sub` du fichier d'origine.
+        ctx.font=`600 ${b.taille}px "Inter",sans-serif`;
+        const g=ctx.createLinearGradient(m,0,m+maxW,0);
+        g.addColorStop(0,mixHex(accent,'#ffffff',0.45)); g.addColorStop(1,vif);
+        ctx.fillStyle=g;
+        b.l.forEach((l,i)=>ctx.fillText(l,m,y+i*b.lh));
       }
-      else if(b.type==='sous'){
-        ctx.font=`500 ${b.taille}px "Inter",sans-serif`;
-        ctx.fillStyle='rgba(255,255,255,.80)';
-        b.lignes.forEach((l,i)=>ctx.fillText(l,m,y+i*b.lh));
+      else if(b.t==='pills'){
+        ctx.font=`600 ${b.taille}px "Inter",sans-serif`;
+        let px=m;
+        const hp=Math.round(b.taille*2.3), padX=Math.round(b.taille*1.0), gap=Math.round(b.taille*0.75);
+        for(const t of pills){
+          const txt='✔ '+t;
+          const w=ctx.measureText(txt).width+padX*2;
+          if(px+w>W-m) break;
+          ctx.fillStyle=rgba(accent,0.14);
+          ctx.strokeStyle=rgba(accent,0.34); ctx.lineWidth=Math.max(1,W*0.001);
+          ctx.beginPath();
+          if(ctx.roundRect) ctx.roundRect(px,y,w,hp,hp/2); else ctx.rect(px,y,w,hp);
+          ctx.fill(); ctx.stroke();
+          ctx.fillStyle=mixHex(accent,'#ffffff',0.78);
+          ctx.fillText(txt,px+padX,y+Math.round((hp-b.taille)/2)-Math.round(b.taille*0.06));
+          px+=w+gap;
+        }
       }
       y+=b.h;
     }
 
-    // 9) Signature en pied : le nom de la société et un filet de couleur.
-    // Aucun bandeau blanc : il coupait l'image en deux.
-    ctx.font=`600 ${Math.round(W*0.021)}px "Inter",sans-serif`;
-    ctx.fillStyle='rgba(255,255,255,.55)';
-    ctx.fillText(co?co.name.toUpperCase():'',m,H-m*0.62);
+    // 5) Pied : adresse du site à droite, filet de marque en bas.
+    if(co&&co.website){
+      const t=Math.round(W*0.020);
+      ctx.font=`700 ${t}px "Inter",sans-serif`;
+      ctx.fillStyle=mixHex(accent,'#ffffff',0.66);
+      const site=String(co.website).replace(/^https?:\/\//,'').replace(/\/$/,'');
+      ctx.fillText(site,W-m-ctx.measureText(site).width,H-Math.round(H*0.062));
+    }
     ctx.fillStyle=accent;
-    ctx.fillRect(0,H-Math.max(5,Math.round(H*0.009)),W,Math.max(5,Math.round(H*0.009)));
+    ctx.fillRect(0,H-Math.max(5,Math.round(H*0.008)),W,Math.max(5,Math.round(H*0.008)));
 
     const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
     if(!blob) return null;
