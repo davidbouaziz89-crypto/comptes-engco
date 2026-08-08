@@ -75,6 +75,8 @@
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:600}
   .btn.ghost:hover{color:var(--txt);border-color:var(--accent)}
   .btn.small{padding:5px 10px;font-size:13px}
+  /* Un libellé ne doit jamais se couper en deux ni pousser le bouton hors cadre. */
+  .btn{white-space:nowrap;max-width:100%}
   .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(1200px 600px at 50% -10%,rgba(124,92,255,.15),transparent),var(--bg);z-index:50}
   .authcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:30px 28px;width:100%;max-width:400px}
   .authcard h1{margin:0 0 4px;font-size:22px}
@@ -790,8 +792,10 @@
       <!-- Génération + posts -->
       <div class="panel companyPanel">
         <div class="row" style="align-items:center">
-          <h2 style="margin:0">🗓️ Posts de la semaine</h2>
-          <div style="flex:0 0 auto;display:flex;gap:8px;flex-wrap:wrap">
+          <h2 style="margin:0;flex:0 0 auto">🗓️ Posts de la semaine</h2>
+          <!-- Le groupe doit pouvoir rétrécir ET passer à la ligne : figé à
+               flex:0 0 auto, les derniers boutons sortaient du panneau. -->
+          <div style="flex:1 1 auto;min-width:0;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
             <button class="btn ghost" id="newPostBtn">✍️ Nouveau post</button>
             <button class="btn ghost" id="designBtn">🖌️ Visuels designés</button>
             <button class="btn ghost" id="redoBtn">↻ Tout refaire (photo)</button>
@@ -1056,7 +1060,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v45 · texte cadre + vider';
+const APP_VERSION='v46 · boutons dans le cadre';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
