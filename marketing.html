@@ -1091,7 +1091,7 @@ const SUPABASE_URL="https://lrslisyydbiejqzpsoxc.supabase.co";
 const SUPABASE_KEY="sb_publishable_4mNr4f4_4yKGcJeBOLD1QQ_0CXSyuJP";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=(id)=>document.getElementById(id);
-const APP_VERSION='v49 · gabarit CALL IA';
+const APP_VERSION='v50 · progression reelle';
 let SESSION=null, COMPANIES=[], CURRENT_COMPANY=null, EDITORIAL=null, EDIT_MODE=false, MODAL_EDIT_ID=null;
 let POSTS=[], IMG_RUNNING=false;
 let TEAM={}, CHATS=[], CHAT_ID=null, CHAT_MSGS=[], CHAT_PARTS=['orchestrateur'], UPLOADED_LOGO=null;
@@ -2153,21 +2153,48 @@ function imgZone(p){
 // Avancement d'un traitement long, affiché en haut de page. Sans ça, David
 // changeait d'onglet en croyant que rien ne se passait — ce qui interrompt le
 // travail, puisqu'il s'exécute dans le navigateur.
-function progOuvre(txt,ico){
-  el('progIco').textContent=ico||'🎨';
-  el('progTxt').textContent=txt;
-  el('progPc').textContent='0 %';
-  el('progBar').style.width='0%';
-  el('prog').classList.remove('hidden');
+let PROG={t0:0,tick:0,base:'',duree:0};
+function duree(s){
+  s=Math.max(0,Math.round(s));
+  if(s<60) return s+' s';
+  const m=Math.floor(s/60);
+  return m+' min'+(s%60?' '+(s%60)+' s':'');
 }
+function progAffiche(pc,reste){
+  el('progPc').textContent=Math.round(pc)+' %';
+  el('progBar').style.width=Math.min(100,pc)+'%';
+  el('progTxt').textContent=PROG.base+(reste!=null&&reste>1?` — encore ${duree(reste)}`:'');
+}
+// `dureeEstimee` sert quand le serveur ne peut rien nous dire de son avancement
+// (la rédaction est un seul appel) : la barre progresse alors sur le temps écoulé,
+// sans jamais atteindre 100 % avant la vraie fin.
+function progOuvre(txt,ico,dureeEstimee){
+  clearInterval(PROG.tick);
+  PROG={t0:Date.now(),tick:0,base:txt,duree:dureeEstimee||0};
+  el('progIco').textContent=ico||'🎨';
+  el('prog').classList.remove('hidden');
+  progAffiche(0,dureeEstimee||null);
+  if(dureeEstimee){
+    PROG.tick=setInterval(()=>{
+      const ecoule=(Date.now()-PROG.t0)/1000;
+      const pc=Math.min(93,ecoule/PROG.duree*100);
+      progAffiche(pc,Math.max(0,PROG.duree-ecoule));
+    },500);
+  }
+}
+// Avancement réel : le temps restant se déduit de la durée moyenne déjà observée,
+// ce qui vaut mieux qu'une estimation écrite en dur.
 function progMaj(fait,total,txt){
-  const pc=total?Math.round(fait/total*100):0;
-  el('progPc').textContent=pc+' %';
-  el('progBar').style.width=pc+'%';
-  if(txt) el('progTxt').textContent=txt;
+  clearInterval(PROG.tick); PROG.tick=0;
+  if(txt) PROG.base=txt;
+  const pc=total?fait/total*100:0;
+  const ecoule=(Date.now()-PROG.t0)/1000;
+  const reste=fait>0?(ecoule/fait)*(total-fait):null;
+  progAffiche(pc,reste);
 }
 function progFerme(txt){
-  if(txt){ el('progTxt').textContent=txt; el('progPc').textContent='100 %'; el('progBar').style.width='100%'; }
+  clearInterval(PROG.tick); PROG.tick=0;
+  if(txt){ PROG.base=txt; progAffiche(100,null); }
   setTimeout(()=>el('prog').classList.add('hidden'),txt?2500:0);
 }
 // Empêche une fermeture d'onglet accidentelle pendant un traitement.
@@ -2179,7 +2206,9 @@ async function runImageQueue(ids,mode,instruction){
   if(!ids.length || IMG_RUNNING) return;
   IMG_RUNNING=true; el('imagesBtn').disabled=true; el('generateBtn').disabled=true;
   const quoi=mode==='design'?'Visuels designés':mode==='retouche'?'Retouche du visuel':'Création des visuels';
-  progOuvre(`${quoi} — 0 / ${ids.length}`,'🎨');
+  // Ordre de grandeur au démarrage ; dès le premier visuel terminé, l'estimation
+  // s'appuie sur la durée réellement mesurée.
+  progOuvre(`${quoi} — 0 / ${ids.length}`,'🎨',ids.length*(mode==='design'?12:38));
   let ok=0, ko=0;
   for(let i=0;i<ids.length;i++){
     setAgent('designer', ids.length>1?`🎨 Visuel ${i+1}/${ids.length}`:'🎨 Création du visuel','busy');
@@ -2435,8 +2464,7 @@ async function generateWeek(){
   el('genMsg').textContent='⏳ Les agents travaillent… (10–30 s)';
   el('generateBtn').disabled=true;
   // Écriture puis relecture : deux passes, d'où l'attente. On l'annonce.
-  progOuvre('Rédaction de la semaine, puis relecture par le rédacteur en chef…','✍️');
-  progMaj(1,3);
+  progOuvre('Rédaction de la semaine, puis relecture par le rédacteur en chef','✍️',95);
   setAgent('orchestrateur','🧠 Planifie la semaine…','busy');
   setAgent('redacteur','✍️ Écrit les posts…','busy');
   let newIds=[];
